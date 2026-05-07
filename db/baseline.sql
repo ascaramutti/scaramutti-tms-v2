@@ -274,6 +274,8 @@ COMMENT ON TABLE cotizaciones.system_settings IS
 CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
     id                     BIGSERIAL PRIMARY KEY,
     code                   VARCHAR(15) NOT NULL UNIQUE,
+    quotation_type         VARCHAR(20) NOT NULL DEFAULT 'TRANSPORTE',
+    status                 VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
     client_id              INTEGER NOT NULL REFERENCES public.clients(id),
     contact_name           VARCHAR(200),
     currency_id            INTEGER NOT NULL REFERENCES public.currencies(id),
@@ -283,21 +285,31 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
     origin                 VARCHAR(255),
     destination            VARCHAR(255),
     created_by             INTEGER NOT NULL REFERENCES public.users(id),
+    updated_by             INTEGER NOT NULL REFERENCES public.users(id),
     created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT chk_quotations_type   CHECK (quotation_type IN ('TRANSPORTE','ALQUILER')),
+    CONSTRAINT chk_quotations_status CHECK (status IN ('DRAFT','SENT')),
+    CONSTRAINT chk_quotations_validity_days CHECK (validity_days > 0 AND validity_days <= 365)
 );
 
-COMMENT ON TABLE  cotizaciones.quotations          IS 'Cabecera de cotización emitida al cliente';
-COMMENT ON COLUMN cotizaciones.quotations.contact_name IS 'Snapshot del contacto al momento de cotizar (no se reactualiza si el cliente cambia)';
+COMMENT ON TABLE  cotizaciones.quotations               IS 'Cabecera de cotización emitida al cliente';
+COMMENT ON COLUMN cotizaciones.quotations.quotation_type IS 'TRANSPORTE (con origen/destino) | ALQUILER (sin ruta, por días/unidades)';
+COMMENT ON COLUMN cotizaciones.quotations.status        IS 'DRAFT (borrador interno) | SENT (enviada al cliente). Estado vencido se calcula desde created_at + validity_days';
+COMMENT ON COLUMN cotizaciones.quotations.contact_name  IS 'Snapshot del contacto al momento de cotizar (no se reactualiza si el cliente cambia)';
 COMMENT ON COLUMN cotizaciones.quotations.validity_days IS 'Días de validez de la cotización desde la fecha de creación';
 
 CREATE INDEX IF NOT EXISTS idx_quotations_client     ON cotizaciones.quotations(client_id);
 CREATE INDEX IF NOT EXISTS idx_quotations_code       ON cotizaciones.quotations(code);
 CREATE INDEX IF NOT EXISTS idx_quotations_created_at ON cotizaciones.quotations(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_quotations_status     ON cotizaciones.quotations(status);
+CREATE INDEX IF NOT EXISTS idx_quotations_type       ON cotizaciones.quotations(quotation_type);
+CREATE INDEX IF NOT EXISTS idx_quotations_created_by ON cotizaciones.quotations(created_by);
 
 CREATE TABLE IF NOT EXISTS cotizaciones.quotation_items (
     id                        BIGSERIAL PRIMARY KEY,
     quotation_id              BIGINT NOT NULL REFERENCES cotizaciones.quotations(id) ON DELETE CASCADE,
+    parent_item_id            BIGINT REFERENCES cotizaciones.quotation_items(id) ON DELETE CASCADE,
     item_number               INTEGER NOT NULL,
     quotation_service_type_id INTEGER REFERENCES cotizaciones.quotation_service_types(id),
     cargo_type_id             INTEGER REFERENCES public.cargo_types(id),
@@ -309,16 +321,29 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotation_items (
     quantity                  INTEGER NOT NULL DEFAULT 1,
     unit_price                NUMERIC(12,2) NOT NULL DEFAULT 0,
     igv_percentage            NUMERIC(5,2) NOT NULL DEFAULT 18.00,
+    insured_amount            NUMERIC(14,2),
+    internal_reference_price  NUMERIC(12,2),
     created_at                TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    UNIQUE (quotation_id, item_number)
+    UNIQUE (quotation_id, item_number),
+    CONSTRAINT chk_items_quantity   CHECK (quantity > 0),
+    CONSTRAINT chk_items_unit_price CHECK (unit_price >= 0),
+    CONSTRAINT chk_items_igv        CHECK (igv_percentage >= 0 AND igv_percentage <= 100),
+    CONSTRAINT chk_items_no_self_parent CHECK (parent_item_id IS NULL OR parent_item_id <> id)
 );
 
 COMMENT ON TABLE  cotizaciones.quotation_items IS
-    'Entidad débil dependiente de quotations (CASCADE garantiza integridad existencial)';
+    'Entidad débil dependiente de quotations (CASCADE garantiza integridad existencial). Soporta jerarquía padre-hijos vía parent_item_id para Servicio Integral.';
+COMMENT ON COLUMN cotizaciones.quotation_items.parent_item_id IS
+    'Self-reference para Servicio Integral: ítems hijos referencian al ítem padre que tiene el precio total. NULL para ítems independientes.';
 COMMENT ON COLUMN cotizaciones.quotation_items.weight_kg IS
     'Snapshot del peso desde cargo_type (puede sobreescribirse manualmente)';
+COMMENT ON COLUMN cotizaciones.quotation_items.insured_amount IS
+    'Valor asegurado de la carga (solo aplica a ítems de tipo Seguro de Carga)';
+COMMENT ON COLUMN cotizaciones.quotation_items.internal_reference_price IS
+    'Precio interno de referencia para ítems hijos del Servicio Integral. NO se muestra en el PDF al cliente.';
 
 CREATE INDEX IF NOT EXISTS idx_quotation_items_quotation ON cotizaciones.quotation_items(quotation_id);
+CREATE INDEX IF NOT EXISTS idx_quotation_items_parent    ON cotizaciones.quotation_items(parent_item_id);
 
 CREATE TABLE IF NOT EXISTS cotizaciones.quotation_standby_costs (
     id                BIGSERIAL PRIMARY KEY,
