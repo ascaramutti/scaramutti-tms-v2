@@ -1,0 +1,18 @@
+# Maven build output
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Quarkus
+.quarkus/
+*.log
+
+# OS
+.DS_Store

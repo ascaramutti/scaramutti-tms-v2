@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: scaramutti-tms-db-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: scaramutti_user
+      POSTGRES_PASSWORD: dev_local_only
+      POSTGRES_DB: scaramutti_tms_dev
+    ports:
+      - "5432:5432"
+    volumes:
+      - tms_dev_data:/var/lib/postgresql/data
+      - ./db/baseline.sql:/docker-entrypoint-initdb.d/01-baseline.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U scaramutti_user -d scaramutti_tms_dev"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  tms_dev_data:
