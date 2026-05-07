@@ -1,0 +1,16 @@
+# Documentación interna (no se publica al remoto)
+docs/
+
+# macOS
+.DS_Store
+
+# Editores
+.idea/
+.vscode/
+*.swp
+*~
+
+# Logs y artefactos locales
+*.log
+*.dump
+*.sql.gz
