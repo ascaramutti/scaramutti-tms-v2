@@ -26,7 +26,7 @@ info:
 
     ## Roles
 
-    Cuatro roles del sistema: `ADMINISTRADOR`, `VENDEDOR`, `GERENTE_GENERAL`, `JEFE_OPERACIONES`.
+    Cinco roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`.
 
 servers:
   - url: http://localhost:8080/api/v1
@@ -336,7 +336,7 @@ components:
     # -------- Enums ---------------------------------------------------------
     UserRole:
       type: string
-      enum: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      enum: [admin, sales, dispatcher, general_manager, operations_manager]
 
     # -------- Auth ----------------------------------------------------------
     LoginRequest:

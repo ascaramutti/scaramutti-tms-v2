@@ -9,13 +9,13 @@ public record UserResponse(
     @Schema(description = "Username (unico)", example = "lcampos")
     String username,
 
-    @Schema(description = "Nombre completo (snapshot del Worker)", example = "Luraidis Campos")
+    @Schema(description = "Nombre completo (snapshot del Worker)", example = "Carolina Campos")
     String fullName,
 
     @Schema(description = "Cargo (Worker.position)", example = "Ejecutiva de Ventas")
     String position,
 
-    @Schema(description = "Rol del sistema", example = "VENDEDOR")
+    @Schema(description = "Rol del sistema", example = "sales")
     String role,
 
     @Schema(description = "Indica si el usuario esta activo", example = "true")
