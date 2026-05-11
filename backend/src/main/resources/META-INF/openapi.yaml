@@ -1,0 +1,402 @@
+openapi: 3.1.0
+
+info:
+  title: Scaramutti TMS API
+  version: 1.0.0
+  contact:
+    name: Equipo Scaramutti TMS
+    email: ascaramutti@hotmail.com
+  description: |
+    API del sistema de gestión Scaramutti TMS. Esta es la especificación
+    **runtime** que refleja lo efectivamente implementado en el backend.
+    El contrato completo de diseño (incluye módulos aún no implementados)
+    vive en `api/openapi.yaml` en la raíz del repo.
+
+    ## Convenciones generales
+
+    - **Versionado**: en URL `/api/v1/...`. Cambios breaking suben mayor (`v2`).
+    - **Autenticación**: JWT en header `Authorization: Bearer <token>`. Todos los
+      endpoints requieren auth excepto los marcados con `security: []`
+      (`/auth/login`, `/auth/refresh`).
+    - **Errores**: formato Problem Details (RFC 7807). Incluyen `traceId` para
+      correlacionar con logs. Errores de validación incluyen array `errors` por campo.
+    - **Idioma**: español (es-PE). Las respuestas no son multi-idioma.
+    - **Timezone**: todos los timestamps en UTC, formato ISO 8601 con offset `Z`.
+    - **Naming**: snake_case en BD, camelCase en JSON.
+
+    ## Roles
+
+    Cuatro roles del sistema: `ADMINISTRADOR`, `VENDEDOR`, `GERENTE_GENERAL`, `JEFE_OPERACIONES`.
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local (dev). El URL real se inyecta en cada cliente vía variable de entorno.
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Autenticación y gestión de sesión
+
+# =============================================================================
+paths:
+# =============================================================================
+
+  # ----- Auth ----------------------------------------------------------------
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Iniciar sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example:
+              username: lcampos
+              password: 'P@ssw0rd123'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400':
+          description: Solicitud inválida (campos faltantes o mal formados)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                loginValidation:
+                  summary: Credenciales mal formadas
+                  value:
+                    type: 'urn:tms:error:com-001'
+                    title: 'Validation failed'
+                    status: 400
+                    detail: 'La solicitud contiene errores de validación'
+                    instance: '/api/v1/auth/login'
+                    code: 'COM-001'
+                    traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+                    errors:
+                      - field: 'username'
+                        message: 'no debe estar vacío'
+                        code: 'REQUIRED'
+                      - field: 'password'
+                        message: 'debe tener al menos 8 caracteres'
+                        code: 'MIN_LENGTH'
+        '401':
+          description: Credenciales inválidas o usuario inactivo
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                invalidCredentials:
+                  summary: Usuario o contraseña incorrectos
+                  value:
+                    type: 'urn:tms:error:auth-001'
+                    title: 'Invalid credentials'
+                    status: 401
+                    detail: 'Usuario o contraseña incorrectos'
+                    instance: '/api/v1/auth/login'
+                    code: 'AUTH-001'
+                    traceId: '3a8b1c5d-7e2f-4a9b-8c3d-6e1f4a5b7c2d'
+                userInactive:
+                  summary: Usuario desactivado
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/login'
+                    code: 'AUTH-002'
+                    traceId: '4b9c2d6e-8f3a-4b1c-9d4e-7f2a5b8c1d3e'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Renovar token de acceso
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Token renovado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401':
+          description: Refresh token inválido o expirado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                refreshTokenExpired:
+                  summary: Refresh token expirado (requiere re-login)
+                  value:
+                    type: 'urn:tms:error:auth-009'
+                    title: 'Refresh token expired'
+                    status: 401
+                    detail: 'El refresh token expiró. Volver a hacer login.'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-009'
+                    traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
+                refreshTokenInvalid:
+                  summary: Refresh token mal formado o ya revocado
+                  value:
+                    type: 'urn:tms:error:auth-003'
+                    title: 'Invalid refresh token'
+                    status: 401
+                    detail: 'Refresh token inválido o revocado'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-003'
+                    traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+                userInactiveOnRefresh:
+                  summary: El usuario quedó inactivo desde el último login
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-002'
+                    traceId: '6d2b3c4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e'
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Cambiar contraseña del usuario actual
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204':
+          description: Contraseña actualizada
+        '400':
+          description: Validación de contraseña fallida o contraseña actual incorrecta
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                passwordValidation:
+                  summary: La nueva contraseña no cumple los requisitos
+                  value:
+                    type: 'urn:tms:error:com-001'
+                    title: 'Validation failed'
+                    status: 400
+                    detail: 'La solicitud contiene errores de validación'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'COM-001'
+                    traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
+                    errors:
+                      - field: 'newPassword'
+                        message: 'debe tener al menos 8 caracteres'
+                        code: 'MIN_LENGTH'
+                wrongCurrentPassword:
+                  summary: La contraseña actual es incorrecta
+                  value:
+                    type: 'urn:tms:error:auth-004'
+                    title: 'Wrong current password'
+                    status: 400
+                    detail: 'La contraseña actual proporcionada es incorrecta'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-004'
+                    traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentUser
+      summary: Obtener datos del usuario autenticado
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: El usuario del token ya no existe
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                userNotFound:
+                  summary: El usuario referenciado por el token fue eliminado
+                  value:
+                    type: 'urn:tms:error:auth-005'
+                    title: 'User not found'
+                    status: 404
+                    detail: 'Usuario no encontrado'
+                    instance: '/api/v1/auth/me'
+                    code: 'AUTH-005'
+                    traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+
+# =============================================================================
+components:
+# =============================================================================
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT firmado con RS256. Claims esperados:
+        `sub` (userId), `username`, `role`, `fullName`, `position`, `type`, `iat`, `exp`.
+
+  responses:
+    Unauthorized:
+      description: Token de acceso ausente, expirado o inválido
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            tokenMissing:
+              summary: No se envió header Authorization
+              value:
+                type: 'urn:tms:error:auth-006'
+                title: 'Token missing'
+                status: 401
+                detail: 'Falta el header Authorization con un token Bearer'
+                instance: '/api/v1/auth/me'
+                code: 'AUTH-006'
+                traceId: '4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d'
+            tokenExpired:
+              summary: Token de acceso expirado
+              value:
+                type: 'urn:tms:error:auth-007'
+                title: 'Token expired'
+                status: 401
+                detail: 'El token de acceso expiró. Use /auth/refresh para renovarlo.'
+                instance: '/api/v1/auth/me'
+                code: 'AUTH-007'
+                traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
+            tokenInvalid:
+              summary: Token mal formado o no firmado por este servidor
+              value:
+                type: 'urn:tms:error:auth-008'
+                title: 'Token invalid'
+                status: 401
+                detail: 'El token de acceso es inválido o está mal formado'
+                instance: '/api/v1/auth/me'
+                code: 'AUTH-008'
+                traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+
+  schemas:
+
+    # -------- Errores RFC 7807 ---------------------------------------------
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI que identifica el tipo de error (ver catálogo de errores)
+          example: 'urn:tms:error:auth-001'
+        title:    { type: string, example: 'Invalid credentials' }
+        status:   { type: integer, example: 401 }
+        detail:
+          type: [string, 'null']
+          example: 'Usuario o contraseña incorrectos'
+        instance:
+          type: [string, 'null']
+          example: '/api/v1/auth/login'
+        code:
+          type: [string, 'null']
+          description: Código corto del error para que el frontend pueda matchear sin parsear `detail`.
+          example: 'AUTH-001'
+        traceId:
+          type: [string, 'null']
+          description: Identificador de la traza para correlacionar con logs.
+          example: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+        errors:
+          description: Errores de validación por campo (presente solo cuando aplica).
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:   { type: string, example: 'username' }
+              message: { type: string, example: 'no debe estar vacío' }
+              code:    { type: [string, 'null'], example: 'REQUIRED' }
+
+    # -------- Enums ---------------------------------------------------------
+    UserRole:
+      type: string
+      enum: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+
+    # -------- Auth ----------------------------------------------------------
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9._-]+$'
+          example: 'lcampos'
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+
+    LoginResponse:
+      type: object
+      required: [token, expiresAt, expiresIn, user]
+      properties:
+        token:        { type: string, description: 'JWT de acceso' }
+        refreshToken: { type: [string, 'null'], description: 'Token para renovar la sesión sin re-login' }
+        expiresAt:    { type: string, format: date-time }
+        expiresIn:    { type: integer, format: int64, description: 'Segundos hasta expiración del access token', example: 3600 }
+        user:         { $ref: '#/components/schemas/UserResponse' }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 200
+          maxLength: 4096
+          description: 'JWT firmado emitido previamente por /auth/login o /auth/refresh.'
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, format: password, minLength: 8, maxLength: 100 }
+        newPassword:     { type: string, format: password, minLength: 8, maxLength: 100 }
+
+    UserRef:
+      description: Referencia mínima a un usuario (para embeber en respuestas)
+      type: object
+      required: [id, username, fullName]
+      properties:
+        id:       { type: integer, format: int32 }
+        username: { type: string, example: 'lcampos' }
+        fullName: { type: string, example: 'Luraidis Campos' }
+        position: { type: [string, 'null'], description: 'Cargo del trabajador (ej: Ejecutiva de Ventas)', example: 'Ejecutiva de Ventas' }
+
+    UserResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserRef'
+        - type: object
+          required: [role, isActive]
+          properties:
+            role:     { $ref: '#/components/schemas/UserRole' }
+            isActive: { type: boolean }

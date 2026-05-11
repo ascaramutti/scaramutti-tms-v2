@@ -52,10 +52,19 @@ mvn quarkus:dev
 Levanta Quarkus en modo desarrollo (hot reload) en `http://localhost:8080`.
 
 Endpoints útiles para verificar:
-- `http://localhost:8080/api/v1/hello` — smoke test
 - `http://localhost:8080/api/v1/q/health` — estado del servicio + conexión a BD
 - `http://localhost:8080/swagger` — Swagger UI
-- `http://localhost:8080/openapi` — esquema OpenAPI generado
+- `http://localhost:8080/openapi` — spec OpenAPI runtime (módulos implementados)
+
+Usuarios seed disponibles en perfil `dev` (creados por `DevDataSeeder`):
+
+| Username | Password | Rol | Estado |
+|---|---|---|---|
+| `admin` | `Admin1234` | `ADMINISTRADOR` | activo |
+| `lcampos` | `Vendedor1234` | `VENDEDOR` | activo |
+| `inactivo` | `Inactivo1234` | `VENDEDOR` | inactivo (para probar AUTH-002) |
+
+Para probar autenticación: `POST /api/v1/auth/login` con `{ "username": "admin", "password": "Admin1234" }`. Usar el `token` devuelto como `Authorization: Bearer <token>` en endpoints protegidos.
 
 ### 3. Frontend
 

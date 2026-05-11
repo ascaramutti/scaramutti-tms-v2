@@ -97,12 +97,12 @@ paths:
                 loginValidation:
                   summary: Credenciales mal formadas
                   value:
-                    type: 'https://errors.scaramutti-tms.com/validation-failed'
+                    type: 'urn:tms:error:com-001'
                     title: 'Validation failed'
                     status: 400
                     detail: 'La solicitud contiene errores de validación'
                     instance: '/api/v1/auth/login'
-                    code: 'VALIDATION_FAILED'
+                    code: 'COM-001'
                     traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
                     errors:
                       - field: 'username'
@@ -120,12 +120,12 @@ paths:
                 invalidCredentials:
                   summary: Usuario o contraseña incorrectos
                   value:
-                    type: 'https://errors.scaramutti-tms.com/invalid-credentials'
+                    type: 'urn:tms:error:auth-001'
                     title: 'Invalid credentials'
                     status: 401
                     detail: 'Usuario o contraseña incorrectos'
                     instance: '/api/v1/auth/login'
-                    code: 'INVALID_CREDENTIALS'
+                    code: 'AUTH-001'
                     traceId: '3a8b1c5d-7e2f-4a9b-8c3d-6e1f4a5b7c2d'
 
   /auth/refresh:
@@ -153,32 +153,23 @@ paths:
                 refreshTokenExpired:
                   summary: Refresh token expirado (requiere re-login)
                   value:
-                    type: 'https://errors.scaramutti-tms.com/token-expired'
+                    type: 'urn:tms:error:auth-007'
                     title: 'Refresh token expired'
                     status: 401
                     detail: 'El refresh token expiró. Volver a hacer login.'
                     instance: '/api/v1/auth/refresh'
-                    code: 'REFRESH_TOKEN_EXPIRED'
+                    code: 'AUTH-009'
                     traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
                 refreshTokenInvalid:
                   summary: Refresh token mal formado o ya revocado
                   value:
-                    type: 'https://errors.scaramutti-tms.com/token-invalid'
+                    type: 'urn:tms:error:auth-008'
                     title: 'Invalid refresh token'
                     status: 401
                     detail: 'Refresh token inválido o revocado'
                     instance: '/api/v1/auth/refresh'
-                    code: 'REFRESH_TOKEN_INVALID'
+                    code: 'AUTH-003'
                     traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
-
-  /auth/logout:
-    post:
-      tags: [Auth]
-      operationId: logout
-      summary: Cerrar sesión (revoca token actual)
-      responses:
-        '204':
-          description: Sesión cerrada
 
   /auth/change-password:
     post:
@@ -202,12 +193,12 @@ paths:
                 passwordValidation:
                   summary: La nueva contraseña no cumple los requisitos
                   value:
-                    type: 'https://errors.scaramutti-tms.com/validation-failed'
+                    type: 'urn:tms:error:com-001'
                     title: 'Validation failed'
                     status: 400
                     detail: 'La solicitud contiene errores de validación'
                     instance: '/api/v1/auth/change-password'
-                    code: 'VALIDATION_FAILED'
+                    code: 'COM-001'
                     traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
                     errors:
                       - field: 'newPassword'
@@ -216,12 +207,12 @@ paths:
                 wrongCurrentPassword:
                   summary: La contraseña actual es incorrecta
                   value:
-                    type: 'https://errors.scaramutti-tms.com/wrong-current-password'
+                    type: 'urn:tms:error:auth-004'
                     title: 'Wrong current password'
                     status: 400
                     detail: 'La contraseña actual proporcionada es incorrecta'
                     instance: '/api/v1/auth/change-password'
-                    code: 'WRONG_CURRENT_PASSWORD'
+                    code: 'AUTH-004'
                     traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
         '401': { $ref: '#/components/responses/Unauthorized' }
 
@@ -911,12 +902,12 @@ components:
             validationFailed:
               summary: Errores de validación por campo
               value:
-                type: 'https://errors.scaramutti-tms.com/validation-failed'
+                type: 'urn:tms:error:com-001'
                 title: 'Validation failed'
                 status: 400
                 detail: 'La solicitud contiene errores de validación'
                 instance: '/api/v1/quotations'
-                code: 'VALIDATION_FAILED'
+                code: 'COM-001'
                 traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
                 errors:
                   - field: 'items[0].unitPrice'
@@ -928,12 +919,12 @@ components:
             invalidEnum:
               summary: Valor de enum inválido
               value:
-                type: 'https://errors.scaramutti-tms.com/validation-failed'
+                type: 'urn:tms:error:com-001'
                 title: 'Validation failed'
                 status: 400
                 detail: "Valor 'OTRO' no es válido para quotationType (esperado: TRANSPORTE | ALQUILER)"
                 instance: '/api/v1/quotations'
-                code: 'INVALID_ENUM'
+                code: 'COM-002'
                 traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
     Unauthorized:
       description: Token de acceso ausente, expirado o inválido
@@ -944,32 +935,32 @@ components:
             tokenExpired:
               summary: Token de acceso expirado
               value:
-                type: 'https://errors.scaramutti-tms.com/token-expired'
+                type: 'urn:tms:error:auth-007'
                 title: 'Token expired'
                 status: 401
                 detail: 'El token de acceso expiró. Use /auth/refresh para renovarlo.'
                 instance: '/api/v1/quotations'
-                code: 'TOKEN_EXPIRED'
+                code: 'AUTH-007'
                 traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
             tokenInvalid:
               summary: Token mal formado o no firmado por este servidor
               value:
-                type: 'https://errors.scaramutti-tms.com/token-invalid'
+                type: 'urn:tms:error:auth-008'
                 title: 'Token invalid'
                 status: 401
                 detail: 'El token de acceso es inválido'
                 instance: '/api/v1/quotations'
-                code: 'TOKEN_INVALID'
+                code: 'AUTH-008'
                 traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
             tokenMissing:
               summary: No se envió header Authorization
               value:
-                type: 'https://errors.scaramutti-tms.com/token-missing'
+                type: 'urn:tms:error:auth-006'
                 title: 'Token missing'
                 status: 401
                 detail: 'Falta el header Authorization con un token Bearer'
                 instance: '/api/v1/quotations'
-                code: 'TOKEN_MISSING'
+                code: 'AUTH-006'
                 traceId: '4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d'
     Forbidden:
       description: Autenticado pero sin permisos para esta operación
@@ -980,12 +971,12 @@ components:
             insufficientRole:
               summary: Rol insuficiente para la operación
               value:
-                type: 'https://errors.scaramutti-tms.com/insufficient-role'
+                type: 'urn:tms:error:com-003'
                 title: 'Forbidden'
                 status: 403
                 detail: 'El rol VENDEDOR no puede eliminar cotizaciones'
                 instance: '/api/v1/quotations/142'
-                code: 'INSUFFICIENT_ROLE'
+                code: 'COM-003'
                 traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
     NotFound:
       description: Recurso no encontrado
@@ -996,12 +987,12 @@ components:
             quotationNotFound:
               summary: Cotización inexistente
               value:
-                type: 'https://errors.scaramutti-tms.com/not-found'
+                type: 'urn:tms:error:cot-001'
                 title: 'Resource not found'
                 status: 404
                 detail: 'La cotización con id 999 no existe'
                 instance: '/api/v1/quotations/999'
-                code: 'QUOTATION_NOT_FOUND'
+                code: 'COT-001'
                 traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
     Conflict:
       description: Conflicto (recurso ya existe, restricción de unicidad violada)
@@ -1012,22 +1003,22 @@ components:
             duplicateRuc:
               summary: RUC duplicado al crear cliente
               value:
-                type: 'https://errors.scaramutti-tms.com/duplicate-resource'
+                type: 'urn:tms:error:cli-001'
                 title: 'Conflict'
                 status: 409
                 detail: 'Ya existe un cliente con RUC 20123456789'
                 instance: '/api/v1/clients'
-                code: 'DUPLICATE_RUC'
+                code: 'CLI-001'
                 traceId: '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a'
             duplicateCode:
               summary: Código de cotización duplicado (race condition)
               value:
-                type: 'https://errors.scaramutti-tms.com/duplicate-resource'
+                type: 'urn:tms:error:cot-002'
                 title: 'Conflict'
                 status: 409
                 detail: 'El código 2026-00042 ya está en uso'
                 instance: '/api/v1/quotations'
-                code: 'DUPLICATE_CODE'
+                code: 'COT-002'
                 traceId: '7e8f9a0b-1c2d-3e4f-5a6b-7c8d9e0f1a2b'
     PreconditionFailed:
       description: Optimistic lock — el recurso fue modificado desde que se leyó
@@ -1038,12 +1029,12 @@ components:
             staleVersion:
               summary: Versión obsoleta (otro usuario editó primero)
               value:
-                type: 'https://errors.scaramutti-tms.com/stale-version'
+                type: 'urn:tms:error:com-004'
                 title: 'Precondition failed'
                 status: 412
                 detail: 'El recurso fue modificado por otro usuario. Recargue antes de editar.'
                 instance: '/api/v1/quotations/142'
-                code: 'STALE_VERSION'
+                code: 'COM-004'
                 traceId: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
 
   schemas:
@@ -1057,7 +1048,7 @@ components:
           type: string
           format: uri
           description: URI que identifica el tipo de error (ver catálogo de errores)
-          example: 'https://errors.scaramutti-tms.com/validation-failed'
+          example: 'urn:tms:error:validation-failed'
         title:    { type: string, example: 'Validation failed' }
         status:   { type: integer, example: 400 }
         detail:
@@ -1125,8 +1116,17 @@ components:
       type: object
       required: [username, password]
       properties:
-        username: { type: string, minLength: 3, maxLength: 50, example: 'lcampos' }
-        password: { type: string, format: password, minLength: 8, maxLength: 100 }
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9._-]+$'
+          example: 'lcampos'
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
 
     LoginResponse:
       type: object
@@ -1142,13 +1142,17 @@ components:
       type: object
       required: [refreshToken]
       properties:
-        refreshToken: { type: string }
+        refreshToken:
+          type: string
+          minLength: 200
+          maxLength: 4096
+          description: 'JWT firmado emitido previamente por /auth/login o /auth/refresh.'
 
     ChangePasswordRequest:
       type: object
       required: [currentPassword, newPassword]
       properties:
-        currentPassword: { type: string, format: password, minLength: 8 }
+        currentPassword: { type: string, format: password, minLength: 8, maxLength: 100 }
         newPassword:     { type: string, format: password, minLength: 8, maxLength: 100 }
 
     UserRef:
