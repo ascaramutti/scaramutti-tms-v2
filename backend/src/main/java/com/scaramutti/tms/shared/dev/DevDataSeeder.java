@@ -21,12 +21,19 @@ import java.time.OffsetDateTime;
 /**
  * Seed de datos de desarrollo. SOLO corre en perfil dev/test (NO en prod).
  *
- * Crea (idempotente):
+ * Garantiza (idempotente):
  *  - DocumentType DNI (si la tabla esta vacia)
- *  - Role: ADMINISTRADOR, VENDEDOR
- *  - Worker + User: admin / Admin1234 (activo)
- *  - Worker + User: lcampos / Vendedor1234 (activo)
- *  - Worker + User: inactivo / Inactivo1234 (isActive=false, para tests de USER_INACTIVE)
+ *  - Los 5 roles del sistema (alineados con prod): admin, sales, dispatcher,
+ *    general_manager, operations_manager
+ *  - Usuarios dev con passwords conocidas:
+ *      - admin / Admin1234       (role admin, activo)
+ *      - lcampos / Sales1234     (role sales, activo)
+ *      - inactivo / Inactivo1234 (role sales, isActive=false, para tests AUTH-002)
+ *
+ * Cuando la BD viene de un restore de prod, los usuarios admin/lcampos ya existen
+ * con sus password hashes reales (desconocidos). En dev forzamos el password al
+ * documentado para que el equipo pueda autenticarse. Esto es seguro porque el
+ * seeder no corre en prod (@UnlessBuildProfile("prod")).
  */
 @ApplicationScoped
 @UnlessBuildProfile("prod")
@@ -43,12 +50,15 @@ public class DevDataSeeder {
     @Transactional
     public void onStart(@Observes StartupEvent startupEvent) {
         Integer dniId = ensureDniDocumentType();
-        Role admin = ensureRole("ADMINISTRADOR", "Administrador del sistema");
-        Role vendedor = ensureRole("VENDEDOR", "Vendedor / Ejecutiva de Ventas");
+        Role admin = ensureRole("admin", "Administrador del sistema");
+        Role sales = ensureRole("sales", "Encargado de Ventas");
+        ensureRole("dispatcher", "Coordinador de Operaciones");
+        ensureRole("general_manager", "Gerente General");
+        ensureRole("operations_manager", "Gerente de Operaciones");
 
-        ensureUser("admin",    "Admin1234",     "Admin",   "TMS",      "00000001", "Administrador del sistema", admin,    true,  dniId);
-        ensureUser("lcampos",  "Vendedor1234",  "Luraidis","Campos",   "00000002", "Ejecutiva de Ventas",       vendedor, true,  dniId);
-        ensureUser("inactivo", "Inactivo1234",  "Usuario", "Inactivo", "00000003", "Inactivo de prueba",        vendedor, false, dniId);
+        ensureUser("admin",    "Admin1234",    "Admin",    "TMS",      "00000001", "Administrador del sistema", admin, true,  dniId);
+        ensureUser("lcampos",  "Sales1234",    "Luraidis", "Campos",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
+        ensureUser("inactivo", "Inactivo1234", "Usuario",  "Inactivo", "00000003", "Inactivo de prueba",        sales, false, dniId);
 
         LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo");
     }
@@ -78,11 +88,20 @@ public class DevDataSeeder {
         });
     }
 
-    /** Crea user+worker solo si no existe; idempotente para correr en cada arranque. */
+    /**
+     * Garantiza un user dev con credenciales conocidas.
+     * - Si el user existe (ej. viene del restore de prod): solo actualiza
+     *   passwordHash + isActive. Respeta worker/role/nombres reales.
+     * - Si no existe: lo crea junto con su worker.
+     */
     private void ensureUser(String username, String password,
                             String firstName, String lastName, String documentNumber, String position,
                             Role role, boolean isActive, Integer documentTypeId) {
-        if (userRepository.findByUsername(username).isPresent()) {
+        var existing = userRepository.findByUsername(username);
+        if (existing.isPresent()) {
+            User user = existing.get();
+            user.passwordHash = passwordService.hash(password);
+            user.isActive = isActive;
             return;
         }
         Worker worker = new Worker();

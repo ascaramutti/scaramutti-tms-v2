@@ -13,7 +13,7 @@ public record LoginRequest(
              message = "solo letras, numeros, puntos, guiones y guion bajo")
     String username,
 
-    @Schema(description = "Contrasena del usuario", example = "Vendedor1234")
+    @Schema(description = "Contrasena del usuario", example = "Sales1234")
     @NotBlank
     @Size(min = 8, max = 100)
     String password

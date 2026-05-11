@@ -36,7 +36,9 @@ info:
 
     ## Roles
 
-    Cuatro roles del sistema: `ADMINISTRADOR`, `VENDEDOR`, `GERENTE_GENERAL`, `JEFE_OPERACIONES`.
+    Cinco roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`.
+    `dispatcher` (Coordinador de Operaciones) por ahora no tiene endpoints accesibles; queda
+    reservado para integracion futura con el modulo de servicios de la app legacy.
     Cada operación documenta los roles permitidos en `x-required-roles`.
 
 servers:
@@ -235,7 +237,7 @@ paths:
       tags: [Quotations]
       operationId: listQuotations
       summary: Listar cotizaciones con búsqueda y filtros
-      x-required-roles: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
@@ -292,7 +294,7 @@ paths:
       tags: [Quotations]
       operationId: createQuotation
       summary: Crear cotización
-      x-required-roles: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
@@ -323,7 +325,7 @@ paths:
       tags: [Quotations]
       operationId: getQuotation
       summary: Obtener detalle de una cotización
-      x-required-roles: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       responses:
         '200':
           description: OK
@@ -339,7 +341,7 @@ paths:
       tags: [Quotations]
       operationId: updateQuotation
       summary: Reemplazar cotización completa (incluye items y standby)
-      x-required-roles: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -363,8 +365,8 @@ paths:
       tags: [Quotations]
       operationId: deleteQuotation
       summary: Eliminar cotización
-      description: Acción restringida — solo `ADMINISTRADOR`, `GERENTE_GENERAL` y `JEFE_OPERACIONES`. Vendedores no pueden eliminar.
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      description: Acción restringida — solo `admin`, `general_manager` y `operations_manager`. Vendedores no pueden eliminar.
+      x-required-roles: [admin, general_manager, operations_manager]
       responses:
         '204':
           description: Eliminada
@@ -378,7 +380,7 @@ paths:
       tags: [Quotations]
       operationId: updateQuotationStatus
       summary: 'Cambiar el estado de una cotización (ej: marcar como enviada)'
-      x-required-roles: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - $ref: '#/components/parameters/IfMatch'
       requestBody:
@@ -406,7 +408,7 @@ paths:
       tags: [Quotations]
       operationId: downloadQuotationPdf
       summary: Descargar o previsualizar el PDF de la cotización
-      x-required-roles: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - name: preview
           in: query
@@ -492,7 +494,7 @@ paths:
       tags: [Clients]
       operationId: updateClient
       summary: Actualizar cliente
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, general_manager, operations_manager]
       requestBody:
         required: true
         content:
@@ -509,7 +511,7 @@ paths:
       tags: [Clients]
       operationId: deleteClient
       summary: Desactivar cliente (soft delete via `isActive=false`)
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       responses:
         '204':
           description: Desactivado
@@ -538,7 +540,7 @@ paths:
       tags: [Catalogs]
       operationId: createCurrency
       summary: Crear moneda
-      x-required-roles: [ADMINISTRADOR]
+      x-required-roles: [admin]
       requestBody:
         required: true
         content:
@@ -558,7 +560,7 @@ paths:
       tags: [Catalogs]
       operationId: updateCurrency
       summary: Actualizar moneda
-      x-required-roles: [ADMINISTRADOR]
+      x-required-roles: [admin]
       requestBody:
         required: true
         content:
@@ -625,7 +627,7 @@ paths:
       tags: [CargoTypes]
       operationId: updateCargoType
       summary: Actualizar tipo de carga
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      x-required-roles: [admin, general_manager, operations_manager]
       requestBody:
         required: true
         content:
@@ -642,7 +644,7 @@ paths:
       tags: [CargoTypes]
       operationId: deleteCargoType
       summary: Desactivar tipo de carga
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       responses:
         '204':
           description: Desactivado
@@ -671,7 +673,7 @@ paths:
       tags: [Catalogs]
       operationId: createQuotationServiceType
       summary: Crear tipo de servicio cotizable
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       requestBody:
         required: true
         content:
@@ -691,7 +693,7 @@ paths:
       tags: [Catalogs]
       operationId: updateQuotationServiceType
       summary: Actualizar tipo de servicio cotizable
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       requestBody:
         required: true
         content:
@@ -728,7 +730,7 @@ paths:
       tags: [Catalogs]
       operationId: createPaymentTerm
       summary: Crear término de pago
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       requestBody:
         required: true
         content:
@@ -748,7 +750,7 @@ paths:
       tags: [Catalogs]
       operationId: updatePaymentTerm
       summary: Actualizar término de pago
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       requestBody:
         required: true
         content:
@@ -769,7 +771,7 @@ paths:
       tags: [Settings]
       operationId: listSystemSettings
       summary: Listar todos los settings
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       responses:
         '200':
           description: OK
@@ -802,7 +804,7 @@ paths:
       tags: [Settings]
       operationId: updateSystemSetting
       summary: Actualizar valor de un setting
-      x-required-roles: [ADMINISTRADOR, GERENTE_GENERAL]
+      x-required-roles: [admin, general_manager]
       requestBody:
         required: true
         content:
@@ -974,7 +976,7 @@ components:
                 type: 'urn:tms:error:com-003'
                 title: 'Forbidden'
                 status: 403
-                detail: 'El rol VENDEDOR no puede eliminar cotizaciones'
+                detail: 'El rol sales no puede eliminar cotizaciones'
                 instance: '/api/v1/quotations/142'
                 code: 'COM-003'
                 traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
@@ -1109,7 +1111,7 @@ components:
 
     UserRole:
       type: string
-      enum: [ADMINISTRADOR, VENDEDOR, GERENTE_GENERAL, JEFE_OPERACIONES]
+      enum: [admin, sales, dispatcher, general_manager, operations_manager]
 
     # -------- Auth ----------------------------------------------------------
     LoginRequest:

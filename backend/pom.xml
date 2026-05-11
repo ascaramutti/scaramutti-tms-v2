@@ -84,9 +84,12 @@
         </dependency>
 
         <!-- Password hashing (BCrypt) -->
+        <!-- at.favre.lib:bcrypt soporta variantes $2a, $2b y $2y (la app legacy v1 usa $2b).
+             Quarkus Elytron BcryptUtil solo soporta $2a, asi que no nos sirve. -->
         <dependency>
-            <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-elytron-security-common</artifactId>
+            <groupId>at.favre.lib</groupId>
+            <artifactId>bcrypt</artifactId>
+            <version>0.10.2</version>
         </dependency>
 
         <!-- MapStruct (mappers entre Request/Command/Response) -->

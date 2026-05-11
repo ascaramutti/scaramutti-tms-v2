@@ -63,7 +63,7 @@ class AuthServiceTest {
     void setUp() {
         Role role = new Role();
         role.id = 1;
-        role.name = "VENDEDOR";
+        role.name = "sales";
 
         Worker worker = new Worker();
         worker.id = 10;
@@ -79,7 +79,7 @@ class AuthServiceTest {
         user.role = role;
         user.isActive = true;
 
-        userResponse = new UserResponse(100, "lcampos", "Luraidis Campos", "Ejecutiva de Ventas", "VENDEDOR", true);
+        userResponse = new UserResponse(100, "lcampos", "Luraidis Campos", "Ejecutiva de Ventas", "sales", true);
         accessToken = new AccessToken("access.jwt.token", Instant.now().plusSeconds(3600), 3600L);
         loginResponse = new LoginResponse(
             "access.jwt.token", "refresh.jwt.token",

@@ -19,7 +19,7 @@ class AuthResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body("""
-                {"username":"lcampos","password":"Vendedor1234"}
+                {"username":"lcampos","password":"Sales1234"}
                 """)
         .when()
             .post("/auth/login")
@@ -29,8 +29,8 @@ class AuthResourceTest {
             .body("refreshToken", notNullValue())
             .body("expiresIn", equalTo(3600))
             .body("user.username", equalTo("lcampos"))
-            .body("user.role", equalTo("VENDEDOR"))
-            .body("user.fullName", equalTo("Luraidis Campos"));
+            .body("user.role", equalTo("sales"))
+            .body("user.fullName", equalTo("Carolina Campos"));
     }
 
     @Test
@@ -55,7 +55,7 @@ class AuthResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body("""
-                {"username":"","password":"Vendedor1234"}
+                {"username":"","password":"Sales1234"}
                 """)
         .when()
             .post("/auth/login")
@@ -106,7 +106,7 @@ class AuthResourceTest {
         .then()
             .statusCode(200)
             .body("username", equalTo("admin"))
-            .body("role", equalTo("ADMINISTRADOR"));
+            .body("role", equalTo("admin"));
     }
 
     @Test
@@ -335,7 +335,7 @@ class AuthResourceTest {
         Instant past = Instant.now().minusSeconds(60);
         String expiredAccessToken = Jwt.subject("1")
             .upn("admin")
-            .groups(java.util.Set.of("ADMINISTRADOR"))
+            .groups(java.util.Set.of("admin"))
             .claim("typ", "access")
             .issuedAt(past.minusSeconds(3600))
             .expiresAt(past)
@@ -356,7 +356,7 @@ class AuthResourceTest {
         Instant now = Instant.now();
         String tokenForGhostUser = Jwt.subject("999999")
             .upn("ghost")
-            .groups(java.util.Set.of("VENDEDOR"))
+            .groups(java.util.Set.of("sales"))
             .claim("typ", "access")
             .issuedAt(now)
             .expiresAt(now.plusSeconds(3600))
