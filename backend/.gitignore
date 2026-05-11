@@ -14,5 +14,8 @@ target/
 .quarkus/
 *.log
 
+# JWT — la clave PRIVADA nunca va al repo
+src/main/resources/keys/privatekey.pem
+
 # OS
 .DS_Store
