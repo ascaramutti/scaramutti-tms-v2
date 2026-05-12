@@ -10,6 +10,11 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+
+# Env files: ningun .env* se commitea, EXCEPTO el template `.env.example`.
+# Cada dev copia `.env.example` a `.env.local` (o `.env.<mode>.local`) y completa.
+.env*
+!.env.example
 *.local
 
 # Vite cache (regenerated on each dev run)
