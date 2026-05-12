@@ -40,7 +40,8 @@ describe('LoginPage', () => {
   // ----- Render -----
   it('renderiza el form con campos de usuario y contraseña', () => {
     renderLogin()
-    expect(screen.getByRole('heading', { name: /scaramutti tms/i })).toBeInTheDocument()
+    // level: 1 para distinguir del botón que también dice "Iniciar sesión".
+    expect(screen.getByRole('heading', { name: /iniciar sesión/i, level: 1 })).toBeInTheDocument()
     expect(screen.getByLabelText(/usuario/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/contraseña/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /iniciar sesión/i })).toBeInTheDocument()
