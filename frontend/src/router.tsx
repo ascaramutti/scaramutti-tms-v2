@@ -1,15 +1,17 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { ProtectedRoute } from './shared/auth/ProtectedRoute'
+import { LoginPage } from './features/auth/components/LoginPage'
+import { HomePage } from './pages/HomePage'
 
-// Router placeholder. Las pantallas reales se registran cuando cada feature
-// se implementa (ej. /new-screen /login agrega su ruta).
 export const router = createBrowserRouter([
+  { path: '/login', element: <LoginPage /> },
   {
     path: '/',
     element: (
-      <main style={{ padding: '2rem' }}>
-        <h1>Scaramutti TMS</h1>
-        <p>Frontend bootstrap activo. Pantallas pendientes de implementar.</p>
-      </main>
+      <ProtectedRoute>
+        <HomePage />
+      </ProtectedRoute>
     ),
   },
+  { path: '*', element: <Navigate to="/" replace /> },
 ])

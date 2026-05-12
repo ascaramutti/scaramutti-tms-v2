@@ -1,6 +1,8 @@
 import type { HttpHandler } from 'msw'
+import { authHandlers } from './handlers/auth'
 
-// Los handlers especificos por feature se agregan aca o se importan desde
-// `src/features/<feature>/mocks/*.ts`. Los tests individuales pueden hacer
-// `server.use(...)` para override puntual.
-export const handlers: HttpHandler[] = []
+// Default handlers (happy path) por feature.
+// Los tests individuales pueden overridear con `server.use(...)`.
+export const handlers: HttpHandler[] = [
+  ...authHandlers,
+]

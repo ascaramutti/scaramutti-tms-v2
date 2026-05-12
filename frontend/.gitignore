@@ -10,6 +10,7 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+coverage
 
 # Env files: ningun .env* se commitea, EXCEPTO el template `.env.example`.
 # Cada dev copia `.env.example` a `.env.local` (o `.env.<mode>.local`) y completa.
