@@ -17,5 +17,10 @@ target/
 # JWT — la clave PRIVADA nunca va al repo
 src/main/resources/keys/privatekey.pem
 
+# Env files: ningun .env* se commitea, EXCEPTO el template `.env.example`.
+# Quarkus carga `.env` del root del modulo en dev. Cada dev/CI provee el suyo.
+.env*
+!.env.example
+
 # OS
 .DS_Store
