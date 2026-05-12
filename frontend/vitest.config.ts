@@ -11,5 +11,20 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: [
+        'src/api/**',                       // autogenerado
+        'src/test/**',                      // setup/mocks
+        '**/*.test.{ts,tsx}',               // tests
+        'src/main.tsx',                     // entrypoint, dificil de testear sin browser
+        // Wiring/config sin logica: se valida con build + smoke browser, no con unit tests.
+        'src/router.tsx',                   // tabla declarativa de rutas
+        'src/shared/query/queryClient.ts',  // defaults de react-query
+        'src/pages/HomePage.tsx',           // placeholder pre-design final
+      ],
+    },
   },
 })
