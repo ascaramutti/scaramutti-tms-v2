@@ -23,6 +23,8 @@ export const fakeLoginResponse: LoginResponse = {
 export const authHandlers = [
   http.post(`${API}/auth/login`, () => HttpResponse.json(fakeLoginResponse)),
   http.get(`${API}/auth/me`, () => HttpResponse.json(fakeUser)),
+  // 204 No Content (success default para change-password)
+  http.post(`${API}/auth/change-password`, () => new HttpResponse(null, { status: 204 })),
 ]
 
 // Helpers para tests que quieren respuestas de error puntuales.
@@ -34,6 +36,12 @@ export function loginErrorResponse(status: number, problem: Problem) {
 
 export function getCurrentUserErrorResponse(status: number, problem: Problem) {
   return http.get(`${API}/auth/me`, () =>
+    HttpResponse.json(problem, { status, headers: { 'Content-Type': 'application/problem+json' } }),
+  )
+}
+
+export function changePasswordErrorResponse(status: number, problem: Problem) {
+  return http.post(`${API}/auth/change-password`, () =>
     HttpResponse.json(problem, { status, headers: { 'Content-Type': 'application/problem+json' } }),
   )
 }

@@ -46,4 +46,5 @@ describe('SidebarFooter', () => {
       expect(tokenStorage.getAccessToken()).toBeNull()
     })
   })
+
 })
