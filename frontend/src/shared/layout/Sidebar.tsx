@@ -1,4 +1,4 @@
-import { FileText, Home, Truck, Users, type LucideIcon } from 'lucide-react'
+import { FileText, Home, KeyRound, Truck, Users, type LucideIcon } from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
@@ -39,6 +39,14 @@ const MENU: MenuGroup[] = [
         label: 'Clientes',
         allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
       },
+    ],
+  },
+  {
+    label: 'Administrar cuenta',
+    items: [
+      // Sin allowedRoles → visible para todos. Cualquier usuario puede cambiar
+      // su propia contraseña, independientemente del rol.
+      { icon: KeyRound, label: 'Cambiar contraseña', to: '/cuenta/cambiar-contrasena' },
     ],
   },
 ]

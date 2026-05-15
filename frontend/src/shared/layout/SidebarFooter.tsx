@@ -3,8 +3,10 @@ import { LogOut } from 'lucide-react'
 import { useAuth } from '../auth/AuthContext'
 
 /**
- * Footer del sidebar con info de sesión + botón de logout.
- * clearSession() actualiza el AuthContext → ProtectedRoute redirige a /login.
+ * Footer del sidebar con info de sesión + botón "Cerrar sesión".
+ * Las acciones de cuenta (ej. cambiar contraseña) viven en la sección
+ * "Administrar cuenta" del menú principal — separadas del logout para
+ * evitar mezclar acciones cotidianas con la salida de sesión.
  */
 export function SidebarFooter() {
   const { user, clearSession } = useAuth()
