@@ -265,6 +265,24 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/CurrencyResponse' }
 
+  /payment-terms:
+    get:
+      tags: [Catalogs]
+      operationId: listPaymentTerms
+      summary: Listar términos de pago
+      parameters:
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PaymentTermResponse' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -432,4 +450,14 @@ components:
         code:     { type: string, pattern: '^[A-Z]{3}$', example: 'PEN' }
         symbol:   { type: string, maxLength: 5, example: 'S/' }
         name:     { type: [string, 'null'], maxLength: 50 }
+        isActive: { type: boolean }
+
+    # -------- Catálogos: PaymentTerm ---------------------------------------
+    PaymentTermResponse:
+      type: object
+      required: [id, name, days, isActive]
+      properties:
+        id:       { type: integer, format: int32 }
+        name:     { type: string, maxLength: 100, example: '30 días' }
+        days:     { type: integer, format: int32, minimum: 0, example: 30 }
         isActive: { type: boolean }

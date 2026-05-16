@@ -2,10 +2,12 @@ package com.scaramutti.tms.shared.dev;
 
 import com.scaramutti.tms.auth.service.PasswordService;
 import com.scaramutti.tms.shared.entity.Currency;
+import com.scaramutti.tms.shared.entity.PaymentTerm;
 import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.CurrencyRepository;
+import com.scaramutti.tms.shared.repository.PaymentTermRepository;
 import com.scaramutti.tms.shared.repository.RoleRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
@@ -47,6 +49,7 @@ public class DevDataSeeder {
     @Inject WorkerRepository workerRepository;
     @Inject RoleRepository roleRepository;
     @Inject CurrencyRepository currencyRepository;
+    @Inject PaymentTermRepository paymentTermRepository;
     @Inject PasswordService passwordService;
     @Inject EntityManager entityManager;
 
@@ -66,7 +69,15 @@ public class DevDataSeeder {
         ensureCurrency("USD", "$",  "Dólar Estadounidense");
         ensureCurrency("PEN", "S/", "Sol Peruano");
 
-        LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo. Monedas garantizadas — USD, PEN.");
+        ensurePaymentTerm("Contado",                              0);
+        ensurePaymentTerm("15 días",                              15);
+        ensurePaymentTerm("30 días",                              30);
+        ensurePaymentTerm("60 días",                              60);
+        ensurePaymentTerm("50% adelanto / 50% antes de descarga", 0);
+
+        LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo. "
+            + "Monedas garantizadas — USD, PEN. "
+            + "Términos de pago garantizados — Contado, 15d, 30d, 60d, 50/50.");
     }
 
     private void ensureCurrency(String code, String symbol, String name) {
@@ -79,6 +90,17 @@ public class DevDataSeeder {
         currency.name = name;
         currency.isActive = true;
         currencyRepository.persist(currency);
+    }
+
+    private void ensurePaymentTerm(String name, int days) {
+        if (paymentTermRepository.count("name", name) > 0) {
+            return;
+        }
+        PaymentTerm paymentTerm = new PaymentTerm();
+        paymentTerm.name = name;
+        paymentTerm.days = days;
+        paymentTerm.isActive = true;
+        paymentTermRepository.persist(paymentTerm);
     }
 
     @SuppressWarnings("unchecked")
