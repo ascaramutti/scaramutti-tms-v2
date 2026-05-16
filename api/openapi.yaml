@@ -657,6 +657,11 @@ paths:
       tags: [Catalogs]
       operationId: listQuotationServiceTypes
       summary: Listar tipos de servicio cotizables
+      description: |
+        Devuelve el catálogo completo (24 entradas fijas). El campo `kind` viene
+        en cada item para que el frontend filtre en memoria según el
+        `quotation_type` elegido en el wizard. NO se ofrece filtro server-side
+        por kind porque el catálogo es chico y se cachea en el cliente.
       parameters:
         - name: isActive
           in: query
@@ -1272,13 +1277,27 @@ components:
         standardHeight: { type: [number, 'null'], format: double, minimum: 0 }
 
     # -------- Catálogos: QuotationServiceType ------------------------------
+    QuotationServiceKind:
+      type: string
+      enum: [SERVICIO, ALQUILER, COMPLEMENTARIO, INTEGRAL]
+      description: |
+        Categoría del servicio. El backend la **computa** desde el prefijo del
+        `code` (S→SERVICIO, A→ALQUILER, C→COMPLEMENTARIO, I→INTEGRAL): no es
+        columna en BD. Se expone en el response para que el frontend filtre sin
+        conocer la convención del prefijo.
+
+        Reglas del wizard:
+        - `quotationType=TRANSPORTE` → muestra SERVICIO + COMPLEMENTARIO + INTEGRAL
+        - `quotationType=ALQUILER`   → muestra solo ALQUILER
+
     QuotationServiceTypeRef:
       type: object
-      required: [id, code, name]
+      required: [id, code, name, kind]
       properties:
         id:   { type: integer, format: int32 }
-        code: { type: string, example: 'CAB' }
-        name: { type: string }
+        code: { type: string, example: 'SCB' }
+        name: { type: string, example: 'Servicio de transporte en Cama Baja' }
+        kind: { $ref: '#/components/schemas/QuotationServiceKind' }
 
     QuotationServiceTypeResponse:
       allOf:
@@ -1293,7 +1312,7 @@ components:
       type: object
       required: [code, name]
       properties:
-        code:        { type: string, minLength: 2, maxLength: 10, pattern: '^[A-Z]{2,10}$' }
+        code:        { type: string, minLength: 2, maxLength: 10, pattern: '^[A-Z]{2,10}$', description: 'Debe empezar con S/A/C/I según la categoría (ver QuotationServiceKind).' }
         name:        { type: string, maxLength: 100 }
         description: { type: [string, 'null'] }
 

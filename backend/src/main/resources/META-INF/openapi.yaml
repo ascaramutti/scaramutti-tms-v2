@@ -283,6 +283,24 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/PaymentTermResponse' }
 
+  /quotation-service-types:
+    get:
+      tags: [Catalogs]
+      operationId: listQuotationServiceTypes
+      summary: Listar tipos de servicio cotizables
+      parameters:
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -461,3 +479,24 @@ components:
         name:     { type: string, maxLength: 100, example: '30 días' }
         days:     { type: integer, format: int32, minimum: 0, example: 30 }
         isActive: { type: boolean }
+
+    # -------- Catálogos: QuotationServiceType ------------------------------
+    QuotationServiceKind:
+      type: string
+      enum: [SERVICIO, ALQUILER, COMPLEMENTARIO, INTEGRAL]
+      description: |
+        Categoría del servicio. El backend la computa desde el prefijo del
+        `code` (S→SERVICIO, A→ALQUILER, C→COMPLEMENTARIO, I→INTEGRAL): no es
+        columna en BD. Se expone en el response para que el frontend filtre
+        sin conocer la convención del prefijo.
+
+    QuotationServiceTypeResponse:
+      type: object
+      required: [id, code, name, kind, isActive]
+      properties:
+        id:          { type: integer, format: int32 }
+        code:        { type: string, example: 'SCB' }
+        name:        { type: string, example: 'Servicio de transporte en Cama Baja' }
+        kind:        { $ref: '#/components/schemas/QuotationServiceKind' }
+        description: { type: [string, 'null'] }
+        isActive:    { type: boolean }

@@ -1,13 +1,16 @@
 package com.scaramutti.tms.shared.dev;
 
 import com.scaramutti.tms.auth.service.PasswordService;
+import com.scaramutti.tms.catalogs.quotationservicetype.model.QuotationServiceKind;
 import com.scaramutti.tms.shared.entity.Currency;
 import com.scaramutti.tms.shared.entity.PaymentTerm;
+import com.scaramutti.tms.shared.entity.QuotationServiceType;
 import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.PaymentTermRepository;
+import com.scaramutti.tms.shared.repository.QuotationServiceTypeRepository;
 import com.scaramutti.tms.shared.repository.RoleRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
@@ -50,6 +53,7 @@ public class DevDataSeeder {
     @Inject RoleRepository roleRepository;
     @Inject CurrencyRepository currencyRepository;
     @Inject PaymentTermRepository paymentTermRepository;
+    @Inject QuotationServiceTypeRepository quotationServiceTypeRepository;
     @Inject PasswordService passwordService;
     @Inject EntityManager entityManager;
 
@@ -75,9 +79,42 @@ public class DevDataSeeder {
         ensurePaymentTerm("60 días",                              60);
         ensurePaymentTerm("50% adelanto / 50% antes de descarga", 0);
 
+        // Servicios de transporte (prefijo S → kind=SERVICIO)
+        ensureQuotationServiceType("SCB", "Servicio de transporte en Cama Baja",                       "Transporte en cama baja");
+        ensureQuotationServiceType("SCC", "Servicio de transporte en Cama Cuna",                       "Transporte en cama cuna");
+        ensureQuotationServiceType("SPL", "Servicio de transporte en Plataforma",                      "Transporte en plataforma");
+        ensureQuotationServiceType("SMO", "Servicio de transporte en Modular",                         "Transporte modular multilinea");
+        ensureQuotationServiceType("SPE", "Servicio de transporte en Plataforma Extensible",           "Transporte en plataforma extensible");
+        ensureQuotationServiceType("SCH", "Servicio de transporte en Cama Cuna Especial Hidráulica",   "Transporte en cama cuna especial hidráulica");
+        ensureQuotationServiceType("SCM", "Servicio de transporte en Cama Cuna Modular Especial",      "Transporte en cama cuna modular especial");
+        ensureQuotationServiceType("STR", "Servicio de Tracto",                                        "Servicio de tracto con conductor que engancha carreta del cliente (tránsito limitado)");
+
+        // Alquileres (prefijo A → kind=ALQUILER)
+        ensureQuotationServiceType("ACB", "Alquiler de Cama Baja",                                     "Alquiler de equipo cama baja");
+        ensureQuotationServiceType("ACC", "Alquiler de Cama Cuna",                                     "Alquiler de equipo cama cuna");
+        ensureQuotationServiceType("APL", "Alquiler de Plataforma",                                    "Alquiler de equipo plataforma");
+        ensureQuotationServiceType("APE", "Alquiler de Plataforma Extensible",                         "Alquiler de equipo plataforma extensible");
+        ensureQuotationServiceType("AMO", "Alquiler de Modular",                                       "Alquiler de equipo modular");
+        ensureQuotationServiceType("AGR", "Alquiler de Grúa",                                          "Alquiler de grúa");
+        ensureQuotationServiceType("AMN", "Alquiler de Montacargas",                                   "Alquiler de montacargas");
+        ensureQuotationServiceType("ATR", "Alquiler de Tracto",                                        "Alquiler de tracto sin conductor, sin limitaciones de uso");
+        ensureQuotationServiceType("ALM", "Almacenamiento",                                            "Alquiler de espacio para almacenamiento de carga");
+
+        // Complementarios (prefijo C → kind=COMPLEMENTARIO)
+        ensureQuotationServiceType("CES", "Servicio de Escolta",                                       "Servicio de escolta vehicular");
+        ensureQuotationServiceType("COP", "Servicio de Operador",                                      "Servicio de operador de maquinaria");
+        ensureQuotationServiceType("CSE", "Seguro de Carga",                                           "Seguro para la carga transportada");
+        ensureQuotationServiceType("CGR", "Servicio de Grúa",                                          "Servicio de grúa para carga/descarga");
+        ensureQuotationServiceType("CMN", "Servicio de Montacargas",                                   "Servicio de montacargas");
+        ensureQuotationServiceType("CDE", "Servicio de Desconsolidación con Maniobra",                 "Desconsolidación de carga con maniobra");
+
+        // Integral (prefijo I → kind=INTEGRAL)
+        ensureQuotationServiceType("INT", "Servicio Integral",                                         "Servicio integral con jerarquía padre+hijos (transporte + complementarios en un solo precio con descuento)");
+
         LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo. "
             + "Monedas garantizadas — USD, PEN. "
-            + "Términos de pago garantizados — Contado, 15d, 30d, 60d, 50/50.");
+            + "Términos de pago garantizados — Contado, 15d, 30d, 60d, 50/50. "
+            + "Tipos de servicio cotizable garantizados — 8 servicios (S), 9 alquileres (A), 6 complementarios (C), 1 integral (I) = 24 total.");
     }
 
     private void ensureCurrency(String code, String symbol, String name) {
@@ -101,6 +138,25 @@ public class DevDataSeeder {
         paymentTerm.days = days;
         paymentTerm.isActive = true;
         paymentTermRepository.persist(paymentTerm);
+    }
+
+    /**
+     * Garantiza un quotation_service_type. Valida que el code respete la
+     * convención del prefijo (S/A/C/I) — si no, falla loudly al startup.
+     */
+    private void ensureQuotationServiceType(String code, String name, String description) {
+        // Valida la convencion del prefijo (tira ApiException CAT-001/CAT-002 si no cumple)
+        QuotationServiceKind.fromCode(code);
+
+        if (quotationServiceTypeRepository.count("code", code) > 0) {
+            return;
+        }
+        QuotationServiceType quotationServiceType = new QuotationServiceType();
+        quotationServiceType.code = code;
+        quotationServiceType.name = name;
+        quotationServiceType.description = description;
+        quotationServiceType.isActive = true;
+        quotationServiceTypeRepository.persist(quotationServiceType);
     }
 
     @SuppressWarnings("unchecked")
