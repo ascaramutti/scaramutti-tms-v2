@@ -1,9 +1,11 @@
 package com.scaramutti.tms.shared.dev;
 
 import com.scaramutti.tms.auth.service.PasswordService;
+import com.scaramutti.tms.shared.entity.Currency;
 import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
+import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.RoleRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
@@ -44,6 +46,7 @@ public class DevDataSeeder {
     @Inject UserRepository userRepository;
     @Inject WorkerRepository workerRepository;
     @Inject RoleRepository roleRepository;
+    @Inject CurrencyRepository currencyRepository;
     @Inject PasswordService passwordService;
     @Inject EntityManager entityManager;
 
@@ -60,7 +63,22 @@ public class DevDataSeeder {
         ensureUser("lcampos",  "Sales1234",    "Luraidis", "Campos",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
         ensureUser("inactivo", "Inactivo1234", "Usuario",  "Inactivo", "00000003", "Inactivo de prueba",        sales, false, dniId);
 
-        LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo");
+        ensureCurrency("USD", "$",  "Dólar Estadounidense");
+        ensureCurrency("PEN", "S/", "Sol Peruano");
+
+        LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo. Monedas garantizadas — USD, PEN.");
+    }
+
+    private void ensureCurrency(String code, String symbol, String name) {
+        if (currencyRepository.count("code", code) > 0) {
+            return;
+        }
+        Currency currency = new Currency();
+        currency.code = code;
+        currency.symbol = symbol;
+        currency.name = name;
+        currency.isActive = true;
+        currencyRepository.persist(currency);
     }
 
     @SuppressWarnings("unchecked")
