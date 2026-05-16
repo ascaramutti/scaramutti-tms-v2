@@ -250,7 +250,7 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotation_service_types (
 );
 
 COMMENT ON TABLE cotizaciones.quotation_service_types IS
-    'Tipos de servicio que aparecen en una cotización (transporte, alquiler, complementarios, integral)';
+    'Tipos de servicio que aparecen en una cotización. La categoría (kind) se infiere del prefijo del `code`: S=SERVICIO, A=ALQUILER, C=COMPLEMENTARIO, I=INTEGRAL. El backend la computa al armar el response (no es columna). Notar que el `kind` SERVICIO es independiente del `quotation_type` TRANSPORTE de la cabecera — ver api/openapi.yaml para la regla del wizard.';
 
 CREATE TABLE IF NOT EXISTS cotizaciones.payment_terms (
     id         SERIAL PRIMARY KEY,
