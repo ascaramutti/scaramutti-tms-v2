@@ -462,6 +462,7 @@ paths:
       tags: [Clients]
       operationId: createClient
       summary: Crear cliente al vuelo
+      x-required-roles: [admin, general_manager, sales, operations_manager]
       requestBody:
         required: true
         content:
@@ -1017,6 +1018,16 @@ components:
                 instance: '/api/v1/clients'
                 code: 'CLI-001'
                 traceId: '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a'
+            duplicateClientName:
+              summary: Nombre de cliente duplicado al crear cliente
+              value:
+                type: 'urn:tms:error:cli-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe un cliente con el nombre Acme Corp'
+                instance: '/api/v1/clients'
+                code: 'CLI-002'
+                traceId: '5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b'
             duplicateCode:
               summary: Código de cotización duplicado (race condition)
               value:

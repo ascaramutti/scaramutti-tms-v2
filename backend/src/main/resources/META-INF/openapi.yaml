@@ -40,6 +40,8 @@ tags:
     description: Autenticación y gestión de sesión
   - name: Catalogs
     description: Catálogos simples de referencia — monedas, términos de pago, tipos de servicio
+  - name: Clients
+    description: Clientes — búsqueda, creación al vuelo, edición y desactivación
 
 # =============================================================================
 paths:
@@ -301,6 +303,30 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
 
+  # ----- Clients ------------------------------------------------------------
+
+  /clients:
+    post:
+      tags: [Clients]
+      operationId: createClient
+      summary: Crear cliente al vuelo
+      x-required-roles: [admin, general_manager, sales, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -351,6 +377,74 @@ components:
                 instance: '/api/v1/auth/me'
                 code: 'AUTH-008'
                 traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+
+    BadRequest:
+      description: Solicitud inválida (validación, formato, valores fuera de rango)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            validationFailed:
+              summary: Errores de validación por campo
+              value:
+                type: 'urn:tms:error:com-001'
+                title: 'Validation failed'
+                status: 400
+                detail: 'La solicitud contiene errores de validación'
+                instance: '/api/v1/clients'
+                code: 'COM-001'
+                traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+                errors:
+                  - field: 'name'
+                    message: 'no debe estar vacío'
+                    code: 'REQUIRED'
+                  - field: 'ruc'
+                    message: 'debe tener exactamente 11 dígitos'
+                    code: 'PATTERN'
+
+    Forbidden:
+      description: Autenticado pero sin permisos para esta operación
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            insufficientRole:
+              summary: Rol insuficiente para la operación
+              value:
+                type: 'urn:tms:error:com-003'
+                title: 'Forbidden'
+                status: 403
+                detail: 'No tiene permisos para acceder a este recurso'
+                instance: '/api/v1/clients'
+                code: 'COM-003'
+                traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
+
+    Conflict:
+      description: Conflicto (recurso ya existe, restricción de unicidad violada)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            duplicateRuc:
+              summary: RUC duplicado al crear cliente
+              value:
+                type: 'urn:tms:error:cli-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe un cliente con RUC 20123456789'
+                instance: '/api/v1/clients'
+                code: 'CLI-001'
+                traceId: '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a'
+            duplicateClientName:
+              summary: Nombre de cliente duplicado al crear cliente
+              value:
+                type: 'urn:tms:error:cli-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe un cliente con el nombre Acme Corp'
+                instance: '/api/v1/clients'
+                code: 'CLI-002'
+                traceId: '5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b'
 
   schemas:
 
@@ -479,6 +573,40 @@ components:
         name:     { type: string, maxLength: 100, example: '30 días' }
         days:     { type: integer, format: int32, minimum: 0, example: 30 }
         isActive: { type: boolean }
+
+    # -------- Clients ------------------------------------------------------
+    ClientRef:
+      description: |
+        Referencia a un cliente con datos de contacto (live, no snapshot).
+        Si el cliente actualiza sus datos, las cotizaciones existentes verán los
+        nuevos valores en su `client` embebido, excepto `quotations.contactName`
+        (que sí se persiste como snapshot independiente).
+      type: object
+      required: [id, name, ruc]
+      properties:
+        id:          { type: integer, format: int32 }
+        name:        { type: string }
+        ruc:         { type: string, pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
+
+    ClientResponse:
+      allOf:
+        - $ref: '#/components/schemas/ClientRef'
+        - type: object
+          required: [isActive, createdAt]
+          properties:
+            isActive:  { type: boolean }
+            createdAt: { type: string, format: date-time }
+
+    ClientRequest:
+      type: object
+      required: [name, ruc]
+      properties:
+        name:        { type: string, minLength: 1, maxLength: 200 }
+        ruc:         { type: string, pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
 
     # -------- Catálogos: QuotationServiceType ------------------------------
     QuotationServiceKind:
