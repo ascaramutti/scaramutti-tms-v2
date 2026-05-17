@@ -4,6 +4,8 @@ import com.scaramutti.tms.clients.ClientsError;
 import com.scaramutti.tms.clients.dto.ClientResponse;
 import com.scaramutti.tms.clients.mapper.ClientServiceMapper;
 import com.scaramutti.tms.clients.service.cmd.CreateClientCommand;
+import com.scaramutti.tms.clients.service.cmd.ListClientsQuery;
+import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.entity.Client;
 import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ClientRepository;
@@ -14,6 +16,8 @@ import jakarta.transaction.Transactional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.jboss.logging.Logger;
 
+import java.util.List;
+
 @ApplicationScoped
 public class ClientService {
 
@@ -21,6 +25,26 @@ public class ClientService {
 
     @Inject ClientRepository clientRepository;
     @Inject ClientServiceMapper clientServiceMapper;
+
+    /**
+     * Listado paginado con busqueda fuzzy opcional. Read-only, no requiere
+     * @Transactional (Quarkus abre tx implicita si Hibernate la necesita).
+     *
+     * Doble query (search + count) con el mismo predicado garantizado por el
+     * helper privado del repo. Para 100k clientes el count es O(rows_filtered)
+     * pero los GIN trgm indexes lo hacen aceptable; si se vuelve cuello,
+     * cachear el count por (q,isActive) o cambiar a keyset pagination.
+     *
+     * El Query viene ya normalizado desde el ClientResourceMapper
+     * (q trimmed + uppercased). El service solo orquesta.
+     */
+    public PageResponse<ClientResponse> listClients(ListClientsQuery listClientsQuery) {
+        List<Client> clients = clientRepository.searchPaged(listClientsQuery);
+        long totalElements = clientRepository.countSearch(listClientsQuery);
+
+        List<ClientResponse> content = clientServiceMapper.toClientResponseList(clients);
+        return PageResponse.of(content, listClientsQuery.page(), listClientsQuery.size(), totalElements);
+    }
 
     @Transactional
     public ClientResponse createClient(CreateClientCommand createClientCommand) {

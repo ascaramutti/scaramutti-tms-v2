@@ -442,11 +442,18 @@ paths:
       tags: [Clients]
       operationId: listClients
       summary: Buscar clientes (paginado por volumen)
+      description: |
+        Listado paginado de clientes. Filtra por substring case-insensitive en
+        `name` y `ruc` cuando se envía `q` (ILIKE acelerado por GIN trgm).
+        Default sort: `name ASC`. Cuando hay `q`, ranking primario por
+        `similarity(name|ruc, q) DESC`, tiebreak `name ASC`.
+        `q` vacío o sólo whitespace se trata como sin filtro.
+        Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre por nombre o RUC (fuzzy con pg_trgm)
-          schema: { type: string }
+          description: Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Vacío = sin filtro.
+          schema: { type: string, maxLength: 200 }
         - name: isActive
           in: query
           schema: { type: boolean }
@@ -458,6 +465,8 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PageOfClient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Clients]
       operationId: createClient
