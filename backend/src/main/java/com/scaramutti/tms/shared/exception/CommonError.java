@@ -7,7 +7,9 @@ package com.scaramutti.tms.shared.exception;
 public enum CommonError implements ApiError {
 
     VALIDATION_FAILED("COM-001", 400, "Validation failed",
-        "La solicitud contiene errores de validación");
+        "La solicitud contiene errores de validación"),
+    FORBIDDEN        ("COM-003", 403, "Forbidden",
+        "No tiene permisos para acceder a este recurso");
 
     private final String code;
     private final int status;
