@@ -306,6 +306,35 @@ paths:
   # ----- Clients ------------------------------------------------------------
 
   /clients:
+    get:
+      tags: [Clients]
+      operationId: listClients
+      summary: Buscar clientes (paginado por volumen)
+      description: |
+        Listado paginado de clientes. Filtra por substring case-insensitive en
+        `name` y `ruc` cuando se envía `q` (ILIKE acelerado por GIN trgm).
+        Default sort: `name ASC`. Cuando hay `q`, ranking primario por
+        `similarity(name|ruc, q) DESC`, tiebreak `name ASC`.
+        `q` vacío o sólo whitespace se trata como sin filtro.
+        Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
+      parameters:
+        - name: q
+          in: query
+          description: Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Vacío = sin filtro.
+          schema: { type: string, maxLength: 200 }
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfClient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Clients]
       operationId: createClient
@@ -339,6 +368,18 @@ components:
       description: |
         JWT firmado con RS256. Claims esperados:
         `sub` (userId), `username`, `role`, `fullName`, `position`, `type`, `iat`, `exp`.
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      description: Página (base 0)
+      schema: { type: integer, default: 0, minimum: 0 }
+    Size:
+      name: size
+      in: query
+      description: Tamaño de página (máx. 100)
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
 
   responses:
     Unauthorized:
@@ -607,6 +648,30 @@ components:
         ruc:         { type: string, pattern: '^\d{11}$' }
         phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
         contactName: { type: [string, 'null'], maxLength: 100 }
+
+    # -------- Paginación ---------------------------------------------------
+    PageMeta:
+      type: object
+      required: [page, size, totalElements, totalPages, numberOfElements, first, last, empty]
+      properties:
+        page:              { type: integer, format: int32, example: 0 }
+        size:              { type: integer, format: int32, example: 20 }
+        totalElements:     { type: integer, format: int64, example: 137 }
+        totalPages:        { type: integer, format: int32, example: 7 }
+        numberOfElements:  { type: integer, format: int32, description: 'Cantidad de items en la página actual', example: 20 }
+        first:             { type: boolean, description: '¿Es la primera página?' }
+        last:              { type: boolean, description: '¿Es la última página?' }
+        empty:             { type: boolean, description: '¿La página actual está vacía?' }
+
+    PageOfClient:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/ClientResponse' }
 
     # -------- Catálogos: QuotationServiceType ------------------------------
     QuotationServiceKind:

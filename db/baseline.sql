@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS public.clients (
     created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- GIN trgm indexes para busqueda fuzzy del endpoint listClients.
+-- gin_trgm_ops habilita los operadores `%` (similarity threshold) y `<->`
+-- (distancia) sobre name y ruc. Sin estos el matching similarity full-scanea.
+-- pg_trgm.similarity_threshold se mantiene en su default 0.3 (ajustable a
+-- nivel cluster sin redeploy).
+CREATE INDEX IF NOT EXISTS idx_clients_name_trgm ON public.clients USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_clients_ruc_trgm  ON public.clients USING GIN (ruc  gin_trgm_ops);
+
 CREATE TABLE IF NOT EXISTS public.currencies (
     id        SERIAL PRIMARY KEY,
     code      CHAR(3) NOT NULL UNIQUE,

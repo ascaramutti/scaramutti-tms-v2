@@ -7,15 +7,21 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.util.Set;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.anyOf;
+import static org.hamcrest.Matchers.containsInRelativeOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -499,5 +505,563 @@ class ClientsResourceTest {
             .statusCode(401)
             .contentType("application/problem+json")
             .body("code", equalTo("AUTH-007"));
+    }
+
+    // =========================================================================
+    // GET /clients (listClients) — paginado con busqueda fuzzy + filtro isActive
+    // =========================================================================
+    //
+    // Fixtures de listing:
+    //  - RUCs siempre con prefijo "90" (los seeds prod arrancan con "20").
+    //  - Nombres con prefijo "ZTEST_" (letra Z al final del orden alfabetico
+    //    asi no perturba a otros clients que pudiera haber).
+    //  - Cleanup en @AfterEach borra TODO lo que matchee prefijo "90" — los tests
+    //    corren secuencialmente bajo @QuarkusTest, sin condiciones de carrera.
+
+    private static final String TEST_RUC_PREFIX = "90";
+    private static final String TEST_NAME_PREFIX = "ZTEST_";
+
+    @AfterEach
+    void cleanupListingFixtures() {
+        QuarkusTransaction.requiringNew().run(() ->
+            clientRepository.delete("ruc like ?1", TEST_RUC_PREFIX + "%")
+        );
+    }
+
+    /** Inserta un cliente y devuelve la entity persistida (con id asignado por BD). */
+    private void seedClient(String name, String ruc, boolean isActive) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            Client c = new Client();
+            c.name = name;
+            c.ruc = ruc;
+            c.isActive = isActive;
+            clientRepository.persist(c);
+        });
+    }
+
+    // ---------- Happy path / shape del response ------------------------------
+
+    @Test
+    void list_withoutQueryParams_returnsFirstPageWithDefaults() {
+        // 25 fixtures > size default (20). Verifica defaults page=0, size=20.
+        for (int i = 1; i <= 25; i++) {
+            seedClient(TEST_NAME_PREFIX + String.format("%02d", i),
+                       TEST_RUC_PREFIX + String.format("%09d", i), true);
+        }
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients")
+        .then()
+            .statusCode(200)
+            .contentType("application/json")
+            .body("page", equalTo(0))
+            .body("size", equalTo(20))
+            .body("numberOfElements", equalTo(20))
+            .body("totalElements", greaterThanOrEqualTo(25))
+            .body("first", equalTo(true))
+            .body("last", equalTo(false))
+            .body("empty", equalTo(false))
+            .body("content.size()", equalTo(20));
+    }
+
+    @Test
+    void list_responseShape_matchesPageMetaAndClientResponseContract() {
+        seedClient(TEST_NAME_PREFIX + "SHAPE", TEST_RUC_PREFIX + "099099099", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "SHAPE")
+        .then()
+            .statusCode(200)
+            .body("page", notNullValue())
+            .body("size", notNullValue())
+            .body("totalElements", notNullValue())
+            .body("totalPages", notNullValue())
+            .body("numberOfElements", notNullValue())
+            .body("first", notNullValue())
+            .body("last", notNullValue())
+            .body("empty", notNullValue())
+            .body("content", notNullValue())
+            .body("content[0].id", notNullValue())
+            .body("content[0].name", equalTo(TEST_NAME_PREFIX + "SHAPE"))
+            .body("content[0].ruc", equalTo(TEST_RUC_PREFIX + "099099099"))
+            .body("content[0].phone", nullValue())
+            .body("content[0].contactName", nullValue())
+            .body("content[0].isActive", equalTo(true))
+            .body("content[0].createdAt", notNullValue());
+    }
+
+    @Test
+    void list_returnsApplicationJsonContentType() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients")
+        .then()
+            .statusCode(200)
+            .contentType("application/json");
+    }
+
+    // ---------- Busqueda fuzzy q ---------------------------------------------
+
+    @Test
+    void list_withQMatchingName_returnsMatchingClients() {
+        seedClient(TEST_NAME_PREFIX + "ACMECORP", TEST_RUC_PREFIX + "011111111", true);
+        seedClient(TEST_NAME_PREFIX + "OTHERCO",  TEST_RUC_PREFIX + "022222222", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=ACMECORP")
+        .then()
+            .statusCode(200)
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "ACMECORP"))
+            .body("content.name", not(hasItem(TEST_NAME_PREFIX + "OTHERCO")));
+    }
+
+    @Test
+    void list_withQPartialRuc_matchesByRucSimilarity() {
+        seedClient(TEST_NAME_PREFIX + "RUCMATCH", "90100200300", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=901002003")
+        .then()
+            .statusCode(200)
+            .body("content.ruc", hasItem("90100200300"));
+    }
+
+    @Test
+    void list_withQLowerCase_matchesUppercaseStoredName() {
+        // name almacenado siempre uppercase (ver ClientResourceMapper.trimUpperOrNull).
+        // El mapper uppercasea q antes de pasarlo al repo — pg_trgm es case-sensitive.
+        seedClient(TEST_NAME_PREFIX + "CASETEST", TEST_RUC_PREFIX + "033333333", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=ztest_casetest")
+        .then()
+            .statusCode(200)
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "CASETEST"));
+    }
+
+    @Test
+    void list_withShortQAsSubstring_matchesLongName_viaIlike() {
+        // Regresion guard: q corto contra name largo debe matchear via ILIKE substring.
+        // Con el operador pg_trgm `%` puro y threshold 0.3 esto FALLABA
+        // (q=FER vs FERREYROS_LONG → similarity ~0.15 < 0.3). Con ILIKE matchea siempre.
+        seedClient(TEST_NAME_PREFIX + "FERREYROS_LONG_NAME_SAC", TEST_RUC_PREFIX + "088100100", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=FERRE")
+        .then()
+            .statusCode(200)
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "FERREYROS_LONG_NAME_SAC"));
+    }
+
+    @Test
+    void list_withQNoMatch_returnsEmptyPage() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=ZZZNADAEXISTE_xyzzy_999")
+        .then()
+            .statusCode(200)
+            .body("content.size()", equalTo(0))
+            .body("totalElements", equalTo(0))
+            .body("totalPages", equalTo(0))
+            .body("numberOfElements", equalTo(0))
+            .body("first", equalTo(true))
+            .body("last", equalTo(true))
+            .body("empty", equalTo(true));
+    }
+
+    @Test
+    void list_withQEmptyString_treatedAsNoFilter() {
+        // q="" debe normalizarse a sin filtro (lock-in del trim del ResourceMapper).
+        seedClient(TEST_NAME_PREFIX + "ANY", TEST_RUC_PREFIX + "044444444", true);
+        String token = login("admin", "Admin1234");
+
+        int totalWithoutQ = given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients")
+        .then()
+            .statusCode(200)
+            .extract().jsonPath().getInt("totalElements");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=")
+        .then()
+            .statusCode(200)
+            .body("totalElements", equalTo(totalWithoutQ));
+    }
+
+    // ---------- Filtro isActive ----------------------------------------------
+
+    @Test
+    void list_withIsActiveTrue_returnsOnlyActiveClients() {
+        seedClient(TEST_NAME_PREFIX + "ACT", TEST_RUC_PREFIX + "055555551", true);
+        seedClient(TEST_NAME_PREFIX + "INA", TEST_RUC_PREFIX + "055555552", false);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "&isActive=true")
+        .then()
+            .statusCode(200)
+            .body("content.isActive", everyItem(is(true)))
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "ACT"))
+            .body("content.name", not(hasItem(TEST_NAME_PREFIX + "INA")));
+    }
+
+    @Test
+    void list_withIsActiveFalse_returnsOnlyInactiveClients() {
+        seedClient(TEST_NAME_PREFIX + "ACT", TEST_RUC_PREFIX + "066666661", true);
+        seedClient(TEST_NAME_PREFIX + "INA", TEST_RUC_PREFIX + "066666662", false);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "&isActive=false")
+        .then()
+            .statusCode(200)
+            .body("content.isActive", everyItem(is(false)))
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "INA"))
+            .body("content.name", not(hasItem(TEST_NAME_PREFIX + "ACT")));
+    }
+
+    @Test
+    void list_withoutIsActive_returnsBothActiveAndInactive() {
+        seedClient(TEST_NAME_PREFIX + "ACT", TEST_RUC_PREFIX + "077777771", true);
+        seedClient(TEST_NAME_PREFIX + "INA", TEST_RUC_PREFIX + "077777772", false);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX)
+        .then()
+            .statusCode(200)
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "ACT"))
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "INA"));
+    }
+
+    @Test
+    void list_withMalformedIsActive_treatsAsFalse() {
+        // Lock-in del binder JAX-RS Boolean.parseBoolean("maybe") == false.
+        seedClient(TEST_NAME_PREFIX + "INA", TEST_RUC_PREFIX + "088888888", false);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "INA&isActive=maybe")
+        .then()
+            .statusCode(200)
+            .body("content.isActive", everyItem(is(false)));
+    }
+
+    // ---------- Paginacion ----------------------------------------------------
+
+    @Test
+    void list_withPage1Size5_returnsSecondPageOfFive() {
+        for (int i = 1; i <= 12; i++) {
+            seedClient(TEST_NAME_PREFIX + "P" + String.format("%02d", i),
+                       TEST_RUC_PREFIX + "11" + String.format("%07d", i), true);
+        }
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "P&page=1&size=5")
+        .then()
+            .statusCode(200)
+            .body("page", equalTo(1))
+            .body("size", equalTo(5))
+            .body("numberOfElements", equalTo(5))
+            .body("totalElements", equalTo(12))
+            .body("totalPages", equalTo(3))
+            .body("first", equalTo(false))
+            .body("last", equalTo(false))
+            .body("content.size()", equalTo(5));
+    }
+
+    @Test
+    void list_withPage2Size5_returnsLastPartialPage() {
+        for (int i = 1; i <= 12; i++) {
+            seedClient(TEST_NAME_PREFIX + "P" + String.format("%02d", i),
+                       TEST_RUC_PREFIX + "22" + String.format("%07d", i), true);
+        }
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "P&page=2&size=5")
+        .then()
+            .statusCode(200)
+            .body("page", equalTo(2))
+            .body("numberOfElements", equalTo(2))
+            .body("totalElements", equalTo(12))
+            .body("first", equalTo(false))
+            .body("last", equalTo(true))
+            .body("content.size()", equalTo(2));
+    }
+
+    @Test
+    void list_withSize100_boundaryMaxAccepted() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?size=100")
+        .then()
+            .statusCode(200)
+            .body("size", equalTo(100));
+    }
+
+    @Test
+    void list_withPage0Size1_boundaryMinSize() {
+        seedClient(TEST_NAME_PREFIX + "S1", TEST_RUC_PREFIX + "033111111", true);
+        seedClient(TEST_NAME_PREFIX + "S2", TEST_RUC_PREFIX + "033111112", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "S&page=0&size=1")
+        .then()
+            .statusCode(200)
+            .body("size", equalTo(1))
+            .body("numberOfElements", equalTo(1))
+            .body("totalElements", equalTo(2))
+            .body("totalPages", equalTo(2))
+            .body("first", equalTo(true))
+            .body("last", equalTo(false));
+    }
+
+    @Test
+    void list_pageBeyondTotalPages_returnsEmptyContent() {
+        seedClient(TEST_NAME_PREFIX + "OVERFLOW1", TEST_RUC_PREFIX + "044111111", true);
+        seedClient(TEST_NAME_PREFIX + "OVERFLOW2", TEST_RUC_PREFIX + "044111112", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=" + TEST_NAME_PREFIX + "OVERFLOW&page=99&size=20")
+        .then()
+            .statusCode(200)
+            .body("content.size()", equalTo(0))
+            .body("numberOfElements", equalTo(0))
+            .body("totalElements", equalTo(2))
+            .body("empty", equalTo(true))
+            .body("last", equalTo(true));
+    }
+
+    // ---------- Orden ASC por name (sin q) -----------------------------------
+
+    @Test
+    void list_resultsOrderedByNameAscending() {
+        // Sin q: order primario es name ASC.
+        // (Con q, el order primario es similarity DESC y el tiebreak es name ASC —
+        // como nombres distintos tienen similarity distinta vs el mismo prefijo,
+        // el ordering no es estrictamente ASC; ese caso lo cubre el test de fuzzy.)
+        seedClient(TEST_NAME_PREFIX + "ZZZ", TEST_RUC_PREFIX + "055111111", true);
+        seedClient(TEST_NAME_PREFIX + "AAA", TEST_RUC_PREFIX + "055111112", true);
+        seedClient(TEST_NAME_PREFIX + "MMM", TEST_RUC_PREFIX + "055111113", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?size=100")
+        .then()
+            .statusCode(200)
+            .body("content.name", containsInRelativeOrder(
+                TEST_NAME_PREFIX + "AAA", TEST_NAME_PREFIX + "MMM", TEST_NAME_PREFIX + "ZZZ"
+            ));
+    }
+
+    // ---------- Validacion 400 (Bean Validation en query params) -------------
+
+    @Test
+    void list_withPageNegative_returns400_COM001() {
+        // Verifica codigo COM-001 + que el error apunta al parametro `page`.
+        // ValidationExceptionMapper trunca el prefijo "methodName.argN." y deja
+        // solo el nombre del param (vacio en este caso) o el path del field.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?page=-1")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("errors", notNullValue())
+            .body("errors.size()", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_withSizeZero_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?size=0")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors", notNullValue())
+            .body("errors.size()", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_withSizeAboveMax_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?size=101")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors", notNullValue())
+            .body("errors.size()", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_withPageNotANumber_returns400Or404() {
+        // Binder JAX-RS falla al parsear "abc" → int. RestEasy Reactive responde
+        // 400 (sin Problem) o 404 segun el dispatcher. Lock-in al rango exacto
+        // que se observa hoy — si cambia a 5xx en una version futura, este test
+        // se rompe (intencionalmente).
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?page=abc")
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(404)));
+    }
+
+    @Test
+    void list_withSizeNotANumber_returns400Or404() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?size=xyz")
+        .then()
+            .statusCode(anyOf(equalTo(400), equalTo(404)));
+    }
+
+    // ---------- Auth 401 ------------------------------------------------------
+
+    @Test
+    void list_withoutToken_returns401() {
+        given()
+        .when()
+            .get("/clients")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void list_withMalformedToken_returns401_AUTH008() {
+        given()
+            .header("Authorization", "Bearer eyJ.malformed.token")
+        .when()
+            .get("/clients")
+        .then()
+            .statusCode(401)
+            .contentType("application/problem+json")
+            .body("code", equalTo("AUTH-008"));
+    }
+
+    @Test
+    void list_withExpiredToken_returns401_AUTH007() {
+        Instant past = Instant.now().minusSeconds(120);
+        String expiredToken = Jwt.subject("1")
+            .upn("admin")
+            .groups(Set.of("admin"))
+            .claim("typ", "access")
+            .issuedAt(past.minusSeconds(3600))
+            .expiresAt(past)
+            .sign();
+
+        given()
+            .header("Authorization", "Bearer " + expiredToken)
+        .when()
+            .get("/clients")
+        .then()
+            .statusCode(401)
+            .contentType("application/problem+json")
+            .body("code", equalTo("AUTH-007"));
+    }
+
+    // ---------- Authorization: cualquier rol autenticado puede listar --------
+
+    @Test
+    void list_withAdminRole_returns200() {
+        String token = login("admin", "Admin1234");
+        given().header("Authorization", "Bearer " + token)
+        .when().get("/clients")
+        .then().statusCode(200);
+    }
+
+    @Test
+    void list_withSalesRole_returns200() {
+        String token = login("lcampos", "Sales1234");
+        given().header("Authorization", "Bearer " + token)
+        .when().get("/clients")
+        .then().statusCode(200);
+    }
+
+    @Test
+    void list_withDispatcherRole_returns200() {
+        // Sin x-required-roles: dispatcher tambien puede listar (a diferencia de POST).
+        String token = fabricateAccessToken("disp_test", "dispatcher");
+        given().header("Authorization", "Bearer " + token)
+        .when().get("/clients")
+        .then().statusCode(200);
+    }
+
+    @Test
+    void list_withOperationsManagerRole_returns200() {
+        String token = fabricateAccessToken("ops_test", "operations_manager");
+        given().header("Authorization", "Bearer " + token)
+        .when().get("/clients")
+        .then().statusCode(200);
     }
 }
