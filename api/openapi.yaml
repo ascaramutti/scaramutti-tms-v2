@@ -619,7 +619,12 @@ paths:
     post:
       tags: [CargoTypes]
       operationId: createCargoType
-      summary: Crear tipo de carga
+      summary: Crear tipo de carga al vuelo
+      description: |
+        Crea un tipo de carga al vuelo desde el wizard de cotizaciones. El `name`
+        se almacena en mayúsculas (trim + toUpperCase). Si ya existe un tipo
+        con el mismo `name` (case-insensitive efectivo), devuelve 409 CGT-001.
+      x-required-roles: [admin, general_manager, sales, operations_manager]
       requestBody:
         required: true
         content:
@@ -631,6 +636,10 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CargoTypeResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /cargo-types/{id}:
     parameters:
@@ -1312,7 +1321,7 @@ components:
       type: object
       required: [name, standardWeight]
       properties:
-        name:           { type: string, maxLength: 100 }
+        name:           { type: string, minLength: 1, maxLength: 100 }
         description:    { type: [string, 'null'] }
         standardWeight: { type: number, format: double, minimum: 0 }
         standardLength: { type: [number, 'null'], format: double, minimum: 0 }

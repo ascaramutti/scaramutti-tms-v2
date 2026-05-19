@@ -1,5 +1,7 @@
 package com.scaramutti.tms.cargotypes.mapper;
 
+import com.scaramutti.tms.cargotypes.dto.CargoTypeRequest;
+import com.scaramutti.tms.cargotypes.service.cmd.CreateCargoTypeCommand;
 import com.scaramutti.tms.cargotypes.service.cmd.ListCargoTypesQuery;
 import com.scaramutti.tms.shared.util.StringUtils;
 import org.mapstruct.Mapper;
@@ -33,6 +35,17 @@ public interface CargoTypeResourceMapper {
 
     @Mapping(target = "q", source = "q", qualifiedByName = "trimUpperOrNull")
     ListCargoTypesQuery toListCargoTypesQuery(String q, Boolean isActive, int page, int size);
+
+    /**
+     * Normaliza el request del POST:
+     *  - name: trim + uppercase (mismo patron que clients).
+     *  - description: trim, "" → null (es texto libre, NO uppercase).
+     *  - Numericos (standardWeight/Length/Width/Height): pasan tal cual.
+     *    Bean Validation (@DecimalMin + @Digits) ya garantiza rangos.
+     */
+    @Mapping(target = "name",        source = "name",        qualifiedByName = "trimUpperOrNull")
+    @Mapping(target = "description", source = "description", qualifiedByName = "trimToNull")
+    CreateCargoTypeCommand toCreateCargoTypeCommand(CargoTypeRequest cargoTypeRequest);
 
     /**
      * Trim + uppercase. Delega normalizacion vacio → null a `StringUtils.trimToNull`.

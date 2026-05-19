@@ -24,6 +24,9 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 @QuarkusTest
 class CargoTypesResourceTest {
@@ -533,5 +536,587 @@ class CargoTypesResourceTest {
         String token = fabricateAccessToken("ops_test", "operations_manager");
         given().header("Authorization", "Bearer " + token)
         .when().get("/cargo-types").then().statusCode(200);
+    }
+
+    // =========================================================================
+    // POST /cargo-types (createCargoType)
+    // =========================================================================
+    //
+    // Calco de POST /clients (PR #15) con 3 simplificaciones:
+    //  - 1 solo codigo de duplicado (CGT-001 sobre name)
+    //  - Sin patterns regex
+    //  - Numericos con @DecimalMin("0") + @Digits(8,2)
+
+    private void cleanupCargoTypeByName(String nameUpper) {
+        QuarkusTransaction.requiringNew().run(() ->
+            cargoTypeRepository.delete("name", nameUpper)
+        );
+    }
+
+    /** Arma JSON con solo los campos no-null. Numericos sin comillas. */
+    private String body(String name, String description, String standardWeight,
+                        String standardLength, String standardWidth, String standardHeight) {
+        StringBuilder sb = new StringBuilder("{");
+        if (name != null) sb.append("\"name\":\"").append(name).append("\",");
+        if (description != null) sb.append("\"description\":\"").append(description).append("\",");
+        if (standardWeight != null) sb.append("\"standardWeight\":").append(standardWeight).append(",");
+        if (standardLength != null) sb.append("\"standardLength\":").append(standardLength).append(",");
+        if (standardWidth != null) sb.append("\"standardWidth\":").append(standardWidth).append(",");
+        if (standardHeight != null) sb.append("\"standardHeight\":").append(standardHeight).append(",");
+        if (sb.charAt(sb.length() - 1) == ',') sb.deleteCharAt(sb.length() - 1);
+        sb.append("}");
+        return sb.toString();
+    }
+
+    // ---------- Happy path / contrato --------------------------------------
+
+    @Test
+    void create_withValidPayload_returns201AndPersists() {
+        String name = "ZTEST_EXCAVADORA_320";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, "Excavadora oruga 30t", "30.50", "12.00", "3.00", "3.20"))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                .contentType("application/json")
+                .body("id", greaterThanOrEqualTo(1))
+                .body("name", equalTo(name))
+                .body("description", equalTo("Excavadora oruga 30t"))
+                .body("standardWeight", equalTo(30.50f))
+                .body("standardLength", equalTo(12.00f))
+                .body("standardWidth", equalTo(3.00f))
+                .body("standardHeight", equalTo(3.20f))
+                .body("isActive", equalTo(true));
+
+            CargoType persisted = cargoTypeRepository.find("name", name).firstResult();
+            assertNotNull(persisted);
+            assertEquals(name, persisted.name);
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_withOnlyRequiredFields_returns201AndPersistsNullsForOptionals() {
+        String name = "ZTEST_MINCARGO";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                .body("name", equalTo(name))
+                .body("description", nullValue())
+                .body("standardLength", nullValue())
+                .body("standardWidth", nullValue())
+                .body("standardHeight", nullValue())
+                .body("isActive", equalTo(true));
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_responseShape_omitsCreatedAt() {
+        // Lock-in: CargoTypeResponse NO expone createdAt (a diferencia de ClientResponse).
+        String name = "ZTEST_SHAPECHECK";
+        try {
+            String token = login("admin", "Admin1234");
+
+            String createdAt = given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                .extract().jsonPath().getString("createdAt");
+
+            assertEquals(null, createdAt);
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_returnsApplicationJsonContentType() {
+        String name = "ZTEST_CONTENTTYPE";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                .contentType("application/json");
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    // ---------- Trim + normalizacion ---------------------------------------
+
+    @Test
+    void create_trimsAndUppercasesName() {
+        String stored = "ZTEST_TRIMNAME";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body("  ztest_trimname  ", null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                .body("name", equalTo(stored));
+
+            CargoType persisted = cargoTypeRepository.find("name", stored).firstResult();
+            assertNotNull(persisted);
+            assertEquals(stored, persisted.name);
+        } finally {
+            cleanupCargoTypeByName(stored);
+        }
+    }
+
+    @Test
+    void create_trimsDescription_andEmptyToNull() {
+        String name = "ZTEST_DESCTRIM";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, "   ", "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                .body("description", nullValue());
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_withNameOnlyWhitespace_returns400_COM001() {
+        // El name "   " puede pasar @NotBlank en versiones donde @NotBlank
+        // valida non-empty-after-trim (depende del implementor), o fallar antes.
+        // En ambos casos: 400 COM-001 (no se persiste).
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("   ", null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    // ---------- Duplicados -------------------------------------------------
+
+    @Test
+    void create_withDuplicateName_returns409_CGT001() {
+        String name = "ZTEST_DUPNAME";
+        try {
+            String token = login("admin", "Admin1234");
+
+            // 1er POST OK
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201);
+
+            // 2do POST con mismo name → 409 CGT-001
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "2.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(409)
+                .contentType("application/problem+json")
+                .body("code", equalTo("CGT-001"));
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_withDuplicateNameCaseInsensitive_returns409_CGT001() {
+        // Almacenado UPPER por el mapper. Reintento en lowercase debe normalizar
+        // a UPPER y encontrar el duplicado.
+        String stored = "ZTEST_DUPCASE";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(stored, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201);
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body("ztest_dupcase", null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(409)
+                .body("code", equalTo("CGT-001"));
+        } finally {
+            cleanupCargoTypeByName(stored);
+        }
+    }
+
+    // ---------- Validation 400 — required + boundaries ---------------------
+
+    @Test
+    void create_withMissingName_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(null, null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("name"));
+    }
+
+    @Test
+    void create_withEmptyName_returns400() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("", null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withNameTooLong_returns400() {
+        String token = login("admin", "Admin1234");
+        String longName = "X".repeat(101);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(longName, null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withMissingStandardWeight_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NOWEIGHT", null, null, null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWeight"));
+    }
+
+    // ---------- Validation 400 — campos numericos --------------------------
+
+    @Test
+    void create_withNegativeStandardWeight_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NEGWEIGHT", null, "-1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWeight"));
+    }
+
+    @Test
+    void create_withNegativeStandardLength_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NEGLEN", null, "1.00", "-2.00", null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardLength"));
+    }
+
+    @Test
+    void create_withNegativeStandardWidth_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NEGWIDTH", null, "1.00", null, "-2.00", null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWidth"));
+    }
+
+    @Test
+    void create_withNegativeStandardHeight_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NEGHEIGHT", null, "1.00", null, null, "-2.00"))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardHeight"));
+    }
+
+    // ---------- Boundary numericos (decisiones distintivas del PR) ---------
+
+    @Test
+    void create_withZeroStandardWeight_returns201() {
+        // Lock-in de @DecimalMin(value="0", inclusive=true): un cargo type con
+        // standardWeight=0 es valido. Si en el futuro se cambia a inclusive=false
+        // este test debe fallar (decision explicita del PR).
+        String name = "ZTEST_ZEROWEIGHT";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "0", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                // BigDecimal "0" se serializa sin decimal → JSON parser lo lee como Integer 0.
+                .body("standardWeight", equalTo(0));
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_withStandardWeightOverflow_returns400_COM001() {
+        // Lock-in de @Digits(integer=8, fraction=2): valores con > 8 enteros
+        // serian rechazados por Bean Validation con 400 limpio, en vez de
+        // explotar como 500 (SQL overflow del NUMERIC(10,2)).
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_OVERFLOW", null, "100000000.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWeight"));
+    }
+
+    @Test
+    void create_withStandardWeightMaxInteger_returns201() {
+        // Boundary superior valido: 99999999.99 = 8 enteros + 2 decimales = max NUMERIC(10,2).
+        String name = "ZTEST_MAXWEIGHT";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "99999999.99", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                .body("standardWeight", equalTo(99999999.99f));
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    // ---------- Auth 401 ---------------------------------------------------
+
+    @Test
+    void create_withoutToken_returns401() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NOAUTH", null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void create_withMalformedToken_returns401_AUTH008() {
+        given()
+            .header("Authorization", "Bearer eyJ.malformed.token")
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_MALFORMED", null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(401)
+            .contentType("application/problem+json")
+            .body("code", equalTo("AUTH-008"));
+    }
+
+    @Test
+    void create_withExpiredToken_returns401_AUTH007() {
+        Instant past = Instant.now().minusSeconds(120);
+        String expiredToken = Jwt.subject("1")
+            .upn("admin")
+            .groups(Set.of("admin"))
+            .claim("typ", "access")
+            .issuedAt(past.minusSeconds(3600))
+            .expiresAt(past)
+            .sign();
+
+        given()
+            .header("Authorization", "Bearer " + expiredToken)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_EXPIRED", null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(401)
+            .contentType("application/problem+json")
+            .body("code", equalTo("AUTH-007"));
+    }
+
+    // ---------- Authorization: dispatcher 403, otros 201 -------------------
+
+    @Test
+    void create_withDispatcherRole_returns403_COM003() {
+        // Dispatcher excluido del @RolesAllowed → 403 COM-003.
+        String dispatcherToken = fabricateAccessToken("disp_test", "dispatcher");
+
+        given()
+            .header("Authorization", "Bearer " + dispatcherToken)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_DISPATCHER_FORBID", null, "1.00", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(403)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void create_withAdminRole_returns201() {
+        String name = "ZTEST_ADMIN_OK";
+        try {
+            String token = login("admin", "Admin1234");
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201);
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_withSalesRole_returns201() {
+        String name = "ZTEST_SALES_OK";
+        try {
+            String token = login("lcampos", "Sales1234");
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201);
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
+    void create_withOperationsManagerRole_returns201() {
+        String name = "ZTEST_OPSMGR_OK";
+        try {
+            String token = fabricateAccessToken("ops_test", "operations_manager");
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "1.00", null, null, null))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201);
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
     }
 }
