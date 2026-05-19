@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS public.cargo_types (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- GIN trgm index para busqueda fuzzy en listCargoTypes.
+-- Acelera tanto ILIKE '%pat%' como similarity(name, q) usados en el endpoint.
+-- Solo en name (no hay equivalente al ruc de clients).
+CREATE INDEX IF NOT EXISTS idx_cargo_types_name_trgm ON public.cargo_types USING GIN (name gin_trgm_ops);
+
 CREATE TABLE IF NOT EXISTS public.clients (
     id           SERIAL PRIMARY KEY,
     name         VARCHAR(200) NOT NULL UNIQUE,
