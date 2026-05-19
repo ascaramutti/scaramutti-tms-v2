@@ -36,10 +36,16 @@ public class ClientResource {
      *
      * Bean Validation en query-params: violaciones disparan
      * ConstraintViolationException → ValidationExceptionMapper → 400 COM-001.
+     *
+     * `@Size(min=3, max=200)` en `q` valida el minimo de busqueda esperado
+     * por el combobox del frontend. Defense-in-depth: si el front tiene un bug
+     * y manda q="ab", backend rechaza. Tambien previene queries patologicos
+     * en BD grandes (q="a" daria miles de matches por ILIKE). Mismo patron
+     * que GET /cargo-types.
      */
     @GET
     public PageResponse<ClientResponse> listClients(
-        @QueryParam("q")        @Size(max = 200)                  String q,
+        @QueryParam("q")        @Size(min = 3, max = 200)         String q,
         @QueryParam("isActive")                                   Boolean isActive,
         @QueryParam("page")     @DefaultValue("0")  @Min(0)       int page,
         @QueryParam("size")     @DefaultValue("20") @Min(1) @Max(100) int size

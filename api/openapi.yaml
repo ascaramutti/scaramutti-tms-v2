@@ -447,13 +447,13 @@ paths:
         `name` y `ruc` cuando se envía `q` (ILIKE acelerado por GIN trgm).
         Default sort: `name ASC`. Cuando hay `q`, ranking primario por
         `similarity(name|ruc, q) DESC`, tiebreak `name ASC`.
-        `q` vacío o sólo whitespace se trata como sin filtro.
+        Para no filtrar, OMITIR el parámetro `q` (no enviarlo vacío).
         Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Vacío = sin filtro.
-          schema: { type: string, maxLength: 200 }
+          description: Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+          schema: { type: string, minLength: 3, maxLength: 200 }
         - name: isActive
           in: query
           schema: { type: boolean }
