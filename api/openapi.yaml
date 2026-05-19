@@ -590,19 +590,32 @@ paths:
     get:
       tags: [CargoTypes]
       operationId: listCargoTypes
-      summary: Listar tipos de carga
+      summary: Buscar tipos de carga (paginado por volumen)
+      description: |
+        Listado paginado de tipos de carga. Filtra por substring case-insensitive
+        en `name` cuando se envía `q` (ILIKE acelerado por GIN trgm).
+        Default sort: `name ASC`. Cuando hay `q`, ranking primario por
+        `similarity(name, q) DESC`, tiebreak `name ASC`.
+        Para no filtrar, OMITIR el parámetro `q` (no enviarlo vacío).
+        Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
       parameters:
+        - name: q
+          in: query
+          description: Búsqueda libre por nombre (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+          schema: { type: string, minLength: 3, maxLength: 200 }
         - name: isActive
           in: query
           schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
       responses:
         '200':
           description: OK
           content:
             application/json:
-              schema:
-                type: array
-                items: { $ref: '#/components/schemas/CargoTypeResponse' }
+              schema: { $ref: '#/components/schemas/PageOfCargoType' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [CargoTypes]
       operationId: createCargoType
@@ -1284,6 +1297,16 @@ components:
             standardWidth:  { type: [number, 'null'], format: double, minimum: 0 }
             standardHeight: { type: [number, 'null'], format: double, minimum: 0 }
             isActive:       { type: boolean }
+
+    PageOfCargoType:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/CargoTypeResponse' }
 
     CargoTypeRequest:
       type: object
