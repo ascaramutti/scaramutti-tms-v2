@@ -1,20 +1,25 @@
 package com.scaramutti.tms.cargotypes.api;
 
+import com.scaramutti.tms.cargotypes.dto.CargoTypeRequest;
 import com.scaramutti.tms.cargotypes.dto.CargoTypeResponse;
 import com.scaramutti.tms.cargotypes.mapper.CargoTypeResourceMapper;
 import com.scaramutti.tms.cargotypes.service.CargoTypeService;
 import com.scaramutti.tms.shared.dto.PageResponse;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import org.jboss.resteasy.reactive.ResponseStatus;
 
 @Path("/cargo-types")
 @Produces(MediaType.APPLICATION_JSON)
@@ -46,6 +51,22 @@ public class CargoTypeResource {
     ) {
         return cargoTypeService.listCargoTypes(
             cargoTypeResourceMapper.toListCargoTypesQuery(q, isActive, page, size)
+        );
+    }
+
+    /**
+     * Crea un tipo de carga al vuelo desde el wizard de cotizaciones.
+     * @RolesAllowed: admin/general_manager/sales/operations_manager pueden crear;
+     * dispatcher NO (mismo criterio que POST /clients). Si dispatcher llama,
+     * Quarkus tira io.quarkus.security.ForbiddenException → ForbiddenExceptionMapper
+     * → 403 COM-003.
+     */
+    @POST
+    @RolesAllowed({"admin", "general_manager", "sales", "operations_manager"})
+    @ResponseStatus(201) // Response.Status.CREATED — el default de JAX-RS para POST que retorna body es 200, lo sobreescribimos.
+    public CargoTypeResponse createCargoType(@Valid CargoTypeRequest cargoTypeRequest) {
+        return cargoTypeService.createCargoType(
+            cargoTypeResourceMapper.toCreateCargoTypeCommand(cargoTypeRequest)
         );
     }
 }

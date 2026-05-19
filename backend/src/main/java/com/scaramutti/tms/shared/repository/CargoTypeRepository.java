@@ -28,6 +28,16 @@ public class CargoTypeRepository implements PanacheRepositoryBase<CargoType, Int
     EntityManager entityManager;
 
     /**
+     * Existe un cargo type con el name dado (case-sensitive porque los names
+     * se almacenan ya uppercased por el ResourceMapper). Usado por
+     * validateNoDuplicates en el service antes del INSERT. La race condition
+     * la cubre el catch de ConstraintViolationException del service.
+     */
+    public boolean existsByName(String name) {
+        return count("name", name) > 0;
+    }
+
+    /**
      * Busca tipos de carga paginados aplicando filtros opcionales.
      *
      *  - q: si != null → ILIKE substring match (`%q%`) contra `name`. Recall
