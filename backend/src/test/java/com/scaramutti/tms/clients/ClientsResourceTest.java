@@ -693,27 +693,53 @@ class ClientsResourceTest {
             .body("empty", equalTo(true));
     }
 
-    @Test
-    void list_withQEmptyString_treatedAsNoFilter() {
-        // q="" debe normalizarse a sin filtro (lock-in del trim del ResourceMapper).
-        seedClient(TEST_NAME_PREFIX + "ANY", TEST_RUC_PREFIX + "044444444", true);
-        String token = login("admin", "Admin1234");
+    // ---------- minLength validation ---------------------------------------
 
-        int totalWithoutQ = given()
-            .header("Authorization", "Bearer " + token)
-        .when()
-            .get("/clients")
-        .then()
-            .statusCode(200)
-            .extract().jsonPath().getInt("totalElements");
+    @Test
+    void list_withQEmptyString_returns400_COM001() {
+        // Con minLength=3, q="" no es valido. Para no filtrar el cliente debe
+        // OMITIR el param, no enviarlo vacio.
+        String token = login("admin", "Admin1234");
 
         given()
             .header("Authorization", "Bearer " + token)
         .when()
             .get("/clients?q=")
         .then()
-            .statusCode(200)
-            .body("totalElements", equalTo(totalWithoutQ));
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("errors.size()", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_withQ2Chars_returns400_COM001() {
+        // Lock-in del minLength=3 en el param q (defense-in-depth + previene
+        // queries patologicos en BD grandes).
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=ab")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("errors.size()", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_withQ1Char_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=a")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
     }
 
     // ---------- Filtro isActive ----------------------------------------------
