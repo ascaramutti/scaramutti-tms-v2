@@ -38,6 +38,20 @@ public class ClientService {
      * El Query viene ya normalizado desde el ClientResourceMapper
      * (q trimmed + uppercased). El service solo orquesta.
      */
+    /**
+     * Devuelve el cliente con el id dado, o tira CLI-003 (404) si no existe.
+     * NO filtra por isActive — el caller decide segun contexto:
+     *  - GET /clients/{id} (admin/operations): puede mostrar inactivos.
+     *  - POST /quotations (loader): valida isActive y tira COM-001 si no aplica.
+     */
+    public ClientResponse findById(Integer id) {
+        Client client = clientRepository.findById(id);
+        if (client == null) {
+            throw ClientsError.NOT_FOUND.toException();
+        }
+        return clientServiceMapper.toClientResponse(client);
+    }
+
     public PageResponse<ClientResponse> listClients(ListClientsQuery listClientsQuery) {
         List<Client> clients = clientRepository.searchPaged(listClientsQuery);
         long totalElements = clientRepository.countSearch(listClientsQuery);

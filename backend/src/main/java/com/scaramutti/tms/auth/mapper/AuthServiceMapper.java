@@ -22,7 +22,20 @@ import java.time.ZoneOffset;
 @Mapper(componentModel = MappingConstants.ComponentModel.CDI)
 public interface AuthServiceMapper {
 
-    @Mapping(target = "fullName", expression = "java(user.worker.fullName())")
+    /**
+     * Compone UserResponse desde User + Worker (relacion @OneToOne EAGER) +
+     * Role (relacion @ManyToOne EAGER). El {@code fullName} usa el metodo
+     * {@code Worker#fullName()} via expression (MapStruct no detecta metodos
+     * sin prefijo {@code get}). Defensivo: si {@code user.worker} es null,
+     * devuelve null en lugar de NPE — soporta casos donde un User existe
+     * sin Worker asociado (raro, pero posible en migraciones de data).
+     *
+     * Este metodo es el {@code toUserResponse} canonico del proyecto;
+     * otros services que necesiten convertir User → UserResponse inyectan
+     * este mapper en vez de duplicar la logica.
+     */
+    @Mapping(target = "fullName",
+             expression = "java(user.worker != null ? user.worker.fullName() : null)")
     @Mapping(target = "position", source = "worker.position")
     @Mapping(target = "role",     source = "role.name")
     UserResponse toUserResponse(User user);

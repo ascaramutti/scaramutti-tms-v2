@@ -14,7 +14,11 @@ public enum CatalogsError implements ApiError {
     QUOTATION_SERVICE_TYPE_CODE_REQUIRED       ("CAT-001", 400, "Service type code required",
         "El code del tipo de servicio no puede ser null ni vacío"),
     QUOTATION_SERVICE_TYPE_CODE_PREFIX_INVALID ("CAT-002", 400, "Service type code prefix invalid",
-        "El code del tipo de servicio debe empezar con S, A, C o I (categoría del kind)");
+        "El code del tipo de servicio debe empezar con S, A, C o I (categoría del kind)"),
+    CURRENCY_NOT_FOUND                         ("CAT-003", 404, "Not Found",
+        "Moneda no encontrada"),
+    PAYMENT_TERM_NOT_FOUND                     ("CAT-004", 404, "Not Found",
+        "Término de pago no encontrado");
 
     private final String code;
     private final int status;

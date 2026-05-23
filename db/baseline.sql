@@ -290,7 +290,8 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
     quotation_type         VARCHAR(20) NOT NULL DEFAULT 'TRANSPORTE',
     status                 VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
     client_id              INTEGER NOT NULL REFERENCES public.clients(id),
-    contact_name           VARCHAR(200),
+    contact_name           VARCHAR(200) NOT NULL,
+    contact_phone          VARCHAR(9),
     currency_id            INTEGER NOT NULL REFERENCES public.currencies(id),
     payment_term_id        INTEGER REFERENCES cotizaciones.payment_terms(id),
     tentative_service_date DATE,
@@ -309,7 +310,8 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
 COMMENT ON TABLE  cotizaciones.quotations               IS 'Cabecera de cotización emitida al cliente';
 COMMENT ON COLUMN cotizaciones.quotations.quotation_type IS 'TRANSPORTE (con origen/destino) | ALQUILER (sin ruta, por días/unidades)';
 COMMENT ON COLUMN cotizaciones.quotations.status        IS 'DRAFT (borrador interno) | SENT (enviada al cliente). Estado vencido se calcula desde created_at + validity_days';
-COMMENT ON COLUMN cotizaciones.quotations.contact_name  IS 'Snapshot del contacto al momento de cotizar (no se reactualiza si el cliente cambia)';
+COMMENT ON COLUMN cotizaciones.quotations.contact_name  IS 'Snapshot del contacto al momento de cotizar (obligatorio — la cotización siempre se dirige a alguien). No se reactualiza si el cliente master cambia.';
+COMMENT ON COLUMN cotizaciones.quotations.contact_phone IS 'Snapshot del telefono de contacto al momento de cotizar (9 digitos numericos, no se reactualiza si el cliente cambia)';
 COMMENT ON COLUMN cotizaciones.quotations.validity_days IS 'Días de validez de la cotización desde la fecha de creación';
 
 CREATE INDEX IF NOT EXISTS idx_quotations_client     ON cotizaciones.quotations(client_id);

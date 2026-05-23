@@ -16,7 +16,10 @@ import jakarta.transaction.Transactional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 
 @ApplicationScoped
 public class CargoTypeService {
@@ -25,6 +28,17 @@ public class CargoTypeService {
 
     @Inject CargoTypeRepository cargoTypeRepository;
     @Inject CargoTypeServiceMapper cargoTypeServiceMapper;
+
+    /**
+     * Bulk fetch por ids. UNA sola query (WHERE id IN). NO valida que todos
+     * los ids existan — el caller compara la lista devuelta vs los ids pedidos.
+     * Método interno, sin endpoint REST asociado.
+     */
+    public List<CargoTypeResponse> findByIds(Set<Integer> ids) {
+        if (ids == null || ids.isEmpty()) return Collections.emptyList();
+        List<CargoType> cargoTypes = cargoTypeRepository.list("id in ?1", new ArrayList<>(ids));
+        return cargoTypeServiceMapper.toCargoTypeResponseList(cargoTypes);
+    }
 
     /**
      * Listado paginado con busqueda fuzzy opcional. Read-only, no requiere
