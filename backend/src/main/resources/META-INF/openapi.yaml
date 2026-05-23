@@ -44,6 +44,8 @@ tags:
     description: Catálogos simples de referencia — monedas, términos de pago, tipos de servicio
   - name: Clients
     description: Clientes — búsqueda, creación al vuelo, edición y desactivación
+  - name: Quotations
+    description: Cotizaciones — wizard de creación, listing, edición y PDF
 
 # =============================================================================
 paths:
@@ -415,6 +417,41 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  # ----- Quotations ---------------------------------------------------------
+
+  /quotations:
+    post:
+      tags: [Quotations]
+      operationId: createQuotation
+      summary: Crear cotización
+      description: |
+        Crea una cotización con su cabecera + ítems + stand-by costs en una
+        transacción atómica. El backend genera el `code` (formato `YYYY-NNNNN`)
+        usando advisory lock por año (reinicio anual automático del contador).
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotationRequest' }
+      responses:
+        '201':
+          description: Cotización creada
+          headers:
+            Location:
+              description: URL del recurso creado
+              schema: { type: string }
+            ETag:
+              description: Versión del recurso (mismo valor que `updatedAt` del body).
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -545,6 +582,36 @@ components:
                 instance: '/api/v1/clients'
                 code: 'CLI-002'
                 traceId: '5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b'
+            duplicateCargoTypeName:
+              summary: Nombre de tipo de carga duplicado al crear cargo type
+              value:
+                type: 'urn:tms:error:cgt-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe un tipo de carga con el nombre indicado'
+                instance: '/api/v1/cargo-types'
+                code: 'CGT-001'
+                traceId: '6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c'
+            duplicateQuotationCode:
+              summary: Código de cotización duplicado (race condition extrema sobre el advisory lock)
+              value:
+                type: 'urn:tms:error:quo-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'El código 2026-00042 ya está en uso, reintente'
+                instance: '/api/v1/quotations'
+                code: 'QUO-001'
+                traceId: '7e8f9a0b-1c2d-3e4f-5a6b-7c8d9e0f1a2b'
+            duplicateQuotationDetected:
+              summary: Cotización duplicada detectada (protección anti doble-click backend-side)
+              value:
+                type: 'urn:tms:error:quo-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Se detectó una cotización idéntica creada hace menos de 30 segundos'
+                instance: '/api/v1/quotations'
+                code: 'QUO-002'
+                traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
 
   schemas:
 
@@ -779,18 +846,314 @@ components:
       type: string
       enum: [SERVICIO, ALQUILER, COMPLEMENTARIO, INTEGRAL]
       description: |
-        Categoría del servicio. El backend la computa desde el prefijo del
+        Categoría del servicio. El backend la **computa** desde el prefijo del
         `code` (S→SERVICIO, A→ALQUILER, C→COMPLEMENTARIO, I→INTEGRAL): no es
-        columna en BD. Se expone en el response para que el frontend filtre
-        sin conocer la convención del prefijo.
+        columna en BD. Se expone en el response para que el frontend filtre sin
+        conocer la convención del prefijo.
+
+        Reglas del wizard:
+        - `quotationType=TRANSPORTE` → muestra SERVICIO + COMPLEMENTARIO + INTEGRAL
+        - `quotationType=ALQUILER`   → muestra solo ALQUILER
 
     QuotationServiceTypeResponse:
+      allOf:
+        - $ref: '#/components/schemas/QuotationServiceTypeRef'
+        - type: object
+          required: [isActive]
+          properties:
+            description: { type: [string, 'null'] }
+            isActive:    { type: boolean }
+
+    # -------- Quotations ---------------------------------------------------
+    QuotationType:
+      type: string
+      enum: [TRANSPORTE, ALQUILER]
+      description: |
+        - `TRANSPORTE`: requiere `origin` y `destination`. Usa tipos de servicio de transporte y complementarios.
+        - `ALQUILER`: sin ruta. Solo tipos de servicio de alquiler.
+
+    QuotationStatus:
+      type: string
+      enum: [DRAFT, SENT]
+      description: |
+        - `DRAFT`: cotización en edición, no enviada al cliente.
+        - `SENT`: ya enviada al cliente. Editable, pero queda registrado el envío.
+
+        El estado "vencida" se calcula en runtime: `createdAt + validityDays < now()`. No se almacena.
+
+    QuotationServiceTypeRef:
       type: object
-      required: [id, code, name, kind, isActive]
+      required: [id, code, name, kind]
       properties:
-        id:          { type: integer, format: int32 }
-        code:        { type: string, example: 'SCB' }
-        name:        { type: string, example: 'Servicio de transporte en Cama Baja' }
-        kind:        { $ref: '#/components/schemas/QuotationServiceKind' }
-        description: { type: [string, 'null'] }
-        isActive:    { type: boolean }
+        id:   { type: integer, format: int32 }
+        code: { type: string, example: 'SCB' }
+        name: { type: string, example: 'Servicio de transporte en Cama Baja' }
+        kind: { $ref: '#/components/schemas/QuotationServiceKind' }
+
+    QuotationStandbyCostRequest:
+      type: object
+      required: [pricePerDay]
+      properties:
+        pricePerDay: { type: number, format: double, minimum: 0 }
+        includesIgv: { type: boolean, default: false }
+
+    QuotationStandbyCostResponse:
+      type: object
+      required: [id, pricePerDay, includesIgv]
+      properties:
+        id:           { type: integer, format: int64 }
+        pricePerDay:  { type: number, format: double, minimum: 0 }
+        includesIgv:  { type: boolean }
+
+    # ----- Quotation embedded summaries (Adapter / Anti-Corruption Layer) ---
+    # Vistas resumidas de entidades externas (Client, Currency, etc.) embebidas
+    # dentro del response de cotizacion. Subset intencional de los Response DTOs
+    # de origen — solo los campos relevantes al contexto de cotizacion. Aislan
+    # el bounded context Quotations de cambios futuros en los DTOs de otros modulos.
+
+    QuotationClientSummary:
+      type: object
+      required: [id, name, ruc]
+      properties:
+        id:   { type: integer, format: int32 }
+        name: { type: string, description: 'Razon social del cliente' }
+        ruc:  { type: string, pattern: '^\d{11}$' }
+
+    QuotationCurrencySummary:
+      type: object
+      required: [id, code, symbol]
+      properties:
+        id:     { type: integer, format: int32 }
+        code:   { type: string, description: 'Codigo ISO 4217', pattern: '^[A-Z]{3}$' }
+        symbol: { type: string, maxLength: 5 }
+
+    QuotationPaymentTermSummary:
+      type: object
+      required: [id, name, days]
+      properties:
+        id:   { type: integer, format: int32 }
+        name: { type: string }
+        days: { type: integer, minimum: 0 }
+
+    QuotationServiceTypeSummary:
+      type: object
+      required: [id, code, name, kind]
+      properties:
+        id:   { type: integer, format: int32 }
+        code: { type: string, pattern: '^[A-Z]{2,10}$' }
+        name: { type: string }
+        kind: { type: string, description: 'Categoria del servicio (SERVICIO/ALQUILER/COMPLEMENTARIO/INTEGRAL)' }
+
+    QuotationCargoTypeSummary:
+      description: |
+        Subset minimo del tipo de carga para embeber en items de la cotizacion.
+        Las dimensiones del catalogo (standardWeight/Length/Width/Height) NO se
+        incluyen aca: el item persiste su propio weightKg/lengthMeters/...
+        como snapshot. Los valores de referencia del catalogo siguen disponibles
+        via GET /catalogs/cargo-types/{id} si se necesitan.
+      type: object
+      required: [id, name]
+      properties:
+        id:   { type: integer, format: int32 }
+        name: { type: string }
+
+    QuotationItemRequest:
+      description: |
+        Item de cotización. **`unitPrice` es requerido para ítems root**; para hijos del
+        Servicio Integral debe omitirse o enviarse como 0 (en su lugar puede enviarse
+        `internalReferencePrice`).
+      type: object
+      required: [serviceTypeId, quantity]
+      properties:
+        itemNumber:
+          type: [integer, 'null']
+          format: int32
+          description: 'Si se omite, lo asigna el backend en orden de aparición. Si la cotización tiene Integral, debe ser `1`.'
+        parentItemNumber:
+          type: [integer, 'null']
+          format: int32
+          description: 'Para ítems hijos del Integral, referencia al `itemNumber` del padre dentro del mismo request (siempre `1`).'
+        serviceTypeId: { type: integer, format: int32 }
+        cargoTypeId:   { type: [integer, 'null'], format: int32 }
+        observations:  { type: [string, 'null'] }
+        weightKg:      { type: [number, 'null'], format: double, minimum: 0 }
+        lengthMeters:  { type: [number, 'null'], format: double, minimum: 0 }
+        widthMeters:   { type: [number, 'null'], format: double, minimum: 0 }
+        heightMeters:  { type: [number, 'null'], format: double, minimum: 0 }
+        quantity:      { type: integer, minimum: 1, default: 1 }
+        unitPrice:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Requerido para ítems root. Para hijos del Integral debe omitirse o ser 0.'
+        internalReferencePrice:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Solo válido para hijos del Integral. Opcional. NO se muestra en el PDF.'
+        # igvPercentage NO se acepta en el request — el backend lo resuelve desde
+        # config (IGV nacional uniforme). Se persiste como snapshot en cada item
+        # y se devuelve en el response.
+        insuredAmount: { type: [number, 'null'], format: double, minimum: 0, description: 'Solo válido si `serviceTypeId` corresponde a SEG.' }
+        standby:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/QuotationStandbyCostRequest'
+
+    QuotationItemResponse:
+      description: |
+        Ítem de cotización. Puede ser **root** (sin `parentItemId`) o **hijo del Servicio
+        Integral** (con `parentItemId` apuntando al padre).
+
+        **Pricing según tipo:**
+        - Ítems root: `unitPrice` es el precio que paga el cliente, IGV calculado al 18%.
+        - Hijos del Integral: `unitPrice` no aplica (siempre 0); usan `internalReferencePrice`
+          opcional, que es referencia histórica interna y NO se muestra en el PDF al cliente.
+          La suma de referencias de hijos puede exceder el precio del padre (es el descuento
+          implícito del paquete Integral).
+      type: object
+      required: [id, itemNumber, serviceType, quantity, igvPercentage, subtotal]
+      properties:
+        id:             { type: integer, format: int64 }
+        parentItemId:
+          type: [integer, 'null']
+          format: int64
+          description: 'NULL para ítems root. Set para ítems hijos del Servicio Integral.'
+        itemNumber:     { type: integer, format: int32 }
+        serviceType:    { $ref: '#/components/schemas/QuotationServiceTypeSummary' }
+        cargoType:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/QuotationCargoTypeSummary'
+        observations:   { type: [string, 'null'] }
+        weightKg:       { type: [number, 'null'], format: double, minimum: 0 }
+        lengthMeters:   { type: [number, 'null'], format: double, minimum: 0 }
+        widthMeters:    { type: [number, 'null'], format: double, minimum: 0 }
+        heightMeters:   { type: [number, 'null'], format: double, minimum: 0 }
+        quantity:       { type: integer, minimum: 1 }
+        unitPrice:
+          type: number
+          format: double
+          minimum: 0
+          description: 'Precio unitario que paga el cliente. Aplica solo para ítems root. En hijos del Integral siempre es 0 (usar `internalReferencePrice`).'
+        internalReferencePrice:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Precio interno de referencia. Solo aplica para ítems hijos del Servicio Integral. NO se muestra en el PDF al cliente. Opcional.'
+        igvPercentage:  { type: number, format: double, minimum: 0, maximum: 100, example: 18.00 }
+        subtotal:
+          type: number
+          format: double
+          description: '`unitPrice * quantity` para root; 0 para hijos del Integral (no entran al total de la cotización).'
+        insuredAmount:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Solo aplica para ítems de tipo Seguro de Carga (SEG).'
+        standby:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/QuotationStandbyCostResponse'
+        children:
+          description: 'Ítems hijos (presente solo en ítems padre del Servicio Integral).'
+          type: array
+          items: { $ref: '#/components/schemas/QuotationItemResponse' }
+
+    QuotationRequest:
+      description: |
+        ## Reglas de negocio (validadas por backend)
+
+        - **Máximo 5 ítems root** (los hijos del Servicio Integral no cuentan).
+        - **Servicio Integral**: si la cotización tiene un ítem con `serviceType.code='INT'`:
+          - debe ser el primer ítem (`itemNumber=1`),
+          - debe tener al menos **2 ítems hijos** (referenciados vía `parentItemNumber=1`),
+          - los hijos deben incluir al menos **1 servicio de tipo TRANSPORTE (kind=S)** y
+            al menos **1 servicio de tipo COMPLEMENTARIO (kind=C)**,
+          - solo puede haber un Integral por cotización.
+        - **Origen/destino**: requeridos si `quotationType=TRANSPORTE`, ignorados si `ALQUILER`.
+        - **`contactName`**: snapshot editable. Se precarga desde `client.contactName` en el
+          formulario, pero el usuario puede editarlo. Lo que se guarda es el valor final del
+          formulario, congelado al momento de crear/editar la cotización.
+        - **Anti-duplicado**: el backend rechaza con `409 QUO-002` si llega un POST con
+          mismo `clientId` + mismo set de `serviceTypeId`s + mismo usuario creador dentro
+          de los últimos 30 segundos (protección anti doble-click backend-side).
+      type: object
+      required: [quotationType, clientId, contactName, currencyId, validityDays, items]
+      properties:
+        quotationType:        { $ref: '#/components/schemas/QuotationType' }
+        clientId:             { type: integer, format: int32 }
+        contactName:          { type: string, minLength: 1, maxLength: 200, description: 'Obligatorio — la cotización siempre se dirige a alguien. Snapshot al momento de cotizar (se precarga del cliente, el usuario puede editarlo, queda congelado).' }
+        contactPhone:         { type: [string, 'null'], pattern: '^\d{9}$', description: 'Snapshot editable del telefono de contacto (9 digitos numericos). Se precarga del cliente y queda congelado en la cotización.' }
+        currencyId:           { type: integer, format: int32 }
+        paymentTermId:        { type: [integer, 'null'], format: int32 }
+        tentativeServiceDate: { type: [string, 'null'], format: date }
+        validityDays:         { type: integer, minimum: 1, maximum: 365, example: 15 }
+        origin:
+          type: [string, 'null']
+          description: 'Requerido si `quotationType=TRANSPORTE`. Validado por backend.'
+          maxLength: 255
+        destination:
+          type: [string, 'null']
+          description: 'Requerido si `quotationType=TRANSPORTE`. Validado por backend.'
+          maxLength: 255
+        items:
+          type: array
+          minItems: 1
+          description: 'Lista plana de ítems root e hijos. Los hijos referencian al padre vía `parentItemNumber`. Máximo 5 ítems root (validado por backend).'
+          items: { $ref: '#/components/schemas/QuotationItemRequest' }
+
+    QuotationResponse:
+      type: object
+      required:
+        - id
+        - code
+        - quotationType
+        - status
+        - client
+        - currency
+        - validityDays
+        - expiresAt
+        - isExpired
+        - items
+        - totalSubtotal
+        - totalIgv
+        - totalAmount
+        - createdBy
+        - updatedBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string, example: '2026-00042' }
+        quotationType: { $ref: '#/components/schemas/QuotationType' }
+        status:        { $ref: '#/components/schemas/QuotationStatus' }
+        client:        { $ref: '#/components/schemas/QuotationClientSummary' }
+        contactName:
+          type: [string, 'null']
+          description: 'Snapshot del contacto al momento de cotizar (queda fijo aunque cambie el cliente master).'
+        contactPhone:
+          type: [string, 'null']
+          pattern: '^\d{9}$'
+          description: 'Snapshot del telefono de contacto al momento de cotizar (9 digitos). Queda fijo aunque cambie el cliente master.'
+        currency:      { $ref: '#/components/schemas/QuotationCurrencySummary' }
+        paymentTerm:
+          nullable: true
+          allOf:
+            - $ref: '#/components/schemas/QuotationPaymentTermSummary'
+        tentativeServiceDate: { type: [string, 'null'], format: date }
+        validityDays: { type: integer, minimum: 1, maximum: 365, example: 15 }
+        expiresAt:    { type: string, format: date-time, description: 'createdAt + validityDays (computado)' }
+        isExpired:    { type: boolean, description: 'now() > expiresAt' }
+        origin:       { type: [string, 'null'] }
+        destination:  { type: [string, 'null'] }
+        totalSubtotal: { type: number, format: double, description: 'Suma de items.subtotal' }
+        totalIgv:      { type: number, format: double, description: 'IGV total' }
+        totalAmount:   { type: number, format: double, description: 'Total = subtotal + IGV' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/QuotationItemResponse' }
+        createdBy: { $ref: '#/components/schemas/UserResponse' }
+        updatedBy: { $ref: '#/components/schemas/UserResponse' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: 'Source de la versión para optimistic locking (mismo valor que el header ETag).' }

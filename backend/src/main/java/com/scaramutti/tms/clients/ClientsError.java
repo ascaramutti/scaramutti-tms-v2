@@ -11,7 +11,9 @@ public enum ClientsError implements ApiError {
     DUPLICATE_RUC  ("CLI-001", 409, "Conflict",
         "Ya existe un cliente con el RUC indicado"),
     DUPLICATE_NAME ("CLI-002", 409, "Conflict",
-        "Ya existe un cliente con el nombre indicado");
+        "Ya existe un cliente con el nombre indicado"),
+    NOT_FOUND      ("CLI-003", 404, "Not Found",
+        "Cliente no encontrado");
 
     private final String code;
     private final int status;
