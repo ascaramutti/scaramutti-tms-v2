@@ -21,6 +21,7 @@ import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.exception.CommonError;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.jboss.logging.Logger;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -29,33 +30,38 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Carga y valida la existencia + estado activo de TODAS las entidades
- * referenciadas por un CreateQuotationCommand (client, currency, paymentTerm,
- * serviceTypes, cargoTypes).
+ * Carga las entidades referenciadas por una cotizacion (client, currency,
+ * paymentTerm, serviceTypes, cargoTypes) y las convierte a Summaries del
+ * bounded context Quotations.
+ *
+ * <p>Dos entry points publicos paralelos, diferenciados por el flag
+ * {@code isCreatePath}:
+ * <ul>
+ *   <li>{@link #loadFor(CreateQuotationCommand)} — para CREATE (POST). Valida
+ *       que TODAS las FKs esten {@code isActive=true}. Una FK inactiva o
+ *       inexistente en el payload de creacion es invalido (input del usuario)
+ *       — se traduce a {@code COM-001} (400 VALIDATION_FAILED).</li>
+ *   <li>{@link #loadByIds(Integer, Integer, Integer, Set, Set)} — para READ
+ *       (GET /{id} y futuro listado). NO valida isActive: una cotizacion vieja
+ *       puede referenciar entidades que se desactivaron despues — el frontend
+ *       igual debe poder mostrarla. Una FK INEXISTENTE en este path indica
+ *       <b>bug de integridad referencial</b> (alguien borro un row del catalogo
+ *       que la cotizacion referenciaba): se loguea como error y se traduce a
+ *       {@code COM-500} (500 INTERNAL_ERROR) — no es input del usuario.</li>
+ * </ul>
  *
  * <p>Pattern: <b>Anti-Corruption Layer</b>. Internamente llama a los services
  * de cada modulo (ClientService.findById, etc.) que devuelven sus Response
  * DTOs completos. Luego convierte cada Response a un <em>Summary</em>
- * especifico del contexto de cotizacion via {@link QuotationEmbeddedSummaryMapper}
- * — preservando solo los campos relevantes y aislando este modulo de cambios
- * futuros en los DTOs de otros modulos.
- *
- * <p>Traduccion de errores: los services tiran NOT_FOUND (CLI-003, CAT-003,
- * etc. con status 404) cuando no encuentran la entidad. Desde POST /quotations
- * eso es un payload invalido (no un recurso ausente en la URL), asi que el
- * loader captura el NOT_FOUND y lo retraduce a {@code COM-001} (400 VALIDATION_FAILED)
- * con un mensaje generico apuntando al field del payload.
- *
- * <p>Chequeo de {@code isActive}: lo hace el loader sobre el Response (antes
- * de convertir a Summary), no los services. Razon: el endpoint REST GET /{id}
- * debe poder devolver entidades inactivas (admin las ve para reactivarlas).
- * Solo desde el contexto "crear cotizacion" tiene sentido rechazar inactivas.
+ * especifico del contexto de cotizacion via {@link QuotationEmbeddedSummaryMapper}.
  *
  * <p>Performance: los maps (serviceTypes, cargoTypes) usan {@code findByIds}
  * (1 query con WHERE id IN), no N llamadas a findById.
  */
 @ApplicationScoped
 public class QuotationDependencyLoaderService {
+
+    private static final Logger LOG = Logger.getLogger(QuotationDependencyLoaderService.class);
 
     @Inject ClientService clientService;
     @Inject CurrencyService currencyService;
@@ -64,15 +70,53 @@ public class QuotationDependencyLoaderService {
     @Inject QuotationServiceTypeService quotationServiceTypeService;
     @Inject QuotationEmbeddedSummaryMapper summaryMapper;
 
+    /**
+     * Carga dependencias para CREATE. Valida isActive en TODAS las FKs.
+     * FK inexistente → COM-001 (400) "{field} no existe".
+     */
     public LoadedDependencies loadFor(CreateQuotationCommand command) {
-        QuotationClientSummary client = requireActiveClient(command.clientId());
-        QuotationCurrencySummary currency = requireActiveCurrency(command.currencyId());
-        QuotationPaymentTermSummary paymentTerm = loadOptionalActivePaymentTerm(command.paymentTermId());
+        return loadInternal(
+            command.clientId(),
+            command.currencyId(),
+            command.paymentTermId(),
+            collectServiceTypeIds(command),
+            collectCargoTypeIds(command),
+            true
+        );
+    }
 
+    /**
+     * Carga dependencias para READ. NO valida isActive — cotizaciones viejas
+     * con entidades desactivadas se muestran igual. FK inexistente → loguea
+     * error y tira COM-500 (500) — bug de integridad referencial.
+     */
+    public LoadedDependencies loadByIds(
+        Integer clientId,
+        Integer currencyId,
+        Integer paymentTermId,
+        Set<Integer> serviceTypeIds,
+        Set<Integer> cargoTypeIds
+    ) {
+        return loadInternal(clientId, currencyId, paymentTermId, serviceTypeIds, cargoTypeIds, false);
+    }
+
+    // ---------- Implementacion compartida -----------------------------------
+
+    private LoadedDependencies loadInternal(
+        Integer clientId,
+        Integer currencyId,
+        Integer paymentTermId,
+        Set<Integer> serviceTypeIds,
+        Set<Integer> cargoTypeIds,
+        boolean isCreatePath
+    ) {
+        QuotationClientSummary client = loadClient(clientId, isCreatePath);
+        QuotationCurrencySummary currency = loadCurrency(currencyId, isCreatePath);
+        QuotationPaymentTermSummary paymentTerm = loadOptionalPaymentTerm(paymentTermId, isCreatePath);
         Map<Integer, QuotationServiceTypeSummary> serviceTypesById =
-            loadActiveServiceTypes(collectServiceTypeIds(command));
+            loadServiceTypes(serviceTypeIds, isCreatePath);
         Map<Integer, QuotationCargoTypeSummary> cargoTypesById =
-            loadActiveCargoTypes(collectCargoTypeIds(command));
+            loadCargoTypes(cargoTypeIds, isCreatePath);
 
         return new LoadedDependencies(
             client, currency, paymentTerm, serviceTypesById, cargoTypesById
@@ -81,28 +125,28 @@ public class QuotationDependencyLoaderService {
 
     // ---------- Loaders por FK (type-specific) ------------------------------
 
-    private QuotationClientSummary requireActiveClient(Integer id) {
-        ClientResponse client = findOrTranslate(() -> clientService.findById(id), fieldNotExists("clientId"));
-        if (!Boolean.TRUE.equals(client.isActive())) {
+    private QuotationClientSummary loadClient(Integer id, boolean isCreatePath) {
+        ClientResponse client = findOrTranslate(() -> clientService.findById(id), "clientId", isCreatePath);
+        if (isCreatePath && !Boolean.TRUE.equals(client.isActive())) {
             throw CommonError.VALIDATION_FAILED.toException(fieldInactive("clientId"));
         }
         return summaryMapper.toClientSummary(client);
     }
 
-    private QuotationCurrencySummary requireActiveCurrency(Integer id) {
-        CurrencyResponse currency = findOrTranslate(() -> currencyService.findById(id), fieldNotExists("currencyId"));
-        if (!Boolean.TRUE.equals(currency.isActive())) {
+    private QuotationCurrencySummary loadCurrency(Integer id, boolean isCreatePath) {
+        CurrencyResponse currency = findOrTranslate(() -> currencyService.findById(id), "currencyId", isCreatePath);
+        if (isCreatePath && !Boolean.TRUE.equals(currency.isActive())) {
             throw CommonError.VALIDATION_FAILED.toException(fieldInactive("currencyId"));
         }
         return summaryMapper.toCurrencySummary(currency);
     }
 
-    private QuotationPaymentTermSummary loadOptionalActivePaymentTerm(Integer id) {
+    private QuotationPaymentTermSummary loadOptionalPaymentTerm(Integer id, boolean isCreatePath) {
         if (id == null) return null;
         PaymentTermResponse paymentTerm = findOrTranslate(
-            () -> paymentTermService.findById(id), fieldNotExists("paymentTermId")
+            () -> paymentTermService.findById(id), "paymentTermId", isCreatePath
         );
-        if (!Boolean.TRUE.equals(paymentTerm.isActive())) {
+        if (isCreatePath && !Boolean.TRUE.equals(paymentTerm.isActive())) {
             throw CommonError.VALIDATION_FAILED.toException(fieldInactive("paymentTermId"));
         }
         return summaryMapper.toPaymentTermSummary(paymentTerm);
@@ -110,11 +154,10 @@ public class QuotationDependencyLoaderService {
 
     /**
      * Carga los serviceTypes referenciados en UNA query. Si algun id pedido
-     * no fue devuelto → COM-001 ("serviceTypeId no existe"). Si todos existen
-     * pero alguno esta inactivo → COM-001 ("serviceTypeId esta inactivo").
-     * Devuelve Map de Summary (no Response) para uso en el assembler.
+     * no fue devuelto → COM-001 (CREATE) o COM-500 con log (READ). Si
+     * {@code isCreatePath} y alguno esta inactivo → COM-001.
      */
-    private Map<Integer, QuotationServiceTypeSummary> loadActiveServiceTypes(Set<Integer> ids) {
+    private Map<Integer, QuotationServiceTypeSummary> loadServiceTypes(Set<Integer> ids, boolean isCreatePath) {
         if (ids.isEmpty()) return new HashMap<>();
 
         Map<Integer, QuotationServiceTypeResponse> responseMap = new HashMap<>();
@@ -123,12 +166,14 @@ public class QuotationDependencyLoaderService {
         }
         for (Integer id : ids) {
             if (!responseMap.containsKey(id)) {
-                throw CommonError.VALIDATION_FAILED.toException(fieldNotExists("serviceTypeId"));
+                throwFkNotFound("serviceTypeId", isCreatePath);
             }
         }
-        for (QuotationServiceTypeResponse st : responseMap.values()) {
-            if (!Boolean.TRUE.equals(st.isActive())) {
-                throw CommonError.VALIDATION_FAILED.toException(fieldInactive("serviceTypeId"));
+        if (isCreatePath) {
+            for (QuotationServiceTypeResponse st : responseMap.values()) {
+                if (!Boolean.TRUE.equals(st.isActive())) {
+                    throw CommonError.VALIDATION_FAILED.toException(fieldInactive("serviceTypeId"));
+                }
             }
         }
         Map<Integer, QuotationServiceTypeSummary> summaryMap = new HashMap<>();
@@ -140,9 +185,9 @@ public class QuotationDependencyLoaderService {
 
     /**
      * Carga los cargoTypes referenciados en UNA query. Misma logica que
-     * loadActiveServiceTypes pero para cargoTypeId.
+     * {@link #loadServiceTypes(Set, boolean)} pero para cargoTypeId.
      */
-    private Map<Integer, QuotationCargoTypeSummary> loadActiveCargoTypes(Set<Integer> ids) {
+    private Map<Integer, QuotationCargoTypeSummary> loadCargoTypes(Set<Integer> ids, boolean isCreatePath) {
         if (ids.isEmpty()) return new HashMap<>();
 
         Map<Integer, CargoTypeResponse> responseMap = new HashMap<>();
@@ -151,12 +196,14 @@ public class QuotationDependencyLoaderService {
         }
         for (Integer id : ids) {
             if (!responseMap.containsKey(id)) {
-                throw CommonError.VALIDATION_FAILED.toException(fieldNotExists("cargoTypeId"));
+                throwFkNotFound("cargoTypeId", isCreatePath);
             }
         }
-        for (CargoTypeResponse ct : responseMap.values()) {
-            if (!Boolean.TRUE.equals(ct.isActive())) {
-                throw CommonError.VALIDATION_FAILED.toException(fieldInactive("cargoTypeId"));
+        if (isCreatePath) {
+            for (CargoTypeResponse ct : responseMap.values()) {
+                if (!Boolean.TRUE.equals(ct.isActive())) {
+                    throw CommonError.VALIDATION_FAILED.toException(fieldInactive("cargoTypeId"));
+                }
             }
         }
         Map<Integer, QuotationCargoTypeSummary> summaryMap = new HashMap<>();
@@ -167,20 +214,42 @@ public class QuotationDependencyLoaderService {
     }
 
     /**
-     * Ejecuta el lookup contra el service. Si el service tira NOT_FOUND
-     * (status 404), lo retraduce a COM-001 (400) con un mensaje generico
-     * apuntando al field del payload — sin exponer el id (el usuario sabe
-     * que envio). Cualquier otra ApiException se propaga sin tocar.
+     * Ejecuta el lookup contra el service. Si tira NOT_FOUND (404), delega
+     * a {@link #throwFkNotFound(String, boolean)} para decidir si traducir
+     * a COM-001 (CREATE) o COM-500 con log (READ). Cualquier otra ApiException
+     * se propaga sin tocar.
      */
-    private <T> T findOrTranslate(Supplier<T> lookup, String fieldNotFoundMessage) {
+    private <T> T findOrTranslate(Supplier<T> lookup, String fieldName, boolean isCreatePath) {
         try {
             return lookup.get();
         } catch (ApiException ex) {
             if (ex.status() == 404) {
-                throw CommonError.VALIDATION_FAILED.toException(fieldNotFoundMessage);
+                throwFkNotFound(fieldName, isCreatePath);
             }
             throw ex;
         }
+    }
+
+    /**
+     * Tira la excepcion apropiada cuando una FK no existe.
+     *
+     * <p><b>CREATE path</b>: el usuario envio un id invalido en el payload →
+     * COM-001 (400 VALIDATION_FAILED) con mensaje "{field} no existe". El
+     * frontend muestra el error de validacion.
+     *
+     * <p><b>READ path</b>: el id viene de una entity persistida — alguien
+     * borro un row del catalogo que la cotizacion referenciaba (orfandad).
+     * Es <b>bug de integridad referencial</b>, no input invalido. Loguea
+     * error y tira COM-500 — alerta para soporte/operaciones.
+     */
+    private void throwFkNotFound(String fieldName, boolean isCreatePath) {
+        if (isCreatePath) {
+            throw CommonError.VALIDATION_FAILED.toException(fieldNotExists(fieldName));
+        }
+        LOG.errorf("Orphan FK in quotation READ path: field=%s — borrado del catalogo dejo cotizacion referenciando entidad inexistente", fieldName);
+        throw CommonError.INTERNAL_ERROR.toException(
+            "La cotizacion tiene una referencia rota (" + fieldName + " inexistente). Reporte a soporte."
+        );
     }
 
     // ---------- Extraccion de IDs desde el command --------------------------
