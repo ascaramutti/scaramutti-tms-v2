@@ -11,6 +11,7 @@ import com.scaramutti.tms.auth.service.AuthService;
 import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -31,20 +32,20 @@ public class AuthResource {
     @POST
     @Path("/login")
     @PermitAll
-    public LoginResponse login(@Valid LoginRequest loginRequest) {
+    public LoginResponse login(@Valid @NotNull LoginRequest loginRequest) {
         return authService.login(authResourceMapper.toLoginCommand(loginRequest));
     }
 
     @POST
     @Path("/refresh")
     @PermitAll
-    public LoginResponse refresh(@Valid RefreshRequest refreshRequest) {
+    public LoginResponse refresh(@Valid @NotNull RefreshRequest refreshRequest) {
         return authService.refresh(authResourceMapper.toRefreshCommand(refreshRequest));
     }
 
     @POST
     @Path("/change-password")
-    public Response changePassword(@Valid ChangePasswordRequest changePasswordRequest) {
+    public Response changePassword(@Valid @NotNull ChangePasswordRequest changePasswordRequest) {
         authService.changePassword(authResourceMapper.toChangePasswordCommand(currentUser.requireId(), changePasswordRequest));
         return Response.noContent().build();
     }

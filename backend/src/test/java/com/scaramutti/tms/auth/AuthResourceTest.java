@@ -371,6 +371,83 @@ class AuthResourceTest {
             .body("code", equalTo("AUTH-005"));
     }
 
+    // ---------- @NotNull en body (regresion: body vacio NO debe ser 500) -----
+
+    @Test
+    void login_withEmptyBody_returns400() {
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .post("/auth/login")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void login_withExplicitNullBody_returns400() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("null")
+        .when()
+            .post("/auth/login")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void refresh_withEmptyBody_returns400() {
+        given()
+            .contentType(ContentType.JSON)
+        .when()
+            .post("/auth/refresh")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void refresh_withExplicitNullBody_returns400() {
+        given()
+            .contentType(ContentType.JSON)
+            .body("null")
+        .when()
+            .post("/auth/refresh")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void changePassword_withEmptyBody_returns400() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+        .when()
+            .post("/auth/change-password")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void changePassword_withExplicitNullBody_returns400() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body("null")
+        .when()
+            .post("/auth/change-password")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
     // ----- helpers ----------------------------------------------------------
 
     private String login(String username, String password) {
