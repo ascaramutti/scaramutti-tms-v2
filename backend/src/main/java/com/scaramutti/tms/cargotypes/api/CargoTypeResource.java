@@ -10,6 +10,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
@@ -64,7 +65,7 @@ public class CargoTypeResource {
     @POST
     @RolesAllowed({"admin", "general_manager", "sales", "operations_manager"})
     @ResponseStatus(201) // Response.Status.CREATED — el default de JAX-RS para POST que retorna body es 200, lo sobreescribimos.
-    public CargoTypeResponse createCargoType(@Valid CargoTypeRequest cargoTypeRequest) {
+    public CargoTypeResponse createCargoType(@Valid @NotNull CargoTypeRequest cargoTypeRequest) {
         return cargoTypeService.createCargoType(
             cargoTypeResourceMapper.toCreateCargoTypeCommand(cargoTypeRequest)
         );

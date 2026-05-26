@@ -1119,4 +1119,40 @@ class CargoTypesResourceTest {
             cleanupCargoTypeByName(name);
         }
     }
+
+    // ---------- @NotNull en body (regresion: body vacio NO debe ser 500) -----
+
+    @Test
+    void create_withEmptyBody_returns400() {
+        // POST sin body — debe rechazarse por @NotNull en la frontera (Bean Validation)
+        // ANTES de tocar el service. Sin esto, el null se propagaba al service y
+        // crasheaba con NPE 500.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withExplicitNullBody_returns400() {
+        // POST con body "null" literal — Jackson parsea como null. Mismo path
+        // que el caso anterior pero por una via diferente.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body("null")
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
 }
