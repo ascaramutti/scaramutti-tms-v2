@@ -53,7 +53,12 @@ import java.util.Set;
 @ApplicationScoped
 public class QuotationValidatorService {
 
-    private static final int MAX_ROOT_ITEMS = 5;
+    /**
+     * Maximo de items root permitidos por cotizacion (hijos del Servicio
+     * Integral NO cuentan). Publica para que {@link com.scaramutti.tms.quotations.service.QuotationConfigService}
+     * la exponga al frontend via GET /quotations/config — single source of truth.
+     */
+    public static final int MAX_ROOT_ITEMS = 5;
 
     /**
      * Lista negra de kinds que NO pueden tener {@code standby} asociado.

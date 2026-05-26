@@ -316,6 +316,34 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /quotations/config:
+    get:
+      tags: [Quotations]
+      operationId: getQuotationConfig
+      summary: Configuración pública del módulo de cotizaciones
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      description: |
+        Devuelve constantes runtime del módulo (IGV vigente, máximo de ítems
+        root, validez por defecto). El frontend lo usa para precargar el
+        wizard y mostrar previews sin hardcodear los valores.
+
+        Backend responde desde `app.quotations.*` properties + constantes del
+        validator. Cacheable agresivamente (cambia raramente).
+      responses:
+        '200':
+          description: Config vigente
+          headers:
+            Cache-Control:
+              description: |
+                Cache 1 hora privada. `private` indica que solo el browser del
+                usuario puede cachear (no proxies / CDN compartidos).
+              schema: { type: string, example: 'max-age=3600, private' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationConfigResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /quotations/{id}:
     parameters:
       - $ref: '#/components/parameters/IdLong'
@@ -1654,6 +1682,32 @@ components:
         id:           { type: integer, format: int64 }
         pricePerDay:  { type: number, format: double, minimum: 0 }
         includesIgv:  { type: boolean }
+
+    QuotationConfigResponse:
+      description: |
+        Constantes runtime del módulo Quotations expuestas al frontend.
+        Los valores vienen del config del backend (`app.quotations.*`) o de
+        constantes del validator. Cacheable agresivamente (raramente cambian).
+      type: object
+      required: [igvPercentage, maxRootItems, defaultValidityDays]
+      properties:
+        igvPercentage:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: 'IGV nacional vigente. Se persiste como snapshot en cada `quotation_items.igv_percentage` al crear.'
+          example: 18.00
+        maxRootItems:
+          type: integer
+          minimum: 1
+          description: 'Máximo de ítems root permitidos por cotización (hijos del Servicio Integral no cuentan).'
+          example: 5
+        defaultValidityDays:
+          type: integer
+          minimum: 1
+          description: 'Validez por defecto sugerida para precargar el form (el usuario puede editarla).'
+          example: 15
 
     # ----- Quotation embedded summaries (Adapter / Anti-Corruption Layer) ---
     # Vistas resumidas de entidades externas (Client, Currency, etc.) embebidas
