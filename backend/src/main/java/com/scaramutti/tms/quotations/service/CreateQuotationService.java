@@ -61,7 +61,7 @@ public class CreateQuotationService {
     @ConfigProperty(name = "app.quotations.anti-duplicate-window-seconds")
     int antiDuplicateWindowSeconds;
 
-    @ConfigProperty(name = "app.quotations.default-igv-percentage", defaultValue = "18.00")
+    @ConfigProperty(name = "app.quotations.default-igv-percentage")
     BigDecimal defaultIgvPercentage;
 
     // Repos especificos del modulo (persistencia de la propia entity de quotation).

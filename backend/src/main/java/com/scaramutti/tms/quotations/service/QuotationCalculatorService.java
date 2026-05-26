@@ -33,7 +33,7 @@ public class QuotationCalculatorService {
     private static final BigDecimal CIEN = new BigDecimal("100");
     private static final int SCALE = 2;
 
-    @ConfigProperty(name = "app.quotations.default-igv-percentage", defaultValue = "18.00")
+    @ConfigProperty(name = "app.quotations.default-igv-percentage")
     BigDecimal defaultIgvPercentage;
 
     /**
