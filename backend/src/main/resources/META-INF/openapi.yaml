@@ -480,6 +480,44 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /quotations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdLong'
+    get:
+      tags: [Quotations]
+      operationId: getQuotation
+      summary: Obtener detalle de una cotización
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      description: |
+        Devuelve la cotización completa: cabecera + items (jerárquicos
+        con `children` del Servicio Integral) + totales calculados +
+        `expiresAt` computado + `isExpired` flag runtime (`now() > expiresAt`).
+
+        **`isExpired`** se recomputa en cada GET (no se cachea server-side).
+        El cliente NO debe persistir el valor — el flag puede cambiar entre
+        requests consecutivos si la cotización venció en el medio.
+
+        **Totales** recalculados desde items: subtotal por item root, IGV
+        usando el snapshot `item.igvPercentage` persistido (no el config
+        actual) — preserva integridad del documento firmado.
+
+        El header `ETag` viene con el `updatedAt` del recurso — el cliente
+        puede usarlo para futuros `PUT/PATCH` con `If-Match` (optimistic
+        locking). Mismo formato exacto que el ETag del POST.
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag:
+              description: Versión del recurso (mismo valor que `updatedAt` del body).
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -504,6 +542,11 @@ components:
       in: query
       description: Tamaño de página (máx. 100)
       schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+    IdLong:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
 
   responses:
     Unauthorized:
@@ -640,6 +683,23 @@ components:
                 instance: '/api/v1/quotations'
                 code: 'QUO-002'
                 traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
+
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            quotationNotFound:
+              summary: Cotización inexistente
+              value:
+                type: 'urn:tms:error:quo-003'
+                title: 'Resource not found'
+                status: 404
+                detail: 'La cotización con id 999 no existe'
+                instance: '/api/v1/quotations/999'
+                code: 'QUO-003'
+                traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
 
   schemas:
 

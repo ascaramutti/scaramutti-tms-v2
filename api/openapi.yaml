@@ -352,16 +352,34 @@ paths:
       operationId: getQuotation
       summary: Obtener detalle de una cotización
       x-required-roles: [admin, sales, general_manager, operations_manager]
+      description: |
+        Devuelve la cotización completa: cabecera + items (jerárquicos
+        con `children` del Servicio Integral) + totales calculados +
+        `expiresAt` computado + `isExpired` flag runtime (`now() > expiresAt`).
+
+        **`isExpired`** se recomputa en cada GET (no se cachea server-side).
+        El cliente NO debe persistir el valor — el flag puede cambiar entre
+        requests consecutivos si la cotización venció en el medio.
+
+        **Totales** recalculados desde items: subtotal por item root, IGV
+        usando el snapshot `item.igvPercentage` persistido (no el config
+        actual) — preserva integridad del documento firmado.
+
+        El header `ETag` viene con el `updatedAt` del recurso — el cliente
+        puede usarlo para futuros `PUT/PATCH` con `If-Match` (optimistic
+        locking). Mismo formato exacto que el ETag del POST.
       responses:
         '200':
           description: OK
           headers:
             ETag:
-              description: Versión del recurso
+              description: Versión del recurso (mismo valor que `updatedAt` del body).
               schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Quotations]
@@ -1052,12 +1070,12 @@ components:
             quotationNotFound:
               summary: Cotización inexistente
               value:
-                type: 'urn:tms:error:cot-001'
+                type: 'urn:tms:error:quo-003'
                 title: 'Resource not found'
                 status: 404
                 detail: 'La cotización con id 999 no existe'
                 instance: '/api/v1/quotations/999'
-                code: 'COT-001'
+                code: 'QUO-003'
                 traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
     Conflict:
       description: Conflicto (recurso ya existe, restricción de unicidad violada)

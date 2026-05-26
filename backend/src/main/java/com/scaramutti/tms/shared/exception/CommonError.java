@@ -9,7 +9,9 @@ public enum CommonError implements ApiError {
     VALIDATION_FAILED("COM-001", 400, "Validation failed",
         "La solicitud contiene errores de validación"),
     FORBIDDEN        ("COM-003", 403, "Forbidden",
-        "No tiene permisos para acceder a este recurso");
+        "No tiene permisos para acceder a este recurso"),
+    INTERNAL_ERROR   ("COM-500", 500, "Internal Server Error",
+        "Error interno del servidor");
 
     private final String code;
     private final int status;

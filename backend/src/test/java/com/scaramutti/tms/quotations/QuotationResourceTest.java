@@ -746,4 +746,479 @@ class QuotationResourceTest {
         org.junit.jupiter.api.Assertions.assertEquals(year, year2, "ambos codes del mismo anio");
         org.junit.jupiter.api.Assertions.assertEquals(n1 + 1, n2, "code secuencial");
     }
+
+    // =========================================================================
+    // GET /quotations/{id}
+    // =========================================================================
+
+    // ---------- Helpers de creacion para GET tests --------------------------
+
+    /** Crea una quotation con el body dado y devuelve el id persistido. */
+    private long createQuotationAndReturnId(String token, String body) {
+        return given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body)
+        .when()
+            .post("/quotations")
+        .then()
+            .statusCode(201)
+            .extract().jsonPath().getLong("id");
+    }
+
+    private String alquilerBody() {
+        // ALQUILER no requiere origin/destination/cargoType/weight — todo nullable.
+        // serviceTypeId 9 es ACB (kind=ALQUILER, verificado en BD prod).
+        return String.format("""
+            {
+              "quotationType": "ALQUILER",
+              "clientId": %d,
+              "contactName": "ZTEST_ALQ",
+              "currencyId": %d,
+              "validityDays": 30,
+              "items": [
+                { "serviceTypeId": 9, "quantity": 5, "unitPrice": 500.00 }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID);
+    }
+
+    private String integralBody() {
+        // INT (24) root + SCB (1) transporte + CES (18) complementario.
+        return String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_INT",
+              "currencyId": %d,
+              "validityDays": 15,
+              "origin": "ZTEST_LIMA",
+              "destination": "ZTEST_CUSCO",
+              "items": [
+                { "itemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 8000.00 },
+                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1,
+                  "weightKg": 25.00, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 5000.00 },
+                { "itemNumber": 3, "parentItemNumber": 1, "serviceTypeId": %d, "quantity": 1,
+                  "unitPrice": 0, "internalReferencePrice": 1500.00 }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, ST_CES);
+    }
+
+    private String transporteWithStandbyBody() {
+        return String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_STBY",
+              "currencyId": %d,
+              "validityDays": 15,
+              "origin": "ZTEST_PIURA",
+              "destination": "ZTEST_TUMBES",
+              "items": [
+                {
+                  "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 12.00,
+                  "quantity": 1, "unitPrice": 1500.00,
+                  "standby": { "pricePerDay": 200.00, "includesIgv": false }
+                }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB);
+    }
+
+    private String multiRootBody() {
+        // 3 items root con itemNumber explicito.
+        return String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_MULTI",
+              "currencyId": %d,
+              "validityDays": 15,
+              "origin": "ZTEST_LIMA",
+              "destination": "ZTEST_TRUJILLO",
+              "items": [
+                { "itemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 },
+                { "itemNumber": 2, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1500.00 },
+                { "itemNumber": 3, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 2000.00 }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, ST_SPL, 6 /* ST_SCH */);
+    }
+
+    private String transporteBodyWithoutPaymentTerm() {
+        // Sin paymentTermId, sin tentativeServiceDate, sin contactPhone (todos nullable).
+        return String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_NULL",
+              "currencyId": %d,
+              "validityDays": 15,
+              "origin": "ZTEST_LIMA",
+              "destination": "ZTEST_ICA",
+              "items": [
+                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB);
+    }
+
+    // ---------- Happy paths -------------------------------------------------
+
+    @Test
+    void get_existingTransporteQuotation_returns200_withCompleteShape() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token,
+            transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .contentType("application/json")
+            .body("id", equalTo((int) id))
+            .body("code", matchesRegex("\\d{4}-\\d{5}"))
+            .body("quotationType", equalTo("TRANSPORTE"))
+            .body("status", equalTo("DRAFT"))
+            .body("client.id", equalTo(CLIENT_ID))
+            .body("currency.id", equalTo(CURRENCY_ID))
+            .body("paymentTerm.id", equalTo(PAYMENT_TERM_ID))
+            .body("origin", equalTo("ZTEST_LIMA"))
+            .body("destination", equalTo("ZTEST_AREQUIPA"))
+            .body("contactName", equalTo("ZTEST_CONTACT"))
+            .body("totalSubtotal", equalTo(1000.00f))
+            .body("totalIgv", equalTo(180.00f))
+            .body("totalAmount", equalTo(1180.00f))
+            .body("items.size()", equalTo(1))
+            .body("items[0].subtotal", equalTo(1000.00f))
+            .body("expiresAt", notNullValue())
+            .body("isExpired", equalTo(false))
+            .body("createdBy.username", equalTo("admin"))
+            .body("updatedBy.username", equalTo("admin"))
+            .body("createdAt", notNullValue())
+            .body("updatedAt", notNullValue());
+    }
+
+    @Test
+    void get_existingAlquilerQuotation_returns200_withNullOptionalFields() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token, alquilerBody());
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .body("quotationType", equalTo("ALQUILER"))
+            .body("origin", nullValue())
+            .body("destination", nullValue())
+            .body("paymentTerm", nullValue())
+            .body("items[0].cargoType", nullValue())
+            .body("items[0].weightKg", nullValue())
+            .body("items[0].lengthMeters", nullValue())
+            .body("items[0].widthMeters", nullValue())
+            .body("items[0].heightMeters", nullValue());
+    }
+
+    @Test
+    void get_existingIntegralQuotation_returns200_withChildrenEmbedded() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token, integralBody());
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            // El response trae 1 item root (el INT). Los 2 hijos embebidos en children.
+            .body("items.size()", equalTo(1))
+            .body("items[0].serviceType.code", equalTo("INT"))
+            .body("items[0].children.size()", equalTo(2))
+            .body("items[0].children[0].subtotal", equalTo(0))
+            .body("items[0].children[1].subtotal", equalTo(0))
+            .body("items[0].children[0].parentItemId", notNullValue())
+            .body("items[0].children[1].parentItemId", notNullValue())
+            // El total solo cuenta el root (los hijos suman 0).
+            .body("totalSubtotal", equalTo(8000.00f));
+    }
+
+    @Test
+    void get_quotationWithStandby_returns200_withStandbyPopulated() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token, transporteWithStandbyBody());
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .body("items[0].standby", notNullValue())
+            .body("items[0].standby.pricePerDay", equalTo(200.00f))
+            .body("items[0].standby.includesIgv", equalTo(false))
+            .body("items[0].standby.id", notNullValue());
+    }
+
+    @Test
+    void get_quotationFreshlyCreated_isExpiredFalse() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token,
+            transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .body("isExpired", equalTo(false));
+        // Cotizacion vieja con isExpired=true se valida en el unit test del service
+        // (GetQuotationServiceTest) — no requiere insertar fixture con createdAt
+        // manipulado via JDBC, mucho mas estable.
+    }
+
+    @Test
+    void get_paymentTermNull_returnsNull() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token, transporteBodyWithoutPaymentTerm());
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .body("paymentTerm", nullValue())
+            .body("tentativeServiceDate", nullValue())
+            .body("contactPhone", nullValue());
+    }
+
+    @Test
+    void get_clientSummary_doesNotLeakClientResponseFields() {
+        // Anti-leak ACL: client embebido debe ser Summary {id, name, ruc} — sin
+        // phone, contactName, isActive, createdAt del catalogo Clients.
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token,
+            transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .body("client.id", notNullValue())
+            .body("client.name", notNullValue())
+            .body("client.ruc", notNullValue())
+            .body("client.phone", nullValue())
+            .body("client.contactName", nullValue())
+            .body("client.isActive", nullValue())
+            .body("client.createdAt", nullValue());
+    }
+
+    @Test
+    void get_includesETagHeader_matchingPostFormat() {
+        // POST devuelve ETag con formato "<updatedAt>". GET debe devolver mismo
+        // formato exacto para que un futuro PUT/PATCH con If-Match matchee.
+        String token = loginAdmin();
+        // POST y capturamos el ETag + id en una sola operacion.
+        var postResponse = given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"))
+        .when()
+            .post("/quotations")
+        .then()
+            .statusCode(201)
+            .extract();
+        long id = postResponse.jsonPath().getLong("id");
+        String postedEtag = postResponse.header("ETag");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .header("ETag", notNullValue())
+            .header("ETag", matchesRegex("\".+\""))      // quoted format
+            .header("ETag", equalTo(postedEtag));         // exacto = POST (no fue updated)
+    }
+
+    @Test
+    void get_multiRootItems_orderedByItemNumber() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token, multiRootBody());
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200)
+            .body("items.size()", equalTo(3))
+            .body("items[0].itemNumber", equalTo(1))
+            .body("items[1].itemNumber", equalTo(2))
+            .body("items[2].itemNumber", equalTo(3))
+            .body("items[0].subtotal", equalTo(1000.00f))
+            .body("items[1].subtotal", equalTo(1500.00f))
+            .body("items[2].subtotal", equalTo(2000.00f))
+            .body("totalSubtotal", equalTo(4500.00f));
+    }
+
+    // ---------- 404 Not Found -----------------------------------------------
+
+    @Test
+    void get_nonExistentId_returns404_QUO003() {
+        String token = loginAdmin();
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/999999999")
+        .then()
+            .statusCode(404)
+            .contentType("application/problem+json")
+            .body("code", equalTo("QUO-003"))
+            .body("status", equalTo(404))
+            .body("detail", equalTo("La cotizacion con id 999999999 no existe"))
+            .body("traceId", notNullValue());
+    }
+
+    @Test
+    void get_idZero_returns404_QUO003() {
+        String token = loginAdmin();
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/0")
+        .then()
+            .statusCode(404)
+            .body("code", equalTo("QUO-003"))
+            .body("detail", equalTo("La cotizacion con id 0 no existe"));
+    }
+
+    // ---------- 401 Unauthorized --------------------------------------------
+
+    @Test
+    void get_withoutToken_returns401() {
+        // Sin token — el filtro de Quarkus Security responde 401 antes del endpoint.
+        // No hay body Problem JSON (mismo patron que en el resto de los tests).
+        given()
+        .when()
+            .get("/quotations/1")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void get_withMalformedToken_returns401_AUTH008() {
+        given()
+            .header("Authorization", "Bearer eyJ.malformed.token")
+        .when()
+            .get("/quotations/1")
+        .then()
+            .statusCode(401)
+            .body("code", equalTo("AUTH-008"));
+    }
+
+    @Test
+    void get_withExpiredToken_returns401_AUTH007() {
+        Instant past = Instant.now().minusSeconds(60);
+        String expiredToken = Jwt.subject("1")
+            .upn("admin")
+            .groups(Set.of("admin"))
+            .claim("typ", "access")
+            .issuedAt(past.minusSeconds(3600))
+            .expiresAt(past)
+            .sign();
+
+        given()
+            .header("Authorization", "Bearer " + expiredToken)
+        .when()
+            .get("/quotations/1")
+        .then()
+            .statusCode(401)
+            .body("code", equalTo("AUTH-007"));
+    }
+
+    // ---------- 403 Forbidden -----------------------------------------------
+
+    @Test
+    void get_withDispatcherRole_returns403_COM003() {
+        String token = fabricateAccessToken("disp_test", "dispatcher");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/1")
+        .then()
+            .statusCode(403)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-003"));
+    }
+
+    // ---------- Roles permitidos --------------------------------------------
+
+    @Test
+    void get_withSalesRole_returns200() {
+        // lcampos esta seeded como sales en DevDataSeeder.
+        String adminToken = loginAdmin();
+        long id = createQuotationAndReturnId(adminToken,
+            transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"));
+
+        String salesToken = given()
+            .contentType(ContentType.JSON)
+            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+        .when()
+            .post("/auth/login")
+        .then()
+            .statusCode(200)
+            .extract().jsonPath().getString("token");
+
+        given()
+            .header("Authorization", "Bearer " + salesToken)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200);
+    }
+
+    @Test
+    void get_withGeneralManagerRole_returns200() {
+        String adminToken = loginAdmin();
+        long id = createQuotationAndReturnId(adminToken,
+            transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"));
+
+        String token = fabricateAccessToken("gm_test", "general_manager");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200);
+    }
+
+    @Test
+    void get_withOperationsManagerRole_returns200() {
+        String adminToken = loginAdmin();
+        long id = createQuotationAndReturnId(adminToken,
+            transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"));
+
+        String token = fabricateAccessToken("ops_test", "operations_manager");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .statusCode(200);
+    }
 }

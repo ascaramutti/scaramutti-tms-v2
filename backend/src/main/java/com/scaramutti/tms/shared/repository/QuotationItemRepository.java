@@ -20,6 +20,16 @@ import java.util.Set;
 public class QuotationItemRepository implements PanacheRepositoryBase<QuotationItem, Long> {
 
     /**
+     * Items de una cotizacion ordenados por {@code itemNumber} ASC. Garantiza
+     * orden estable para que el assembler arme la jerarquia visual (padres
+     * antes que hijos del Integral). El campo {@code itemNumber} es snapshot
+     * del request original (asignado por el backend si el caller lo omite).
+     */
+    public List<QuotationItem> findByQuotationId(Long quotationId) {
+        return list("quotationId = ?1 ORDER BY itemNumber ASC", quotationId);
+    }
+
+    /**
      * Devuelve los ids de servicio (distinct, no null) de los items de una
      * lista de cotizaciones. Si la lista de quotationIds es vacia, devuelve
      * un set vacio.
