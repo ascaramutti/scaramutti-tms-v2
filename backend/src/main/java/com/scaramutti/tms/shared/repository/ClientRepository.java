@@ -112,13 +112,28 @@ public class ClientRepository implements PanacheRepositoryBase<Client, Integer> 
             // ILIKE con wildcards en ambos lados = substring match (caso autocomplete).
             // Los GIN indexes (idx_clients_name_trgm, idx_clients_ruc_trgm) aceleran
             // ILIKE cuando el operando contiene patrones >= 3 chars.
-            conditions.add("(name ILIKE :qLike OR ruc ILIKE :qLike)");
-            params.put("qLike", "%" + q + "%");
+            // Se escapan los metacaracteres de LIKE (% _ \) del input para que un
+            // q="100%" o "A_B" busque esos literales y no sobre-matchee (ESCAPE '\').
+            // El similarity() del ORDER BY usa :qRank sin escapar — es fuzzy ranking,
+            // no patron LIKE, los wildcards no le aplican.
+            conditions.add("(name ILIKE :qLike ESCAPE '\\' OR ruc ILIKE :qLike ESCAPE '\\')");
+            params.put("qLike", "%" + escapeLikeWildcards(q) + "%");
         }
         if (isActive != null) {
             conditions.add("is_active = :isActive");
             params.put("isActive", isActive);
         }
         return conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);
+    }
+
+    /**
+     * Escapa los metacaracteres de LIKE/ILIKE ({@code \ % _}) para que el input
+     * de busqueda se trate como literal. El backslash primero (es el char de
+     * escape, no debe duplicarse despues). Usado con {@code ESCAPE '\'} en el SQL.
+     * (Mismo helper que {@code QuotationRepository.escapeLikeWildcards} — si
+     * aparece un 3er repo con ILIKE, mover a un util compartido.)
+     */
+    private static String escapeLikeWildcards(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }
