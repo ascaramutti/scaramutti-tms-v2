@@ -675,6 +675,24 @@ class ClientsResourceTest {
     }
 
     @Test
+    void list_qWithUnderscore_treatedAsLiteralNotWildcard() {
+        // El `_` del q debe buscarse literal, NO como comodin de LIKE. Si no se
+        // escapara, q="ESCA_B" matchearia tambien "ESCA1B" (_ = cualquier char).
+        seedClient(TEST_NAME_PREFIX + "ESCA1B", TEST_RUC_PREFIX + "111111111", true);
+        seedClient(TEST_NAME_PREFIX + "ESCA_B", TEST_RUC_PREFIX + "222222222", true);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients?q=ESCA_B")
+        .then()
+            .statusCode(200)
+            .body("content.name", hasItem(TEST_NAME_PREFIX + "ESCA_B"))
+            .body("content.name", not(hasItem(TEST_NAME_PREFIX + "ESCA1B")));   // el _ no comodineo
+    }
+
+    @Test
     void list_withQNoMatch_returnsEmptyPage() {
         String token = login("admin", "Admin1234");
 
