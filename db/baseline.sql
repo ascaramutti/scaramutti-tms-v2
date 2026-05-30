@@ -321,6 +321,12 @@ CREATE INDEX IF NOT EXISTS idx_quotations_status     ON cotizaciones.quotations(
 CREATE INDEX IF NOT EXISTS idx_quotations_type       ON cotizaciones.quotations(quotation_type);
 CREATE INDEX IF NOT EXISTS idx_quotations_created_by ON cotizaciones.quotations(created_by);
 
+-- GIN trigram para la busqueda libre `q` del listado (ILIKE %...% sobre estos campos).
+-- pg_trgm ya esta habilitado (ver seccion Extensiones). Aceleran wildcards >= 3 chars.
+CREATE INDEX IF NOT EXISTS idx_quotations_code_trgm        ON cotizaciones.quotations USING GIN (code gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_quotations_origin_trgm      ON cotizaciones.quotations USING GIN (origin gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_quotations_destination_trgm ON cotizaciones.quotations USING GIN (destination gin_trgm_ops);
+
 CREATE TABLE IF NOT EXISTS cotizaciones.quotation_items (
     id                        BIGSERIAL PRIMARY KEY,
     quotation_id              BIGINT NOT NULL REFERENCES cotizaciones.quotations(id) ON DELETE CASCADE,
@@ -359,6 +365,9 @@ COMMENT ON COLUMN cotizaciones.quotation_items.internal_reference_price IS
 
 CREATE INDEX IF NOT EXISTS idx_quotation_items_quotation ON cotizaciones.quotation_items(quotation_id);
 CREATE INDEX IF NOT EXISTS idx_quotation_items_parent    ON cotizaciones.quotation_items(parent_item_id);
+-- Para los filtros EXISTS por tipo del listado (cargoTypeId / serviceTypeId).
+CREATE INDEX IF NOT EXISTS idx_quotation_items_cargo_type   ON cotizaciones.quotation_items(cargo_type_id);
+CREATE INDEX IF NOT EXISTS idx_quotation_items_service_type ON cotizaciones.quotation_items(quotation_service_type_id);
 
 CREATE TABLE IF NOT EXISTS cotizaciones.quotation_standby_costs (
     id                BIGSERIAL PRIMARY KEY,

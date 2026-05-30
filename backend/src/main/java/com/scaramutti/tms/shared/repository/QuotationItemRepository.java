@@ -4,6 +4,7 @@ import com.scaramutti.tms.shared.entity.QuotationItem;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 
@@ -27,6 +28,19 @@ public class QuotationItemRepository implements PanacheRepositoryBase<QuotationI
      */
     public List<QuotationItem> findByQuotationId(Long quotationId) {
         return list("quotationId = ?1 ORDER BY itemNumber ASC", quotationId);
+    }
+
+    /**
+     * Batch-load de items de VARIAS cotizaciones en UNA query (WHERE IN). Usado
+     * por el listado (GET /quotations) para calcular totalAmount/itemsCount de
+     * toda la pagina sin N+1 — el service agrupa por quotationId en memoria.
+     * Si la coleccion es vacia, devuelve lista vacia (evita un IN () invalido).
+     */
+    public List<QuotationItem> findByQuotationIds(Collection<Long> quotationIds) {
+        if (quotationIds == null || quotationIds.isEmpty()) {
+            return List.of();
+        }
+        return list("quotationId IN ?1", quotationIds);
     }
 
     /**
