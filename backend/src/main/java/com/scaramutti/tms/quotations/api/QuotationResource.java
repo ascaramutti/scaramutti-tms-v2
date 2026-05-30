@@ -3,24 +3,35 @@ package com.scaramutti.tms.quotations.api;
 import com.scaramutti.tms.quotations.dto.QuotationConfigResponse;
 import com.scaramutti.tms.quotations.dto.QuotationRequest;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
+import com.scaramutti.tms.quotations.dto.QuotationSummaryResponse;
 import com.scaramutti.tms.quotations.mapper.QuotationResourceMapper;
+import com.scaramutti.tms.quotations.model.QuotationStatus;
+import com.scaramutti.tms.quotations.model.QuotationType;
 import com.scaramutti.tms.quotations.service.CreateQuotationService;
 import com.scaramutti.tms.quotations.service.GetQuotationService;
+import com.scaramutti.tms.quotations.service.ListQuotationsService;
 import com.scaramutti.tms.quotations.service.QuotationConfigService;
+import com.scaramutti.tms.shared.dto.PageResponse;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 
 import java.net.URI;
+import java.time.LocalDate;
 
 @Path("/quotations")
 @Produces(MediaType.APPLICATION_JSON)
@@ -29,8 +40,47 @@ public class QuotationResource {
 
     @Inject CreateQuotationService createQuotationService;
     @Inject GetQuotationService getQuotationService;
+    @Inject ListQuotationsService listQuotationsService;
     @Inject QuotationConfigService quotationConfigService;
     @Inject QuotationResourceMapper resourceMapper;
+
+    /**
+     * Lista cotizaciones paginadas con busqueda + multifiltro. Todos los filtros
+     * son opcionales y se combinan con AND. Orden fijo: createdAt DESC.
+     *
+     * <p>Mismos roles que el resto del modulo — dispatcher excluido. Un listado
+     * sin resultados devuelve 200 con content vacio (no 404 — vacio es valido).
+     *
+     * <p>El usuario interactua con nombres en el frontend (comboboxes); el backend
+     * recibe IDs (clientId, currencyId, etc.). El filtro `q` busca por texto sobre
+     * code/client.name/client.ruc/origin/destination (minimo 3 chars).
+     *
+     * <p>{@code totalAmount}/{@code itemsCount} se calculan en runtime (no se
+     * persisten). Las fechas se interpretan en zona Lima (UTC-5).
+     */
+    @GET
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
+    public PageResponse<QuotationSummaryResponse> listQuotations(
+        @QueryParam("q")             @Size(min = 3, max = 255)        String q,
+        @QueryParam("status")                                        QuotationStatus status,
+        @QueryParam("quotationType")                                 QuotationType quotationType,
+        @QueryParam("clientId")                                      Integer clientId,
+        @QueryParam("createdById")                                   Integer createdById,
+        @QueryParam("currencyId")                                    Integer currencyId,
+        @QueryParam("cargoTypeId")                                   Integer cargoTypeId,
+        @QueryParam("serviceTypeId")                                 Integer serviceTypeId,
+        @QueryParam("dateFrom")                                      LocalDate dateFrom,
+        @QueryParam("dateTo")                                        LocalDate dateTo,
+        @QueryParam("page")  @DefaultValue("0")  @Min(0)             int page,
+        @QueryParam("size")  @DefaultValue("20") @Min(1) @Max(100)   int size
+    ) {
+        return listQuotationsService.list(
+            resourceMapper.toListQuotationsQuery(
+                q, status, quotationType, clientId, createdById, currencyId,
+                cargoTypeId, serviceTypeId, dateFrom, dateTo, page, size
+            )
+        );
+    }
 
     /**
      * Crea una cotizacion.

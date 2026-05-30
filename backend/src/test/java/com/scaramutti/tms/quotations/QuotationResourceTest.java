@@ -2,6 +2,8 @@ package com.scaramutti.tms.quotations;
 
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
@@ -10,17 +12,42 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.Map;
 import java.util.Set;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsInRelativeOrder;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesRegex;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
 @QuarkusTest
+@TestProfile(QuotationResourceTest.AntiDupDisabledProfile.class)
 class QuotationResourceTest {
+
+    /**
+     * Deshabilita el anti-duplicate window (=0) para esta clase: los tests de
+     * listado crean multiples cotizaciones identicas como fixtures y el window
+     * de 30s las rechazaria con 409. El anti-duplicate se verifica aparte en
+     * {@link QuotationAntiDuplicateResourceTest} (con su propio profile que lo
+     * reactiva). Via @TestProfile (no application-test.properties) porque es el
+     * mecanismo garantizado de override de config en QuarkusTest.
+     */
+    public static class AntiDupDisabledProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            return Map.of("app.quotations.anti-duplicate-window-seconds", "0");
+        }
+    }
 
     @Inject EntityManager entityManager;
 
@@ -40,6 +67,9 @@ class QuotationResourceTest {
     private static final int ST_SPL = 3;
     private static final int ST_CES = 18;
     private static final int ST_INT = 24;
+
+    /** Zona del negocio — los filtros de fecha del listado se interpretan aca (igual que el backend). */
+    private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     @AfterEach
     void cleanupQuotations() {
@@ -689,34 +719,9 @@ class QuotationResourceTest {
             .statusCode(201);
     }
 
-    // ---------- Anti-duplicado (QUO-002) -------------------------------------
-
-    @Test
-    void create_sameClientAndServiceTypesWithin30s_returns409_QUO002() {
-        String token = loginAdmin();
-        String body = transporteBody("ZTEST_DUP1", "ZTEST_DUP2", ST_SCB, "100.00");
-
-        // Primer POST OK.
-        given()
-            .header("Authorization", "Bearer " + token)
-            .contentType(ContentType.JSON)
-            .body(body)
-        .when()
-            .post("/quotations")
-        .then()
-            .statusCode(201);
-
-        // Segundo POST inmediato con mismo client + mismo serviceType → 409.
-        given()
-            .header("Authorization", "Bearer " + token)
-            .contentType(ContentType.JSON)
-            .body(body)
-        .when()
-            .post("/quotations")
-        .then()
-            .statusCode(409)
-            .body("code", equalTo("QUO-002"));
-    }
+    // Anti-duplicado (QUO-002): el test vive en QuotationAntiDuplicateResourceTest
+    // (clase aparte con @TestProfile que reactiva el window a 30s — la suite
+    // general lo deshabilita para poder crear fixtures multiples del listado).
 
     // ---------- Code formato YYYY-NNNNN --------------------------------------
 
@@ -1220,5 +1225,600 @@ class QuotationResourceTest {
             .get("/quotations/" + id)
         .then()
             .statusCode(200);
+    }
+
+    // =========================================================================
+    // GET /quotations  (listado paginado con multifiltro)
+    // =========================================================================
+    //
+    // Aislamiento de la dev DB compartida con prod: cada test crea sus fixtures
+    // con un origin ZTEST_LST_<caso> unico y FILTRA por q=<ese token> para que el
+    // content contenga SOLO sus propios fixtures (sin ruido prod ni de otros tests).
+
+    /** TRANSPORTE en USD con origin/destination y currency custom (helper de listado). */
+    private String transporteListBody(String origin, int currencyId, int serviceTypeId, String unitPrice) {
+        return String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_CONTACT",
+              "currencyId": %d,
+              "validityDays": 15,
+              "origin": "%s",
+              "destination": "%s_DEST",
+              "items": [
+                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": %s }
+              ]
+            }
+            """, CLIENT_ID, currencyId, origin, origin, serviceTypeId, unitPrice);
+    }
+
+    // ---------- Paginación + shape ------------------------------------------
+
+    @Test
+    void list_withoutParams_returns200WithDefaults() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_DEF", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations")
+        .then()
+            .statusCode(200)
+            .contentType("application/json")
+            .body("page", equalTo(0))
+            .body("size", equalTo(20))
+            .body("totalElements", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_summaryShape_hasAllContractFields() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_SHAPE", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_SHAPE")
+        .then()
+            .statusCode(200)
+            .body("content[0].id", notNullValue())
+            .body("content[0].code", matchesRegex("\\d{4}-\\d{5}"))
+            .body("content[0].quotationType", equalTo("TRANSPORTE"))
+            .body("content[0].status", equalTo("DRAFT"))
+            .body("content[0].client.id", equalTo(CLIENT_ID))
+            .body("content[0].client.name", notNullValue())
+            .body("content[0].client.ruc", notNullValue())
+            .body("content[0].currencyCode", equalTo("USD"))
+            .body("content[0].totalAmount", equalTo(1180.00f))
+            .body("content[0].itemsCount", equalTo(1))
+            .body("content[0].validityDays", equalTo(15))
+            .body("content[0].isExpired", equalTo(false))
+            .body("content[0].origin", equalTo("ZTEST_LST_SHAPE"))
+            .body("content[0].createdAt", notNullValue())
+            .body("content[0].createdBy.username", equalTo("admin"));
+    }
+
+    @Test
+    void list_clientSummary_doesNotLeakMasterFields() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_ACL", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_ACL")
+        .then()
+            .statusCode(200)
+            .body("content[0].client.id", notNullValue())
+            .body("content[0].client.phone", nullValue())
+            .body("content[0].client.contactName", nullValue())
+            .body("content[0].client.isActive", nullValue());
+    }
+
+    @Test
+    void list_emptySlice_returns200NotEmpty() {
+        String token = loginAdmin();
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZZZNADAEXISTE_xyz_999")
+        .then()
+            .statusCode(200)
+            .body("content.size()", is(0))
+            .body("totalElements", equalTo(0))
+            .body("totalPages", equalTo(0))
+            .body("empty", equalTo(true))
+            .body("first", equalTo(true))
+            .body("last", equalTo(true));
+    }
+
+    @Test
+    void list_pagination_page1Size5() {
+        String token = loginAdmin();
+        for (int i = 0; i < 12; i++) {
+            createQuotationAndReturnId(token,
+                transporteListBody(String.format("ZTEST_LST_PG_%02d", i), CURRENCY_ID, ST_SCB, "1000.00"));
+        }
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_PG&page=1&size=5")
+        .then()
+            .statusCode(200)
+            .body("page", equalTo(1))
+            .body("size", equalTo(5))
+            .body("numberOfElements", equalTo(5))
+            .body("totalElements", equalTo(12))
+            .body("totalPages", equalTo(3))
+            .body("first", equalTo(false))
+            .body("last", equalTo(false));
+    }
+
+    @Test
+    void list_pageBeyondTotal_returnsEmptyContentLastTrue() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_OVF", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_OVF&page=99&size=20")
+        .then()
+            .statusCode(200)
+            .body("content.size()", is(0))
+            .body("totalElements", equalTo(1))
+            .body("empty", equalTo(true))
+            .body("last", equalTo(true));
+    }
+
+    @Test
+    void list_sizeAboveMax_returns400() {
+        given()
+            .header("Authorization", "Bearer " + loginAdmin())
+        .when()
+            .get("/quotations?size=101")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void list_pageNegative_returns400() {
+        given()
+            .header("Authorization", "Bearer " + loginAdmin())
+        .when()
+            .get("/quotations?page=-1")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    // ---------- Orden fijo createdAt DESC -----------------------------------
+
+    @Test
+    void list_orderedByCreatedAtDescending() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_ORD_A", CURRENCY_ID, ST_SCB, "1000.00"));
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_ORD_B", CURRENCY_ID, ST_SCB, "1000.00"));
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_ORD_C", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_ORD&size=100")
+        .then()
+            .statusCode(200)
+            // C es el más reciente → primero. Orden relativo C, B, A.
+            .body("content[0].origin", equalTo("ZTEST_LST_ORD_C"))
+            .body("content.origin", containsInRelativeOrder(
+                "ZTEST_LST_ORD_C", "ZTEST_LST_ORD_B", "ZTEST_LST_ORD_A"));
+    }
+
+    // ---------- Filtros individuales ----------------------------------------
+
+    @Test
+    void list_filterByStatusDraft_returnsOnlyDraft() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_ST", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_ST&status=DRAFT")
+        .then()
+            .statusCode(200)
+            .body("content.status", everyItem(equalTo("DRAFT")))
+            .body("totalElements", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_filterByStatusSent_excludesDraftFixture() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_STS", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_STS&status=SENT")
+        .then()
+            .statusCode(200)
+            .body("content.size()", is(0));   // el fixture es DRAFT, no aparece bajo SENT
+    }
+
+    @Test
+    void list_filterByClientId() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CID", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_CID&clientId=" + CLIENT_ID)
+        .then()
+            .statusCode(200)
+            .body("content.client.id", everyItem(equalTo(CLIENT_ID)))
+            .body("totalElements", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_filterByNonExistentClientId_returnsEmpty() {
+        given()
+            .header("Authorization", "Bearer " + loginAdmin())
+        .when()
+            .get("/quotations?clientId=999999&q=ZTEST_LST_NOCLI")
+        .then()
+            .statusCode(200)
+            .body("content.size()", is(0));
+    }
+
+    @Test
+    void list_filterByCreatedById_returnsOnlyThatCreator() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CBID", CURRENCY_ID, ST_SCB, "1000.00"));
+        // El createdBy.id no es determinista (restore de prod) — lo extraemos del recurso.
+        int adminId = given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations/" + id)
+        .then()
+            .extract().jsonPath().getInt("createdBy.id");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_CBID&createdById=" + adminId)
+        .then()
+            .statusCode(200)
+            .body("content.createdBy.id", everyItem(equalTo(adminId)))
+            .body("content.origin", hasItem("ZTEST_LST_CBID"));
+    }
+
+    @Test
+    void list_filterByCurrencyId_returnsOnlyThatCurrency() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CUR_USD", CURRENCY_ID, ST_SCB, "1000.00"));
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CUR_PEN", 2, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_CUR&currencyId=2")
+        .then()
+            .statusCode(200)
+            .body("content.currencyCode", everyItem(equalTo("PEN")))
+            .body("content.origin", not(hasItem("ZTEST_LST_CUR_USD")));
+    }
+
+    @Test
+    void list_filterByServiceTypeId_returnsOnlyHavingThatType() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_STID_SPL", CURRENCY_ID, ST_SPL, "1000.00"));
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_STID_SCB", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_STID&serviceTypeId=" + ST_SPL)
+        .then()
+            .statusCode(200)
+            .body("content.origin", hasItem("ZTEST_LST_STID_SPL"))
+            .body("content.origin", not(hasItem("ZTEST_LST_STID_SCB")));
+    }
+
+    @Test
+    void list_filterByServiceTypeId_matchesIntegralChild() {
+        // El Integral tiene hijos SCB(1) + CES(18). Filtrar por CES debe encontrarlo
+        // (el EXISTS incluye items hijos, no solo root).
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, integralListBody("ZTEST_LST_STINT"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_STINT&serviceTypeId=" + ST_CES)
+        .then()
+            .statusCode(200)
+            .body("content.origin", hasItem("ZTEST_LST_STINT"));
+    }
+
+    @Test
+    void list_filterByCargoTypeId() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CTID", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_CTID&cargoTypeId=1")
+        .then()
+            .statusCode(200)
+            .body("content.origin", hasItem("ZTEST_LST_CTID"));
+    }
+
+    @Test
+    void list_filterByDatePastFrom_includesTodayFixture() {
+        // dateFrom = ayer (zona Lima, como el backend) → el fixture de hoy queda incluido.
+        // Margen de 1 día evita el borde de medianoche por zona horaria.
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_DFROM", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_DFROM&dateFrom=" + LocalDate.now(LIMA).minusDays(1))
+        .then()
+            .statusCode(200)
+            .body("totalElements", greaterThanOrEqualTo(1));
+    }
+
+    @Test
+    void list_filterByFutureDateFrom_excludesTodayFixture() {
+        // dateFrom = pasado mañana (zona Lima) → el fixture de hoy queda excluido.
+        // Margen de 2 días evita el borde de medianoche por zona horaria.
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_DFUT", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_DFUT&dateFrom=" + LocalDate.now(LIMA).plusDays(2))
+        .then()
+            .statusCode(200)
+            .body("content.size()", is(0));
+    }
+
+    @Test
+    void list_filterByDateToToday_includesTodayFixture() {
+        // dateTo = hoy (zona Lima). dateTo es INCLUSIVO del día completo → el
+        // fixture creado hoy (cualquier hora) debe aparecer. Pin del borde de
+        // inclusividad (< dateTo+1día Lima).
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_DTO", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_DTO&dateTo=" + LocalDate.now(LIMA))
+        .then()
+            .statusCode(200)
+            .body("totalElements", greaterThanOrEqualTo(1));
+    }
+
+    // ---------- Búsqueda q ---------------------------------------------------
+
+    @Test
+    void list_qMatchingOrigin_returnsMatch() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_QORIG", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_QORIG")
+        .then()
+            .statusCode(200)
+            .body("content.origin", hasItem("ZTEST_LST_QORIG"));
+    }
+
+    @Test
+    void list_qMatchingCode_returnsThatQuotation() {
+        String token = loginAdmin();
+        long id = createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_QCODE", CURRENCY_ID, ST_SCB, "1000.00"));
+        String code = given().header("Authorization", "Bearer " + token)
+            .when().get("/quotations/" + id)
+            .then().extract().jsonPath().getString("code");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=" + code)
+        .then()
+            .statusCode(200)
+            .body("content.code", hasItem(code));
+    }
+
+    @Test
+    void list_qTooShort_returns400() {
+        given()
+            .header("Authorization", "Bearer " + loginAdmin())
+        .when()
+            .get("/quotations?q=ab")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void list_qWithUnderscore_treatedAsLiteralNotWildcard() {
+        // El `_` del q debe buscarse literal, NO como comodin de LIKE. Si no se
+        // escapara, q="ESCA_B" matchearia tambien "ESCA1B" (_ = cualquier char).
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_ESCA1B", CURRENCY_ID, ST_SCB, "1000.00"));
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_ESCA_B", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ESCA_B")
+        .then()
+            .statusCode(200)
+            .body("content.origin", hasItem("ZTEST_ESCA_B"))
+            .body("content.origin", not(hasItem("ZTEST_ESCA1B")));   // el _ no comodineo
+    }
+
+    // ---------- Multifiltro (AND) -------------------------------------------
+
+    @Test
+    void list_multifilter_statusClientType_combinesWithAnd() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_MULTI_T", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_MULTI&status=DRAFT&clientId=" + CLIENT_ID + "&quotationType=TRANSPORTE")
+        .then()
+            .statusCode(200)
+            .body("content.origin", hasItem("ZTEST_LST_MULTI_T"))
+            .body("content.quotationType", everyItem(equalTo("TRANSPORTE")))
+            .body("content.status", everyItem(equalTo("DRAFT")));
+    }
+
+    @Test
+    void list_multifilter_currencyAndServiceType_combinesWithAnd() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_HIT", 2, ST_SPL, "1000.00"));      // PEN + SPL → matchea
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_USD", CURRENCY_ID, ST_SPL, "1000.00")); // USD → excluido
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_SCB", 2, ST_SCB, "1000.00"));      // SCB → excluido
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_M2&currencyId=2&serviceTypeId=" + ST_SPL)
+        .then()
+            .statusCode(200)
+            .body("content.origin", hasItem("ZTEST_LST_M2_HIT"))
+            .body("content.origin", not(hasItem("ZTEST_LST_M2_USD")))
+            .body("content.origin", not(hasItem("ZTEST_LST_M2_SCB")));
+    }
+
+    // ---------- Reglas del summary ------------------------------------------
+
+    @Test
+    void list_totalAmount_correctForKnownQuotation() {
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_TOTAL", CURRENCY_ID, ST_SCB, "1000.00"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_TOTAL")
+        .then()
+            .statusCode(200)
+            .body("content[0].totalAmount", equalTo(1180.00f));   // 1000 + 18% IGV
+    }
+
+    @Test
+    void list_itemsCount_integralCountsRootOnly() {
+        // CASO CRÍTICO: un Integral tiene 1 root (INT) + 2 hijos. itemsCount debe ser 1, no 3.
+        String token = loginAdmin();
+        createQuotationAndReturnId(token, integralListBody("ZTEST_LST_INTCNT"));
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/quotations?q=ZTEST_LST_INTCNT")
+        .then()
+            .statusCode(200)
+            .body("content[0].itemsCount", equalTo(1))
+            .body("content[0].totalAmount", equalTo(9440.00f));   // root 8000 + 18% IGV
+    }
+
+    // ---------- Auth + roles -------------------------------------------------
+
+    @Test
+    void list_withoutToken_returns401() {
+        given()
+        .when()
+            .get("/quotations")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void list_withMalformedToken_returns401_AUTH008() {
+        given()
+            .header("Authorization", "Bearer eyJ.malformed.token")
+        .when()
+            .get("/quotations")
+        .then()
+            .statusCode(401)
+            .body("code", equalTo("AUTH-008"));
+    }
+
+    @Test
+    void list_withDispatcherRole_returns403_COM003() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("disp_test", "dispatcher"))
+        .when()
+            .get("/quotations")
+        .then()
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void list_withSalesRole_returns200() {
+        String salesToken = given()
+            .contentType(ContentType.JSON)
+            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+        .when()
+            .post("/auth/login")
+        .then()
+            .statusCode(200)
+            .extract().jsonPath().getString("token");
+
+        given()
+            .header("Authorization", "Bearer " + salesToken)
+        .when()
+            .get("/quotations")
+        .then()
+            .statusCode(200);
+    }
+
+    @Test
+    void list_withGeneralManagerRole_returns200() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("gm_test", "general_manager"))
+        .when()
+            .get("/quotations")
+        .then()
+            .statusCode(200);
+    }
+
+    /** Integral con origin custom (1 INT root + SCB + CES hijos). Para tests de listado. */
+    private String integralListBody(String origin) {
+        return String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_INT",
+              "currencyId": %d,
+              "validityDays": 15,
+              "origin": "%s",
+              "destination": "%s_DEST",
+              "items": [
+                { "itemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 8000.00 },
+                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1,
+                  "weightKg": 25.00, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 5000.00 },
+                { "itemNumber": 3, "parentItemNumber": 1, "serviceTypeId": %d, "quantity": 1,
+                  "unitPrice": 0, "internalReferencePrice": 1500.00 }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID, origin, origin, ST_INT, ST_SCB, ST_CES);
     }
 }

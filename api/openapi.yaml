@@ -237,17 +237,25 @@ paths:
       tags: [Quotations]
       operationId: listQuotations
       summary: Listar cotizaciones con búsqueda y filtros
+      description: |
+        Listado paginado de cotizaciones. Todos los filtros son opcionales y se
+        combinan con AND. Orden fijo: `createdAt` descendente (más recientes primero).
+
+        `totalAmount` e `itemsCount` se calculan en runtime desde los ítems
+        (no se persisten). `itemsCount` cuenta solo ítems root (los hijos del
+        Servicio Integral no cuentan). Un listado sin resultados devuelve `200`
+        con `content: []` (no 404).
       x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
-        - $ref: '#/components/parameters/Sort'
         - name: q
           in: query
           description: |
             Búsqueda libre con coincidencia parcial sobre: `code`, `client.name`,
             `client.ruc`, `origin`, `destination`. Usa pg_trgm para fuzzy matching.
-          schema: { type: string }
+            Mínimo 3 caracteres.
+          schema: { type: string, minLength: 3, maxLength: 255 }
         - name: status
           in: query
           schema: { $ref: '#/components/schemas/QuotationStatus' }
@@ -265,31 +273,29 @@ paths:
           schema: { type: integer }
         - name: cargoTypeId
           in: query
-          description: Filtra cotizaciones que tengan al menos un ítem con este cargo type
+          description: Filtra cotizaciones que tengan al menos un ítem (root o hijo) con este cargo type
           schema: { type: integer }
         - name: serviceTypeId
           in: query
-          description: Filtra cotizaciones que tengan al menos un ítem con este service type
+          description: Filtra cotizaciones que tengan al menos un ítem (root o hijo) con este service type
           schema: { type: integer }
         - name: dateFrom
           in: query
-          description: Filtro por `createdAt` desde (ISO date)
+          description: 'Filtro por `createdAt` desde (ISO date, inclusivo). Interpretado en zona horaria de Lima (UTC-5).'
           schema: { type: string, format: date }
         - name: dateTo
           in: query
+          description: 'Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Interpretado en zona horaria de Lima (UTC-5).'
           schema: { type: string, format: date }
-        - name: amountMin
-          in: query
-          schema: { type: number, format: double }
-        - name: amountMax
-          in: query
-          schema: { type: number, format: double }
       responses:
         '200':
           description: Listado paginado
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PageOfQuotationSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Quotations]
       operationId: createQuotation
@@ -1525,7 +1531,7 @@ components:
         code:          { type: string }
         quotationType: { $ref: '#/components/schemas/QuotationType' }
         status:        { $ref: '#/components/schemas/QuotationStatus' }
-        client:        { $ref: '#/components/schemas/ClientRef' }
+        client:        { $ref: '#/components/schemas/QuotationClientSummary' }
         currencyCode:  { type: string }
         totalAmount:   { type: number, format: double }
         itemsCount:    { type: integer, format: int32, description: 'Cantidad de ítems root (no incluye hijos del Servicio Integral)', example: 3 }
@@ -1535,7 +1541,7 @@ components:
         origin:        { type: [string, 'null'] }
         destination:   { type: [string, 'null'] }
         createdAt:     { type: string, format: date-time }
-        createdBy:     { $ref: '#/components/schemas/UserRef' }
+        createdBy:     { $ref: '#/components/schemas/UserResponse' }
 
     PageOfQuotationSummary:
       allOf:

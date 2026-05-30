@@ -290,4 +290,47 @@ class QuotationResourceMapperTest {
         assertEquals("Av. Lima 123", cmd.origin());
         assertEquals("Cusco - Centro", cmd.destination());
     }
+
+    // ---------- toListQuotationsQuery ----------------------------------------
+
+    @Test
+    void toListQuotationsQuery_allFiltersNull_returnsNonNullQueryWithPaging() {
+        // Caso GET /quotations sin filtros (happy path). El @BeanMapping
+        // RETURN_DEFAULT garantiza que NO devuelva null aunque todos los
+        // filtros sean null — blinda contra un refactor futuro que lo borre.
+        var query = mapper.toListQuotationsQuery(
+            null, null, null, null, null, null, null, null, null, null, 0, 20
+        );
+
+        assertNotNull(query);
+        assertEquals(0, query.page());
+        assertEquals(20, query.size());
+        assertNull(query.q());
+        assertNull(query.status());
+        assertNull(query.clientId());
+    }
+
+    @Test
+    void toListQuotationsQuery_blankQ_trimsToNull() {
+        // q solo-espacios → trimToNull lo lleva a null (= sin búsqueda).
+        var query = mapper.toListQuotationsQuery(
+            "   ", null, null, null, null, null, null, null, null, null, 0, 20
+        );
+
+        assertNull(query.q());
+    }
+
+    @Test
+    void toListQuotationsQuery_passesFiltersThrough() {
+        var query = mapper.toListQuotationsQuery(
+            "  lima  ", null, null, 42, null, 2, null, 7, null, null, 1, 50
+        );
+
+        assertEquals("lima", query.q());   // trim aplicado
+        assertEquals(42, query.clientId());
+        assertEquals(2, query.currencyId());
+        assertEquals(7, query.serviceTypeId());
+        assertEquals(1, query.page());
+        assertEquals(50, query.size());
+    }
 }
