@@ -31,3 +31,19 @@ export function formatDate(isoDate: string): string {
     timeZone: 'America/Lima',
   }).format(new Date(isoDate))
 }
+
+/**
+ * Formatea una fecha *sin hora* (`YYYY-MM-DD`, ej. `tentativeServiceDate`) a
+ * dd/mm/aaaa. A diferencia de `formatDate`, NO usa zona horaria: `new Date(iso)`
+ * interpretaría un date-only como UTC medianoche y en Lima (UTC-5) retrocedería
+ * al día anterior. Acá construimos la fecha en horario local para que el día sea
+ * exactamente el del string.
+ */
+export function formatDateOnly(isoDate: string): string {
+  const [year, month, day] = isoDate.slice(0, 10).split('-').map(Number)
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
