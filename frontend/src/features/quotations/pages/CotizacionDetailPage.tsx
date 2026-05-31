@@ -31,7 +31,7 @@ export function CotizacionDetailPage() {
   // Id no numérico o 404 → "no encontrada" (estado dedicado, no un error genérico).
   if (idInvalid || (isError && isNotFoundError(error))) {
     return (
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-[1024px] px-6 py-8">
         <EmptyState
           icon={FileQuestion}
           title="Cotización no encontrada"
@@ -48,7 +48,7 @@ export function CotizacionDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div className="flex justify-center py-16">
           <Spinner size={28} label="Cargando cotización" className="text-blue-600" />
         </div>
@@ -59,7 +59,7 @@ export function CotizacionDetailPage() {
   // Cualquier otro error (401/403/500/red): aviso + reintentar.
   if (isError || !data) {
     return (
-      <div className="mx-auto max-w-5xl px-6 py-8">
+      <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div role="alert" className="flex flex-col items-center justify-center px-6 py-16 text-center">
           <p className="text-sm font-medium text-slate-700">
             {getApiErrorMessage(error, 'No se pudo cargar la cotización.')}
@@ -78,7 +78,7 @@ export function CotizacionDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 px-6 py-8">
+    <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
       <QuotationDetailHeader
         code={data.code}
         quotationType={data.quotationType}

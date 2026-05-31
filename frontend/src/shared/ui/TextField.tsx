@@ -15,6 +15,12 @@ interface TextFieldProps {
   /** Mensaje de error inline (suele venir de `formState.errors[field].message`). */
   error?: string
   disabled?: boolean
+  /** Para `type='number'`: límites y paso del input nativo (acotan el spinner + validación HTML). */
+  min?: number
+  max?: number
+  step?: number
+  /** Clases extra para el `<label>` (ej. reservar altura en grids multi-columna para alinear). */
+  labelClassName?: string
   /** Registro de react-hook-form: `register('fieldName')`. */
   register: UseFormRegisterReturn
 }
@@ -38,6 +44,10 @@ export function TextField({
   placeholder,
   error,
   disabled,
+  min,
+  max,
+  step,
+  labelClassName,
   register,
 }: TextFieldProps) {
   const finalPlaceholder =
@@ -45,19 +55,31 @@ export function TextField({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-slate-700 mb-1.5">
+      <label htmlFor={id} className={cn('mb-1.5 block text-sm font-medium text-slate-700', labelClassName)}>
         {label}
       </label>
       <input
         id={id}
         type={type}
+        min={min}
+        max={max}
+        step={step}
         autoComplete={autoComplete}
         aria-invalid={!!error}
         aria-describedby={error ? `${id}-error` : undefined}
         disabled={disabled}
         placeholder={finalPlaceholder}
+        onKeyDown={
+          // En inputs numéricos, bloquear signo/notación científica (ej. evita teclear "-8").
+          // El rango efectivo lo dan min/max + la validación zod.
+          type === 'number'
+            ? (event) => {
+                if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault()
+              }
+            : undefined
+        }
         className={cn(
-          'w-full rounded-lg border bg-white px-3.5 py-2.5 text-slate-900 placeholder:text-slate-400',
+          'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400',
           'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
           'disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed',
           error

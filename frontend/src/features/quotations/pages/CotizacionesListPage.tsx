@@ -6,7 +6,7 @@ import { PageHeader } from '../../../shared/ui/PageHeader'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 import { CotizacionesFilterBar } from '../components/CotizacionesFilterBar'
 import { CotizacionesTable } from '../components/CotizacionesTable'
-import { useDebouncedValue } from '../hooks/useDebouncedValue'
+import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { SEARCH_MIN_LENGTH, useQuotationsList } from '../hooks/useQuotationsList'
 import {
   EMPTY_QUOTATION_FILTERS,
@@ -59,7 +59,7 @@ export function CotizacionesListPage() {
     !!effectiveFilters.dateTo
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+    <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
       <PageHeader
         title="Cotizaciones"
         description="Gestión de cotizaciones comerciales · Transportes Scaramutti S.A.C."
