@@ -52,7 +52,11 @@ describe('Sidebar - filtrado por rol', () => {
       expect(screen.getByText(/usuario admin/i)).toBeInTheDocument()
     })
     expect(screen.getByRole('link', { name: /inicio/i })).toBeInTheDocument()
-    expect(screen.getByText('Cotizaciones')).toBeInTheDocument()
+    // Cotizaciones ya está activa: es un link navegable (no el placeholder disabled).
+    expect(screen.getByRole('link', { name: /cotizaciones/i })).toHaveAttribute(
+      'href',
+      '/cotizaciones',
+    )
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/comercial/i)).toBeInTheDocument()
     expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()
