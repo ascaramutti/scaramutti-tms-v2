@@ -32,6 +32,7 @@ const MENU: MenuGroup[] = [
       {
         icon: FileText,
         label: 'Cotizaciones',
+        to: '/cotizaciones',
         allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
       },
       {

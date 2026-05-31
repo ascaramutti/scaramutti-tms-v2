@@ -3,6 +3,7 @@ import { ProtectedRoute } from './shared/auth/ProtectedRoute'
 import { AppLayout } from './shared/layout/AppLayout'
 import { LoginPage } from './features/auth/components/LoginPage'
 import { ChangePasswordPage } from './features/auth/components/ChangePasswordPage'
+import { CotizacionesListPage } from './features/quotations/pages/CotizacionesListPage'
 import { HomePage } from './pages/HomePage'
 
 export const router = createBrowserRouter([
@@ -16,6 +17,14 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: '/', element: <HomePage /> },
+      {
+        path: '/cotizaciones',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+            <CotizacionesListPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: '/cuenta/cambiar-contrasena', element: <ChangePasswordPage /> },
     ],
   },
