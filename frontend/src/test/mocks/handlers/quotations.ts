@@ -1,5 +1,12 @@
 import { http, HttpResponse, delay } from 'msw'
-import type { PageOfQuotationSummary, Problem, QuotationSummary } from '../../../api'
+import type {
+  PageOfQuotationSummary,
+  Problem,
+  QuotationItemResponse,
+  QuotationResponse,
+  QuotationSummary,
+  UserResponse,
+} from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -55,7 +62,89 @@ export function pageOfQuotations(
   }
 }
 
-/** Default happy-path: 3 cotizaciones en una sola página. */
+const AUDIT_USER: UserResponse = {
+  id: 1,
+  username: 'admin',
+  fullName: 'Admin TMS',
+  position: 'Administrador',
+  role: 'admin',
+  isActive: true,
+}
+
+/** Fixture de ítem de cotización (detalle). Default: ítem root simple. */
+export function fakeItem(overrides: Partial<QuotationItemResponse> = {}): QuotationItemResponse {
+  return {
+    id: 1,
+    itemNumber: 1,
+    serviceType: { id: 3, code: 'SPL', name: 'Servicio de transporte en Plataforma', kind: 'SERVICIO' },
+    quantity: 1,
+    unitPrice: 500,
+    igvPercentage: 18,
+    subtotal: 500,
+    ...overrides,
+  }
+}
+
+/** Fixture completo de detalle (QuotationResponse). Default: TRANSPORTE con un
+ * Servicio Integral (2 hijos con referencia interna) + ruta. */
+export function getQuotationResponse(overrides: Partial<QuotationResponse> = {}): QuotationResponse {
+  return {
+    id: 1,
+    code: '2026-00001',
+    quotationType: 'TRANSPORTE',
+    status: 'DRAFT',
+    client: { id: 1, name: 'ACME S.A.C.', ruc: '20123456789' },
+    contactName: 'Juan Pérez',
+    contactPhone: '987654321',
+    currency: { id: 2, code: 'PEN', symbol: 'S/' },
+    paymentTerm: { id: 3, name: '30 días', days: 30 },
+    tentativeServiceDate: '2026-06-01',
+    validityDays: 15,
+    expiresAt: '2026-06-15T00:00:00Z',
+    isExpired: false,
+    origin: 'Lima',
+    destination: 'Arequipa',
+    totalSubtotal: 1271.19,
+    totalIgv: 228.81,
+    totalAmount: 1500.0,
+    items: [
+      fakeItem({
+        id: 1,
+        itemNumber: 1,
+        serviceType: { id: 24, code: 'INT', name: 'Servicio Integral', kind: 'INTEGRAL' },
+        unitPrice: 1500,
+        subtotal: 1500,
+        children: [
+          fakeItem({
+            id: 2,
+            parentItemId: 1,
+            itemNumber: 2,
+            serviceType: { id: 3, code: 'SPL', name: 'Servicio de transporte en Plataforma', kind: 'SERVICIO' },
+            unitPrice: 0,
+            subtotal: 0,
+            internalReferencePrice: 900,
+          }),
+          fakeItem({
+            id: 3,
+            parentItemId: 1,
+            itemNumber: 3,
+            serviceType: { id: 18, code: 'CES', name: 'Servicio de Escolta', kind: 'COMPLEMENTARIO' },
+            unitPrice: 0,
+            subtotal: 0,
+            internalReferencePrice: 371.19,
+          }),
+        ],
+      }),
+    ],
+    createdBy: AUDIT_USER,
+    updatedBy: AUDIT_USER,
+    createdAt: '2026-05-20T10:00:00Z',
+    updatedAt: '2026-05-20T10:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Default happy-path: listado (GET /quotations) + detalle (GET /quotations/:id). */
 export const quotationsHandlers = [
   http.get(`${API}/quotations`, () =>
     HttpResponse.json(
@@ -72,6 +161,7 @@ export const quotationsHandlers = [
       ]),
     ),
   ),
+  http.get(`${API}/quotations/:id`, () => HttpResponse.json(getQuotationResponse())),
 ]
 
 // ----- Overrides para server.use(...) -----
@@ -154,5 +244,38 @@ export function quotationsPagedByParam(totalElements = 25, size = 20) {
         page,
       }),
     )
+  })
+}
+
+// ----- Detalle (GET /quotations/:id) -----
+
+/** Responde un detalle fijo. */
+export function quotationDetail(quotation: QuotationResponse) {
+  return http.get(`${API}/quotations/:id`, () => HttpResponse.json(quotation))
+}
+
+/** Detalle con delay (para observar el estado de carga). */
+export function quotationDetailSlow(quotation: QuotationResponse, ms = 40) {
+  return http.get(`${API}/quotations/:id`, async () => {
+    await delay(ms)
+    return HttpResponse.json(quotation)
+  })
+}
+
+/** Error (Problem RFC 7807) en el detalle (ej. 404, 500). */
+export function quotationDetailError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/quotations/:id`, () =>
+    HttpResponse.json(
+      { type: 'urn:tms:error:test', title: 'Error', status, detail: 'Fallo de prueba', ...problem },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Captura el path param `id` en `sink` (verifica que useParams alimenta el fetch). */
+export function quotationDetailCapture(sink: { id?: string }, quotation: QuotationResponse) {
+  return http.get(`${API}/quotations/:id`, ({ params }) => {
+    sink.id = params.id as string
+    return HttpResponse.json(quotation)
   })
 }

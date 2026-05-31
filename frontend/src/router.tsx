@@ -4,6 +4,7 @@ import { AppLayout } from './shared/layout/AppLayout'
 import { LoginPage } from './features/auth/components/LoginPage'
 import { ChangePasswordPage } from './features/auth/components/ChangePasswordPage'
 import { CotizacionesListPage } from './features/quotations/pages/CotizacionesListPage'
+import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDetailPage'
 import { HomePage } from './pages/HomePage'
 
 export const router = createBrowserRouter([
@@ -22,6 +23,18 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
             <CotizacionesListPage />
+          </ProtectedRoute>
+        ),
+      },
+      // El wizard de creación aún no existe; hasta entonces /cotizaciones/nueva
+      // redirige a Inicio (evita que matchee /:id como id="nueva"). Reemplazar
+      // por el wizard cuando se implemente.
+      { path: '/cotizaciones/nueva', element: <Navigate to="/" replace /> },
+      {
+        path: '/cotizaciones/:id',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+            <CotizacionDetailPage />
           </ProtectedRoute>
         ),
       },

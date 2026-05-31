@@ -21,3 +21,9 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
   }
   return fallback
 }
+
+/** `true` si el error es un 404 (recurso inexistente). Para distinguir el estado
+ * "no encontrado" de un fallo genérico en pantallas de detalle. */
+export function isNotFoundError(error: unknown): boolean {
+  return isAxiosError(error) && error.response?.status === 404
+}
