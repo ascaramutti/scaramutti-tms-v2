@@ -10,6 +10,6 @@ export const quotationKeys = {
   all: ['quotations'] as const,
   lists: () => [...quotationKeys.all, 'list'] as const,
   list: (params: QuotationListParams) => [...quotationKeys.lists(), params] as const,
-  // Listo para el detalle (próxima pantalla del backlog).
   detail: (id: number) => [...quotationKeys.all, 'detail', id] as const,
+  config: () => [...quotationKeys.all, 'config'] as const,
 }

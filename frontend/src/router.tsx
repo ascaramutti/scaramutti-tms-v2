@@ -5,6 +5,7 @@ import { LoginPage } from './features/auth/components/LoginPage'
 import { ChangePasswordPage } from './features/auth/components/ChangePasswordPage'
 import { CotizacionesListPage } from './features/quotations/pages/CotizacionesListPage'
 import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDetailPage'
+import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { HomePage } from './pages/HomePage'
 
 export const router = createBrowserRouter([
@@ -26,10 +27,15 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      // El wizard de creación aún no existe; hasta entonces /cotizaciones/nueva
-      // redirige a Inicio (evita que matchee /:id como id="nueva"). Reemplazar
-      // por el wizard cuando se implemente.
-      { path: '/cotizaciones/nueva', element: <Navigate to="/" replace /> },
+      // Declarado ANTES de /cotizaciones/:id para que "nueva" no matchee como id.
+      {
+        path: '/cotizaciones/nueva',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+            <CotizacionWizardPage />
+          </ProtectedRoute>
+        ),
+      },
       {
         path: '/cotizaciones/:id',
         element: (
