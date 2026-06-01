@@ -1,5 +1,6 @@
 import type { HttpHandler } from 'msw'
 import { authHandlers } from './handlers/auth'
+import { cargoTypesHandlers } from './handlers/cargotypes'
 import { catalogsHandlers } from './handlers/catalogs'
 import { clientsHandlers } from './handlers/clients'
 import { quotationsHandlers } from './handlers/quotations'
@@ -12,5 +13,6 @@ export const handlers: HttpHandler[] = [
   ...authHandlers,
   ...catalogsHandlers,
   ...clientsHandlers,
+  ...cargoTypesHandlers,
   ...quotationsHandlers,
 ]

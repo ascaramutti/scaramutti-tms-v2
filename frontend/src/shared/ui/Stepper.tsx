@@ -5,36 +5,38 @@ export interface StepperStep {
   label: string
 }
 
+/** Estado de un paso ya "visitado/evaluado": completo (check) o con faltantes (alerta). */
+export type StepStatus = 'completed' | 'error'
+
 interface StepperProps {
   steps: StepperStep[]
   currentStep: number
-  /** Máximo paso visitado (para habilitar navegación hacia atrás por el stepper). */
-  maxVisitedStep?: number
-  /** Índices de steps con error de validación. */
-  stepErrors?: number[]
+  /**
+   * Estado por paso evaluado. `'completed'` → check verde; `'error'` → alerta. Los
+   * pasos sin entrada quedan pendientes. La navegación es LIBRE (no bloqueante): se
+   * puede ir a cualquier paso; el gate real es el submit final.
+   */
+  stepStatus?: Record<number, StepStatus>
   onStepClick?: (index: number) => void
 }
 
 /**
- * Indicador de pasos del wizard. Estados por paso: actual, completado, con error
- * y pendiente. Los pasos ya visitados son navegables (botón) si se pasa `onStepClick`.
+ * Indicador de pasos del wizard. Estados: actual, completado (check), con error
+ * (alerta) y pendiente. Cualquier paso distinto del actual es navegable si se pasa
+ * `onStepClick` — los pasos NO bloquean el avance, solo señalan lo que falta.
  */
-export function Stepper({
-  steps,
-  currentStep,
-  maxVisitedStep = 0,
-  stepErrors = [],
-  onStepClick,
-}: StepperProps) {
+export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: StepperProps) {
   const lastIndex = steps.length - 1
 
   return (
     <ol className="flex items-center justify-center overflow-x-auto pb-1">
       {steps.map((step, index) => {
         const isActive = index === currentStep
-        const hasError = stepErrors.includes(index) && !isActive
-        const isCompleted = index < currentStep && !hasError
-        const isClickable = !!onStepClick && index !== currentStep && index <= maxVisitedStep
+        const status = stepStatus[index]
+        const hasError = status === 'error' && !isActive
+        const isCompleted = status === 'completed' && !isActive
+        const isVisited = isActive || status !== undefined
+        const isClickable = !!onStepClick && !isActive
 
         let circleClass: string
         let content: React.ReactNode
@@ -72,7 +74,7 @@ export function Stepper({
               <span
                 className={cn(
                   'mt-1 whitespace-nowrap text-xs',
-                  index <= maxVisitedStep ? 'font-medium text-blue-700' : 'text-slate-400',
+                  isVisited ? 'font-medium text-blue-700' : 'text-slate-400',
                 )}
               >
                 {step.label}
@@ -83,7 +85,7 @@ export function Stepper({
                 aria-hidden="true"
                 className={cn(
                   'mx-2 mt-[-16px] h-0.5 w-8 sm:w-12',
-                  index < maxVisitedStep ? 'bg-blue-600' : 'bg-slate-300',
+                  status !== undefined ? 'bg-blue-600' : 'bg-slate-300',
                 )}
               />
             )}

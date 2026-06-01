@@ -13,6 +13,7 @@ import {
   createClientOk,
   fakeClient,
 } from '../../../test/mocks/handlers/clients'
+import { cargoTypesSearch, createCargoTypeOk, fakeCargoType } from '../../../test/mocks/handlers/cargotypes'
 
 function renderWizard() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -179,13 +180,16 @@ describe('CotizacionWizardPage', () => {
   })
 
   // ----- Validación Step 1 -----
-  it('"Siguiente" sin cliente muestra error y no avanza', async () => {
+  it('"Siguiente" sin cliente NO bloquea: avanza y marca el Step 1 con alerta', async () => {
     const user = userEvent.setup()
     renderWizard()
     await waitForForm()
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    expect(await screen.findByText(/seleccioná un cliente/i)).toBeInTheDocument()
-    expect(screen.getByText('Tipo de cotización')).toBeInTheDocument() // sigue en step 1
+    // No bloqueante: avanza al Step 2 igual.
+    expect(await screen.findByText(/ítems de la cotización/i)).toBeInTheDocument()
+    // El Step 1 quedó marcado: al volver por el stepper, el error sigue visible.
+    await user.click(screen.getByRole('button', { name: /información general/i }))
+    expect(await screen.findByText(/selecciona un cliente/i)).toBeInTheDocument()
   })
 
   it('teléfono de contacto con formato inválido muestra error', async () => {
@@ -197,11 +201,13 @@ describe('CotizacionWizardPage', () => {
     expect(await screen.findByText(/9 dígitos/i)).toBeInTheDocument()
   })
 
-  it('origen es obligatorio en TRANSPORTE', async () => {
+  it('origen es obligatorio en TRANSPORTE (se marca al intentar avanzar)', async () => {
     const user = userEvent.setup()
     renderWizard()
     await waitForForm()
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await screen.findByText(/ítems de la cotización/i) // avanzó (no bloqueante)
+    await user.click(screen.getByRole('button', { name: /información general/i }))
     expect(await screen.findByText(/origen es obligatorio/i)).toBeInTheDocument()
   })
 
@@ -214,7 +220,7 @@ describe('CotizacionWizardPage', () => {
     await user.click(screen.getByRole('button', { name: /alquiler/i }))
     await selectAcme(user)
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    expect(await screen.findByText(/ítems del servicio/i)).toBeInTheDocument()
+    expect(await screen.findByText(/ítems de la cotización/i)).toBeInTheDocument()
   })
 
   it('"Atrás" vuelve al Step 1 conservando los datos', async () => {
@@ -225,10 +231,286 @@ describe('CotizacionWizardPage', () => {
     await user.click(screen.getByRole('button', { name: /alquiler/i }))
     await selectAcme(user)
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    await screen.findByText(/ítems del servicio/i)
+    await screen.findByText(/ítems de la cotización/i)
     await user.click(screen.getByRole('button', { name: /atrás/i }))
     expect(await screen.findByText('Tipo de cotización')).toBeInTheDocument()
     expect(screen.getByText('ACME S.A.C.')).toBeInTheDocument() // cliente conservado
+  })
+
+  // ----- Step 2: Ítems -----
+  /** Navega al Step 2 (no bloqueante, no requiere completar el Step 1). */
+  async function goToItems(user: ReturnType<typeof userEvent.setup>) {
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await screen.findByText(/ítems de la cotización/i)
+  }
+
+  /** Agrega un ítem y elige un tipo de SERVICIO (revela carga + peso + dimensiones). */
+  async function addServicioItem(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '1') // SCB · SERVICIO
+  }
+
+  it('agrega un ítem y muestra el form del ítem', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    expect(screen.getByText(/agrega al menos un ítem/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    expect(screen.getByText('Ítem 1')).toBeInTheDocument()
+    expect(screen.getByLabelText('Tipo de servicio')).toBeInTheDocument()
+  })
+
+  it('los campos del ítem aparecen recién al elegir el tipo de servicio', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    // Sin tipo: solo el select + un hint; nada de cantidad/precio.
+    expect(screen.getByText(/elige un tipo de servicio/i)).toBeInTheDocument()
+    expect(screen.queryByLabelText('Cantidad')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Precio unitario')).not.toBeInTheDocument()
+    // Al elegir un tipo, aparecen los demás campos.
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '1')
+    expect(screen.getByLabelText('Cantidad')).toBeInTheDocument()
+    expect(screen.getByLabelText('Precio unitario')).toBeInTheDocument()
+  })
+
+  it('TRANSPORTE muestra Servicios + Complementarios y excluye ALQUILER; el Integral va deshabilitado', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    const select = screen.getByLabelText('Tipo de servicio')
+    expect(within(select).getByRole('option', { name: 'Transporte de carga general' })).toBeInTheDocument() // SERVICIO
+    expect(within(select).getByRole('option', { name: 'Escolta armada' })).toBeInTheDocument() // COMPLEMENTARIO
+    expect(within(select).queryByRole('option', { name: /alquiler de camión/i })).not.toBeInTheDocument() // ALQUILER fuera
+    const integral = within(select).getByRole('option', { name: /servicio integral/i })
+    expect(integral).toBeInTheDocument()
+    expect(integral).toBeDisabled()
+  })
+
+  it('ALQUILER muestra solo tipos de alquiler en el select', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /alquiler/i }))
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await screen.findByText(/ítems de la cotización/i)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    const select = screen.getByLabelText('Tipo de servicio')
+    expect(within(select).getByRole('option', { name: 'Alquiler de camión' })).toBeInTheDocument()
+    expect(within(select).queryByRole('option', { name: 'Transporte de carga general' })).not.toBeInTheDocument()
+    expect(within(select).queryByRole('option', { name: /servicio integral/i })).not.toBeInTheDocument()
+  })
+
+  it('un ítem SERVICIO pide tipo de carga y peso', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await addServicioItem(user)
+    // Al elegir un tipo SERVICIO se revelan carga + peso.
+    expect(screen.getByLabelText('Tipo de carga')).toBeInTheDocument()
+    expect(screen.getByLabelText('Peso (kg)')).toBeInTheDocument()
+  })
+
+  it('al elegir el tipo de servicio no muestra el error de peso prematuramente', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '1') // SERVICIO
+    // El peso está vacío pero no se tocó → el error no debe aparecer todavía (onTouched).
+    expect(screen.queryByText(/el peso debe ser mayor a 0/i)).not.toBeInTheDocument()
+  })
+
+  it('al elegir un tipo de carga precarga su peso y dimensiones estándar', async () => {
+    const user = userEvent.setup()
+    server.use(
+      cargoTypesSearch([
+        fakeCargoType({
+          id: 7,
+          name: 'EXCAVADORA 330',
+          standardWeight: 33000,
+          standardLength: 11,
+          standardWidth: 3.2,
+          standardHeight: 3.5,
+        }),
+      ]),
+    )
+    renderWizard()
+    await goToItems(user)
+    await addServicioItem(user)
+    await user.type(screen.getByLabelText('Tipo de carga'), 'exca')
+    await user.click(await screen.findByText('EXCAVADORA 330'))
+    expect((screen.getByLabelText('Peso (kg)') as HTMLInputElement).value).toBe('33000')
+    expect((screen.getByLabelText('Largo (m)') as HTMLInputElement).value).toBe('11')
+  })
+
+  it('al quitar el tipo de carga limpia el peso y las dimensiones', async () => {
+    const user = userEvent.setup()
+    server.use(
+      cargoTypesSearch([fakeCargoType({ id: 7, name: 'EXCAVADORA 330', standardWeight: 33000, standardLength: 11 })]),
+    )
+    renderWizard()
+    await goToItems(user)
+    await addServicioItem(user)
+    await user.type(screen.getByLabelText('Tipo de carga'), 'exca')
+    await user.click(await screen.findByText('EXCAVADORA 330'))
+    expect((screen.getByLabelText('Peso (kg)') as HTMLInputElement).value).toBe('33000')
+    await user.click(screen.getByRole('button', { name: /quitar selección/i }))
+    expect((screen.getByLabelText('Peso (kg)') as HTMLInputElement).value).toBe('')
+    expect((screen.getByLabelText('Largo (m)') as HTMLInputElement).value).toBe('')
+  })
+
+  it('calcula el total del ítem con IGV', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    // Escolta (COMPLEMENTARIO): sin carga/peso, simplifica el caso.
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2')
+    const qty = screen.getByLabelText('Cantidad')
+    await user.clear(qty)
+    await user.type(qty, '2')
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '100')
+    // 2 × 100 × 1.18 = 236
+    expect((screen.getByLabelText(/total del ítem 1/i) as HTMLInputElement).value).toMatch(/236/)
+  })
+
+  it('permite tipear el total y calcula el precio unitario a la inversa', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // COMPLEMENTARIO
+    // Cantidad 1, IGV 18%: total 1180 (incl. IGV) → precio unitario = 1180 / 1.18 = 1000.
+    await user.type(screen.getByLabelText(/total del ítem 1/i), '1180')
+    await user.tab() // blur → commit del total
+    expect((screen.getByLabelText('Precio unitario') as HTMLInputElement).value).toBe('1000')
+  })
+
+  it('respeta el máximo de ítems del config', async () => {
+    const user = userEvent.setup()
+    server.use(configOk({ maxRootItems: 1 }))
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    expect(screen.getByText(/máximo 1 ítems · 1\/1/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /agregar ítem/i })).toBeDisabled()
+  })
+
+  it('crea un tipo de carga al vuelo y lo selecciona', async () => {
+    const user = userEvent.setup()
+    server.use(createCargoTypeOk(fakeCargoType({ id: 50, name: 'CONTENEDOR 40' })))
+    renderWizard()
+    await goToItems(user)
+    await addServicioItem(user)
+    await user.type(screen.getByLabelText('Tipo de carga'), 'cont')
+    await user.click(await screen.findByText('Nuevo tipo de carga'))
+    const dialog = screen.getByRole('dialog')
+    await user.type(within(dialog).getByLabelText('Nombre'), 'CONTENEDOR 40')
+    await user.type(within(dialog).getByLabelText(/peso estándar/i), '5000')
+    await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
+    expect(await screen.findByText('CONTENEDOR 40')).toBeInTheDocument()
+  })
+
+  it('el modal de tipo de carga permite cargar descripción y dimensiones', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await addServicioItem(user)
+    await user.type(screen.getByLabelText('Tipo de carga'), 'nuevo')
+    await user.click(await screen.findByText('Nuevo tipo de carga'))
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByLabelText('Nombre')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Descripción (opcional)')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/peso estándar/i)).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/largo estándar/i)).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/ancho estándar/i)).toBeInTheDocument()
+    expect(within(dialog).getByLabelText(/alto estándar/i)).toBeInTheDocument()
+  })
+
+  it('permite saltar entre pasos por el stepper (no bloqueante)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /stand-by/i }))
+    expect(await screen.findByText(/costos de stand-by/i)).toBeInTheDocument()
+  })
+
+  it('vacía los ítems al cambiar el tipo de cotización', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    expect(screen.getByText('Ítem 1')).toBeInTheDocument()
+    // Volver al Step 1 y cambiar TRANSPORTE → ALQUILER.
+    await user.click(screen.getByRole('button', { name: /atrás/i }))
+    await screen.findByText('Tipo de cotización')
+    await user.click(screen.getByRole('button', { name: /alquiler/i }))
+    // Avanzar de nuevo al Step 2: los ítems se vaciaron (sus tipos dependían del tipo).
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    expect(await screen.findByText(/agrega al menos un ítem/i)).toBeInTheDocument()
+    expect(screen.queryByText('Ítem 1')).not.toBeInTheDocument()
+  })
+
+  it('al agregar un ítem colapsa el anterior y abre solo el nuevo', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    expect(screen.getByLabelText('Tipo de servicio')).toBeInTheDocument() // ítem 1 abierto
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    // 2 ítems en la lista (headers visibles), pero solo el nuevo abierto → 1 form visible.
+    expect(screen.getByText('Ítem 1')).toBeInTheDocument()
+    expect(screen.getByText('Ítem 2')).toBeInTheDocument()
+    expect(screen.getAllByLabelText('Tipo de servicio')).toHaveLength(1)
+  })
+
+  it('al hacer click en un ítem colapsado lo expande (varios abiertos)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    expect(screen.getAllByLabelText('Tipo de servicio')).toHaveLength(1) // solo el ítem 2
+    // El ítem 1 quedó colapsado: su header es el único toggle con aria-expanded=false.
+    await user.click(screen.getAllByRole('button', { expanded: false })[0])
+    expect(screen.getAllByLabelText('Tipo de servicio')).toHaveLength(2) // ambos abiertos
+  })
+
+  it('el indicador de estado se muestra solo cuando el ítem está colapsado', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    // Expandido (recién agregado) → sin indicador.
+    expect(screen.queryByText('Faltan datos')).not.toBeInTheDocument()
+    // Completar el ítem (COMPLEMENTARIO no pide carga/peso).
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2')
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '100')
+    // Colapsar → muestra "Completo".
+    await user.click(screen.getAllByRole('button', { expanded: true })[0])
+    expect(await screen.findByText('Completo')).toBeInTheDocument()
+  })
+
+  it('el footer desglosa subtotal, IGV y total', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2')
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '1000')
+    // Desglose en el footer: Subtotal + IGV (18%) (el ítem solo tiene "Total" e "IGV (%)").
+    expect(screen.getByText('Subtotal')).toBeInTheDocument()
+    expect(screen.getByText(/IGV \(18%\)/)).toBeInTheDocument()
   })
 
   it('"Cancelar" navega al listado', async () => {

@@ -38,7 +38,7 @@ describe('handleApiFormError', () => {
     })
     expect(setError).not.toHaveBeenCalled()
     expect(mockToastError).toHaveBeenCalledWith(
-      'Error inesperado. Intentá de nuevo.',
+      'Error inesperado. Intenta de nuevo.',
       expect.objectContaining({ icon: expect.anything() }),
     )
   })
@@ -176,11 +176,11 @@ describe('handleApiFormError', () => {
     const error = makeAxiosError(500, undefined)
     handleApiFormError(error, {
       setError,
-      fallbackMessage: 'No se pudo iniciar sesión. Verificá tu conexión e intentá de nuevo.',
+      fallbackMessage: 'No se pudo iniciar sesión. Verifica tu conexión e intenta de nuevo.',
     })
     expect(setError).not.toHaveBeenCalled()
     expect(mockToastError).toHaveBeenCalledWith(
-      'No se pudo iniciar sesión. Verificá tu conexión e intentá de nuevo.',
+      'No se pudo iniciar sesión. Verifica tu conexión e intenta de nuevo.',
     )
   })
 })

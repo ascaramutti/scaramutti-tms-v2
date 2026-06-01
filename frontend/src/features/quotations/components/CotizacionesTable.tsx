@@ -124,8 +124,8 @@ export function CotizacionesTable({
       emptyTitle={hasActiveFilters ? 'No se encontraron cotizaciones' : 'Aún no hay cotizaciones'}
       emptyDescription={
         hasActiveFilters
-          ? 'Probá ajustar los filtros de búsqueda.'
-          : 'Creá la primera con el botón "Nueva cotización".'
+          ? 'Prueba ajustar los filtros de búsqueda.'
+          : 'Crea la primera con el botón "Nueva cotización".'
       }
     />
   )

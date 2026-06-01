@@ -5,21 +5,28 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { Spinner } from '../../../shared/ui/Spinner'
-import { Stepper, type StepperStep } from '../../../shared/ui/Stepper'
+import { Stepper, type StepperStep, type StepStatus } from '../../../shared/ui/Stepper'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 import { useCurrencies } from '../../catalogs/hooks/useCurrencies'
 import { usePaymentTerms } from '../../catalogs/hooks/usePaymentTerms'
+import { useQuotationServiceTypes } from '../../catalogs/hooks/useQuotationServiceTypes'
 import { useQuotationConfig } from '../hooks/useQuotationConfig'
 import { Step1InfoGeneral } from '../wizard/Step1InfoGeneral'
+import { Step2Items } from '../wizard/Step2Items'
 import { StepPlaceholder } from '../wizard/StepPlaceholder'
 import { WizardNav } from '../wizard/WizardNav'
 import {
   STEP_FIELDS,
   WIZARD_DEFAULTS,
-  step1Schema,
+  wizardSchema,
   type WizardFormInput,
 } from '../wizard/quotation-wizard.schema'
-import type { ClientResponse, CurrencyResponse, PaymentTermResponse } from '../../../api'
+import type {
+  ClientResponse,
+  CurrencyResponse,
+  PaymentTermResponse,
+  QuotationServiceTypeResponse,
+} from '../../../api'
 
 const WIZARD_STEPS: StepperStep[] = [
   { label: 'Información General' },
@@ -39,10 +46,12 @@ const SECONDARY_BUTTON =
 export function CotizacionWizardPage() {
   const currencies = useCurrencies()
   const paymentTerms = usePaymentTerms()
+  const serviceTypes = useQuotationServiceTypes()
   const config = useQuotationConfig()
 
-  const isLoading = currencies.isLoading || paymentTerms.isLoading || config.isLoading
-  const ready = currencies.data && paymentTerms.data && config.data
+  const isLoading =
+    currencies.isLoading || paymentTerms.isLoading || serviceTypes.isLoading || config.isLoading
+  const ready = currencies.data && paymentTerms.data && serviceTypes.data && config.data
 
   if (isLoading) {
     return (
@@ -55,7 +64,7 @@ export function CotizacionWizardPage() {
   }
 
   if (!ready) {
-    const error = currencies.error ?? paymentTerms.error ?? config.error
+    const error = currencies.error ?? paymentTerms.error ?? serviceTypes.error ?? config.error
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div role="alert" className="flex flex-col items-center justify-center px-6 py-16 text-center">
@@ -67,6 +76,7 @@ export function CotizacionWizardPage() {
             onClick={() => {
               currencies.refetch()
               paymentTerms.refetch()
+              serviceTypes.refetch()
               config.refetch()
             }}
             className={SECONDARY_BUTTON}
@@ -82,7 +92,10 @@ export function CotizacionWizardPage() {
     <WizardForm
       currencies={currencies.data}
       paymentTerms={paymentTerms.data}
+      serviceTypes={serviceTypes.data}
       defaultValidityDays={config.data.defaultValidityDays}
+      igvPercentage={config.data.igvPercentage}
+      maxRootItems={config.data.maxRootItems}
     />
   )
 }
@@ -90,10 +103,20 @@ export function CotizacionWizardPage() {
 interface WizardFormProps {
   currencies: CurrencyResponse[]
   paymentTerms: PaymentTermResponse[]
+  serviceTypes: QuotationServiceTypeResponse[]
   defaultValidityDays: number
+  igvPercentage: number
+  maxRootItems: number
 }
 
-function WizardForm({ currencies, paymentTerms, defaultValidityDays }: WizardFormProps) {
+function WizardForm({
+  currencies,
+  paymentTerms,
+  serviceTypes,
+  defaultValidityDays,
+  igvPercentage,
+  maxRootItems,
+}: WizardFormProps) {
   const navigate = useNavigate()
   // El array nunca está vacío (USD + PEN siempre seedeados); el `?? 0` es defensivo.
   const defaultCurrencyId = currencies.find((c) => c.code === 'PEN')?.id ?? currencies[0]?.id ?? 0
@@ -101,7 +124,7 @@ function WizardForm({ currencies, paymentTerms, defaultValidityDays }: WizardFor
     paymentTerms.find((term) => term.name.toLowerCase() === 'contado')?.id ?? null
 
   const form = useForm<WizardFormInput>({
-    resolver: zodResolver(step1Schema),
+    resolver: zodResolver(wizardSchema),
     mode: 'onTouched',
     defaultValues: {
       ...WIZARD_DEFAULTS,
@@ -112,39 +135,27 @@ function WizardForm({ currencies, paymentTerms, defaultValidityDays }: WizardFor
   })
 
   const [currentStep, setCurrentStep] = useState(0)
-  const [maxVisitedStep, setMaxVisitedStep] = useState(0)
-  const [stepErrors, setStepErrors] = useState<number[]>([])
+  // Estado por paso evaluado (check/alerta). La navegación NO bloquea: el usuario va
+  // y vuelve libremente; solo se señala lo que falta (gate real = submit del PR3).
+  const [stepStatus, setStepStatus] = useState<Record<number, StepStatus>>({})
   // El cliente seleccionado vive acá (no en ClientField) para persistir entre steps.
   const [selectedClient, setSelectedClient] = useState<ClientResponse | null>(null)
   const lastStep = WIZARD_STEPS.length - 1
 
-  async function validateStep(step: number): Promise<boolean> {
+  /** Valida un paso y registra su estado (check/alerta). Pasos sin campos (placeholders) no se marcan. */
+  async function markStep(step: number): Promise<void> {
     const fields = STEP_FIELDS[step]
-    if (!fields) return true
+    if (!fields) return
     const valid = await form.trigger(fields as (keyof WizardFormInput)[])
-    setStepErrors((prev) => {
-      if (valid) return prev.filter((s) => s !== step)
-      return prev.includes(step) ? prev : [...prev, step]
-    })
-    return valid
+    setStepStatus((prev) => ({ ...prev, [step]: valid ? 'completed' : 'error' }))
   }
 
-  async function handleNext() {
-    const valid = await validateStep(currentStep)
-    if (!valid) return
-    const next = Math.min(currentStep + 1, lastStep)
-    setMaxVisitedStep((prev) => Math.max(prev, next))
-    setCurrentStep(next)
-  }
-
-  function handleBack() {
-    setCurrentStep((prev) => Math.max(prev - 1, 0))
-  }
-
-  async function handleStepClick(index: number) {
-    if (index === currentStep || index > maxVisitedStep) return
-    await validateStep(currentStep)
-    setCurrentStep(index)
+  /** Navega marcando primero el estado del paso que se deja (sin bloquear el avance). */
+  function goToStep(target: number) {
+    const clamped = Math.max(0, Math.min(target, lastStep))
+    if (clamped === currentStep) return
+    void markStep(currentStep)
+    setCurrentStep(clamped)
   }
 
   return (
@@ -152,19 +163,18 @@ function WizardForm({ currencies, paymentTerms, defaultValidityDays }: WizardFor
       <div>
         <BackLink to="/cotizaciones">Cotizaciones</BackLink>
         <div className="mt-3">
-          <PageHeader title="Nueva cotización" description="Completá los datos para generar la cotización." />
+          <PageHeader title="Nueva cotización" description="Completa los datos para generar la cotización." />
         </div>
       </div>
       <Stepper
         steps={WIZARD_STEPS}
         currentStep={currentStep}
-        maxVisitedStep={maxVisitedStep}
-        stepErrors={stepErrors}
-        onStepClick={handleStepClick}
+        stepStatus={stepStatus}
+        onStepClick={goToStep}
       />
       <FormProvider {...form}>
         {/* No es un <form> nativo: el wizard navega con botones (no submit), y un
-            <form> acá anidaría el <form> del modal de crear cliente (HTML inválido). */}
+            <form> acá anidaría el <form> de los modales de crear cliente/tipo de carga. */}
         <div className="space-y-6">
           <div className="min-h-[300px]">
             {currentStep === 0 && (
@@ -175,15 +185,22 @@ function WizardForm({ currencies, paymentTerms, defaultValidityDays }: WizardFor
                 onClientChange={setSelectedClient}
               />
             )}
-            {currentStep === 1 && <StepPlaceholder title="Ítems del servicio" />}
+            {currentStep === 1 && (
+              <Step2Items
+                serviceTypes={serviceTypes}
+                currencies={currencies}
+                igvPercentage={igvPercentage}
+                maxRootItems={maxRootItems}
+              />
+            )}
             {currentStep === 2 && <StepPlaceholder title="Costos de Stand-By" />}
             {currentStep === 3 && <StepPlaceholder title="Resumen y confirmación" />}
           </div>
           <WizardNav
             isFirst={currentStep === 0}
             isLast={currentStep === lastStep}
-            onBack={handleBack}
-            onNext={handleNext}
+            onBack={() => goToStep(currentStep - 1)}
+            onNext={() => goToStep(currentStep + 1)}
             onCancel={() => navigate('/cotizaciones')}
           />
         </div>
