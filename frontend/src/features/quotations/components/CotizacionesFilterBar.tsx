@@ -56,7 +56,7 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
           </div>
           {showSearchHint && (
             <p id="q-hint" className="mt-1 text-xs text-slate-500">
-              Ingresá al menos {SEARCH_MIN_LENGTH} caracteres para buscar.
+              Ingresa al menos {SEARCH_MIN_LENGTH} caracteres para buscar.
             </p>
           )}
         </div>

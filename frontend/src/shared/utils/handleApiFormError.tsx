@@ -31,7 +31,7 @@ export function handleApiFormError<F extends string>(
   const { setError, fallbackMessage, codeFieldMap, allowedFields } = options
 
   if (!isAxiosError(error)) {
-    toast.error('Error inesperado. Intentá de nuevo.', {
+    toast.error('Error inesperado. Intenta de nuevo.', {
       icon: <TriangleAlert className="w-4 h-4" />,
     })
     return

@@ -1,5 +1,10 @@
 import { http, HttpResponse, delay } from 'msw'
-import type { CurrencyResponse, PaymentTermResponse, QuotationConfigResponse } from '../../../api'
+import type {
+  CurrencyResponse,
+  PaymentTermResponse,
+  QuotationConfigResponse,
+  QuotationServiceTypeResponse,
+} from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -15,6 +20,27 @@ export function fakeConfig(overrides: Partial<QuotationConfigResponse> = {}): Qu
   return { igvPercentage: 18, maxRootItems: 5, defaultValidityDays: 15, ...overrides }
 }
 
+export function fakeServiceType(
+  overrides: Partial<QuotationServiceTypeResponse> = {},
+): QuotationServiceTypeResponse {
+  return {
+    id: 1,
+    code: 'SCB',
+    name: 'Transporte de carga general',
+    kind: 'SERVICIO',
+    isActive: true,
+    ...overrides,
+  }
+}
+
+/** Mezcla de kinds (incluye INTEGRAL, que el Step 2 debe EXCLUIR del select por ahora). */
+const DEFAULT_SERVICE_TYPES: QuotationServiceTypeResponse[] = [
+  fakeServiceType({ id: 1, code: 'SCB', name: 'Transporte de carga general', kind: 'SERVICIO' }),
+  fakeServiceType({ id: 2, code: 'CES', name: 'Escolta armada', kind: 'COMPLEMENTARIO' }),
+  fakeServiceType({ id: 3, code: 'ACB', name: 'Alquiler de camión', kind: 'ALQUILER' }),
+  fakeServiceType({ id: 4, code: 'INT', name: 'Servicio Integral', kind: 'INTEGRAL' }),
+]
+
 /** Defaults happy-path. IMPORTANTE: este array va ANTES de quotationsHandlers en
  * `handlers.ts` para que `GET /quotations/config` matchee antes que `/quotations/:id`. */
 export const catalogsHandlers = [
@@ -28,6 +54,7 @@ export const catalogsHandlers = [
     HttpResponse.json([fakePaymentTerm(), fakePaymentTerm({ id: 3, name: '30 días', days: 30 })]),
   ),
   http.get(`${API}/quotations/config`, () => HttpResponse.json(fakeConfig())),
+  http.get(`${API}/quotation-service-types`, () => HttpResponse.json(DEFAULT_SERVICE_TYPES)),
 ]
 
 // ----- Overrides -----
@@ -42,6 +69,10 @@ export function paymentTermsOk(items: PaymentTermResponse[]) {
 
 export function configOk(overrides: Partial<QuotationConfigResponse>) {
   return http.get(`${API}/quotations/config`, () => HttpResponse.json(fakeConfig(overrides)))
+}
+
+export function serviceTypesOk(items: QuotationServiceTypeResponse[]) {
+  return http.get(`${API}/quotation-service-types`, () => HttpResponse.json(items))
 }
 
 export function currenciesError(status: number) {
@@ -66,6 +97,10 @@ export function catalogsSlow(ms = 40) {
     http.get(`${API}/quotations/config`, async () => {
       await delay(ms)
       return HttpResponse.json(fakeConfig())
+    }),
+    http.get(`${API}/quotation-service-types`, async () => {
+      await delay(ms)
+      return HttpResponse.json(DEFAULT_SERVICE_TYPES)
     }),
   ]
 }

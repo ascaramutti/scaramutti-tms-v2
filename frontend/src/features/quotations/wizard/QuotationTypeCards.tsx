@@ -20,10 +20,13 @@ const TYPE_OPTIONS = [
 
 interface QuotationTypeCardsProps {
   control: Control<WizardFormInput>
+  /** Se invoca solo cuando el tipo cambia de verdad. Sirve para resetear los ítems,
+   * cuyos tipos de servicio dependen del tipo de cotización (TRANSPORTE vs ALQUILER). */
+  onTypeChange?: () => void
 }
 
 /** Selector visual del tipo de cotización (cards TRANSPORTE / ALQUILER). */
-export function QuotationTypeCards({ control }: QuotationTypeCardsProps) {
+export function QuotationTypeCards({ control, onTypeChange }: QuotationTypeCardsProps) {
   return (
     <Controller
       name="quotationType"
@@ -36,7 +39,11 @@ export function QuotationTypeCards({ control }: QuotationTypeCardsProps) {
               <button
                 key={value}
                 type="button"
-                onClick={() => field.onChange(value)}
+                onClick={() => {
+                  if (field.value === value) return
+                  field.onChange(value)
+                  onTypeChange?.()
+                }}
                 aria-pressed={selected}
                 className={cn(
                   'flex flex-col items-center gap-2 rounded-xl border-2 p-5 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500',

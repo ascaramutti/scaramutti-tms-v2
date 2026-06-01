@@ -55,7 +55,7 @@ export function ChangePasswordPage() {
     } catch (error) {
       handleApiFormError(error, {
         setError,
-        fallbackMessage: 'No se pudo cambiar la contraseña. Verificá tu conexión e intentá de nuevo.',
+        fallbackMessage: 'No se pudo cambiar la contraseña. Verifica tu conexión e intenta de nuevo.',
         allowedFields: CHANGE_PASSWORD_FIELDS,
         codeFieldMap: { 'AUTH-004': 'currentPassword' },
       })
@@ -77,7 +77,7 @@ export function ChangePasswordPage() {
         <div className="text-center mb-8">
           <h1 className="text-2xl font-semibold text-slate-900">Cambiar contraseña</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Ingresá tu contraseña actual y la nueva
+            Ingresa tu contraseña actual y la nueva
           </p>
         </div>
 

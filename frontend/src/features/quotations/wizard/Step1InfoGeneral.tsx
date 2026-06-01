@@ -38,6 +38,7 @@ export function Step1InfoGeneral({
     control,
     register,
     watch,
+    setValue,
     formState: { errors },
   } = useFormContext<WizardFormInput>()
   const isTransporte = watch('quotationType') === 'TRANSPORTE'
@@ -53,7 +54,12 @@ export function Step1InfoGeneral({
       <section>
         <h2 className={SECTION_TITLE}>Tipo de cotización</h2>
         <div className="mt-3">
-          <QuotationTypeCards control={control} />
+          {/* Al cambiar de tipo se vacían los ítems: sus tipos de servicio dependen del
+              tipo de cotización (TRANSPORTE vs ALQUILER) y no son intercambiables. */}
+          <QuotationTypeCards
+            control={control}
+            onTypeChange={() => setValue('items', [], { shouldValidate: false })}
+          />
         </div>
       </section>
 
@@ -106,7 +112,7 @@ export function Step1InfoGeneral({
             name="currencyId"
             control={control}
             options={currencyOptions}
-            placeholder="Seleccioná"
+            placeholder="Selecciona"
             error={errors.currencyId?.message}
             labelClassName={COMMERCIAL_LABEL}
           />
@@ -116,7 +122,7 @@ export function Step1InfoGeneral({
             name="paymentTermId"
             control={control}
             options={paymentOptions}
-            placeholder="Seleccioná"
+            placeholder="Selecciona"
             error={errors.paymentTermId?.message}
             labelClassName={COMMERCIAL_LABEL}
           />

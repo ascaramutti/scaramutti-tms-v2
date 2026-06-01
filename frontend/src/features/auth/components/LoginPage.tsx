@@ -56,7 +56,7 @@ export function LoginPage() {
     } catch (error) {
       handleApiFormError(error, {
         setError,
-        fallbackMessage: 'No se pudo iniciar sesión. Verificá tu conexión e intentá de nuevo.',
+        fallbackMessage: 'No se pudo iniciar sesión. Verifica tu conexión e intenta de nuevo.',
         allowedFields: LOGIN_FIELDS,
       })
     }

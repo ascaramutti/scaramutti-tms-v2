@@ -51,7 +51,7 @@ export function CrearClienteModal({ initialName = '', onClose, onCreated }: Crea
     } catch (error) {
       handleApiFormError(error, {
         setError,
-        fallbackMessage: 'No se pudo crear el cliente. Intentá de nuevo.',
+        fallbackMessage: 'No se pudo crear el cliente. Intenta de nuevo.',
         codeFieldMap: { 'CLI-001': 'ruc' },
         allowedFields: CLIENT_FIELDS,
       })

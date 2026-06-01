@@ -66,7 +66,7 @@ export function ClientField({ selectedClient, onClientChange }: ClientFieldProps
           <Combobox
             id="clientId"
             label="Cliente"
-            placeholder="Buscá por nombre o RUC…"
+            placeholder="Busca por nombre o RUC…"
             options={options}
             selected={selectedClient ? { id: selectedClient.id, label: selectedClient.name } : null}
             onQueryChange={setQuery}
@@ -75,7 +75,7 @@ export function ClientField({ selectedClient, onClientChange }: ClientFieldProps
             onBlur={() => trigger('clientId')}
             loading={isFetching}
             minChars={CLIENT_SEARCH_MIN_LENGTH}
-            minCharsHint={`Ingresá al menos ${CLIENT_SEARCH_MIN_LENGTH} caracteres para buscar.`}
+            minCharsHint={`Ingresa al menos ${CLIENT_SEARCH_MIN_LENGTH} caracteres para buscar.`}
             emptyText="No se encontraron clientes."
             error={errors.clientId?.message}
             createLabel="Nuevo cliente"

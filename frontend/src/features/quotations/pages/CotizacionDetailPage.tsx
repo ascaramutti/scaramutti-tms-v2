@@ -35,7 +35,7 @@ export function CotizacionDetailPage() {
         <EmptyState
           icon={FileQuestion}
           title="Cotización no encontrada"
-          description="La cotización que buscás no existe o fue eliminada."
+          description="La cotización que buscas no existe o fue eliminada."
           action={
             <button type="button" onClick={goToList} className={PRIMARY_BUTTON}>
               Volver al listado
