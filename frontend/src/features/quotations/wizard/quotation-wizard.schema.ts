@@ -74,6 +74,25 @@ function refineRoute(
 export const step1Schema = z.object(step1Fields).superRefine(refineRoute)
 
 /**
+ * Stand-by (costo de espera/demora) de un ítem. Opcional por ítem; máximo uno. Si se agrega,
+ * `pricePerDay` debe ser > 0 (un stand-by de 0 no tiene sentido): el backend acepta >= 0
+ * (@DecimalMin 0 inclusive, @Digits 10,2) pero el front lo endurece. `includesIgv` es
+ * declarativo (default false). No suma al total de la cotización.
+ */
+export const standbySchema = z.object({
+  pricePerDay: z
+    .number({ message: 'Ingresa el precio por día.' })
+    .positive('El precio debe ser mayor a 0.')
+    .max(9999999999.99, 'Precio demasiado grande.'),
+  includesIgv: z.boolean(),
+})
+
+export type StandbyInput = z.infer<typeof standbySchema>
+
+/** Defaults de un stand-by nuevo. */
+export const STANDBY_DEFAULTS: StandbyInput = { pricePerDay: 0, includesIgv: false }
+
+/**
  * Schema de un COMPONENTE (hijo) del Servicio Integral. Igual que un ítem de transporte
  * o complementario, pero su precio es de REFERENCIA interna (`internalReferencePrice`,
  * opcional): no se cobra al cliente ni suma al total de la cotización. El backend lo
@@ -97,6 +116,8 @@ export const childItemSchema = z
     // Referencia interna opcional (desglose del paquete); no se cobra al cliente.
     internalReferencePrice: z.number().min(0).max(9999999999.99, 'Precio demasiado grande.').nullable(),
     observations: z.string().trim().max(2000, 'Máximo 2000 caracteres.').optional().or(z.literal('')),
+    // Stand-by opcional del componente (los hijos del Integral SÍ pueden tener stand-by).
+    standby: standbySchema.nullable(),
   })
   .superRefine((child, ctx) => {
     // Componente de transporte (SERVICIO): tipo de carga y peso (>0) obligatorios.
@@ -142,6 +163,8 @@ export const itemSchema = z
       .positive('El precio debe ser mayor a 0.')
       .max(9999999999.99, 'Precio demasiado grande.'),
     observations: z.string().trim().max(2000, 'Máximo 2000 caracteres.').optional().or(z.literal('')),
+    // Stand-by opcional del ítem. NO aplica al Servicio Integral padre (sí a sus hijos).
+    standby: standbySchema.nullable(),
     // Componentes hijos: solo se usan cuando el ítem es INTEGRAL (ver superRefine).
     // Siempre presente (los defaults lo inicializan en []), para no divergir input/output.
     components: z.array(childItemSchema),
@@ -185,6 +208,14 @@ export const itemSchema = z
             message: 'Agrega al menos un componente complementario.',
           })
         }
+      }
+      // El Servicio Integral padre no lleva stand-by (sí sus hijos individualmente).
+      if (item.standby) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['standby'],
+          message: 'El Servicio Integral no admite stand-by.',
+        })
       }
     }
   })
@@ -234,6 +265,7 @@ export const ITEM_DEFAULTS: ItemInput = {
   quantity: 1,
   unitPrice: 0,
   observations: '',
+  standby: null,
   components: [],
 }
 
@@ -251,6 +283,7 @@ export const CHILD_DEFAULTS: ChildItemInput = {
   quantity: 1,
   internalReferencePrice: null,
   observations: '',
+  standby: null,
 }
 
 /** Campos a validar por step (para `trigger()` en "Siguiente" / al cambiar de paso). */

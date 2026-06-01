@@ -37,6 +37,7 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
         const isCompleted = status === 'completed' && !isActive
         const isVisited = isActive || status !== undefined
         const isClickable = !!onStepClick && !isActive
+        const stateLabel = isCompleted ? ' (completado)' : hasError ? ' (con alerta)' : ''
 
         let circleClass: string
         let content: React.ReactNode
@@ -61,6 +62,7 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
               disabled={!isClickable}
               onClick={isClickable ? () => onStepClick(index) : undefined}
               aria-current={isActive ? 'step' : undefined}
+              aria-label={stateLabel ? `${step.label}${stateLabel}` : undefined}
               className={cn('flex flex-col items-center', isClickable ? 'cursor-pointer' : 'cursor-default')}
             >
               <span
