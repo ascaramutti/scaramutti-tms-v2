@@ -276,7 +276,7 @@ describe('CotizacionWizardPage', () => {
     expect(screen.getByLabelText('Precio unitario')).toBeInTheDocument()
   })
 
-  it('TRANSPORTE muestra Servicios + Complementarios y excluye ALQUILER; el Integral va deshabilitado', async () => {
+  it('TRANSPORTE muestra Servicios + Complementarios + Integral y excluye ALQUILER', async () => {
     const user = userEvent.setup()
     renderWizard()
     await goToItems(user)
@@ -285,9 +285,10 @@ describe('CotizacionWizardPage', () => {
     expect(within(select).getByRole('option', { name: 'Transporte de carga general' })).toBeInTheDocument() // SERVICIO
     expect(within(select).getByRole('option', { name: 'Escolta armada' })).toBeInTheDocument() // COMPLEMENTARIO
     expect(within(select).queryByRole('option', { name: /alquiler de camión/i })).not.toBeInTheDocument() // ALQUILER fuera
+    // El Servicio Integral ya es seleccionable como ítem #1.
     const integral = within(select).getByRole('option', { name: /servicio integral/i })
     expect(integral).toBeInTheDocument()
-    expect(integral).toBeDisabled()
+    expect(integral).toBeEnabled()
   })
 
   it('ALQUILER muestra solo tipos de alquiler en el select', async () => {
@@ -544,5 +545,227 @@ describe('CotizacionWizardPage', () => {
     expect(screen.getByLabelText(/persona de contacto/i)).toBeInTheDocument()
     expect(screen.getByLabelText('Moneda')).toBeInTheDocument()
     expect(screen.getByLabelText(/validez/i)).toBeInTheDocument()
+  })
+
+  // ----- Step 2: Servicio Integral -----
+  /** Agrega el ítem #1 y lo convierte en Servicio Integral (id 4 = INT). */
+  async function activarIntegral(user: ReturnType<typeof userEvent.setup>) {
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '4') // INT · INTEGRAL
+  }
+
+  /** within() del último componente agregado (mini-card `integral-child`). */
+  function lastChild() {
+    const cards = screen.getAllByTestId('integral-child')
+    return within(cards[cards.length - 1])
+  }
+
+  /** Agrega un componente y le elige el tipo (id '1' = SERVICIO, '2' = COMPLEMENTARIO). */
+  async function addComponente(user: ReturnType<typeof userEvent.setup>, tipoId: string) {
+    await user.click(screen.getByRole('button', { name: /agregar componente/i }))
+    await user.selectOptions(lastChild().getByLabelText(/tipo de servicio del componente/i), tipoId)
+  }
+
+  it('el Servicio Integral NO es seleccionable en el ítem #2', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // CES en el #1
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i })) // #2 (queda abierto)
+    const integral = within(screen.getByLabelText('Tipo de servicio')).getByRole('option', {
+      name: /servicio integral/i,
+    })
+    expect(integral).toBeDisabled()
+  })
+
+  it('elegir Servicio Integral en el ítem #1 activa el modo (banner + sección de componentes)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    expect(await screen.findByText(/modo integral activado/i)).toBeInTheDocument()
+    expect(screen.getByText(/componentes del servicio integral/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /agregar componente/i })).toBeInTheDocument()
+  })
+
+  it('el ítem Integral no pide carga ni peso propios (los llevan los componentes)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    expect(screen.queryByLabelText('Tipo de carga')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Peso (kg)')).not.toBeInTheDocument()
+  })
+
+  it('agregar componentes incrementa el contador', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    expect(screen.getByText(/0 agregados/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /agregar componente/i }))
+    expect(screen.getByText(/· 1 agregado/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /agregar componente/i }))
+    expect(screen.getByText(/2 agregados/i)).toBeInTheDocument()
+  })
+
+  it('quita un componente', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await user.click(screen.getByRole('button', { name: /agregar componente/i }))
+    await user.click(screen.getByRole('button', { name: /agregar componente/i }))
+    expect(screen.getAllByTestId('integral-child')).toHaveLength(2)
+    await user.click(screen.getByRole('button', { name: /eliminar componente 1/i }))
+    expect(screen.getAllByTestId('integral-child')).toHaveLength(1)
+  })
+
+  it('un componente de transporte revela carga y peso; el complementario no', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '1') // SERVICIO
+    expect(lastChild().getByLabelText('Tipo de carga')).toBeInTheDocument()
+    expect(lastChild().getByLabelText(/peso del componente/i)).toBeInTheDocument()
+    await addComponente(user, '2') // COMPLEMENTARIO
+    expect(lastChild().queryByLabelText('Tipo de carga')).not.toBeInTheDocument()
+    expect(lastChild().queryByLabelText(/peso del componente/i)).not.toBeInTheDocument()
+  })
+
+  it('el total de referencia del componente = precio ref × cantidad', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2') // COMPLEMENTARIO
+    const child = lastChild()
+    await user.type(child.getByLabelText(/precio de referencia del componente 1/i), '8500')
+    expect((child.getByLabelText(/total del componente 1/i) as HTMLInputElement).value).toMatch(/8[.,]?500/)
+  })
+
+  it('el total del Integral usa el precio del padre (manual), no la suma de componentes', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2')
+    await user.type(lastChild().getByLabelText(/precio de referencia del componente 1/i), '8500')
+    const price = screen.getByLabelText('Precio unitario') // el del padre
+    await user.clear(price)
+    await user.type(price, '12000')
+    // Total del padre = 12000 × 1 × 1.18 = 14160 (no 12000+8500).
+    expect((screen.getByLabelText(/total del ítem 1/i) as HTMLInputElement).value).toMatch(/14[.,]?160/)
+  })
+
+  it('el footer suma solo el precio del padre Integral, no el de los componentes', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2')
+    await user.type(lastChild().getByLabelText(/precio de referencia del componente 1/i), '8500')
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '12000')
+    // Subtotal del footer = 12000 (el 8500 del componente NO suma).
+    expect(screen.getByText('Subtotal').closest('div')).toHaveTextContent(/12[.,]?000/)
+  })
+
+  it('la guía pide mínimo 2 componentes en vivo (con 1 solo)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2') // 1 componente → reactivo, sin avanzar
+    // "requiere mínimo 2…" es la guía (el contador dice "Mínimo 2 componentes · N agregado").
+    expect(screen.getByText(/requiere mínimo 2 componentes/i)).toBeInTheDocument()
+  })
+
+  it('la guía pide un componente de transporte cuando faltan', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2') // COMPLEMENTARIO
+    await addComponente(user, '2') // COMPLEMENTARIO (faltan transporte)
+    expect(screen.getByText(/al menos un componente de transporte/i)).toBeInTheDocument()
+  })
+
+  it('la guía pide un componente complementario cuando faltan', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '1') // SERVICIO
+    await addComponente(user, '1') // SERVICIO (falta COMPLEMENTARIO)
+    expect(screen.getByText(/al menos un componente complementario/i)).toBeInTheDocument()
+  })
+
+  it('la guía se mantiene "mínimo 2" aunque el único componente sea de transporte', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '1') // SERVICIO (transporte), pero sigue siendo 1 solo
+    // No debe desaparecer: aún falta llegar a 2 (el bug que reportó el usuario).
+    expect(screen.getByText(/requiere mínimo 2 componentes/i)).toBeInTheDocument()
+  })
+
+  it('la guía se actualiza en vivo al corregir el tipo de un componente', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2') // COMPLEMENTARIO
+    await addComponente(user, '2') // COMPLEMENTARIO → falta transporte
+    expect(screen.getByText(/al menos un componente de transporte/i)).toBeInTheDocument()
+    // Cambiar el componente 1 a transporte → 1 transporte + 1 complementario = válido → sin guía.
+    await user.selectOptions(
+      within(screen.getAllByTestId('integral-child')[0]).getByLabelText(/tipo de servicio del componente/i),
+      '1', // SCB · SERVICIO
+    )
+    expect(screen.queryByText(/al menos un componente de transporte/i)).not.toBeInTheDocument()
+  })
+
+  it('el Integral incompleto no bloquea la navegación', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2') // incompleto (1 solo)
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    expect(await screen.findByText(/costos de stand-by/i)).toBeInTheDocument()
+  })
+
+  it('el Integral completo marca el card como Completo al colapsarlo', async () => {
+    const user = userEvent.setup()
+    server.use(cargoTypesSearch([fakeCargoType({ id: 7, name: 'EXCAVADORA 330', standardWeight: 33000 })]))
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '1') // SERVICIO
+    await user.type(lastChild().getByLabelText('Tipo de carga'), 'exca')
+    await user.click(await screen.findByText('EXCAVADORA 330')) // precarga peso 33000
+    await addComponente(user, '2') // COMPLEMENTARIO
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '12000')
+    await user.click(screen.getAllByRole('button', { expanded: true })[0]) // colapsa el card
+    expect(await screen.findByText('Completo')).toBeInTheDocument()
+  })
+
+  it('cambiar el tipo del ítem #1 fuera de Integral descarta el modo y los componentes', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '2')
+    expect(screen.getByTestId('integral-child')).toBeInTheDocument()
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // CES (sale de Integral)
+    expect(screen.queryByText(/modo integral activado/i)).not.toBeInTheDocument()
+    expect(screen.queryByTestId('integral-child')).not.toBeInTheDocument()
   })
 })

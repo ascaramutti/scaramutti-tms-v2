@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useFieldArray, useFormContext } from 'react-hook-form'
-import { Plus } from 'lucide-react'
+import { Info, Plus } from 'lucide-react'
 import { formatCurrency } from '../../../shared/utils/formatters'
 import { ItemCard } from './ItemCard'
 import { itemsSubtotal } from './itemCalc'
@@ -36,9 +36,11 @@ export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootIte
   const items = watch('items')
 
   const currencyCode = currencies.find((currency) => currency.id === currencyId)?.code ?? 'PEN'
+  // El ítem #1 con tipo Integral activa el "modo Integral" (banner + componentes anidados).
+  const isIntegralMode = items?.[0]?.serviceKind === 'INTEGRAL'
 
-  // Regla: TRANSPORTE muestra TODOS menos ALQUILER (Servicio + Complementario + Integral);
-  // ALQUILER muestra solo ALQUILER. El Integral aparece pero deshabilitado (PR2b).
+  // Regla: TRANSPORTE muestra Servicio + Complementario + Integral; ALQUILER muestra solo ALQUILER.
+  // El Integral solo es seleccionable como ítem #1 (lo controla ItemCard según la posición).
   const filteredServiceTypes = serviceTypes.filter((type) =>
     quotationType === 'ALQUILER' ? type.kind === 'ALQUILER' : type.kind !== 'ALQUILER',
   )
@@ -99,6 +101,19 @@ export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootIte
           Agregar ítem
         </button>
       </div>
+
+      {isIntegralMode && (
+        <div
+          role="status"
+          className="flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800"
+        >
+          <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+          <span>
+            <strong className="font-semibold">Modo Integral activado</strong> — el primer ítem es un Servicio
+            Integral. Agrega los componentes del paquete (mínimo 2) dentro del ítem #1.
+          </span>
+        </div>
+      )}
 
       {fields.length === 0 ? (
         <div

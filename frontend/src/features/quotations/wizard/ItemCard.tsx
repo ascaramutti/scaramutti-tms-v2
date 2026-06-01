@@ -5,6 +5,7 @@ import { TextField } from '../../../shared/ui/TextField'
 import { cn } from '../../../shared/utils/cn'
 import { formatCurrency } from '../../../shared/utils/formatters'
 import { CargoTypeField } from './CargoTypeField'
+import { IntegralComponents } from './IntegralComponents'
 import { itemTotal } from './itemCalc'
 import { itemSchema, type ItemServiceKind, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
@@ -62,6 +63,7 @@ export function ItemCard({
   const item = watch(`items.${index}`)
   const hasServiceType = !!item?.serviceTypeId
   const isServicio = item?.serviceKind === 'SERVICIO'
+  const isIntegral = item?.serviceKind === 'INTEGRAL'
   const itemErrors = errors.items?.[index]
   const total = item ? itemTotal(item, igvPercentage) : 0
   const isComplete = item ? itemSchema.safeParse(item).success : false
@@ -96,9 +98,6 @@ export function ItemCard({
   function handleServiceTypeChange(rawValue: string) {
     const id = rawValue === '' ? 0 : Number(rawValue)
     const serviceType = serviceTypes.find((type) => type.id === id)
-    // El Servicio Integral se implementa en PR2b: su opción está deshabilitada, pero
-    // por las dudas no lo dejamos seleccionar (su kind no es manejable por este form).
-    if (serviceType?.kind === 'INTEGRAL') return
     const kind = (serviceType?.kind ?? 'SERVICIO') as ItemServiceKind
     setValue(`items.${index}.serviceTypeId`, id, { shouldTouch: true })
     setValue(`items.${index}.serviceKind`, kind)
@@ -113,6 +112,10 @@ export function ItemCard({
       setValue(`items.${index}.lengthMeters`, null)
       setValue(`items.${index}.widthMeters`, null)
       setValue(`items.${index}.heightMeters`, null)
+    }
+    // Al dejar de ser INTEGRAL, descartar los componentes del paquete.
+    if (kind !== 'INTEGRAL') {
+      setValue(`items.${index}.components`, [])
     }
   }
 
@@ -185,11 +188,11 @@ export function ItemCard({
             >
               <option value="">Selecciona</option>
               {serviceTypes.map((type) => {
-                // El Integral se ve en la lista pero aún no es seleccionable (PR2b).
-                const isIntegral = type.kind === 'INTEGRAL'
+                // El Servicio Integral (paquete jerárquico) solo se permite como ítem #1.
+                const integralLocked = type.kind === 'INTEGRAL' && position !== 1
                 return (
-                  <option key={type.id} value={type.id} disabled={isIntegral}>
-                    {isIntegral ? `${type.name} (próximamente)` : type.name}
+                  <option key={type.id} value={type.id} disabled={integralLocked}>
+                    {type.name}
                   </option>
                 )
               })}
@@ -207,6 +210,13 @@ export function ItemCard({
             </p>
           ) : (
             <>
+              {isIntegral && (
+                <IntegralComponents
+                  parentIndex={index}
+                  serviceTypes={serviceTypes}
+                  currencyCode={currencyCode}
+                />
+              )}
               {isServicio && (
                 <>
                   <CargoTypeField

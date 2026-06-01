@@ -26,3 +26,12 @@ export function itemTotal(item: Priceable, igvPercentage: number): number {
 export function itemsGrandTotal(items: Priceable[], igvPercentage: number): number {
   return items.reduce((acc, item) => acc + itemTotal(item, igvPercentage), 0)
 }
+
+/** Subtotal de referencia de un componente del Integral = precio de referencia × cantidad.
+ * Es informativo (desglose interno del paquete): NO se cobra al cliente ni suma al total. */
+export function componentReferenceSubtotal(component: {
+  internalReferencePrice?: number | null
+  quantity?: number | null
+}): number {
+  return num(component.internalReferencePrice) * num(component.quantity)
+}
