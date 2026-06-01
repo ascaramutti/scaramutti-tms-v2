@@ -439,7 +439,7 @@ describe('CotizacionWizardPage', () => {
     renderWizard()
     await waitForForm()
     await user.click(screen.getByRole('button', { name: /stand-by/i }))
-    expect(await screen.findByText(/costos de stand-by/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /stand-by por ítem/i })).toBeInTheDocument()
   })
 
   it('vacía los ítems al cambiar el tipo de cotización', async () => {
@@ -737,7 +737,7 @@ describe('CotizacionWizardPage', () => {
     await activarIntegral(user)
     await addComponente(user, '2') // incompleto (1 solo)
     await user.click(screen.getByRole('button', { name: /siguiente/i }))
-    expect(await screen.findByText(/costos de stand-by/i)).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: /stand-by por ítem/i })).toBeInTheDocument()
   })
 
   it('el Integral completo marca el card como Completo al colapsarlo', async () => {
@@ -767,5 +767,185 @@ describe('CotizacionWizardPage', () => {
     await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // CES (sale de Integral)
     expect(screen.queryByText(/modo integral activado/i)).not.toBeInTheDocument()
     expect(screen.queryByTestId('integral-child')).not.toBeInTheDocument()
+  })
+
+  // ----- Step 3: Stand-By -----
+  /** Va al Step 2, agrega un ítem COMPLEMENTARIO (id 2), y salta al Step 3 por el stepper. */
+  async function goToStandByWithItem(user: ReturnType<typeof userEvent.setup>) {
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // CES · COMPLEMENTARIO
+    await user.click(screen.getByRole('button', { name: /stand-by/i }))
+    await screen.findByRole('heading', { name: /stand-by por ítem/i })
+  }
+
+  it('el Step 3 muestra la pantalla de Stand-By', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /stand-by/i }))
+    expect(await screen.findByRole('heading', { name: /stand-by por ítem/i })).toBeInTheDocument()
+    expect(screen.getByText(/máximo un stand-by por ítem/i)).toBeInTheDocument()
+  })
+
+  it('sin ítems elegibles muestra el mensaje guía', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /stand-by/i }))
+    expect(await screen.findByText(/no hay ítems que admitan stand-by/i)).toBeInTheDocument()
+  })
+
+  it('lista los ítems elegibles para agregar stand-by', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    const select = screen.getByLabelText(/agregar stand-by a un ítem/i)
+    expect(within(select).getByRole('option', { name: /ítem 1 — escolta armada/i })).toBeInTheDocument()
+  })
+
+  it('agrega un stand-by a un ítem y muestra precio + incluye IGV', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    expect(screen.getByLabelText(/precio por día de ítem 1/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/el precio incluye igv/i)).toBeInTheDocument()
+  })
+
+  it('edita el precio por día del stand-by', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.type(price, '800')
+    expect((price as HTMLInputElement).value).toBe('800')
+  })
+
+  it('quita un stand-by y el ítem vuelve a estar disponible', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    expect(screen.getByLabelText(/precio por día de ítem 1/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /quitar stand-by/i }))
+    expect(screen.queryByLabelText(/precio por día de ítem 1/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/agregar stand-by a un ítem/i)).toBeInTheDocument()
+  })
+
+  it('el precio vacío marca error (validación reactiva del stand-by)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.tab()
+    expect(await screen.findByText(/ingresa el precio por día/i)).toBeInTheDocument()
+  })
+
+  it('quitar y volver a agregar un stand-by al mismo ítem no deja error stale', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    // Provocar el error de precio vacío.
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.tab()
+    expect(await screen.findByText(/ingresa el precio por día/i)).toBeInTheDocument()
+    // Quitar y volver a agregar al MISMO ítem: el error de "vacío" no debe persistir (re-agrega
+    // en 0; el de "> 0" queda latente hasta re-tocar).
+    await user.click(screen.getByRole('button', { name: /quitar stand-by/i }))
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    expect(screen.queryByText(/ingresa el precio por día/i)).not.toBeInTheDocument()
+  })
+
+  it('re-tipar un ítem a Servicio Integral descarta su stand-by', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user) // ítem #1 COMPLEMENTARIO + stand-by
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.type(price, '500')
+    // Volver al Step 2, re-tipar a Integral (descarta el stand-by) y de vuelta a complementario.
+    await user.click(screen.getByRole('button', { name: /ítems/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '4') // INT
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // CES de nuevo
+    await user.click(screen.getByRole('button', { name: /stand-by/i }))
+    await screen.findByRole('heading', { name: /stand-by por ítem/i })
+    // El stand-by se descartó al pasar por Integral: no reaparece la fila con el precio anterior.
+    expect(screen.queryByLabelText(/precio por día de ítem 1/i)).not.toBeInTheDocument()
+  })
+
+  it('el Servicio Integral padre no admite stand-by; sus componentes sí', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '1') // SERVICIO
+    await addComponente(user, '2') // COMPLEMENTARIO
+    await user.click(screen.getByRole('button', { name: /stand-by/i }))
+    await screen.findByRole('heading', { name: /stand-by por ítem/i })
+    const select = screen.getByLabelText(/agregar stand-by a un ítem/i)
+    expect(within(select).queryByRole('option', { name: /ítem 1 — servicio integral/i })).not.toBeInTheDocument()
+    expect(within(select).getByRole('option', { name: /componente 1/i })).toBeInTheDocument()
+    expect(within(select).getByRole('option', { name: /componente 2/i })).toBeInTheDocument()
+  })
+
+  it('el Step 3 sin stand-by se marca como completado al dejarlo', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user) // step 3, ítem elegible pero sin stand-by (opcional)
+    await user.click(screen.getByRole('button', { name: /siguiente/i })) // deja el step 3
+    expect(await screen.findByRole('button', { name: /stand-by \(completado\)/i })).toBeInTheDocument()
+  })
+
+  it('un stand-by con precio válido marca el Step 3 como completado', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.type(price, '800')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    expect(await screen.findByRole('button', { name: /stand-by \(completado\)/i })).toBeInTheDocument()
+  })
+
+  it('un stand-by con precio vacío marca el Step 3 con alerta', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.click(screen.getByRole('button', { name: /siguiente/i })) // deja el step 3 con precio vacío
+    expect(await screen.findByRole('button', { name: /stand-by \(con alerta\)/i })).toBeInTheDocument()
+  })
+
+  it('un stand-by con precio 0 marca el Step 3 con alerta (debe ser mayor a 0)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    // El stand-by arranca en 0 (default), que NO es válido para un stand-by agregado.
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    expect(await screen.findByRole('button', { name: /stand-by \(con alerta\)/i })).toBeInTheDocument()
+  })
+
+  it('el precio 0 del stand-by muestra error inline "mayor a 0"', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.type(price, '0')
+    await user.tab()
+    expect(await screen.findByText(/mayor a 0/i)).toBeInTheDocument()
   })
 })

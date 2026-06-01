@@ -113,9 +113,12 @@ export function ItemCard({
       setValue(`items.${index}.widthMeters`, null)
       setValue(`items.${index}.heightMeters`, null)
     }
-    // Al dejar de ser INTEGRAL, descartar los componentes del paquete.
+    // Al dejar de ser INTEGRAL, descartar los componentes; al PASAR a INTEGRAL, descartar el
+    // stand-by (el padre Integral no admite stand-by; se define en sus componentes).
     if (kind !== 'INTEGRAL') {
       setValue(`items.${index}.components`, [])
+    } else {
+      setValue(`items.${index}.standby`, null)
     }
   }
 

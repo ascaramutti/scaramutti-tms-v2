@@ -13,7 +13,9 @@ import { useQuotationServiceTypes } from '../../catalogs/hooks/useQuotationServi
 import { useQuotationConfig } from '../hooks/useQuotationConfig'
 import { Step1InfoGeneral } from '../wizard/Step1InfoGeneral'
 import { Step2Items } from '../wizard/Step2Items'
+import { StepStandBy } from '../wizard/StepStandBy'
 import { StepPlaceholder } from '../wizard/StepPlaceholder'
+import { standbyPricePaths } from '../wizard/standbyTargets'
 import { WizardNav } from '../wizard/WizardNav'
 import {
   STEP_FIELDS,
@@ -144,6 +146,14 @@ function WizardForm({
 
   /** Valida un paso y registra su estado (check/alerta). Pasos sin campos (placeholders) no se marcan. */
   async function markStep(step: number): Promise<void> {
+    // Step 3 (Stand-By, índice 2): opcional, sin campos propios en STEP_FIELDS. Se evalúa mirando
+    // SOLO los precios de los stand-by cargados (sin stand-by = válido → check).
+    if (step === 2) {
+      const pricePaths = standbyPricePaths(form.getValues('items'))
+      const valid = pricePaths.length === 0 || (await form.trigger(pricePaths))
+      setStepStatus((prev) => ({ ...prev, [step]: valid ? 'completed' : 'error' }))
+      return
+    }
     const fields = STEP_FIELDS[step]
     if (!fields) return
     const valid = await form.trigger(fields as (keyof WizardFormInput)[])
@@ -193,7 +203,7 @@ function WizardForm({
                 maxRootItems={maxRootItems}
               />
             )}
-            {currentStep === 2 && <StepPlaceholder title="Costos de Stand-By" />}
+            {currentStep === 2 && <StepStandBy serviceTypes={serviceTypes} />}
             {currentStep === 3 && <StepPlaceholder title="Resumen y confirmación" />}
           </div>
           <WizardNav
