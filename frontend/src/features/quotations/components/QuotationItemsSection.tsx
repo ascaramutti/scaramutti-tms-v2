@@ -2,7 +2,7 @@ import { Fragment } from 'react'
 import { Badge } from '../../../shared/ui/Badge'
 import { cn } from '../../../shared/utils/cn'
 import { formatCurrency } from '../../../shared/utils/formatters'
-import { isIntegralItem, itemSubtext, itemTotalWithIgv } from '../utils/quotationItemFormat'
+import { isIntegralItem, itemIgvAmount, itemSubtext, itemTotalWithIgv } from '../utils/quotationItemFormat'
 import type { QuotationItemResponse } from '../../../api'
 
 interface QuotationItemsSectionProps {
@@ -40,7 +40,9 @@ function RootRow({ item, currencyCode }: { item: QuotationItemResponse; currency
         {item.unitPrice != null ? formatCurrency(item.unitPrice, currencyCode) : '—'}
       </td>
       <td className={cn(TD, 'text-right tabular-nums')}>{formatCurrency(item.subtotal, currencyCode)}</td>
-      <td className={cn(TD, 'text-right tabular-nums text-slate-500')}>{`${item.igvPercentage}%`}</td>
+      <td className={cn(TD, 'text-right tabular-nums text-slate-500')}>
+        {formatCurrency(itemIgvAmount(item), currencyCode)}
+      </td>
       <td className={cn(TD, 'text-right font-semibold tabular-nums text-slate-900')}>
         {formatCurrency(itemTotalWithIgv(item), currencyCode)}
       </td>
@@ -63,7 +65,7 @@ function ChildRow({ item, currencyCode }: { item: QuotationItemResponse; currenc
       </td>
       <td className={cn(TD, 'text-right tabular-nums')}>{item.quantity}</td>
       <td className={cn(TD, 'text-right tabular-nums text-slate-600')}>
-        {item.internalReferencePrice != null
+        {item.internalReferencePrice
           ? formatCurrency(item.internalReferencePrice, currencyCode)
           : '—'}
       </td>
@@ -77,6 +79,9 @@ function ChildRow({ item, currencyCode }: { item: QuotationItemResponse; currenc
 /** Tabla de ítems con la jerarquía del Servicio Integral y el subtotal/IGV al pie.
  * El total con IGV por ítem se calcula en el front (el contrato da el neto). */
 export function QuotationItemsSection({ items, currencyCode, subtotal, igv }: QuotationItemsSectionProps) {
+  // El IGV es uniforme en la cotización y viene del backend (config en el wizard, snapshot en
+  // el detalle): el % va en la cabecera y el monto por fila. Sin fallback hardcodeado.
+  const igvPercent = items[0]?.igvPercentage
   return (
     <section>
       <h2 className="text-base font-semibold text-slate-900">Detalle de ítems</h2>
@@ -101,7 +106,7 @@ export function QuotationItemsSection({ items, currencyCode, subtotal, igv }: Qu
                 P. Neto
               </th>
               <th scope="col" className={cn(TH, 'text-right')}>
-                IGV
+                {igvPercent != null ? `IGV (${igvPercent}%)` : 'IGV'}
               </th>
               <th scope="col" className={cn(TH, 'text-right')}>
                 Total

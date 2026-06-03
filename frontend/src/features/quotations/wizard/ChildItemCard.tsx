@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { UseFormRegisterReturn } from 'react-hook-form'
 import { useFormContext } from 'react-hook-form'
 import { Trash2 } from 'lucide-react'
@@ -98,6 +99,8 @@ export function ChildItemCard({
 
   const base = `items.${parentIndex}.components.${index}` as const
   const component = watch(base)
+  // Retiene lo tipeado (ej. "1.") mientras se edita el precio ref; al salir se deriva del form.
+  const [priceDraft, setPriceDraft] = useState<string | null>(null)
   const hasServiceType = !!component?.serviceTypeId
   const isServicio = component?.serviceKind === 'SERVICIO'
   const childErrors = errors.items?.[parentIndex]?.components?.[index]
@@ -225,12 +228,40 @@ export function ChildItemCard({
                 error={childErrors?.quantity?.message}
                 register={register(`${base}.quantity`, { setValueAs: requiredNum })}
               />
-              <NumberCell
-                label="Precio ref. (opcional)"
-                ariaLabel={`Precio de referencia del componente ${position}`}
-                error={childErrors?.internalReferencePrice?.message}
-                register={register(`${base}.internalReferencePrice`, { setValueAs: nullableNum })}
-              />
+              <div>
+                <span className={FIELD_LABEL} aria-hidden="true">
+                  Precio ref. (opcional)
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  step={0.01}
+                  aria-label={`Precio de referencia del componente ${position}`}
+                  // Controlado (no `register`): un campo sin tocar queda vacío. Si fuera registrado,
+                  // react-hook-form coerce el number vacío a 0 al revalidar (= precio ref "fantasma").
+                  value={
+                    priceDraft ??
+                    (component?.internalReferencePrice != null ? String(component.internalReferencePrice) : '')
+                  }
+                  onChange={(event) => {
+                    const raw = event.target.value
+                    setPriceDraft(raw)
+                    setValue(`${base}.internalReferencePrice`, raw === '' ? null : Number(raw), {
+                      shouldTouch: true,
+                    })
+                  }}
+                  onBlur={() => setPriceDraft(null)}
+                  onKeyDown={(event) => {
+                    if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault()
+                  }}
+                  className={cn(CONTROL, childErrors?.internalReferencePrice ? 'border-red-300' : 'border-slate-300')}
+                />
+                {childErrors?.internalReferencePrice?.message && (
+                  <p role="alert" className="mt-1 text-xs text-red-600">
+                    {childErrors.internalReferencePrice.message}
+                  </p>
+                )}
+              </div>
               <div>
                 <span className={FIELD_LABEL} aria-hidden="true">
                   Total ref.
@@ -238,7 +269,7 @@ export function ChildItemCard({
                 <input
                   type="text"
                   readOnly
-                  value={formatCurrency(refSubtotal, currencyCode)}
+                  value={refSubtotal > 0 ? formatCurrency(refSubtotal, currencyCode) : '—'}
                   aria-label={`Total del componente ${position}`}
                   className={READONLY}
                 />

@@ -14,7 +14,7 @@ import { useQuotationConfig } from '../hooks/useQuotationConfig'
 import { Step1InfoGeneral } from '../wizard/Step1InfoGeneral'
 import { Step2Items } from '../wizard/Step2Items'
 import { StepStandBy } from '../wizard/StepStandBy'
-import { StepPlaceholder } from '../wizard/StepPlaceholder'
+import { Step4Resumen } from '../wizard/Step4Resumen'
 import { standbyPricePaths } from '../wizard/standbyTargets'
 import { WizardNav } from '../wizard/WizardNav'
 import {
@@ -204,7 +204,15 @@ function WizardForm({
               />
             )}
             {currentStep === 2 && <StepStandBy serviceTypes={serviceTypes} />}
-            {currentStep === 3 && <StepPlaceholder title="Resumen y confirmación" />}
+            {currentStep === 3 && (
+              <Step4Resumen
+                selectedClient={selectedClient}
+                currencies={currencies}
+                paymentTerms={paymentTerms}
+                serviceTypes={serviceTypes}
+                igvPercentage={igvPercentage}
+              />
+            )}
           </div>
           <WizardNav
             isFirst={currentStep === 0}

@@ -45,6 +45,11 @@ export function itemTotalWithIgv(item: QuotationItemResponse): number {
   return item.subtotal * (1 + item.igvPercentage / 100)
 }
 
+/** Monto del IGV de un ítem root = P. Neto × IGV%. */
+export function itemIgvAmount(item: QuotationItemResponse): number {
+  return item.subtotal * (item.igvPercentage / 100)
+}
+
 /** Subtexto descriptivo de un ítem: tipo de carga · peso · dimensiones. `null`
  * si no hay ninguno. */
 export function itemSubtext(item: QuotationItemResponse): string | null {

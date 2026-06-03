@@ -948,4 +948,114 @@ describe('CotizacionWizardPage', () => {
     await user.tab()
     expect(await screen.findByText(/mayor a 0/i)).toBeInTheDocument()
   })
+
+  // ----- Step 4: Resumen -----
+  it('el Step 4 muestra el resumen final (vacío) con sus guías', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    expect(await screen.findByRole('heading', { name: /resumen final/i })).toBeInTheDocument()
+    expect(screen.getByText(/sin cliente seleccionado/i)).toBeInTheDocument()
+    expect(screen.getByText(/agrega ítems en el paso 2/i)).toBeInTheDocument()
+  })
+
+  it('el resumen muestra el cliente seleccionado y las condiciones', async () => {
+    const user = userEvent.setup()
+    server.use(clientsSearch([fakeClient({ ruc: '20123456789' })]))
+    renderWizard()
+    await waitForForm()
+    await selectAcme(user)
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    expect(screen.getByText('ACME S.A.C.')).toBeInTheDocument()
+    expect(screen.getByText(/RUC 20123456789/i)).toBeInTheDocument()
+    expect(screen.getByText(/15 días/i)).toBeInTheDocument() // validez por defecto
+  })
+
+  it('el resumen lista los ítems y el total general', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // CES · Escolta armada
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '1000')
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    expect(screen.getByText('Detalle de ítems')).toBeInTheDocument()
+    expect(screen.getByText('Escolta armada')).toBeInTheDocument()
+    // Total general = 1000 × 1.18 = 1180, con su monto en letras.
+    expect(screen.getByText('Total general').closest('div')).toHaveTextContent(/1[.,]?180/)
+    expect(screen.getByText(/mil ciento ochenta con 00\/100 soles/i)).toBeInTheDocument()
+  })
+
+  it('la columna IGV muestra el % en la cabecera y el monto por fila (no "18%" suelto)', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // Escolta, precio 1000
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '1000')
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    expect(screen.getByText(/IGV \(18%\)/)).toBeInTheDocument() // % en la cabecera
+    expect(screen.queryByText('18%')).not.toBeInTheDocument() // ya no hay "18%" suelto por fila
+  })
+
+  it('un componente sin precio ref muestra "—" (no un precio de 0)', async () => {
+    const user = userEvent.setup()
+    server.use(cargoTypesSearch([fakeCargoType({ id: 7, name: 'EXCAVADORA 326', standardWeight: 25900 })]))
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    // Componente SERVICIO + cargo (lo que antes coercía el precio ref vacío a 0).
+    await user.click(screen.getByRole('button', { name: /agregar componente/i }))
+    const card1 = within(screen.getAllByTestId('integral-child')[0])
+    await user.selectOptions(card1.getByLabelText(/tipo de servicio del componente/i), '1')
+    await user.type(card1.getByLabelText('Tipo de carga'), 'exca')
+    await user.click(await screen.findByText('EXCAVADORA 326'))
+    // Total ref. sin precio referencial → "—", no "S/ 0.00".
+    expect((card1.getByLabelText(/total del componente 1/i) as HTMLInputElement).value).toBe('—')
+    // Completar el Integral y ver el Resumen.
+    await user.click(screen.getByRole('button', { name: /agregar componente/i }))
+    await user.selectOptions(
+      within(screen.getAllByTestId('integral-child')[1]).getByLabelText(/tipo de servicio del componente/i),
+      '2',
+    )
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    const childRow = screen.getByText('Transporte de carga general').closest('tr')!
+    expect(within(childRow).queryByText(/0[.,]00/)).not.toBeInTheDocument() // no hay "S/ 0.00"
+  })
+
+  it('el resumen muestra la jerarquía del Servicio Integral', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToItems(user)
+    await activarIntegral(user)
+    await addComponente(user, '1') // SERVICIO
+    await addComponente(user, '2') // COMPLEMENTARIO
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    expect(screen.getByText('Servicio Integral')).toBeInTheDocument() // padre
+    expect(screen.getByText('Transporte de carga general')).toBeInTheDocument() // hijo SERVICIO
+    expect(screen.getByText('Escolta armada')).toBeInTheDocument() // hijo COMPLEMENTARIO
+  })
+
+  it('el resumen muestra la tabla de stand-by cuando hay', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await goToStandByWithItem(user)
+    await user.selectOptions(screen.getByLabelText(/agregar stand-by a un ítem/i), '0')
+    const price = screen.getByLabelText(/precio por día de ítem 1/i)
+    await user.clear(price)
+    await user.type(price, '500')
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    expect(screen.getByRole('heading', { name: 'Stand-By' })).toBeInTheDocument()
+  })
 })
