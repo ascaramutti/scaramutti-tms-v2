@@ -57,7 +57,7 @@ export function QuotationStandbyTable({ items, currencyCode }: QuotationStandbyT
             {entries.map(({ item, standby }) => (
               <tr key={item.id} className="border-t border-slate-100">
                 <td className="px-3 py-2.5 text-sm text-slate-800">
-                  Ítem #{item.itemNumber} ({item.serviceType.name})
+                  Ítem {item.displayLabel} ({item.serviceType.name})
                 </td>
                 <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-900">
                   {formatCurrency(standby.pricePerDay, currencyCode)}

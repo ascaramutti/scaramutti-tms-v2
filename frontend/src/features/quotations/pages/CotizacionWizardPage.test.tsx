@@ -1044,6 +1044,8 @@ describe('CotizacionWizardPage', () => {
     await screen.findByRole('heading', { name: /resumen final/i })
     const childRow = screen.getByText('Transporte de carga general').closest('tr')!
     expect(within(childRow).queryByText(/0[.,]00/)).not.toBeInTheDocument() // no hay "S/ 0.00"
+    // El hijo de transporte muestra QUÉ transporta (tipo de carga), no solo el nombre del servicio.
+    expect(within(childRow).getByText(/EXCAVADORA 326/)).toBeInTheDocument()
   })
 
   it('el resumen muestra la jerarquía del Servicio Integral', async () => {
@@ -1058,6 +1060,9 @@ describe('CotizacionWizardPage', () => {
     expect(screen.getByText('Servicio Integral')).toBeInTheDocument() // padre
     expect(screen.getByText('Transporte de carga general')).toBeInTheDocument() // hijo SERVICIO
     expect(screen.getByText('Escolta armada')).toBeInTheDocument() // hijo COMPLEMENTARIO
+    // Numeración jerárquica de presentación derivada en el Resumen: hijos "1.a", "1.b".
+    expect(screen.getByText('1.a')).toBeInTheDocument()
+    expect(screen.getByText('1.b')).toBeInTheDocument()
   })
 
   it('el resumen muestra la tabla de stand-by cuando hay', async () => {

@@ -21,7 +21,7 @@ function RootRow({ item, currencyCode }: { item: QuotationItemResponse; currency
   const subtext = itemSubtext(item)
   return (
     <tr className={cn('border-t border-slate-100', integral && 'bg-blue-50')}>
-      <td className={cn(TD, 'text-slate-500')}>{item.itemNumber}</td>
+      <td className={cn(TD, 'text-slate-500')}>{item.displayLabel}</td>
       <td className={TD}>
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium text-slate-900">{item.serviceType.name}</span>
@@ -53,15 +53,21 @@ function RootRow({ item, currencyCode }: { item: QuotationItemResponse; currency
 /** Fila de un hijo del Servicio Integral: precio interno de referencia (no
  * facturable). P. Neto/IGV en "—" porque no entra al total de la cotización. */
 function ChildRow({ item, currencyCode }: { item: QuotationItemResponse; currencyCode: string }) {
+  // Qué transporta/incluye el componente (tipo de carga · peso · dimensiones). Clave para que
+  // el Integral sirva de referencia: sin esto no se sabe qué se cargó en el hijo de transporte.
+  const subtext = itemSubtext(item)
   return (
     <tr className="border-t border-dashed border-slate-100">
       <td className={TD} />
       <td className={cn(TD, 'pl-6')}>
-        <span className="text-slate-400" aria-hidden="true">
-          ↳
-        </span>
-        <span className="ml-1.5 font-medium text-slate-400">{item.itemNumber}</span>
-        <span className="ml-2 text-slate-700">{item.serviceType.name}</span>
+        <div>
+          <span className="text-slate-400" aria-hidden="true">
+            ↳
+          </span>
+          <span className="ml-1.5 font-medium text-slate-400">{item.displayLabel}</span>
+          <span className="ml-2 text-slate-700">{item.serviceType.name}</span>
+        </div>
+        {subtext && <p className="ml-7 mt-0.5 text-xs text-slate-500">{subtext}</p>}
       </td>
       <td className={cn(TD, 'text-right tabular-nums')}>{item.quantity}</td>
       <td className={cn(TD, 'text-right tabular-nums text-slate-600')}>

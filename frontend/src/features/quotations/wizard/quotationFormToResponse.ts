@@ -1,18 +1,25 @@
 import { itemSubtotal } from './itemCalc'
+import { orderIntegralFirst } from './itemOrdering'
 import type { ChildItemInput, WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationItemResponse, QuotationServiceTypeResponse } from '../../../api'
 
 /** Tipo de servicio de respaldo si el id del form no está en el catálogo (defensivo). */
 const FALLBACK_SERVICE_TYPE = { id: 0, code: '', name: 'Sin tipo', kind: '' }
 
+/** Letra del hijo del Integral por índice (0→a, 1→b, ...). Se asume <26 componentes. */
+function childLetter(index: number): string {
+  return String.fromCharCode(97 + index)
+}
+
 /**
  * Mapea los ítems del FORM (anidados en `components[]`) al shape de la API
  * (`QuotationItemResponse` con `children[]`), para reusar los componentes read-only del
  * Detalle (`QuotationItemsSection`, `QuotationStandbyTable`) en el Resumen del wizard.
  *
- * Asigna `itemNumber` consecutivo (root + hijos, como el backend al aplanar) y calcula el
- * `subtotal` neto. Es solo para el RENDER del Resumen: el aplanado real al `POST /quotations`
- * (con `parentItemNumber`) se implementa en un PR posterior.
+ * Asigna `itemNumber` consecutivo (técnico) + `displayLabel` de presentación (root "1","2";
+ * hijo "1.a","1.b", igual que el assembler del backend) y calcula el `subtotal` neto. Es solo
+ * para el RENDER del Resumen (preview pre-guardado); el backend recomputa el displayLabel al
+ * persistir, así Detalle y PDF salen de la misma fuente.
  */
 export function quotationFormItemsToResponse(
   items: WizardFormInput['items'],
@@ -22,11 +29,12 @@ export function quotationFormItemsToResponse(
   let counter = 0
   const serviceTypeOf = (id: number) => serviceTypes.find((type) => type.id === id) ?? FALLBACK_SERVICE_TYPE
 
-  function mapChild(child: ChildItemInput): QuotationItemResponse {
+  function mapChild(child: ChildItemInput, displayLabel: string): QuotationItemResponse {
     const itemNumber = ++counter
     return {
       id: itemNumber,
       itemNumber,
+      displayLabel,
       parentItemId: null,
       serviceType: serviceTypeOf(child.serviceTypeId),
       cargoType: child.cargoTypeId ? { id: child.cargoTypeId, name: child.cargoTypeName ?? '' } : undefined,
@@ -47,12 +55,23 @@ export function quotationFormItemsToResponse(
     }
   }
 
-  return items.map((item) => {
+  // Mismo orden que el mapper del request (Integral primero): el displayLabel-por-posición y el
+  // itemNumber no dependen del orden crudo del form y coinciden con lo que el backend devuelve.
+  return orderIntegralFirst(items).map((item, rootIndex) => {
     const itemNumber = ++counter
-    const children = item.serviceKind === 'INTEGRAL' ? item.components.map(mapChild) : []
+    // displayLabel de presentación: root por posición ("1","2"); hijos "1.a","1.b" (igual que
+    // el assembler del backend). El itemNumber (counter) sigue siendo la numeración técnica.
+    const displayLabel = String(rootIndex + 1)
+    const children =
+      item.serviceKind === 'INTEGRAL'
+        ? item.components.map((child, childIndex) =>
+            mapChild(child, `${displayLabel}.${childLetter(childIndex)}`),
+          )
+        : []
     return {
       id: itemNumber,
       itemNumber,
+      displayLabel,
       parentItemId: null,
       serviceType: serviceTypeOf(item.serviceTypeId),
       cargoType: item.cargoTypeId ? { id: item.cargoTypeId, name: item.cargoTypeName ?? '' } : undefined,

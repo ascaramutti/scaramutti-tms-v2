@@ -390,6 +390,10 @@ export type QuotationItemResponse = {
      */
     parentItemId?: number | null;
     itemNumber: number;
+    /**
+     * Numeración de presentación jerárquica: root "1","2"; hijo del Integral "1.a","1.b". Derivada de itemNumber + jerarquía, NO persistida. El frontend la muestra; itemNumber sigue siendo la numeración técnica (plana, contigua).
+     */
+    displayLabel: string;
     serviceType: QuotationServiceTypeSummary;
     cargoType?: QuotationCargoTypeSummary;
     observations?: string | null;

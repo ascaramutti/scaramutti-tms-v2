@@ -251,6 +251,11 @@ describe('CotizacionDetailPage', () => {
     expect(screen.getByText('Servicio Integral')).toBeInTheDocument()
     expect(screen.getByText('Servicio de transporte en Plataforma')).toBeInTheDocument()
     expect(screen.getByText('Servicio de Escolta')).toBeInTheDocument()
+    // Numeración jerárquica de presentación (del backend, displayLabel): hijos "1.a", "1.b".
+    expect(screen.getByText('1.a')).toBeInTheDocument()
+    expect(screen.getByText('1.b')).toBeInTheDocument()
+    // Qué transporta el hijo de transporte (tipo de carga): clave para usar el Integral como referencia.
+    expect(screen.getByText(/EXCAVADORA 326/)).toBeInTheDocument()
   })
 
   it('los hijos del Integral muestran su precio interno de referencia', async () => {
