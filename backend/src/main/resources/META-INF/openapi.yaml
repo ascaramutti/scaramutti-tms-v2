@@ -1236,7 +1236,7 @@ components:
           La suma de referencias de hijos puede exceder el precio del padre (es el descuento
           implícito del paquete Integral).
       type: object
-      required: [id, itemNumber, serviceType, quantity, igvPercentage, subtotal]
+      required: [id, itemNumber, displayLabel, serviceType, quantity, igvPercentage, subtotal]
       properties:
         id:             { type: integer, format: int64 }
         parentItemId:
@@ -1244,6 +1244,9 @@ components:
           format: int64
           description: 'NULL para ítems root. Set para ítems hijos del Servicio Integral.'
         itemNumber:     { type: integer, format: int32 }
+        displayLabel:
+          type: string
+          description: 'Numeración de presentación jerárquica: root "1","2"; hijo del Integral "1.a","1.b". Derivada de itemNumber + jerarquía, NO persistida. El frontend la muestra; itemNumber sigue siendo la numeración técnica (plana, contigua).'
         serviceType:    { $ref: '#/components/schemas/QuotationServiceTypeSummary' }
         cargoType:
           nullable: true

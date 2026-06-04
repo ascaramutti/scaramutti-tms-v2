@@ -144,7 +144,8 @@ public class QuotationResponseAssemblerService {
                 : item.unitPrice.multiply(BigDecimal.valueOf(item.quantity));
 
             QuotationItemResponse resp = new QuotationItemResponse(
-                item.id, item.parentItemId, item.itemNumber, serviceTypeResp, cargoResp,
+                item.id, item.parentItemId, item.itemNumber, null /* displayLabel: pasada 2 */,
+                serviceTypeResp, cargoResp,
                 item.observations, item.weightKg, item.lengthMeters, item.widthMeters, item.heightMeters,
                 item.quantity, item.unitPrice, item.internalReferencePrice,
                 item.igvPercentage, subtotal, item.insuredAmount, standbyResp,
@@ -157,20 +158,25 @@ public class QuotationResponseAssemblerService {
             }
         }
 
+        // Pasada 2: numeracion de presentacion jerarquica + children embebidos. El displayLabel
+        // se deriva de la POSICION (no del itemNumber plano: un root posterior a un Integral es
+        // "2" aunque su itemNumber sea 4, porque los hijos del Integral consumen 2 y 3). Root ->
+        // "1","2",...; hijo -> "1.a","1.b",... Los roots vienen en orden de itemNumber (insercion).
         List<QuotationItemResponse> finalItems = new ArrayList<>();
+        int rootPosition = 0;
         for (QuotationItemResponse root : rootResponses) {
+            rootPosition++;
+            String rootLabel = String.valueOf(rootPosition);
             List<QuotationItemResponse> children = childrenByParent.remove(root.id());
-            if (children == null || children.isEmpty()) {
-                finalItems.add(root);
-            } else {
-                finalItems.add(new QuotationItemResponse(
-                    root.id(), root.parentItemId(), root.itemNumber(), root.serviceType(), root.cargoType(),
-                    root.observations(), root.weightKg(), root.lengthMeters(), root.widthMeters(), root.heightMeters(),
-                    root.quantity(), root.unitPrice(), root.internalReferencePrice(),
-                    root.igvPercentage(), root.subtotal(), root.insuredAmount(), root.standby(),
-                    children
-                ));
+            List<QuotationItemResponse> labeledChildren = null;
+            if (children != null && !children.isEmpty()) {
+                labeledChildren = new ArrayList<>(children.size());
+                for (int childIndex = 0; childIndex < children.size(); childIndex++) {
+                    String childLabel = rootLabel + "." + childLetter(childIndex);
+                    labeledChildren.add(withDisplayLabel(children.get(childIndex), childLabel, null));
+                }
             }
+            finalItems.add(withDisplayLabel(root, rootLabel, labeledChildren));
         }
 
         // Invariante violada: cualquier entry remanente en childrenByParent es un
@@ -192,5 +198,23 @@ public class QuotationResponseAssemblerService {
         }
 
         return finalItems;
+    }
+
+    /** Reconstruye el item (record inmutable) con su displayLabel y children embebidos. */
+    private static QuotationItemResponse withDisplayLabel(
+            QuotationItemResponse item, String displayLabel, List<QuotationItemResponse> children) {
+        return new QuotationItemResponse(
+            item.id(), item.parentItemId(), item.itemNumber(), displayLabel, item.serviceType(),
+            item.cargoType(), item.observations(), item.weightKg(), item.lengthMeters(),
+            item.widthMeters(), item.heightMeters(), item.quantity(), item.unitPrice(),
+            item.internalReferencePrice(), item.igvPercentage(), item.subtotal(),
+            item.insuredAmount(), item.standby(), children
+        );
+    }
+
+    /** Letra del hijo por indice: 0->a, 1->b, ... Se asume <26 hijos por Integral
+     * (el negocio no arma paquetes con tantos componentes). */
+    private static char childLetter(int childIndex) {
+        return (char) ('a' + childIndex);
     }
 }

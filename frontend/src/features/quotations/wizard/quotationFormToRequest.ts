@@ -1,3 +1,4 @@
+import { orderIntegralFirst } from './itemOrdering'
 import type { ChildItemInput, ItemInput, WizardFormInput } from './quotation-wizard.schema'
 import type {
   QuotationItemRequest,
@@ -56,12 +57,9 @@ function childToRequest(
  * auxiliares del form (`serviceKind`, `cargoTypeName`) no se mapean.
  */
 export function quotationFormToRequest(form: WizardFormInput): QuotationRequest {
-  // El Integral va primero (debe ser `itemNumber = 1`). Se reordena acá en vez de asumir que el
-  // form lo trae en `items[0]`, así un futuro reordenamiento/edición no rompe el aplanado.
-  const integralItem = form.items.find((item) => item.serviceKind === 'INTEGRAL')
-  const orderedItems = integralItem
-    ? [integralItem, ...form.items.filter((item) => item !== integralItem)]
-    : form.items
+  // El Integral va primero (debe ser `itemNumber = 1`). Helper compartido con el mapper del
+  // Resumen para que la numeración no dependa del orden crudo del form (ver `orderIntegralFirst`).
+  const orderedItems = orderIntegralFirst(form.items)
 
   const items: QuotationItemRequest[] = []
   let itemNumber = 0

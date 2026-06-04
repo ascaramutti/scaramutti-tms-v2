@@ -398,4 +398,80 @@ class QuotationResponseAssemblerServiceTest {
 
         assertNull(resp.items().get(0).standby());
     }
+
+    // ---------- displayLabel: numeracion de presentacion jerarquica ----------
+
+    @Test
+    void assemble_displayLabel_singleRoot_isOne() {
+        QuotationItem item = rootItem(1L, 1, 1, new BigDecimal("100"), 1);
+        var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            createdBy, updatedBy, false
+        );
+
+        assertEquals("1", resp.items().get(0).displayLabel());
+    }
+
+    @Test
+    void assemble_displayLabel_multipleRoots_areSequential() {
+        QuotationItem r1 = rootItem(1L, 1, 1, new BigDecimal("100"), 1);
+        QuotationItem r2 = rootItem(2L, 2, 1, new BigDecimal("200"), 1);
+        QuotationItem r3 = rootItem(3L, 3, 1, new BigDecimal("300"), 1);
+        var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(r1, r2, r3), Map.of(), totals("600", "108", "708"), deps,
+            createdBy, updatedBy, false
+        );
+
+        assertEquals("1", resp.items().get(0).displayLabel());
+        assertEquals("2", resp.items().get(1).displayLabel());
+        assertEquals("3", resp.items().get(2).displayLabel());
+    }
+
+    @Test
+    void assemble_displayLabel_integralChildren_useLetterSuffix() {
+        QuotationItem parent = rootItem(1L, 1, 99, new BigDecimal("500"), 1);
+        QuotationItem child1 = childItem(2L, 1L, 2, 1);
+        QuotationItem child2 = childItem(3L, 1L, 3, 10);
+        var deps = depsWith(Map.of(99, st(99, "INT"), 1, st(1, "SCB"), 10, st(10, "CES")), Map.of(), null);
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(parent, child1, child2), Map.of(), totals("500", "90", "590"), deps,
+            createdBy, updatedBy, false
+        );
+
+        QuotationItemResponse root = resp.items().get(0);
+        assertEquals("1", root.displayLabel());
+        assertEquals("1.a", root.children().get(0).displayLabel());
+        assertEquals("1.b", root.children().get(1).displayLabel());
+    }
+
+    @Test
+    void assemble_displayLabel_integralPlusRoot_rootIsTwoDespiteFlatItemNumber() {
+        // Integral (itemNumber 1) + 2 hijos (itemNumber 2,3) + otro root (itemNumber 4).
+        // El otro root es displayLabel "2" aunque su itemNumber PLANO sea 4: los hijos
+        // consumen 2 y 3 en la numeracion tecnica, pero NO en la de presentacion.
+        QuotationItem parent = rootItem(1L, 1, 99, new BigDecimal("500"), 1);
+        QuotationItem child1 = childItem(2L, 1L, 2, 1);
+        QuotationItem child2 = childItem(3L, 1L, 3, 10);
+        QuotationItem extraRoot = rootItem(4L, 4, 1, new BigDecimal("300"), 1);
+        var deps = depsWith(Map.of(99, st(99, "INT"), 1, st(1, "SCB"), 10, st(10, "CES")), Map.of(), null);
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(parent, child1, child2, extraRoot), Map.of(), totals("800", "144", "944"), deps,
+            createdBy, updatedBy, false
+        );
+
+        assertEquals(2, resp.items().size());  // 2 roots: el Integral (con children) + el extra
+        QuotationItemResponse integral = resp.items().get(0);
+        QuotationItemResponse extra = resp.items().get(1);
+        assertEquals("1", integral.displayLabel());
+        assertEquals("1.a", integral.children().get(0).displayLabel());
+        assertEquals("1.b", integral.children().get(1).displayLabel());
+        assertEquals(4, extra.itemNumber());     // itemNumber plano = 4
+        assertEquals("2", extra.displayLabel());  // displayLabel de presentacion = 2
+    }
 }
