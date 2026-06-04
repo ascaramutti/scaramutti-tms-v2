@@ -3,6 +3,7 @@ import type {
   PageOfQuotationSummary,
   Problem,
   QuotationItemResponse,
+  QuotationRequest,
   QuotationResponse,
   QuotationSummary,
   UserResponse,
@@ -162,6 +163,9 @@ export const quotationsHandlers = [
     ),
   ),
   http.get(`${API}/quotations/:id`, () => HttpResponse.json(getQuotationResponse())),
+  http.post(`${API}/quotations`, () =>
+    HttpResponse.json(getQuotationResponse({ id: 99 }), { status: 201 }),
+  ),
 ]
 
 // ----- Overrides para server.use(...) -----
@@ -277,5 +281,33 @@ export function quotationDetailCapture(sink: { id?: string }, quotation: Quotati
   return http.get(`${API}/quotations/:id`, ({ params }) => {
     sink.id = params.id as string
     return HttpResponse.json(quotation)
+  })
+}
+
+// ----- Crear (POST /quotations) -----
+
+/** POST /quotations OK: captura el body enviado en `sink` y responde 201 con el detalle. */
+export function createQuotationSuccess(sink: { body?: QuotationRequest }, response?: QuotationResponse) {
+  return http.post(`${API}/quotations`, async ({ request }) => {
+    sink.body = (await request.json()) as QuotationRequest
+    return HttpResponse.json(response ?? getQuotationResponse({ id: 99 }), { status: 201 })
+  })
+}
+
+/** Error (Problem RFC 7807) al crear (ej. 400 validación, 409 anti-duplicado QUO-002). */
+export function createQuotationError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/quotations`, () =>
+    HttpResponse.json(
+      { type: 'urn:tms:error:test', title: 'Error', status, detail: 'Fallo de prueba', ...problem },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Crear con delay (para observar el botón "Guardando…" deshabilitado). */
+export function createQuotationSlow(ms = 40, response?: QuotationResponse) {
+  return http.post(`${API}/quotations`, async () => {
+    await delay(ms)
+    return HttpResponse.json(response ?? getQuotationResponse({ id: 99 }), { status: 201 })
   })
 }

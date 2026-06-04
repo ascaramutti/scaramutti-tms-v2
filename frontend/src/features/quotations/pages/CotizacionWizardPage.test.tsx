@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CotizacionWizardPage } from './CotizacionWizardPage'
 import { server } from '../../../test/mocks/server'
@@ -14,6 +14,19 @@ import {
   fakeClient,
 } from '../../../test/mocks/handlers/clients'
 import { cargoTypesSearch, createCargoTypeOk, fakeCargoType } from '../../../test/mocks/handlers/cargotypes'
+import {
+  createQuotationError,
+  createQuotationSlow,
+  createQuotationSuccess,
+  getQuotationResponse,
+} from '../../../test/mocks/handlers/quotations'
+import type { QuotationRequest } from '../../../api'
+
+/** Stub del detalle: muestra el id de la URL (para verificar la navegación post-guardado). */
+function QuotationDetailStub() {
+  const { id } = useParams()
+  return <div>DETALLE COTIZACION {id}</div>
+}
 
 function renderWizard() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -23,6 +36,7 @@ function renderWizard() {
         <Routes>
           <Route path="/cotizaciones" element={<div>LISTADO COTIZACIONES</div>} />
           <Route path="/cotizaciones/nueva" element={<CotizacionWizardPage />} />
+          <Route path="/cotizaciones/:id" element={<QuotationDetailStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -1057,5 +1071,81 @@ describe('CotizacionWizardPage', () => {
     await user.click(screen.getByRole('button', { name: /resumen/i }))
     await screen.findByRole('heading', { name: /resumen final/i })
     expect(screen.getByRole('heading', { name: 'Stand-By' })).toBeInTheDocument()
+  })
+
+  // ----- Guardar (POST /quotations) -----
+  /** Llena un form VÁLIDO: cliente (precarga contacto) + ruta + un ítem complementario con precio. */
+  async function fillValidQuotation(user: ReturnType<typeof userEvent.setup>) {
+    server.use(clientsSearch([fakeClient({ contactName: 'Juan Pérez', phone: '987654321' })]))
+    await waitForForm()
+    await selectAcme(user)
+    await user.type(screen.getByLabelText('Origen'), 'Lima')
+    await user.type(screen.getByLabelText('Destino'), 'Arequipa')
+    await user.click(screen.getByRole('button', { name: /siguiente/i }))
+    await screen.findByText(/ítems de la cotización/i)
+    await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
+    await user.selectOptions(screen.getByLabelText('Tipo de servicio'), '2') // Escolta · COMPLEMENTARIO
+    const price = screen.getByLabelText('Precio unitario')
+    await user.clear(price)
+    await user.type(price, '1000')
+  }
+
+  it('guarda la cotización y navega al detalle creado', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: QuotationRequest } = {}
+    server.use(createQuotationSuccess(sink, getQuotationResponse({ id: 42 })))
+    renderWizard()
+    await fillValidQuotation(user)
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
+    // Navega al detalle de la cotización recién creada.
+    expect(await screen.findByText(/DETALLE COTIZACION 42/i)).toBeInTheDocument()
+    // El payload llegó aplanado y normalizado.
+    expect(sink.body).toMatchObject({
+      quotationType: 'TRANSPORTE',
+      contactName: 'Juan Pérez',
+      origin: 'Lima',
+      destination: 'Arequipa',
+      items: [{ serviceTypeId: expect.any(Number), unitPrice: 1000 }],
+    })
+  })
+
+  it('muestra el error del backend si el guardado falla (409 anti-duplicado)', async () => {
+    const user = userEvent.setup()
+    server.use(createQuotationError(409, { detail: 'Ya existe una cotización idéntica reciente.' }))
+    renderWizard()
+    await fillValidQuotation(user)
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
+    expect(await screen.findByText(/ya existe una cotización idéntica reciente/i)).toBeInTheDocument()
+    // No navega: sigue en el Resumen.
+    expect(screen.getByRole('heading', { name: /resumen final/i })).toBeInTheDocument()
+  })
+
+  it('con el form incompleto no envía: muestra alerta y no hace POST', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: QuotationRequest } = {}
+    server.use(createQuotationSuccess(sink))
+    renderWizard()
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
+    expect(await screen.findByText(/faltan datos obligatorios/i)).toBeInTheDocument()
+    expect(sink.body).toBeUndefined()
+  })
+
+  it('deshabilita "Guardar" mientras el envío está en curso (anti doble-click)', async () => {
+    const user = userEvent.setup()
+    server.use(createQuotationSlow(60))
+    renderWizard()
+    await fillValidQuotation(user)
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
+    const button = await screen.findByRole('button', { name: /guardando/i })
+    expect(button).toBeDisabled()
   })
 })

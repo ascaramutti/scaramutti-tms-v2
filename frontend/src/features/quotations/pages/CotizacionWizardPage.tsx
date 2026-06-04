@@ -10,11 +10,13 @@ import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 import { useCurrencies } from '../../catalogs/hooks/useCurrencies'
 import { usePaymentTerms } from '../../catalogs/hooks/usePaymentTerms'
 import { useQuotationServiceTypes } from '../../catalogs/hooks/useQuotationServiceTypes'
+import { useCreateQuotation } from '../hooks/useCreateQuotation'
 import { useQuotationConfig } from '../hooks/useQuotationConfig'
 import { Step1InfoGeneral } from '../wizard/Step1InfoGeneral'
 import { Step2Items } from '../wizard/Step2Items'
 import { StepStandBy } from '../wizard/StepStandBy'
 import { Step4Resumen } from '../wizard/Step4Resumen'
+import { quotationFormToRequest } from '../wizard/quotationFormToRequest'
 import { standbyPricePaths } from '../wizard/standbyTargets'
 import { WizardNav } from '../wizard/WizardNav'
 import {
@@ -142,31 +144,66 @@ function WizardForm({
   const [stepStatus, setStepStatus] = useState<Record<number, StepStatus>>({})
   // El cliente seleccionado vive acá (no en ClientField) para persistir entre steps.
   const [selectedClient, setSelectedClient] = useState<ClientResponse | null>(null)
+  const createQuotation = useCreateQuotation()
+  // Dos señales de error distintas: datos faltantes del form (validación) y rechazo del backend.
+  // El error de API se deriva de la mutation (una sola fuente de verdad), no de un estado paralelo.
+  const [validationError, setValidationError] = useState<string | null>(null)
+  const apiErrorMessage = createQuotation.isError
+    ? getApiErrorMessage(createQuotation.error, 'No se pudo guardar la cotización. Intenta de nuevo.')
+    : null
+  const bannerMessage = validationError ?? apiErrorMessage
   const lastStep = WIZARD_STEPS.length - 1
 
-  /** Valida un paso y registra su estado (check/alerta). Pasos sin campos (placeholders) no se marcan. */
-  async function markStep(step: number): Promise<void> {
+  /** Valida un paso, registra su estado (check/alerta) y devuelve si es válido. Los pasos sin
+   * campos propios se consideran válidos. */
+  async function markStep(step: number): Promise<boolean> {
     // Step 3 (Stand-By, índice 2): opcional, sin campos propios en STEP_FIELDS. Se evalúa mirando
     // SOLO los precios de los stand-by cargados (sin stand-by = válido → check).
     if (step === 2) {
       const pricePaths = standbyPricePaths(form.getValues('items'))
       const valid = pricePaths.length === 0 || (await form.trigger(pricePaths))
       setStepStatus((prev) => ({ ...prev, [step]: valid ? 'completed' : 'error' }))
-      return
+      return valid
     }
     const fields = STEP_FIELDS[step]
-    if (!fields) return
+    if (!fields) return true
     const valid = await form.trigger(fields as (keyof WizardFormInput)[])
     setStepStatus((prev) => ({ ...prev, [step]: valid ? 'completed' : 'error' }))
+    return valid
   }
 
   /** Navega marcando primero el estado del paso que se deja (sin bloquear el avance). */
   function goToStep(target: number) {
     const clamped = Math.max(0, Math.min(target, lastStep))
     if (clamped === currentStep) return
+    // Al navegar, limpiar el aviso de validación y un error de guardado previo (no deben
+    // quedar pegados mientras el usuario corrige en otro paso).
+    setValidationError(null)
+    createQuotation.reset()
     void markStep(currentStep)
     setCurrentStep(clamped)
   }
+
+  /** Guarda la cotización: mapea el form al request y navega al detalle creado. El error del
+   * backend lo expone la mutation (`apiErrorMessage`), no un callback que duplique el estado. */
+  function onValid(values: WizardFormInput) {
+    setValidationError(null)
+    createQuotation.mutate(quotationFormToRequest(values), {
+      onSuccess: (created) => navigate(`/cotizaciones/${created.id}`),
+    })
+  }
+
+  /** Form inválido al guardar: marca cada paso y lleva al primero con errores. Un error de
+   * stand-by, al estar anidado en los ítems, cuenta como error del paso Ítems; el stepper igual
+   * marca la alerta del paso Stand-By. */
+  async function onInvalid() {
+    setValidationError('Faltan datos obligatorios. Revisa los pasos marcados con alerta.')
+    const stepValid = await Promise.all([markStep(0), markStep(1), markStep(2)])
+    const firstInvalidStep = stepValid.findIndex((isValid) => !isValid)
+    setCurrentStep(firstInvalidStep === -1 ? 0 : firstInvalidStep)
+  }
+
+  const handleSave = form.handleSubmit(onValid, onInvalid)
 
   return (
     <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
@@ -214,12 +251,22 @@ function WizardForm({
               />
             )}
           </div>
+          {bannerMessage && (
+            <div
+              role="alert"
+              className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+            >
+              {bannerMessage}
+            </div>
+          )}
           <WizardNav
             isFirst={currentStep === 0}
             isLast={currentStep === lastStep}
             onBack={() => goToStep(currentStep - 1)}
             onNext={() => goToStep(currentStep + 1)}
             onCancel={() => navigate('/cotizaciones')}
+            onSubmit={handleSave}
+            isSubmitting={createQuotation.isPending}
           />
         </div>
       </FormProvider>
