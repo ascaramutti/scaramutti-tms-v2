@@ -1032,3 +1032,43 @@ export type GetQuotationResponses = {
 };
 
 export type GetQuotationResponse = GetQuotationResponses[keyof GetQuotationResponses];
+
+export type DownloadQuotationPdfData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: {
+        /**
+         * Si `true`, sirve inline (Content-Disposition inline). Si `false` o se omite, fuerza descarga.
+         */
+        preview?: boolean;
+    };
+    url: '/quotations/{id}/pdf';
+};
+
+export type DownloadQuotationPdfErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type DownloadQuotationPdfError = DownloadQuotationPdfErrors[keyof DownloadQuotationPdfErrors];
+
+export type DownloadQuotationPdfResponses = {
+    /**
+     * PDF generado
+     */
+    200: Blob | File;
+};
+
+export type DownloadQuotationPdfResponse = DownloadQuotationPdfResponses[keyof DownloadQuotationPdfResponses];
