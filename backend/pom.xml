@@ -99,6 +99,17 @@
             <version>${mapstruct.version}</version>
         </dependency>
 
+        <!-- PDF: Qute (templating HTML) + openhtmltopdf (renderiza HTML/CSS a PDF) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-qute</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.openhtmltopdf</groupId>
+            <artifactId>openhtmltopdf-pdfbox</artifactId>
+            <version>1.0.10</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>io.quarkus</groupId>

@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="es">
+<head>
+  <meta charset="utf-8" />
+  <style>
+    @page {
+      size: A4;
+      margin: 1.5cm 1.8cm 2.6cm 1.8cm;
+      @bottom-center { content: element(footer); }
+    }
+    body { font-family: Helvetica, Arial, sans-serif; font-size: 9pt; color: #1a1a1a; }
+    #footer {
+      position: running(footer);
+      text-align: center; font-size: 7.5pt; color: #29417a;
+      border-top: 1px solid #29417a; padding-top: 4px;
+    }
+    .logo { height: 37px; margin-bottom: 16px; }
+    .date { text-align: right; font-size: 9pt; margin-bottom: 8px; }
+    .title { text-align: center; font-size: 12pt; font-weight: bold; text-decoration: underline; margin: 6px 0 20px; }
+    table.info td { padding: 1px 0; font-size: 9pt; }
+    table.info td.label { font-weight: bold; width: 90px; }
+    .greeting-intro { margin-top: 18px; margin-bottom: 0; }
+    .greeting-body { margin-top: 7px; margin-bottom: 0; }
+    table.items { width: 100%; border-collapse: collapse; margin-top: 18px; table-layout: fixed; }
+    table.items td.name { word-wrap: break-word; }
+    table.items th { background: #29417a; color: #ffffff; font-size: 8pt; font-weight: bold; padding: 7px 5px; text-align: center; }
+    table.items td { font-size: 8pt; padding: 9px 5px; border-bottom: 1px solid #dddddd; vertical-align: top; line-height: 1.35; }
+    td.num { text-align: center; }
+    td.money { text-align: right; white-space: nowrap; }
+    table.items th.col-desc { text-align: left; }
+    tr.child td { color: #555555; }
+    tr.child td.name { padding-left: 22px; }
+    .arrow { color: #999999; }
+    .child-label { font-weight: bold; }
+    .cargo { color: #666666; font-size: 7.5pt; font-style: italic; }
+    .obs { color: #444444; font-size: 7.5pt; }
+    table.totals-wrap { width: 100%; border-collapse: collapse; margin-top: 16px; table-layout: fixed; }
+    td.totals-spacer { width: 52%; }
+    table.totals { width: 100%; background: #29417a; color: #ffffff; border-collapse: collapse; }
+    table.totals td { padding: 4px 10px; font-size: 9pt; }
+    table.totals td.label { font-weight: bold; }
+    table.totals td.value { text-align: right; white-space: nowrap; }
+    table.totals tr.grand td { font-size: 11pt; font-weight: bold; border-top: 1px solid #ffffff; }
+    .in-words { text-align: right; font-size: 8pt; color: #444444; margin-top: 4px; }
+    .in-words .words { font-style: italic; }
+    table.cond { margin-top: 16px; }
+    table.cond td { padding: 1px 0; font-size: 9pt; }
+    table.cond td.label { font-weight: bold; width: 115px; }
+    .standby-title { font-weight: bold; margin-top: 16px; }
+    table.standby { width: 72%; border-collapse: collapse; margin-top: 4px; }
+    table.standby th { background: #eeeeee; font-size: 8pt; padding: 6px 4px; text-align: left; }
+    table.standby td { font-size: 8pt; padding: 8px 4px; border-bottom: 1px solid #dddddd; }
+    table.sheet { width: 100%; height: 25cm; border-collapse: collapse; }
+    table.sheet td { padding: 0; }
+    td.sheet-body { vertical-align: top; }
+    td.sheet-foot { vertical-align: bottom; }
+    .signature { font-size: 9pt; padding-top: 18px; }
+    .signature .name { font-weight: bold; font-size: 10.5pt; }
+    .signature .position { font-size: 8.5pt; }
+    .page2 { page-break-before: always; padding-top: 60px; }
+    .cond-title { text-align: center; font-size: 11pt; font-weight: bold; text-decoration: underline; margin: 0 0 18px; }
+    .term { margin: 11px 0; font-size: 10pt; }
+    table.banks { width: 92%; border-collapse: collapse; margin: 10px auto; }
+    table.banks th { background: #e6e6e6; font-size: 9pt; font-weight: bold; padding: 5px; border: 1px solid #cccccc; text-align: left; }
+    table.banks td { font-size: 9pt; padding: 5px; border: 1px solid #cccccc; }
+  </style>
+</head>
+<body>
+  <div id="footer">
+    {view.companyAddress}<br/>
+    {view.companyPhone}<br/>
+    {view.companyEmail}
+  </div>
+
+  <table class="sheet">
+  <tr><td class="sheet-body">
+  {#if logo}<img class="logo" src="{logo}" alt="logo" />{/if}
+
+  <div class="date">{view.dateText}</div>
+  <div class="title">COTIZACIÓN {view.code}</div>
+
+  <table class="info">
+    <tr><td class="label">Cliente:</td><td>{view.clientName}</td></tr>
+    <tr><td class="label">RUC:</td><td>{view.clientRuc}</td></tr>
+    <tr><td class="label">Contacto:</td><td>{view.contactName}</td></tr>
+    {#if view.contactPhone}<tr><td class="label">Teléfono:</td><td>{view.contactPhone}</td></tr>{/if}
+  </table>
+
+  <p class="greeting-intro">De nuestra mayor consideración.-</p>
+  <p class="greeting-body">Por medio de la presente nos es grato dirigirnos a usted y a la vez hacerle llegar la siguiente cotización{#if view.routeText} en la ruta <strong>{view.routeText}</strong>{/if} por los servicios, según requerimiento:</p>
+
+  <table class="items">
+    <colgroup>
+      <col style="width: 4%;" /><col style="width: 44%;" /><col style="width: 8%;" /><col style="width: 15%;" /><col style="width: 14%;" /><col style="width: 15%;" />
+    </colgroup>
+    <thead>
+      <tr>
+        <th>#</th><th class="col-desc">Descripción</th><th>Cant.</th><th>P. Neto</th><th>I.G.V.</th><th>P. Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#for row in view.items}
+      <tr class="{#if row.child}child{/if}">
+        <td class="num">{#if !row.child}{row.label}{/if}</td>
+        <td class="name">{#if row.child}<span class="child-label">{row.label}</span>&#160;{/if}{row.name}{#if row.cargoSubtext}<br/><span class="cargo">{row.cargoSubtext}</span>{/if}{#if row.observations}<br/><span class="obs">Obs.: {row.observations}</span>{/if}</td>
+        <td class="num">{row.quantity}</td>
+        <td class="money">{row.net}</td>
+        <td class="money">{row.igv}</td>
+        <td class="money">{row.total}</td>
+      </tr>
+      {/for}
+    </tbody>
+  </table>
+
+  <table class="totals-wrap">
+    <tr>
+      <td class="totals-spacer"></td>
+      <td>
+        <table class="totals">
+          <tr><td class="label">Subtotal</td><td class="value">{view.subtotalText}</td></tr>
+          <tr><td class="label">{view.igvLabel}</td><td class="value">{view.igvText}</td></tr>
+          <tr class="grand"><td class="label">TOTAL GENERAL</td><td class="value">{view.grandTotal}</td></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+  <div class="in-words"><strong>SON:</strong> <span class="words">{view.amountInWords}</span></div>
+
+  <table class="cond">
+    <tr><td class="label">Forma de pago:</td><td>{view.paymentTerm}</td></tr>
+    {#if view.validity}<tr><td class="label">Validez:</td><td>{view.validity}</td></tr>{/if}
+    {#if view.tentativeDate}<tr><td class="label">Fecha tentativa:</td><td>{view.tentativeDate}</td></tr>{/if}
+  </table>
+
+  {#if view.standby}
+  <div class="standby-title">Stand-By</div>
+  <table class="standby">
+    <thead><tr><th>Ítem</th><th>Precio por día</th><th>Incluye IGV</th></tr></thead>
+    <tbody>
+      {#for s in view.standby}
+      <tr><td>{s.itemLabel}</td><td>{s.pricePerDay}</td><td>{#if s.includesIgv}Sí{#else}No{/if}</td></tr>
+      {/for}
+    </tbody>
+  </table>
+  {/if}
+
+  </td></tr>
+  <tr><td class="sheet-foot">
+  <div class="signature">
+    ATTE.<br/>
+    <span class="name">{view.signerName}</span><br/>
+    <span class="position">{view.signerPosition}</span>
+  </div>
+  </td></tr>
+  </table>
+
+  {#if view.terms}
+  <div class="page2">
+    <div class="cond-title">CONDICIONES GENERALES</div>
+    {#for term in view.terms}
+      {#if term == bankMarker}
+      <table class="banks">
+        <thead><tr><th>Banco</th><th>Nro. Cuenta</th><th>CCI</th></tr></thead>
+        <tbody>
+          {#for bank in view.bankAccounts}
+          <tr><td>{bank.bank}</td><td>{bank.account}</td><td>{bank.cci}</td></tr>
+          {/for}
+        </tbody>
+      </table>
+      {#else}
+      <p class="term">&#8226;&#160;{term}</p>
+      {/if}
+    {/for}
+  </div>
+  {/if}
+</body>
+</html>
