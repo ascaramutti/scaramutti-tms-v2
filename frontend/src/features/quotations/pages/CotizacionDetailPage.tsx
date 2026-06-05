@@ -2,19 +2,16 @@ import { FileQuestion } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { Spinner } from '../../../shared/ui/Spinner'
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { useQuotation } from '../hooks/useQuotation'
 import { QuotationAuditFooter } from '../components/QuotationAuditFooter'
 import { QuotationDetailHeader } from '../components/QuotationDetailHeader'
 import { QuotationItemsSection } from '../components/QuotationItemsSection'
+import { QuotationPdfActions } from '../components/QuotationPdfActions'
 import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationSummaryCard } from '../components/QuotationSummaryCard'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
-
-const PRIMARY_BUTTON =
-  'inline-flex items-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-const SECONDARY_BUTTON =
-  'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
 export function CotizacionDetailPage() {
   const navigate = useNavigate()
@@ -87,6 +84,7 @@ export function CotizacionDetailPage() {
         createdAt={data.createdAt}
         expiresAt={data.expiresAt}
       />
+      <QuotationPdfActions quotationId={data.id} quotationCode={data.code} />
       <QuotationSummaryCard quotation={data} />
       <QuotationItemsSection
         items={data.items}

@@ -316,3 +316,48 @@ export function createQuotationSlow(ms = 40, response?: QuotationResponse) {
     return HttpResponse.json(response ?? getQuotationResponse({ id: 99 }), { status: 201 })
   })
 }
+
+// ----- PDF (GET /quotations/:id/pdf) -----
+
+/** Responde un PDF binario (blob) OK. Captura el query `preview` en `sink` si se pasa. */
+export function quotationPdf(sink?: { preview?: string | null }, content = '%PDF-1.4 mock') {
+  return http.get(`${API}/quotations/:id/pdf`, ({ request }) => {
+    if (sink) {
+      sink.preview = new URL(request.url).searchParams.get('preview')
+    }
+    return new HttpResponse(new Blob([content], { type: 'application/pdf' }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/pdf',
+        'Content-Disposition': 'attachment; filename="cotizacion-2026-00001.pdf"',
+      },
+    })
+  })
+}
+
+/** Error del PDF servido como Blob: igual que axios con `responseType: 'blob'`, donde
+ * el body de error (Problem JSON) también llega como blob. */
+export function quotationPdfError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(
+    `${API}/quotations/:id/pdf`,
+    () =>
+      new HttpResponse(
+        new Blob(
+          [JSON.stringify({ type: 'urn:tms:error:test', title: 'Error', status, detail: 'Fallo de prueba', ...problem })],
+          { type: 'application/problem+json' },
+        ),
+        { status, headers: { 'Content-Type': 'application/problem+json' } },
+      ),
+  )
+}
+
+/** PDF con delay (para observar los botones deshabilitados mientras genera). */
+export function quotationPdfSlow(ms = 40, content = '%PDF mock') {
+  return http.get(`${API}/quotations/:id/pdf`, async () => {
+    await delay(ms)
+    return new HttpResponse(new Blob([content], { type: 'application/pdf' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/pdf' },
+    })
+  })
+}
