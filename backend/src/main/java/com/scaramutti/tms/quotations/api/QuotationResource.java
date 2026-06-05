@@ -7,6 +7,7 @@ import com.scaramutti.tms.quotations.dto.QuotationSummaryResponse;
 import com.scaramutti.tms.quotations.mapper.QuotationResourceMapper;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
+import com.scaramutti.tms.quotations.pdf.QuotationPdfService;
 import com.scaramutti.tms.quotations.service.CreateQuotationService;
 import com.scaramutti.tms.quotations.service.GetQuotationService;
 import com.scaramutti.tms.quotations.service.ListQuotationsService;
@@ -22,6 +23,7 @@ import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
@@ -32,6 +34,7 @@ import jakarta.ws.rs.core.Response;
 
 import java.net.URI;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 @Path("/quotations")
 @Produces(MediaType.APPLICATION_JSON)
@@ -43,6 +46,7 @@ public class QuotationResource {
     @Inject ListQuotationsService listQuotationsService;
     @Inject QuotationConfigService quotationConfigService;
     @Inject QuotationResourceMapper resourceMapper;
+    @Inject QuotationPdfService pdfService;
 
     /**
      * Lista cotizaciones paginadas con busqueda + multifiltro. Todos los filtros
@@ -139,6 +143,36 @@ public class QuotationResource {
         QuotationResponse quotation = getQuotationService.getById(id);
         return Response.ok(quotation)
             .header("ETag", "\"" + quotation.updatedAt().toString() + "\"")
+            .build();
+    }
+
+    /**
+     * Descarga o previsualiza el PDF de la cotizacion. {@code ?preview=true} lo sirve inline
+     * (abrir en el navegador); por defecto fuerza descarga. El ETag es el {@code updatedAt}
+     * (mismo que el GET): si el cliente manda {@code If-None-Match} con el ETag vigente,
+     * responde 304 sin regenerar el PDF. 404 si la cotizacion no existe.
+     */
+    @GET
+    @Path("/{id}/pdf")
+    @Produces("application/pdf")
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
+    public Response downloadQuotationPdf(
+            @PathParam("id") Long id,
+            @QueryParam("preview") @DefaultValue("false") boolean preview,
+            @HeaderParam("If-None-Match") String ifNoneMatch) {
+        QuotationResponse quotation = getQuotationService.getById(id);
+        String etag = "\"" + quotation.updatedAt().toString() + "\"";
+        if (etag.equals(ifNoneMatch)) {
+            return Response.notModified().header("ETag", etag).build();
+        }
+        byte[] pdf = pdfService.generate(quotation);
+        String disposition = (preview ? "inline" : "attachment")
+            + "; filename=\"cotizacion-" + quotation.code() + ".pdf\"";
+        return Response.ok(pdf)
+            .type("application/pdf")
+            .header("Content-Disposition", disposition)
+            .header("ETag", etag)
+            .header("Last-Modified", DateTimeFormatter.RFC_1123_DATE_TIME.format(quotation.updatedAt()))
             .build();
     }
 
