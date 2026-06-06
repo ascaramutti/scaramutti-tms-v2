@@ -21,4 +21,13 @@ public class QuotationStandbyCostRepository implements PanacheRepositoryBase<Quo
     public List<QuotationStandbyCost> findByQuotationId(Long quotationId) {
         return list("quotationId", quotationId);
     }
+
+    /**
+     * Borra todos los standby costs de una cotizacion. Usado por el UPDATE (PUT)
+     * antes de borrar los items (la FK {@code quotation_item_id} es NOT NULL).
+     * Devuelve la cantidad borrada.
+     */
+    public long deleteByQuotationId(Long quotationId) {
+        return delete("quotationId = ?1", quotationId);
+    }
 }

@@ -4,7 +4,7 @@ import com.scaramutti.tms.quotations.dto.QuotationItemRequest;
 import com.scaramutti.tms.quotations.dto.QuotationRequest;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostRequest;
 import com.scaramutti.tms.quotations.model.QuotationType;
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
@@ -68,7 +68,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("  Juan Perez  ", "  Lima  ", "  Cusco  ",
             List.of(sampleItemRequest(null)));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertEquals("Juan Perez", cmd.contactName());
         assertEquals("Lima", cmd.origin());
@@ -80,7 +80,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("", "", "",
             List.of(sampleItemRequest("")));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertNull(cmd.contactName());
         assertNull(cmd.origin());
@@ -93,7 +93,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("   ", "\t", " \n ",
             List.of(sampleItemRequest("   ")));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertNull(cmd.contactName());
         assertNull(cmd.origin());
@@ -106,7 +106,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest(null, null, null,
             List.of(sampleItemRequest(null)));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertNull(cmd.contactName());
         assertNull(cmd.origin());
@@ -123,7 +123,7 @@ class QuotationResourceMapperTest {
         );
         var req = baseRequest("Juan", "Lima", "Cusco", items);
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertEquals(3, cmd.items().size());
         assertEquals("obs 1", cmd.items().get(0).observations());
@@ -138,7 +138,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("Juan", "Lima", "Cusco",
             List.of(sampleItemRequest("test")));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertEquals(QuotationType.TRANSPORTE, cmd.quotationType());
         assertEquals(1, cmd.clientId());
@@ -159,7 +159,7 @@ class QuotationResourceMapperTest {
         );
         var req = baseRequest("Juan", "Lima", "Cusco", List.of(item));
 
-        CreateQuotationCommand.Item mapped = mapper.toCreateQuotationCommand(req).items().get(0);
+        SaveQuotationCommand.Item mapped = mapper.toSaveQuotationCommand(req).items().get(0);
 
         assertEquals(new BigDecimal("10.55"), mapped.weightKg());
         assertEquals(new BigDecimal("12.34"), mapped.lengthMeters());
@@ -183,7 +183,7 @@ class QuotationResourceMapperTest {
         );
         var req = baseRequest("Juan", "Lima", "Cusco", items);
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertEquals(4, cmd.items().size());
         assertEquals("obs 1", cmd.items().get(0).observations());
@@ -204,7 +204,7 @@ class QuotationResourceMapperTest {
         );
         var req = baseRequest("Juan", "Lima", "Cusco", List.of(item));
 
-        CreateQuotationCommand.Item mapped = mapper.toCreateQuotationCommand(req).items().get(0);
+        SaveQuotationCommand.Item mapped = mapper.toSaveQuotationCommand(req).items().get(0);
 
         assertNotNull(mapped.standby());
         assertEquals(new BigDecimal("75.50"), mapped.standby().pricePerDay());
@@ -216,7 +216,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("Juan", "Lima", "Cusco",
             List.of(sampleItemRequest("test")));
 
-        CreateQuotationCommand.Item mapped = mapper.toCreateQuotationCommand(req).items().get(0);
+        SaveQuotationCommand.Item mapped = mapper.toSaveQuotationCommand(req).items().get(0);
 
         assertNull(mapped.standby());
     }
@@ -235,7 +235,7 @@ class QuotationResourceMapperTest {
         );
         var req = baseRequest("Juan", "Lima", "Cusco", List.of(parent, child));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertEquals(1, cmd.items().get(0).itemNumber());
         assertNull(cmd.items().get(0).parentItemNumber());
@@ -250,7 +250,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("Juan", "Lima", "Cusco",
             List.of(sampleItemRequest("solo item")));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertNotNull(cmd.items());
         assertEquals(1, cmd.items().size());
@@ -261,7 +261,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("Juan", "  987654321  ", "Lima", "Cusco",
             List.of(sampleItemRequest("test")));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertEquals("987654321", cmd.contactPhone());
     }
@@ -271,7 +271,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("Juan", "", "Lima", "Cusco",
             List.of(sampleItemRequest("test")));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertNull(cmd.contactPhone());
     }
@@ -282,7 +282,7 @@ class QuotationResourceMapperTest {
         var req = baseRequest("  Juan  ", "Av. Lima 123", "Cusco - Centro",
             List.of(sampleItemRequest("test")));
 
-        CreateQuotationCommand cmd = mapper.toCreateQuotationCommand(req);
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertEquals("Juan", cmd.contactName());
         // Los espacios internos se preservan (solo se trim borders).

@@ -2,7 +2,7 @@ package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.catalogs.quotationservicetype.model.QuotationServiceKind;
 import com.scaramutti.tms.quotations.model.QuotationType;
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
 import com.scaramutti.tms.shared.exception.CommonError;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -75,8 +75,8 @@ public class QuotationValidatorService {
      * El caller (CreateQuotationService) precarga los serviceTypes de UNA
      * sola query antes de invocar al validator.
      */
-    public void validate(CreateQuotationCommand command, Map<Integer, QuotationServiceTypeSummary> serviceTypesById) {
-        List<CreateQuotationCommand.Item> items = command.items();
+    public void validate(SaveQuotationCommand command, Map<Integer, QuotationServiceTypeSummary> serviceTypesById) {
+        List<SaveQuotationCommand.Item> items = command.items();
 
         // Pre-compute itemNumber efectivo de cada item (1-based). Si el request
         // no envia itemNumber explicito, usamos el indice+1.
@@ -97,7 +97,7 @@ public class QuotationValidatorService {
 
     // ---------- Reglas individuales -----------------------------------------
 
-    private void validateOriginDestination(CreateQuotationCommand command) {
+    private void validateOriginDestination(SaveQuotationCommand command) {
         if (command.quotationType() == QuotationType.TRANSPORTE) {
             if (command.origin() == null || command.destination() == null) {
                 throw CommonError.VALIDATION_FAILED.toException(
@@ -107,7 +107,7 @@ public class QuotationValidatorService {
         }
     }
 
-    private void validateItemNumbers(List<CreateQuotationCommand.Item> items) {
+    private void validateItemNumbers(List<SaveQuotationCommand.Item> items) {
         // Si algun item envia itemNumber, debe ser contiguo (1, 2, 3, ...) sin gaps.
         // Si todos vienen sin itemNumber, el service los autogenera (no es problema aqui).
         // Aqui solo validamos: si AL MENOS UNO envia itemNumber, TODOS deben enviarlo
@@ -133,7 +133,7 @@ public class QuotationValidatorService {
         }
     }
 
-    private void validateMaxRootItems(List<CreateQuotationCommand.Item> items) {
+    private void validateMaxRootItems(List<SaveQuotationCommand.Item> items) {
         // "Root" = item sin parentItemNumber. El item Integral cuenta como root.
         // Por ejemplo: 1 INT + 5 items adicionales no-Integral son 6 root → falla.
         long rootCount = items.stream().filter(i -> i.parentItemNumber() == null).count();
@@ -145,8 +145,8 @@ public class QuotationValidatorService {
         }
     }
 
-    private void validateUnitPricePerItem(List<CreateQuotationCommand.Item> items) {
-        for (CreateQuotationCommand.Item item : items) {
+    private void validateUnitPricePerItem(List<SaveQuotationCommand.Item> items) {
+        for (SaveQuotationCommand.Item item : items) {
             boolean isChild = item.parentItemNumber() != null;
             if (isChild) {
                 // Hijo del Integral: unitPrice debe ser null o 0.
@@ -173,8 +173,8 @@ public class QuotationValidatorService {
         }
     }
 
-    private void validateInternalReferencePrice(List<CreateQuotationCommand.Item> items) {
-        for (CreateQuotationCommand.Item item : items) {
+    private void validateInternalReferencePrice(List<SaveQuotationCommand.Item> items) {
+        for (SaveQuotationCommand.Item item : items) {
             boolean isChild = item.parentItemNumber() != null;
             if (!isChild && item.internalReferencePrice() != null) {
                 throw CommonError.VALIDATION_FAILED.toException(
@@ -184,12 +184,12 @@ public class QuotationValidatorService {
         }
     }
 
-    private void validateParentReferences(List<CreateQuotationCommand.Item> items, List<Integer> effectiveNumbers) {
+    private void validateParentReferences(List<SaveQuotationCommand.Item> items, List<Integer> effectiveNumbers) {
         Map<Integer, Boolean> existingNumbers = new HashMap<>();
         for (Integer number : effectiveNumbers) {
             existingNumbers.put(number, true);
         }
-        for (CreateQuotationCommand.Item item : items) {
+        for (SaveQuotationCommand.Item item : items) {
             Integer parent = item.parentItemNumber();
             if (parent != null && !existingNumbers.containsKey(parent)) {
                 throw CommonError.VALIDATION_FAILED.toException(
@@ -200,9 +200,9 @@ public class QuotationValidatorService {
     }
 
     private void validateInsuredAmountServiceType(
-            List<CreateQuotationCommand.Item> items,
+            List<SaveQuotationCommand.Item> items,
             Map<Integer, QuotationServiceTypeSummary> serviceTypesById) {
-        for (CreateQuotationCommand.Item item : items) {
+        for (SaveQuotationCommand.Item item : items) {
             if (item.insuredAmount() == null) continue;
             QuotationServiceTypeSummary st = requireServiceType(serviceTypesById, item.serviceTypeId());
             if (!"SEG".equalsIgnoreCase(st.code())) {
@@ -219,9 +219,9 @@ public class QuotationValidatorService {
      * los costos de standby viven en sus items hijos (transporte/complementarios).
      */
     private void validateStandbyServiceType(
-            List<CreateQuotationCommand.Item> items,
+            List<SaveQuotationCommand.Item> items,
             Map<Integer, QuotationServiceTypeSummary> serviceTypesById) {
-        for (CreateQuotationCommand.Item item : items) {
+        for (SaveQuotationCommand.Item item : items) {
             if (item.standby() == null) continue;
             QuotationServiceTypeSummary st = requireServiceType(serviceTypesById, item.serviceTypeId());
             QuotationServiceKind kind = resolveKind(st);
@@ -257,9 +257,9 @@ public class QuotationValidatorService {
      * {@code validateInsuredAmountServiceType} (solo SEG).
      */
     private void validateMeasurementsAndCargoType(
-            List<CreateQuotationCommand.Item> items,
+            List<SaveQuotationCommand.Item> items,
             Map<Integer, QuotationServiceTypeSummary> serviceTypesById) {
-        for (CreateQuotationCommand.Item item : items) {
+        for (SaveQuotationCommand.Item item : items) {
             QuotationServiceTypeSummary st = requireServiceType(serviceTypesById, item.serviceTypeId());
             QuotationServiceKind kind = resolveKind(st);
 
@@ -312,14 +312,14 @@ public class QuotationValidatorService {
     // ---------- Servicio Integral -------------------------------------------
 
     private void validateServicioIntegral(
-            List<CreateQuotationCommand.Item> items,
+            List<SaveQuotationCommand.Item> items,
             List<Integer> effectiveNumbers,
             Map<Integer, QuotationServiceTypeSummary> serviceTypesById) {
         // 1. Detectar items INT (kind=INTEGRAL) usando el itemNumber efectivo
         // pre-computado para evitar List.indexOf por item.
         List<Integer> integralItemNumbers = new ArrayList<>();
         for (int i = 0; i < items.size(); i++) {
-            CreateQuotationCommand.Item item = items.get(i);
+            SaveQuotationCommand.Item item = items.get(i);
             QuotationServiceTypeSummary st = serviceTypesById.get(item.serviceTypeId());
             if (st == null) continue;
             QuotationServiceKind kind = resolveKind(st);
@@ -352,7 +352,7 @@ public class QuotationValidatorService {
         }
 
         // 1c. INT debe tener >=2 hijos.
-        List<CreateQuotationCommand.Item> children = items.stream()
+        List<SaveQuotationCommand.Item> children = items.stream()
             .filter(item -> Integer.valueOf(1).equals(item.parentItemNumber()))
             .toList();
         if (children.size() < 2) {
@@ -366,7 +366,7 @@ public class QuotationValidatorService {
         // transporte (codes con prefijo S — cama baja, gondola, plataforma, etc.).
         boolean hasServicio = false;
         boolean hasComplementario = false;
-        for (CreateQuotationCommand.Item child : children) {
+        for (SaveQuotationCommand.Item child : children) {
             QuotationServiceTypeSummary st = requireServiceType(serviceTypesById, child.serviceTypeId());
             QuotationServiceKind kind = resolveKind(st);
             if (kind == QuotationServiceKind.SERVICIO) hasServicio = true;
@@ -390,10 +390,10 @@ public class QuotationValidatorService {
      * Devuelve el itemNumber efectivo de cada item en orden. Si el item envia
      * itemNumber explicito lo usa; sino usa el indice+1 (autogenerado).
      */
-    private List<Integer> computeEffectiveItemNumbers(List<CreateQuotationCommand.Item> items) {
+    private List<Integer> computeEffectiveItemNumbers(List<SaveQuotationCommand.Item> items) {
         List<Integer> numbers = new ArrayList<>(items.size());
         for (int i = 0; i < items.size(); i++) {
-            CreateQuotationCommand.Item item = items.get(i);
+            SaveQuotationCommand.Item item = items.get(i);
             numbers.add(item.itemNumber() != null ? item.itemNumber() : (i + 1));
         }
         return numbers;

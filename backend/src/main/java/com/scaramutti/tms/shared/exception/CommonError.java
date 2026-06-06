@@ -10,6 +10,8 @@ public enum CommonError implements ApiError {
         "La solicitud contiene errores de validación"),
     FORBIDDEN        ("COM-003", 403, "Forbidden",
         "No tiene permisos para acceder a este recurso"),
+    PRECONDITION_FAILED("COM-004", 412, "Precondition failed",
+        "El recurso fue modificado por otro usuario. Recargue antes de editar."),
     INTERNAL_ERROR   ("COM-500", 500, "Internal Server Error",
         "Error interno del servidor");
 

@@ -1,6 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.entity.QuotationItem;
 import jakarta.enterprise.context.ApplicationScoped;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -42,11 +42,11 @@ public class QuotationCalculatorService {
      * Los items hijos del Integral (con parentItemNumber != null) se ignoran
      * para el total — su contribucion es 0 por contrato del negocio.
      */
-    public Totals calculate(List<CreateQuotationCommand.Item> items) {
+    public Totals calculate(List<SaveQuotationCommand.Item> items) {
         BigDecimal totalSubtotal = BigDecimal.ZERO;
         BigDecimal totalIgv = BigDecimal.ZERO;
 
-        for (CreateQuotationCommand.Item item : items) {
+        for (SaveQuotationCommand.Item item : items) {
             if (item.parentItemNumber() != null) {
                 // Hijo del Integral: no contribuye al total.
                 continue;
@@ -70,7 +70,7 @@ public class QuotationCalculatorService {
      * Para hijos del Integral devuelve 0 (defensive — no deberian llegar
      * a este metodo si el caller filtra con parentItemNumber).
      */
-    public BigDecimal subtotalFor(CreateQuotationCommand.Item item) {
+    public BigDecimal subtotalFor(SaveQuotationCommand.Item item) {
         if (item.parentItemNumber() != null) {
             return BigDecimal.ZERO.setScale(SCALE);
         }

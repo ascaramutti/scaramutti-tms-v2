@@ -1,6 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -31,8 +31,8 @@ class QuotationCalculatorServiceTest {
      * Helper sin {@code igvPercentage} — el calculator lee el % del config,
      * no del item.
      */
-    private CreateQuotationCommand.Item item(BigDecimal unitPrice, int qty, Integer parentItemNumber) {
-        return new CreateQuotationCommand.Item(
+    private SaveQuotationCommand.Item item(BigDecimal unitPrice, int qty, Integer parentItemNumber) {
+        return new SaveQuotationCommand.Item(
             null, parentItemNumber, 1, null, null,
             null, null, null, null, qty, unitPrice, null, null, null
         );
@@ -40,7 +40,7 @@ class QuotationCalculatorServiceTest {
 
     @Test
     void calculate_singleRootItem_returnsExpectedTotals() {
-        CreateQuotationCommand.Item only = item(new BigDecimal("1000.00"), 1, null);
+        SaveQuotationCommand.Item only = item(new BigDecimal("1000.00"), 1, null);
         QuotationCalculatorService.Totals t = calculator.calculate(List.of(only));
         assertEquals(new BigDecimal("1000.00"), t.totalSubtotal());
         assertEquals(new BigDecimal("180.00"), t.totalIgv());

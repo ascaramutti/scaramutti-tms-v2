@@ -31,6 +31,15 @@ public class QuotationItemRepository implements PanacheRepositoryBase<QuotationI
     }
 
     /**
+     * Borra todos los items de una cotizacion. Usado por el UPDATE (PUT) que
+     * reemplaza la lista completa de items. Borrar los standby costs ANTES
+     * (FK {@code quotation_item_id NOT NULL}). Devuelve la cantidad borrada.
+     */
+    public long deleteByQuotationId(Long quotationId) {
+        return delete("quotationId = ?1", quotationId);
+    }
+
+    /**
      * Batch-load de items de VARIAS cotizaciones en UNA query (WHERE IN). Usado
      * por el listado (GET /quotations) para calcular totalAmount/itemsCount de
      * toda la pagina sin N+1 — el service agrupa por quotationId en memoria.

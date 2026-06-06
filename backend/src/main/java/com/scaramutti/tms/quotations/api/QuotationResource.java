@@ -12,6 +12,7 @@ import com.scaramutti.tms.quotations.service.CreateQuotationService;
 import com.scaramutti.tms.quotations.service.GetQuotationService;
 import com.scaramutti.tms.quotations.service.ListQuotationsService;
 import com.scaramutti.tms.quotations.service.QuotationConfigService;
+import com.scaramutti.tms.quotations.service.UpdateQuotationService;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
@@ -25,6 +26,7 @@ import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -43,6 +45,7 @@ public class QuotationResource {
 
     @Inject CreateQuotationService createQuotationService;
     @Inject GetQuotationService getQuotationService;
+    @Inject UpdateQuotationService updateQuotationService;
     @Inject ListQuotationsService listQuotationsService;
     @Inject QuotationConfigService quotationConfigService;
     @Inject QuotationResourceMapper resourceMapper;
@@ -106,7 +109,7 @@ public class QuotationResource {
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
     public Response createQuotation(@Valid @NotNull QuotationRequest quotationRequest) {
         QuotationResponse quotation = createQuotationService.createQuotation(
-            resourceMapper.toCreateQuotationCommand(quotationRequest)
+            resourceMapper.toSaveQuotationCommand(quotationRequest)
         );
         return Response.created(URI.create("/api/v1/quotations/" + quotation.id()))
             .header("ETag", "\"" + quotation.updatedAt().toString() + "\"")
@@ -141,6 +144,31 @@ public class QuotationResource {
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
     public Response getQuotation(@PathParam("id") Long id) {
         QuotationResponse quotation = getQuotationService.getById(id);
+        return Response.ok(quotation)
+            .header("ETag", "\"" + quotation.updatedAt().toString() + "\"")
+            .build();
+    }
+
+    /**
+     * Edita una cotizacion completa (reemplazo). Reusa {@code QuotationRequest} (mismo
+     * body que el POST). Requiere {@code If-Match} con el ETag vigente (optimistic
+     * locking): si otro usuario edito en el medio → 412 (COM-004). El {@code quotationType}
+     * y el {@code clientId} son inmutables (400 QUO-004 si el body los cambia);
+     * {@code code}/{@code createdBy}/{@code createdAt}/{@code status} se preservan.
+     *
+     * <p>Reemplaza la lista completa de items (borra los viejos e inserta los nuevos).
+     * Devuelve la cotizacion actualizada + el nuevo {@code ETag} ({@code updatedAt}).
+     */
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
+    public Response updateQuotation(
+            @PathParam("id") Long id,
+            @HeaderParam("If-Match") String ifMatch,
+            @Valid @NotNull QuotationRequest quotationRequest) {
+        QuotationResponse quotation = updateQuotationService.updateQuotation(
+            id, ifMatch, resourceMapper.toSaveQuotationCommand(quotationRequest)
+        );
         return Response.ok(quotation)
             .header("ETag", "\"" + quotation.updatedAt().toString() + "\"")
             .build();
