@@ -3,7 +3,7 @@ package com.scaramutti.tms.quotations.service;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
 import com.scaramutti.tms.catalogs.quotationservicetype.model.QuotationServiceKind;
 import com.scaramutti.tms.quotations.model.QuotationType;
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.exception.ApiException;
 import org.junit.jupiter.api.Test;
 
@@ -58,10 +58,10 @@ class QuotationValidatorServiceTest {
      * SIN weight/cargoType — la regla del proyecto exige que esos campos sean
      * null en kinds que no son transporte (rechazado por validateMeasurementsAndCargoType).
      */
-    private CreateQuotationCommand.Item item(
+    private SaveQuotationCommand.Item item(
             Integer itemNumber, Integer parentItemNumber, Integer serviceTypeId,
             BigDecimal unitPrice, BigDecimal internalRef, BigDecimal insured) {
-        return new CreateQuotationCommand.Item(
+        return new SaveQuotationCommand.Item(
             itemNumber, parentItemNumber, serviceTypeId, null, null,
             null, null, null, null, 1, unitPrice, internalRef,
             insured, null
@@ -72,10 +72,10 @@ class QuotationValidatorServiceTest {
      * Helper para items kind=SERVICIO (transporte). Incluye weightKg=10
      * y cargoTypeId=1 por default — obligatorios para items de transporte.
      */
-    private CreateQuotationCommand.Item transportItem(
+    private SaveQuotationCommand.Item transportItem(
             Integer itemNumber, Integer parentItemNumber, Integer serviceTypeId,
             BigDecimal unitPrice, BigDecimal internalRef, BigDecimal insured) {
-        return new CreateQuotationCommand.Item(
+        return new SaveQuotationCommand.Item(
             itemNumber, parentItemNumber, serviceTypeId, 1, null,
             new BigDecimal("10.00"), null, null, null, 1, unitPrice, internalRef,
             insured, null
@@ -86,11 +86,11 @@ class QuotationValidatorServiceTest {
      * Helper para tests de standby con item kind != SERVICIO.
      * Sin weight/cargoType.
      */
-    private CreateQuotationCommand.Item itemWithStandby(
+    private SaveQuotationCommand.Item itemWithStandby(
             Integer itemNumber, Integer parentItemNumber, Integer serviceTypeId,
             BigDecimal unitPrice) {
-        var standby = new CreateQuotationCommand.Standby(new BigDecimal("50.00"), false);
-        return new CreateQuotationCommand.Item(
+        var standby = new SaveQuotationCommand.Standby(new BigDecimal("50.00"), false);
+        return new SaveQuotationCommand.Item(
             itemNumber, parentItemNumber, serviceTypeId, null, null,
             null, null, null, null, 1, unitPrice, null,
             null, standby
@@ -101,20 +101,20 @@ class QuotationValidatorServiceTest {
      * Helper para tests de standby con item kind=SERVICIO (transporte).
      * Incluye weight + cargoType obligatorios.
      */
-    private CreateQuotationCommand.Item transportItemWithStandby(
+    private SaveQuotationCommand.Item transportItemWithStandby(
             Integer itemNumber, Integer parentItemNumber, Integer serviceTypeId,
             BigDecimal unitPrice) {
-        var standby = new CreateQuotationCommand.Standby(new BigDecimal("50.00"), false);
-        return new CreateQuotationCommand.Item(
+        var standby = new SaveQuotationCommand.Standby(new BigDecimal("50.00"), false);
+        return new SaveQuotationCommand.Item(
             itemNumber, parentItemNumber, serviceTypeId, 1, null,
             new BigDecimal("10.00"), null, null, null, 1, unitPrice, null,
             null, standby
         );
     }
 
-    private CreateQuotationCommand command(QuotationType type, String origin, String destination,
-                                            List<CreateQuotationCommand.Item> items) {
-        return new CreateQuotationCommand(
+    private SaveQuotationCommand command(QuotationType type, String origin, String destination,
+                                            List<SaveQuotationCommand.Item> items) {
+        return new SaveQuotationCommand(
             type, 1, "contact", null, 1, 1, null, 15, origin, destination, items
         );
     }
@@ -468,7 +468,7 @@ class QuotationValidatorServiceTest {
     void validate_servicioItemWithoutCargoTypeId_throwsCOM001() {
         // SCB con weight pero sin cargoTypeId → debe rechazar.
         // Construyo el item inline porque transportItem ya pone cargoTypeId=1.
-        var item = new CreateQuotationCommand.Item(
+        var item = new SaveQuotationCommand.Item(
             null, null, 1, null, null,  // cargoTypeId=null intentional
             new BigDecimal("10.00"), null, null, null, 1, new BigDecimal("100"), null,
             null, null
@@ -484,7 +484,7 @@ class QuotationValidatorServiceTest {
     @Test
     void validate_servicioItemWithWeightZero_throwsCOM001() {
         // weight=0 no es valido para transporte (debe ser >0).
-        var item = new CreateQuotationCommand.Item(
+        var item = new SaveQuotationCommand.Item(
             null, null, 1, 1, null,
             BigDecimal.ZERO, null, null, null, 1, new BigDecimal("100"), null,
             null, null
@@ -499,7 +499,7 @@ class QuotationValidatorServiceTest {
     @Test
     void validate_alquilerItemWithWeight_throwsCOM001() {
         // ALQUILER no debe tener weight.
-        var item = new CreateQuotationCommand.Item(
+        var item = new SaveQuotationCommand.Item(
             null, null, 9, null, null,
             new BigDecimal("10.00"), null, null, null, 1, new BigDecimal("500"), null,
             null, null
@@ -515,7 +515,7 @@ class QuotationValidatorServiceTest {
     @Test
     void validate_complementarioItemWithCargoType_throwsCOM001() {
         // COMPLEMENTARIO no debe tener cargoTypeId.
-        var item = new CreateQuotationCommand.Item(
+        var item = new SaveQuotationCommand.Item(
             null, null, 18, 1, null,  // cargoTypeId=1 indebido
             null, null, null, null, 1, new BigDecimal("100"), null,
             null, null
@@ -531,7 +531,7 @@ class QuotationValidatorServiceTest {
     @Test
     void validate_integralItemWithMeasurements_throwsCOM001() {
         // El item Integral (padre) no debe tener weight/dimensiones.
-        var integralPadre = new CreateQuotationCommand.Item(
+        var integralPadre = new SaveQuotationCommand.Item(
             1, null, 24, null, null,
             new BigDecimal("5.00"), null, null, null, 1, new BigDecimal("5000"), null,  // weight indebido
             null, null
@@ -550,7 +550,7 @@ class QuotationValidatorServiceTest {
     @Test
     void validate_servicioItemWithAllMeasurements_isValid() {
         // SERVICIO con weight + cargoType + length/width/height: OK.
-        var item = new CreateQuotationCommand.Item(
+        var item = new SaveQuotationCommand.Item(
             null, null, 1, 1, null,
             new BigDecimal("10.00"), new BigDecimal("12.00"), new BigDecimal("2.50"), new BigDecimal("3.00"),
             1, new BigDecimal("100"), null,

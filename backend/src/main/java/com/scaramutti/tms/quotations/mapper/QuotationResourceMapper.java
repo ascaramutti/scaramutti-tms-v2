@@ -5,7 +5,7 @@ import com.scaramutti.tms.quotations.dto.QuotationRequest;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostRequest;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.quotations.service.cmd.ListQuotationsQuery;
 import com.scaramutti.tms.shared.util.StringUtils;
 import org.mapstruct.BeanMapping;
@@ -18,7 +18,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Mapper REST: traduce QuotationRequest (DTO) a CreateQuotationCommand (interno).
+ * Mapper REST: traduce QuotationRequest (DTO) a SaveQuotationCommand (interno).
  *
  * Normalizacion aplicada:
  *  - contactName: trim, "" → null.
@@ -36,14 +36,14 @@ public interface QuotationResourceMapper {
     @Mapping(target = "contactPhone", source = "contactPhone", qualifiedByName = "trimToNull")
     @Mapping(target = "origin",       source = "origin",       qualifiedByName = "trimToNull")
     @Mapping(target = "destination",  source = "destination",  qualifiedByName = "trimToNull")
-    CreateQuotationCommand toCreateQuotationCommand(QuotationRequest quotationRequest);
+    SaveQuotationCommand toSaveQuotationCommand(QuotationRequest quotationRequest);
 
     @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")
-    CreateQuotationCommand.Item toCommandItem(QuotationItemRequest itemRequest);
+    SaveQuotationCommand.Item toCommandItem(QuotationItemRequest itemRequest);
 
-    List<CreateQuotationCommand.Item> toCommandItems(List<QuotationItemRequest> items);
+    List<SaveQuotationCommand.Item> toCommandItems(List<QuotationItemRequest> items);
 
-    CreateQuotationCommand.Standby toCommandStandby(QuotationStandbyCostRequest request);
+    SaveQuotationCommand.Standby toCommandStandby(QuotationStandbyCostRequest request);
 
     /**
      * Arma el query del listado desde los query-params del Resource. El `q` se

@@ -391,6 +391,19 @@ paths:
       tags: [Quotations]
       operationId: updateQuotation
       summary: Reemplazar cotización completa (incluye items y standby)
+      description: |
+        Edita una cotización existente (reemplazo completo). Reusa `QuotationRequest`
+        (mismo body que el POST), con dos diferencias de comportamiento:
+
+        - **Campos inmutables**: `quotationType` y `clientId` deben coincidir con los
+          valores actuales de la cotización. Si el body los cambia → **400 (QUO-004)**.
+          El `code`, `createdBy`, `createdAt` y `status` se preservan (no se envían
+          en el request).
+        - **Items**: se reemplaza la lista completa — los items y standby anteriores
+          se borran y se insertan los del request.
+
+        Requiere `If-Match` con el ETag vigente (optimistic locking): si la cotización
+        fue modificada desde que se leyó → **412 (COM-004)**; recargar antes de reintentar.
       x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - $ref: '#/components/parameters/IfMatch'
@@ -408,7 +421,32 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/QuotationResponse' }
-        '400': { $ref: '#/components/responses/BadRequest' }
+        '400':
+          description: Validación de reglas de negocio o intento de modificar un campo inmutable
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                validationFailed:
+                  summary: Regla de negocio violada (ej. falta origin en TRANSPORTE, más de 5 items root)
+                  value:
+                    type: 'urn:tms:error:com-001'
+                    title: 'Validation failed'
+                    status: 400
+                    detail: 'La solicitud contiene errores de validación'
+                    instance: '/api/v1/quotations/142'
+                    code: 'COM-001'
+                    traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+                immutableField:
+                  summary: Intento de cambiar quotationType o clientId (inmutables al editar)
+                  value:
+                    type: 'urn:tms:error:quo-004'
+                    title: 'Bad Request'
+                    status: 400
+                    detail: 'El tipo de cotizacion no puede modificarse'
+                    instance: '/api/v1/quotations/142'
+                    code: 'QUO-004'
+                    traceId: '9f5a3b1c-2d4e-6f8a-0b1c-3d5e7f9a1b2c'
         '404': { $ref: '#/components/responses/NotFound' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
     delete:

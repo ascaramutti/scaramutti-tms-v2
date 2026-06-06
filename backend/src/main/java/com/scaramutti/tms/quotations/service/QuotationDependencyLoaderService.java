@@ -16,7 +16,7 @@ import com.scaramutti.tms.quotations.dto.embedded.QuotationCurrencySummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationPaymentTermSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
 import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.exception.CommonError;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -37,7 +37,7 @@ import java.util.function.Supplier;
  * <p>Dos entry points publicos paralelos, diferenciados por el flag
  * {@code isCreatePath}:
  * <ul>
- *   <li>{@link #loadFor(CreateQuotationCommand)} — para CREATE (POST). Valida
+ *   <li>{@link #loadFor(SaveQuotationCommand)} — para CREATE (POST). Valida
  *       que TODAS las FKs esten {@code isActive=true}. Una FK inactiva o
  *       inexistente en el payload de creacion es invalido (input del usuario)
  *       — se traduce a {@code COM-001} (400 VALIDATION_FAILED).</li>
@@ -74,7 +74,7 @@ public class QuotationDependencyLoaderService {
      * Carga dependencias para CREATE. Valida isActive en TODAS las FKs.
      * FK inexistente → COM-001 (400) "{field} no existe".
      */
-    public LoadedDependencies loadFor(CreateQuotationCommand command) {
+    public LoadedDependencies loadFor(SaveQuotationCommand command) {
         return loadInternal(
             command.clientId(),
             command.currencyId(),
@@ -254,17 +254,17 @@ public class QuotationDependencyLoaderService {
 
     // ---------- Extraccion de IDs desde el command --------------------------
 
-    private Set<Integer> collectServiceTypeIds(CreateQuotationCommand command) {
+    private Set<Integer> collectServiceTypeIds(SaveQuotationCommand command) {
         Set<Integer> ids = new HashSet<>();
-        for (CreateQuotationCommand.Item item : command.items()) {
+        for (SaveQuotationCommand.Item item : command.items()) {
             if (item.serviceTypeId() != null) ids.add(item.serviceTypeId());
         }
         return ids;
     }
 
-    private Set<Integer> collectCargoTypeIds(CreateQuotationCommand command) {
+    private Set<Integer> collectCargoTypeIds(SaveQuotationCommand command) {
         Set<Integer> ids = new HashSet<>();
-        for (CreateQuotationCommand.Item item : command.items()) {
+        for (SaveQuotationCommand.Item item : command.items()) {
             if (item.cargoTypeId() != null) ids.add(item.cargoTypeId());
         }
         return ids;

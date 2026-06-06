@@ -11,7 +11,7 @@ import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
 import com.scaramutti.tms.quotations.mapper.QuotationServiceMapper;
 import com.scaramutti.tms.quotations.model.QuotationType;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
 import com.scaramutti.tms.shared.entity.User;
@@ -20,7 +20,6 @@ import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
-import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -73,13 +72,13 @@ class CreateQuotationServiceTest {
 
     @Mock QuotationRepository quotationRepository;
     @Mock QuotationItemRepository quotationItemRepository;
-    @Mock QuotationStandbyCostRepository quotationStandbyCostRepository;
     @Mock UserRepository userRepository;
 
     @Mock QuotationDependencyLoaderService dependencyLoader;
     @Mock QuotationCodeGeneratorService codeGenerator;
     @Mock QuotationValidatorService validator;
     @Mock QuotationCalculatorService calculator;
+    @Mock QuotationItemPersistenceService itemPersistence;
     @Mock QuotationResponseAssemblerService assembler;
     @Mock AuthServiceMapper authServiceMapper;
     @Mock QuotationServiceMapper quotationServiceMapper;
@@ -90,18 +89,18 @@ class CreateQuotationServiceTest {
 
     @BeforeEach
     void initConfig() {
-        // @ConfigProperty fields no los inyecta Mockito — los seteamos manualmente.
+        // @ConfigProperty field no lo inyecta Mockito — lo seteamos manualmente. El
+        // default-igv-percentage se movio a QuotationItemPersistenceService (mockeado aca).
         service.antiDuplicateWindowSeconds = 30;
-        service.defaultIgvPercentage = new BigDecimal("18.00");
     }
 
-    private CreateQuotationCommand sampleCommand() {
-        var items = List.of(new CreateQuotationCommand.Item(
+    private SaveQuotationCommand sampleCommand() {
+        var items = List.of(new SaveQuotationCommand.Item(
             null, null, 1, null, null,
             null, null, null, null, 1, new BigDecimal("100"), null,
             null, null
         ));
-        return new CreateQuotationCommand(
+        return new SaveQuotationCommand(
             QuotationType.TRANSPORTE, 1, "contact", null, 1, null, null, 15, "Lima", "Cusco", items
         );
     }
@@ -208,6 +207,8 @@ class CreateQuotationServiceTest {
         when(codeGenerator.nextCode()).thenReturn("2026-00001");
         when(quotationServiceMapper.toQuotationEntity(any(), eq("2026-00001"), eq(42)))
             .thenReturn(stubMappedEntity("2026-00001", 42));
+        when(itemPersistence.persistItems(any(), any())).thenReturn(List.of());
+        when(itemPersistence.persistStandbyCosts(any(), any(), any())).thenReturn(Map.of());
         when(userRepository.findById(42)).thenReturn(sampleUser());
         when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
         when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
@@ -219,7 +220,7 @@ class CreateQuotationServiceTest {
         verify(validator).validate(eq(command), any());
         verify(codeGenerator).nextCode();
         verify(quotationRepository).persist(any(Quotation.class));
-        verify(quotationItemRepository).persist(any(QuotationItem.class));
+        verify(itemPersistence).persistItems(eq(command), any(Quotation.class));
         verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 

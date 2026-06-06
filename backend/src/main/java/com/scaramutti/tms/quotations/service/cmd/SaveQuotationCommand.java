@@ -16,7 +16,7 @@ import java.util.List;
  *  - observations trimmed por item.
  *  - Los items vienen como records inmutables — el service no muta el command.
  */
-public record CreateQuotationCommand(
+public record SaveQuotationCommand(
     QuotationType quotationType,
     Integer clientId,
     String contactName,

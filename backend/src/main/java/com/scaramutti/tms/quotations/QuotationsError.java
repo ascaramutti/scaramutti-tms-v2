@@ -17,6 +17,11 @@ import com.scaramutti.tms.shared.exception.ApiError;
  *    cuando el id del path no existe en BD. El caller pasa el id con
  *    {@code toException("La cotizacion con id " + id + " no existe")} para
  *    que el frontend muestre el detail directo sin armar el mensaje.
+ *
+ *  - QUO-004: intento de modificar un campo inmutable al editar (PUT /quotations/{id}).
+ *    El {@code quotationType} y el {@code clientId} no pueden cambiar (la cotizacion
+ *    pertenece a un cliente y su tipo define las reglas de items). El caller pasa el
+ *    detalle especifico con {@code toException(...)}.
  */
 public enum QuotationsError implements ApiError {
 
@@ -25,7 +30,9 @@ public enum QuotationsError implements ApiError {
     DUPLICATE_DETECTED ("QUO-002", 409, "Conflict",
         "Se detecto una cotizacion identica creada hace menos de 30 segundos"),
     NOT_FOUND          ("QUO-003", 404, "Not Found",
-        "La cotizacion no existe");
+        "La cotizacion no existe"),
+    IMMUTABLE_FIELD    ("QUO-004", 400, "Bad Request",
+        "Un campo inmutable de la cotizacion no puede modificarse");
 
     private final String code;
     private final int status;

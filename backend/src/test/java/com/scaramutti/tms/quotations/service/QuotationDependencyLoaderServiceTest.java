@@ -16,7 +16,7 @@ import com.scaramutti.tms.clients.service.ClientService;
 import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
 import com.scaramutti.tms.quotations.model.QuotationType;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
-import com.scaramutti.tms.quotations.service.cmd.CreateQuotationCommand;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.exception.ApiException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -75,16 +75,16 @@ class QuotationDependencyLoaderServiceTest {
         loader.summaryMapper = Mappers.getMapper(QuotationEmbeddedSummaryMapper.class);
     }
 
-    private CreateQuotationCommand.Item item(Integer serviceTypeId, Integer cargoTypeId) {
-        return new CreateQuotationCommand.Item(
+    private SaveQuotationCommand.Item item(Integer serviceTypeId, Integer cargoTypeId) {
+        return new SaveQuotationCommand.Item(
             null, null, serviceTypeId, cargoTypeId, null,
             null, null, null, null, 1, new BigDecimal("100"), null,
             null, null
         );
     }
 
-    private CreateQuotationCommand command(Integer paymentTermId, List<CreateQuotationCommand.Item> items) {
-        return new CreateQuotationCommand(
+    private SaveQuotationCommand command(Integer paymentTermId, List<SaveQuotationCommand.Item> items) {
+        return new SaveQuotationCommand(
             QuotationType.TRANSPORTE, 1, "contact", null, 1, paymentTermId,
             null, 15, "Lima", "Cusco", items
         );
