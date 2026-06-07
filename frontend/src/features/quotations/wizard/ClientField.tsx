@@ -16,14 +16,20 @@ interface ClientFieldProps {
    * steps: este componente se desmonta al cambiar de step. */
   selectedClient: ClientResponse | null
   onClientChange: (client: ClientResponse | null) => void
+  /** Edición: el cliente es inmutable (el backend lo rechaza con QUO-004). Se muestra
+   * read-only (nombre + RUC), sin combobox ni creación al vuelo. */
+  readOnly?: boolean
 }
 
 /**
  * Combobox de cliente (búsqueda async, minLength 3) + creación al vuelo. El
  * `clientId` vive en el form (fuente de verdad para validar); el objeto cliente
  * lo administra el WizardForm (para el label + precargar contacto).
+ *
+ * En `readOnly` (edición) el cliente no se puede cambiar: se renderiza solo el
+ * nombre + RUC en campos de solo lectura.
  */
-export function ClientField({ selectedClient, onClientChange }: ClientFieldProps) {
+export function ClientField({ selectedClient, onClientChange, readOnly = false }: ClientFieldProps) {
   const {
     setValue,
     trigger,
@@ -56,6 +62,40 @@ export function ClientField({ selectedClient, onClientChange }: ClientFieldProps
     // a "ningún cliente" y se arrastraría al POST.
     setValue('contactName', '', { shouldValidate: true })
     setValue('contactPhone', '', { shouldValidate: true })
+  }
+
+  if (readOnly) {
+    return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="sm:col-span-2">
+          <label htmlFor="cliente-readonly" className="mb-1.5 block text-sm font-medium text-slate-700">
+            Cliente
+          </label>
+          <input
+            id="cliente-readonly"
+            type="text"
+            value={selectedClient?.name ?? ''}
+            readOnly
+            aria-label="Cliente de la cotización"
+            className="w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none"
+          />
+          <p className="mt-1.5 text-xs text-slate-500">El cliente no se puede cambiar al editar.</p>
+        </div>
+        <div>
+          <label htmlFor="cliente-ruc-display" className="mb-1.5 block text-sm font-medium text-slate-700">
+            RUC
+          </label>
+          <input
+            id="cliente-ruc-display"
+            type="text"
+            value={selectedClient?.ruc ?? ''}
+            readOnly
+            aria-label="RUC del cliente seleccionado"
+            className="w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none"
+          />
+        </div>
+      </div>
+    )
   }
 
   return (

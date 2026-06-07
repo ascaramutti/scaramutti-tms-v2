@@ -536,6 +536,11 @@ export type Size = number;
 
 export type IdLong = number;
 
+/**
+ * ETag/version del recurso para optimistic locking.
+ */
+export type IfMatch = string;
+
 export type LoginData = {
     body: LoginRequest;
     path?: never;
@@ -1032,6 +1037,55 @@ export type GetQuotationResponses = {
 };
 
 export type GetQuotationResponse = GetQuotationResponses[keyof GetQuotationResponses];
+
+export type UpdateQuotationData = {
+    body: QuotationRequest;
+    headers?: {
+        /**
+         * ETag/version del recurso para optimistic locking.
+         */
+        'If-Match'?: string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/quotations/{id}';
+};
+
+export type UpdateQuotationErrors = {
+    /**
+     * Validación de reglas de negocio o intento de modificar un campo inmutable
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type UpdateQuotationError = UpdateQuotationErrors[keyof UpdateQuotationErrors];
+
+export type UpdateQuotationResponses = {
+    /**
+     * Actualizada
+     */
+    200: QuotationResponse;
+};
+
+export type UpdateQuotationResponse = UpdateQuotationResponses[keyof UpdateQuotationResponses];
 
 export type DownloadQuotationPdfData = {
     body?: never;

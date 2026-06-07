@@ -167,7 +167,10 @@ export const quotationsHandlers = [
       ]),
     ),
   ),
-  http.get(`${API}/quotations/:id`, () => HttpResponse.json(getQuotationResponse())),
+  http.get(`${API}/quotations/:id`, () => {
+    const quotation = getQuotationResponse()
+    return HttpResponse.json(quotation, { headers: { ETag: `"${quotation.updatedAt}"` } })
+  }),
   http.post(`${API}/quotations`, () =>
     HttpResponse.json(getQuotationResponse({ id: 99 }), { status: 201 }),
   ),
@@ -258,16 +261,19 @@ export function quotationsPagedByParam(totalElements = 25, size = 20) {
 
 // ----- Detalle (GET /quotations/:id) -----
 
-/** Responde un detalle fijo. */
-export function quotationDetail(quotation: QuotationResponse) {
-  return http.get(`${API}/quotations/:id`, () => HttpResponse.json(quotation))
+/** Responde un detalle fijo + su header ETag (default `"<updatedAt>"`; se puede pasar uno
+ * distinto para simular el desfase real header-vs-body de los microsegundos). */
+export function quotationDetail(quotation: QuotationResponse, etag = `"${quotation.updatedAt}"`) {
+  return http.get(`${API}/quotations/:id`, () =>
+    HttpResponse.json(quotation, { headers: { ETag: etag } }),
+  )
 }
 
 /** Detalle con delay (para observar el estado de carga). */
-export function quotationDetailSlow(quotation: QuotationResponse, ms = 40) {
+export function quotationDetailSlow(quotation: QuotationResponse, ms = 40, etag = `"${quotation.updatedAt}"`) {
   return http.get(`${API}/quotations/:id`, async () => {
     await delay(ms)
-    return HttpResponse.json(quotation)
+    return HttpResponse.json(quotation, { headers: { ETag: etag } })
   })
 }
 
@@ -314,6 +320,43 @@ export function createQuotationSlow(ms = 40, response?: QuotationResponse) {
   return http.post(`${API}/quotations`, async () => {
     await delay(ms)
     return HttpResponse.json(response ?? getQuotationResponse({ id: 99 }), { status: 201 })
+  })
+}
+
+// ----- Editar (PUT /quotations/:id) -----
+
+/** PUT /quotations/:id OK: captura el body + los headers (If-Match, Authorization) en `sink`
+ * y responde 200 con el detalle actualizado + nuevo ETag. */
+export function updateQuotationSuccess(
+  sink: { body?: QuotationRequest; ifMatch?: string | null; authorization?: string | null },
+  response?: QuotationResponse,
+) {
+  return http.put(`${API}/quotations/:id`, async ({ request }) => {
+    sink.body = (await request.json()) as QuotationRequest
+    sink.ifMatch = request.headers.get('If-Match')
+    sink.authorization = request.headers.get('Authorization')
+    const updated = response ?? getQuotationResponse()
+    return HttpResponse.json(updated, { headers: { ETag: `"${updated.updatedAt}"` } })
+  })
+}
+
+/** Error (Problem RFC 7807) al editar: 412 COM-004 (conflicto de versión), 400 COM-001/QUO-004,
+ * 404 QUO-003. */
+export function updateQuotationError(status: number, problem: Partial<Problem> = {}) {
+  return http.put(`${API}/quotations/:id`, () =>
+    HttpResponse.json(
+      { type: 'urn:tms:error:test', title: 'Error', status, detail: 'Fallo de prueba', ...problem },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Editar con delay (para observar el botón "Guardando…" deshabilitado). */
+export function updateQuotationSlow(ms = 40, response?: QuotationResponse) {
+  return http.put(`${API}/quotations/:id`, async () => {
+    await delay(ms)
+    const updated = response ?? getQuotationResponse()
+    return HttpResponse.json(updated, { headers: { ETag: `"${updated.updatedAt}"` } })
   })
 }
 
