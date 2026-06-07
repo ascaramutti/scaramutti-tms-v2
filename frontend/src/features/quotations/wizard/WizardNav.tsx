@@ -10,6 +10,8 @@ interface WizardNavProps {
   onSubmit: () => void
   /** Envío en curso: deshabilita el botón de guardar (anti doble-click). */
   isSubmitting: boolean
+  /** Label del botón de guardar en el último paso (default "Guardar cotización"). */
+  submitLabel?: string
 }
 
 const PRIMARY =
@@ -30,6 +32,7 @@ export function WizardNav({
   onCancel,
   onSubmit,
   isSubmitting,
+  submitLabel = 'Guardar cotización',
 }: WizardNavProps) {
   return (
     <div className="flex items-center justify-between border-t border-slate-200 pt-4">
@@ -44,7 +47,7 @@ export function WizardNav({
               <span aria-hidden="true">Guardando…</span>
             </>
           ) : (
-            'Guardar cotización'
+            submitLabel
           )}
         </button>
       ) : (

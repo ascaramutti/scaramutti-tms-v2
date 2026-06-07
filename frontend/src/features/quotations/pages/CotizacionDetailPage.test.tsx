@@ -347,13 +347,14 @@ describe('CotizacionDetailPage', () => {
     expect(screen.getByText(/Última edición por Admin TMS/i)).toBeInTheDocument()
   })
 
-  // ----- Acciones de PDF -----
-  it('monta las acciones de PDF (previsualizar y descargar) en el detalle', async () => {
-    // Wiring: el detalle integra <QuotationPdfActions>. La lógica del PDF (descarga,
-    // preview, error) se prueba aislada en QuotationPdfActions.test.tsx; acá solo
-    // verificamos que el detalle efectivamente monta los botones.
+  // ----- Acciones del detalle -----
+  it('monta las acciones del detalle (editar, previsualizar, descargar)', async () => {
+    // Wiring: el detalle integra <QuotationDetailActions>. La lógica del PDF (descarga,
+    // preview, error) se prueba aislada en QuotationDetailActions.test.tsx; acá solo
+    // verificamos que el detalle efectivamente monta las acciones.
     renderDetalle()
     await findTitle()
+    expect(screen.getByRole('link', { name: /editar/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /previsualizar pdf/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /descargar pdf/i })).toBeInTheDocument()
   })

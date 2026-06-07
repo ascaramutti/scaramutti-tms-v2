@@ -5,6 +5,7 @@ import { LoginPage } from './features/auth/components/LoginPage'
 import { ChangePasswordPage } from './features/auth/components/ChangePasswordPage'
 import { CotizacionesListPage } from './features/quotations/pages/CotizacionesListPage'
 import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDetailPage'
+import { CotizacionEditPage } from './features/quotations/pages/CotizacionEditPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { HomePage } from './pages/HomePage'
 
@@ -33,6 +34,15 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
             <CotizacionWizardPage />
+          </ProtectedRoute>
+        ),
+      },
+      // Declarado ANTES de /cotizaciones/:id para que "editar" no matchee como id.
+      {
+        path: '/cotizaciones/:id/editar',
+        element: (
+          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+            <CotizacionEditPage />
           </ProtectedRoute>
         ),
       },

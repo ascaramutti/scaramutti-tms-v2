@@ -4,7 +4,7 @@ import { SelectField } from '../../../shared/ui/SelectField'
 import { TextField } from '../../../shared/ui/TextField'
 import { ClientField } from './ClientField'
 import { QuotationTypeCards } from './QuotationTypeCards'
-import type { WizardFormInput } from './quotation-wizard.schema'
+import type { ImmutableField, WizardFormInput } from './quotation-wizard.schema'
 import type { ClientResponse, CurrencyResponse, PaymentTermResponse } from '../../../api'
 
 function todayISO(): string {
@@ -20,6 +20,8 @@ interface Step1InfoGeneralProps {
   paymentTerms: PaymentTermResponse[]
   selectedClient: ClientResponse | null
   onClientChange: (client: ClientResponse | null) => void
+  /** Campos inmutables (edición): bloquean el selector de tipo y el de cliente. */
+  immutableFields?: ReadonlyArray<ImmutableField>
 }
 
 const SECTION = 'rounded-xl border border-slate-200 bg-white p-5 shadow-sm'
@@ -33,6 +35,7 @@ export function Step1InfoGeneral({
   paymentTerms,
   selectedClient,
   onClientChange,
+  immutableFields = [],
 }: Step1InfoGeneralProps) {
   const {
     control,
@@ -59,13 +62,18 @@ export function Step1InfoGeneral({
           <QuotationTypeCards
             control={control}
             onTypeChange={() => setValue('items', [], { shouldValidate: false })}
+            disabled={immutableFields.includes('quotationType')}
           />
         </div>
       </section>
 
       <section className={`${SECTION} space-y-4`}>
         <h2 className={SECTION_TITLE}>Cliente</h2>
-        <ClientField selectedClient={selectedClient} onClientChange={onClientChange} />
+        <ClientField
+          selectedClient={selectedClient}
+          onClientChange={onClientChange}
+          readOnly={immutableFields.includes('clientId')}
+        />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <TextField
             id="contactName"

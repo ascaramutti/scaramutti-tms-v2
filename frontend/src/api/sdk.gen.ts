@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesResponses, ListPaymentTermsData, ListPaymentTermsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesResponses, ListQuotationsResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses } from './types.gen';
+import type { ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesResponses, ListPaymentTermsData, ListPaymentTermsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesResponses, ListQuotationsResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -247,6 +247,34 @@ export const getQuotation = <ThrowOnError extends boolean = false>(options: Opti
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/quotations/{id}',
     ...options
+});
+
+/**
+ * Reemplazar cotización completa (incluye items y standby)
+ *
+ * Edita una cotización existente (reemplazo completo). Reusa `QuotationRequest`
+ * (mismo body que el POST), con dos diferencias de comportamiento:
+ *
+ * - **Campos inmutables**: `quotationType` y `clientId` deben coincidir con los
+ * valores actuales de la cotización. Si el body los cambia → **400 (QUO-004)**.
+ * El `code`, `createdBy`, `createdAt` y `status` se preservan (no se envían
+ * en el request).
+ * - **Items**: se reemplaza la lista completa — los items y standby anteriores
+ * se borran y se insertan los del request.
+ *
+ * Requiere `If-Match` con el ETag vigente (optimistic locking): si la cotización
+ * fue modificada desde que se leyó → **412 (COM-004)**; recargar antes de reintentar.
+ *
+ */
+export const updateQuotation = <ThrowOnError extends boolean = false>(options: Options<UpdateQuotationData, ThrowOnError>) => (options.client ?? client).put<UpdateQuotationResponses, UpdateQuotationErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/quotations/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

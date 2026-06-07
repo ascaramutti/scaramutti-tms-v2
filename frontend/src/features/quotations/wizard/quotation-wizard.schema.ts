@@ -235,6 +235,10 @@ export const wizardSchema = z
 
 export type WizardFormInput = z.infer<typeof wizardSchema>
 
+/** Campos que la EDICIÓN bloquea (el backend los rechaza con 400 QUO-004 si cambian).
+ * En creación están todos editables. */
+export type ImmutableField = 'quotationType' | 'clientId'
+
 /** Valores por defecto del wizard. `validityDays` se sobreescribe con el config del
  * backend al montar (ver `CotizacionWizardPage`). */
 export const WIZARD_DEFAULTS: WizardFormInput = {

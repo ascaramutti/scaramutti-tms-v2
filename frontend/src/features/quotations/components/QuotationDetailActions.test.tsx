@@ -1,8 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { QuotationPdfActions } from './QuotationPdfActions'
+import { QuotationDetailActions } from './QuotationDetailActions'
 import { server } from '../../../test/mocks/server'
 import { quotationPdf, quotationPdfError, quotationPdfSlow } from '../../../test/mocks/handlers/quotations'
 
@@ -12,12 +13,14 @@ function renderActions(props = { quotationId: 1, quotationCode: '2026-00001' }) 
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <QuotationPdfActions {...props} />
+      <MemoryRouter>
+        <QuotationDetailActions {...props} />
+      </MemoryRouter>
     </QueryClientProvider>,
   )
 }
 
-describe('QuotationPdfActions', () => {
+describe('QuotationDetailActions', () => {
   beforeEach(() => {
     // jsdom no implementa la API de object URLs.
     URL.createObjectURL = vi.fn(() => 'blob:mock-url')
@@ -32,6 +35,11 @@ describe('QuotationPdfActions', () => {
     renderActions()
     expect(screen.getByRole('button', { name: /previsualizar pdf/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /descargar pdf/i })).toBeInTheDocument()
+  })
+
+  it('muestra el botón Editar enlazando al wizard de edición', () => {
+    renderActions({ quotationId: 7, quotationCode: '2026-00007' })
+    expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', '/cotizaciones/7/editar')
   })
 
   it('descarga el PDF (object URL + click de <a>) al hacer click en Descargar', async () => {

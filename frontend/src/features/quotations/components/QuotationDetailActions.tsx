@@ -1,12 +1,13 @@
 import { useState } from 'react'
-import { Download, Eye, Loader2 } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Download, Eye, Loader2, Pencil } from 'lucide-react'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { useQuotationPdf } from '../hooks/useQuotationPdf'
 import { getPdfErrorMessage, openQuotationPdf, saveQuotationPdf } from '../utils/quotationPdf'
 
 type PdfMode = 'preview' | 'download'
 
-interface QuotationPdfActionsProps {
+interface QuotationDetailActionsProps {
   quotationId: number
   quotationCode: string
 }
@@ -14,13 +15,12 @@ interface QuotationPdfActionsProps {
 const DISABLED = 'disabled:cursor-not-allowed disabled:opacity-60'
 
 /**
- * Acciones de PDF del Detalle: **Previsualizar** (abre el PDF inline en una pestaña
- * nueva) y **Descargar** (baja el archivo). Ambas pegan a `GET /quotations/{id}/pdf`
- * con el `preview` correspondiente. Una sola mutación a la vez (los botones se
- * deshabilitan mientras genera). Errores del backend se muestran inline con su
- * `Problem.detail`.
+ * Barra de acciones del Detalle: **Editar** (navega al wizard pre-cargado), **Previsualizar**
+ * (abre el PDF inline en una pestaña nueva) y **Descargar** (baja el archivo). Las de PDF pegan a
+ * `GET /quotations/{id}/pdf`; una sola mutación a la vez (sus botones se deshabilitan mientras
+ * genera). Errores del PDF se muestran inline con su `Problem.detail`.
  */
-export function QuotationPdfActions({ quotationId, quotationCode }: QuotationPdfActionsProps) {
+export function QuotationDetailActions({ quotationId, quotationCode }: QuotationDetailActionsProps) {
   const { mutateAsync, isPending, variables } = useQuotationPdf()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -48,6 +48,10 @@ export function QuotationPdfActions({ quotationId, quotationCode }: QuotationPdf
   return (
     <div className="flex flex-col items-end gap-2">
       <div className="flex gap-2">
+        <Link to={`/cotizaciones/${quotationId}/editar`} className={SECONDARY_BUTTON}>
+          <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+          Editar
+        </Link>
         <button
           type="button"
           onClick={() => handlePdf('preview')}

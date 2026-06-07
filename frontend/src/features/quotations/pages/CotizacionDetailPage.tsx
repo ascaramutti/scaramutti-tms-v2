@@ -8,7 +8,7 @@ import { useQuotation } from '../hooks/useQuotation'
 import { QuotationAuditFooter } from '../components/QuotationAuditFooter'
 import { QuotationDetailHeader } from '../components/QuotationDetailHeader'
 import { QuotationItemsSection } from '../components/QuotationItemsSection'
-import { QuotationPdfActions } from '../components/QuotationPdfActions'
+import { QuotationDetailActions } from '../components/QuotationDetailActions'
 import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationSummaryCard } from '../components/QuotationSummaryCard'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
@@ -84,7 +84,7 @@ export function CotizacionDetailPage() {
         createdAt={data.createdAt}
         expiresAt={data.expiresAt}
       />
-      <QuotationPdfActions quotationId={data.id} quotationCode={data.code} />
+      <QuotationDetailActions quotationId={data.id} quotationCode={data.code} />
       <QuotationSummaryCard quotation={data} />
       <QuotationItemsSection
         items={data.items}

@@ -27,3 +27,9 @@ export function getApiErrorMessage(error: unknown, fallback: string): string {
 export function isNotFoundError(error: unknown): boolean {
   return isAxiosError(error) && error.response?.status === 404
 }
+
+/** `true` si el error es un 412 (precondition failed). Para distinguir el conflicto de
+ * optimistic locking ("otro usuario editó primero") y ofrecer recargar antes de reintentar. */
+export function isPreconditionFailedError(error: unknown): boolean {
+  return isAxiosError(error) && error.response?.status === 412
+}
