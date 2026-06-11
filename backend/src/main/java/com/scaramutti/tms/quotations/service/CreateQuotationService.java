@@ -1,0 +1,161 @@
+package com.scaramutti.tms.quotations.service;
+
+import com.scaramutti.tms.auth.dto.UserResponse;
+import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
+import com.scaramutti.tms.auth.security.CurrentUser;
+import com.scaramutti.tms.quotations.QuotationsError;
+import com.scaramutti.tms.quotations.dto.QuotationResponse;
+import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
+import com.scaramutti.tms.quotations.mapper.QuotationServiceMapper;
+import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
+import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
+import com.scaramutti.tms.shared.entity.Quotation;
+import com.scaramutti.tms.shared.entity.QuotationItem;
+import com.scaramutti.tms.shared.entity.User;
+import com.scaramutti.tms.shared.repository.QuotationItemRepository;
+import com.scaramutti.tms.shared.repository.QuotationRepository;
+import com.scaramutti.tms.shared.repository.UserRepository;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.inject.Inject;
+import jakarta.persistence.PersistenceException;
+import jakarta.transaction.Transactional;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.hibernate.exception.ConstraintViolationException;
+import org.jboss.logging.Logger;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * Facade del flow de creacion de cotizacion. Orquesta entre:
+ *  - QuotationDependencyLoaderService (precarga de entities relacionadas)
+ *  - QuotationValidatorService (reglas de negocio)
+ *  - QuotationCodeGeneratorService (secuencia anual con advisory lock)
+ *  - QuotationCalculatorService (totales)
+ *  - QuotationResponseAssemblerService (composicion del response jerarquico)
+ *  - Repositorios (persistencia)
+ *
+ * Flow:
+ *  1. Resolver usuario actual (created_by/updated_by).
+ *  2. Precargar entities relacionadas (delegado a QuotationDependencyLoaderService).
+ *  3. Validar reglas de negocio (QuotationValidatorService).
+ *  4. Detectar duplicate anti doble-click (anti-spam window).
+ *  5. Calcular totales (QuotationCalculatorService).
+ *  6. Generar code (QuotationCodeGeneratorService — advisory lock + MAX en tx).
+ *  7. Persistir header + items + standby_costs (atomico via @Transactional).
+ *  8. Componer y devolver QuotationResponse (delegado a QuotationResponseAssemblerService).
+ */
+@ApplicationScoped
+public class CreateQuotationService {
+
+    private static final Logger LOG = Logger.getLogger(CreateQuotationService.class);
+
+    @ConfigProperty(name = "app.quotations.anti-duplicate-window-seconds")
+    int antiDuplicateWindowSeconds;
+
+    // Repos especificos del modulo (persistencia de la propia entity de quotation).
+    @Inject QuotationRepository quotationRepository;
+    @Inject QuotationItemRepository quotationItemRepository;
+    @Inject UserRepository userRepository;
+
+    // Services del modulo Quotations (cada uno con SRP, ver bitacora).
+    @Inject QuotationDependencyLoaderService dependencyLoader;
+    @Inject QuotationCodeGeneratorService codeGenerator;
+    @Inject QuotationValidatorService validator;
+    @Inject QuotationCalculatorService calculator;
+    @Inject QuotationItemPersistenceService itemPersistence;
+    @Inject QuotationResponseAssemblerService assembler;
+    @Inject AuthServiceMapper authServiceMapper;
+    @Inject QuotationServiceMapper quotationServiceMapper;
+
+    @Inject CurrentUser currentUser;
+
+    @Transactional
+    public QuotationResponse createQuotation(SaveQuotationCommand command) {
+        Integer userId = currentUser.requireId();
+
+        LoadedDependencies deps = dependencyLoader.loadFor(command);
+
+        validator.validate(command, deps.serviceTypesById());
+
+        // Lock por (createdBy, clientId) ANTES del check anti-duplicado para
+        // cerrar la ventana TOCTOU: dos POST simultaneos del mismo usuario+cliente
+        // quedan serializados aca, asi el segundo ve persistido al primero.
+        // Se libera al commit/rollback de la tx (advisory_xact_lock).
+        quotationRepository.acquireAntiDuplicateLock(userId, command.clientId());
+
+        rejectIfRecentDuplicate(command, userId);
+
+        QuotationCalculatorService.Totals totals = calculator.calculate(command.items());
+
+        String code = codeGenerator.nextCode();
+
+        Quotation quotation = persistQuotation(command, code, userId);
+        List<QuotationItem> persistedItems = itemPersistence.persistItems(command, quotation);
+        Map<Long, QuotationStandbyCostResponse> standbyByItemId =
+            itemPersistence.persistStandbyCosts(command, quotation, persistedItems);
+
+        User user = userRepository.findById(userId);
+        UserResponse currentUserResponse = authServiceMapper.toUserResponse(user);
+        // En CREATE, createdBy == updatedBy y la cotizacion recien-creada NO esta
+        // expirada (isExpired siempre false al instante). El assembler recibe ambos
+        // explicitamente para que pueda ser reusado en UPDATE/GET sin cambiar firma.
+        return assembler.assemble(
+            quotation, persistedItems, standbyByItemId, totals, deps,
+            currentUserResponse, currentUserResponse, false
+        );
+    }
+
+    // ---------- Anti-duplicado -----------------------------------------------
+
+    private void rejectIfRecentDuplicate(SaveQuotationCommand command, Integer userId) {
+        List<Quotation> recent = quotationRepository.findRecentByCreatedByAndClient(
+            userId, command.clientId(), antiDuplicateWindowSeconds
+        );
+        if (recent.isEmpty()) return;
+
+        Set<Integer> incomingTypes = new HashSet<>();
+        for (SaveQuotationCommand.Item item : command.items()) {
+            if (item.serviceTypeId() != null) incomingTypes.add(item.serviceTypeId());
+        }
+
+        List<Long> recentIds = recent.stream().map(q -> q.id).toList();
+        Set<Integer> recentTypes = quotationItemRepository.serviceTypeIdsForQuotations(recentIds);
+
+        if (recentTypes.containsAll(incomingTypes)) {
+            LOG.warnf("Anti-duplicate triggered: createdBy=%d clientId=%d incomingTypes=%s recentTypes=%s recentCount=%d",
+                userId, command.clientId(), incomingTypes, recentTypes, recent.size());
+            throw QuotationsError.DUPLICATE_DETECTED.toException();
+        }
+    }
+
+    // ---------- Persistencia -------------------------------------------------
+
+    private Quotation persistQuotation(SaveQuotationCommand command, String code, Integer userId) {
+        // Mapeo Command → Entity delegado al mapper (consistente con
+        // ClientServiceMapper.toClientEntity / CargoTypeServiceMapper.toCargoTypeEntity).
+        // El mapper setea status=DRAFT como constant + quotationType enum→name +
+        // createdBy/updatedBy = userId.
+        Quotation q = quotationServiceMapper.toQuotationEntity(command, code, userId);
+        try {
+            quotationRepository.persist(q);
+            quotationRepository.flush();
+        } catch (PersistenceException ex) {
+            ConstraintViolationException cve = extractConstraintViolation(ex);
+            if (cve != null && cve.getConstraintName() != null && cve.getConstraintName().contains("code")) {
+                LOG.warnf("Race condition: UNIQUE code violation [code=%s]", code);
+                throw QuotationsError.DUPLICATE_CODE.toException();
+            }
+            throw ex;
+        }
+        return q;
+    }
+
+    private ConstraintViolationException extractConstraintViolation(PersistenceException ex) {
+        if (ex instanceof ConstraintViolationException cve) return cve;
+        Throwable cause = ex.getCause();
+        return (cause instanceof ConstraintViolationException cve) ? cve : null;
+    }
+}

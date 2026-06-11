@@ -1,0 +1,1834 @@
+openapi: 3.1.0
+
+info:
+  title: Scaramutti TMS API
+  version: 1.0.0
+  contact:
+    name: Equipo Scaramutti TMS
+    email: ascaramutti@hotmail.com
+  description: |
+    API del sistema de gestión Scaramutti TMS. Cubre autenticación, módulo de
+    cotizaciones y catálogos compartidos.
+
+    ## Convenciones generales
+
+    - **Versionado**: en URL `/api/v1/...`. Cambios breaking suben mayor (`v2`).
+      Endpoints obsoletos llevan `deprecated: true` y header `Sunset` con la fecha de retiro.
+    - **Autenticación**: JWT en header `Authorization: Bearer <token>`. Todos los endpoints
+      requieren auth excepto los marcados con `security: []` (ej: `/auth/login`).
+    - **Errores**: formato Problem Details (RFC 7807). Incluyen `traceId` para correlacionar
+      con logs. Errores de validación incluyen array `errors` por campo.
+    - **Paginación**: `?page=0&size=20`. Respuesta incluye `content` + metadatos
+      (`totalElements`, `totalPages`, `numberOfElements`, `first`, `last`, `empty`).
+    - **Ordenamiento**: `?sort=campo,asc|desc`. Repetible para múltiples campos.
+    - **Idioma**: español (es-PE). Las respuestas no son multi-idioma.
+    - **Timezone**: todos los timestamps en UTC, formato ISO 8601 con offset `Z`.
+    - **Decimales**: punto como separador. Precios con 2 decimales.
+    - **Naming**: snake_case en BD, camelCase en JSON. IDs en request como `entidadId`,
+      en response como objeto embebido `entidad: { id, ... }` o `entidad: { id, name, ... }` (Ref).
+
+    ## Idempotencia y concurrencia
+
+    - **POST**: acepta header `Idempotency-Key` (UUID). El servidor garantiza que dos
+      requests con la misma key producen la misma respuesta (segura para retries).
+    - **PUT/PATCH/DELETE**: acepta header `If-Match` con el `version` del recurso para
+      optimistic locking. Si el recurso fue modificado, responde `412 Precondition Failed`.
+
+    ## Roles
+
+    Cinco roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`.
+    `dispatcher` (Coordinador de Operaciones) por ahora no tiene endpoints accesibles; queda
+    reservado para integracion futura con el modulo de servicios de la app legacy.
+    Cada operación documenta los roles permitidos en `x-required-roles`.
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local (dev y prod). El URL real se inyecta en cada cliente vía variable de entorno.
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Auth
+    description: Autenticación y gestión de sesión
+  - name: Quotations
+    description: Cotizaciones — CRUD, listado con filtros, generación de PDF
+  - name: Clients
+    description: Clientes — búsqueda, creación al vuelo, edición y desactivación
+  - name: CargoTypes
+    description: Tipos de carga con dimensiones estándar — CRUD completo (admin/operaciones)
+  - name: Catalogs
+    description: Catálogos simples de referencia — monedas, términos de pago, tipos de servicio
+  - name: Settings
+    description: Configuración del sistema (condiciones estándar, defaults)
+  - name: Health
+    description: Endpoints de salud y monitoreo
+
+# =============================================================================
+paths:
+# =============================================================================
+
+  # ----- Auth ----------------------------------------------------------------
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Iniciar sesión
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+            example:
+              username: lcampos
+              password: 'P@ssw0rd123'
+      responses:
+        '200':
+          description: Login exitoso
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400':
+          description: Solicitud inválida (campos faltantes o mal formados)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                loginValidation:
+                  summary: Credenciales mal formadas
+                  value:
+                    type: 'urn:tms:error:com-001'
+                    title: 'Validation failed'
+                    status: 400
+                    detail: 'La solicitud contiene errores de validación'
+                    instance: '/api/v1/auth/login'
+                    code: 'COM-001'
+                    traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+                    errors:
+                      - field: 'username'
+                        message: 'no debe estar vacío'
+                        code: 'REQUIRED'
+                      - field: 'password'
+                        message: 'debe tener al menos 8 caracteres'
+                        code: 'MIN_LENGTH'
+        '401':
+          description: Credenciales inválidas
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                invalidCredentials:
+                  summary: Usuario o contraseña incorrectos
+                  value:
+                    type: 'urn:tms:error:auth-001'
+                    title: 'Invalid credentials'
+                    status: 401
+                    detail: 'Usuario o contraseña incorrectos'
+                    instance: '/api/v1/auth/login'
+                    code: 'AUTH-001'
+                    traceId: '3a8b1c5d-7e2f-4a9b-8c3d-6e1f4a5b7c2d'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshToken
+      summary: Renovar token de acceso
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshRequest' }
+      responses:
+        '200':
+          description: Token renovado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
+        '401':
+          description: Refresh token inválido o expirado
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                refreshTokenExpired:
+                  summary: Refresh token expirado (requiere re-login)
+                  value:
+                    type: 'urn:tms:error:auth-007'
+                    title: 'Refresh token expired'
+                    status: 401
+                    detail: 'El refresh token expiró. Volver a hacer login.'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-009'
+                    traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
+                refreshTokenInvalid:
+                  summary: Refresh token mal formado o ya revocado
+                  value:
+                    type: 'urn:tms:error:auth-008'
+                    title: 'Invalid refresh token'
+                    status: 401
+                    detail: 'Refresh token inválido o revocado'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-003'
+                    traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Cambiar contraseña del usuario actual
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
+      responses:
+        '204':
+          description: Contraseña actualizada
+        '400':
+          description: Validación de contraseña fallida
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                passwordValidation:
+                  summary: La nueva contraseña no cumple los requisitos
+                  value:
+                    type: 'urn:tms:error:com-001'
+                    title: 'Validation failed'
+                    status: 400
+                    detail: 'La solicitud contiene errores de validación'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'COM-001'
+                    traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
+                    errors:
+                      - field: 'newPassword'
+                        message: 'debe tener al menos 8 caracteres'
+                        code: 'MIN_LENGTH'
+                wrongCurrentPassword:
+                  summary: La contraseña actual es incorrecta
+                  value:
+                    type: 'urn:tms:error:auth-004'
+                    title: 'Wrong current password'
+                    status: 400
+                    detail: 'La contraseña actual proporcionada es incorrecta'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-004'
+                    traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getCurrentUser
+      summary: Obtener datos del usuario autenticado
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserResponse' }
+
+  # ----- Quotations ----------------------------------------------------------
+
+  /quotations:
+    get:
+      tags: [Quotations]
+      operationId: listQuotations
+      summary: Listar cotizaciones con búsqueda y filtros
+      description: |
+        Listado paginado de cotizaciones. Todos los filtros son opcionales y se
+        combinan con AND. Orden fijo: `createdAt` descendente (más recientes primero).
+
+        `totalAmount` e `itemsCount` se calculan en runtime desde los ítems
+        (no se persisten). `itemsCount` cuenta solo ítems root (los hijos del
+        Servicio Integral no cuentan). Un listado sin resultados devuelve `200`
+        con `content: []` (no 404).
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: q
+          in: query
+          description: |
+            Búsqueda libre con coincidencia parcial sobre: `code`, `client.name`,
+            `client.ruc`, `origin`, `destination`. Usa pg_trgm para fuzzy matching.
+            Mínimo 3 caracteres.
+          schema: { type: string, minLength: 3, maxLength: 255 }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/QuotationStatus' }
+        - name: quotationType
+          in: query
+          schema: { $ref: '#/components/schemas/QuotationType' }
+        - name: clientId
+          in: query
+          schema: { type: integer }
+        - name: createdById
+          in: query
+          schema: { type: integer }
+        - name: currencyId
+          in: query
+          schema: { type: integer }
+        - name: cargoTypeId
+          in: query
+          description: Filtra cotizaciones que tengan al menos un ítem (root o hijo) con este cargo type
+          schema: { type: integer }
+        - name: serviceTypeId
+          in: query
+          description: Filtra cotizaciones que tengan al menos un ítem (root o hijo) con este service type
+          schema: { type: integer }
+        - name: dateFrom
+          in: query
+          description: 'Filtro por `createdAt` desde (ISO date, inclusivo). Interpretado en zona horaria de Lima (UTC-5).'
+          schema: { type: string, format: date }
+        - name: dateTo
+          in: query
+          description: 'Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Interpretado en zona horaria de Lima (UTC-5).'
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Listado paginado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfQuotationSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Quotations]
+      operationId: createQuotation
+      summary: Crear cotización
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotationRequest' }
+      responses:
+        '201':
+          description: Creada
+          headers:
+            Location:
+              description: URL del recurso creado
+              schema: { type: string }
+            ETag:
+              description: Versión del recurso (para optimistic locking)
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /quotations/config:
+    get:
+      tags: [Quotations]
+      operationId: getQuotationConfig
+      summary: Configuración pública del módulo de cotizaciones
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      description: |
+        Devuelve constantes runtime del módulo (IGV vigente, máximo de ítems
+        root, validez por defecto). El frontend lo usa para precargar el
+        wizard y mostrar previews sin hardcodear los valores.
+
+        Backend responde desde `app.quotations.*` properties + constantes del
+        validator. Cacheable agresivamente (cambia raramente).
+      responses:
+        '200':
+          description: Config vigente
+          headers:
+            Cache-Control:
+              description: |
+                Cache 1 hora privada. `private` indica que solo el browser del
+                usuario puede cachear (no proxies / CDN compartidos).
+              schema: { type: string, example: 'max-age=3600, private' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationConfigResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /quotations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdLong'
+    get:
+      tags: [Quotations]
+      operationId: getQuotation
+      summary: Obtener detalle de una cotización
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      description: |
+        Devuelve la cotización completa: cabecera + items (jerárquicos
+        con `children` del Servicio Integral) + totales calculados +
+        `expiresAt` computado + `isExpired` flag runtime (`now() > expiresAt`).
+
+        **`isExpired`** se recomputa en cada GET (no se cachea server-side).
+        El cliente NO debe persistir el valor — el flag puede cambiar entre
+        requests consecutivos si la cotización venció en el medio.
+
+        **Totales** recalculados desde items: subtotal por item root, IGV
+        usando el snapshot `item.igvPercentage` persistido (no el config
+        actual) — preserva integridad del documento firmado.
+
+        El header `ETag` viene con el `updatedAt` del recurso — el cliente
+        puede usarlo para futuros `PUT/PATCH` con `If-Match` (optimistic
+        locking). Mismo formato exacto que el ETag del POST.
+      responses:
+        '200':
+          description: OK
+          headers:
+            ETag:
+              description: Versión del recurso (mismo valor que `updatedAt` del body).
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Quotations]
+      operationId: updateQuotation
+      summary: Reemplazar cotización completa (incluye items y standby)
+      description: |
+        Edita una cotización existente (reemplazo completo). Reusa `QuotationRequest`
+        (mismo body que el POST), con dos diferencias de comportamiento:
+
+        - **Campos inmutables**: `quotationType` y `clientId` deben coincidir con los
+          valores actuales de la cotización. Si el body los cambia → **400 (QUO-004)**.
+          El `code`, `createdBy`, `createdAt` y `status` se preservan (no se envían
+          en el request).
+        - **Items**: se reemplaza la lista completa — los items y standby anteriores
+          se borran y se insertan los del request.
+
+        Requiere `If-Match` con el ETag vigente (optimistic locking): si la cotización
+        fue modificada desde que se leyó → **412 (COM-004)**; recargar antes de reintentar.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotationRequest' }
+      responses:
+        '200':
+          description: Actualizada
+          headers:
+            ETag:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '400':
+          description: Validación de reglas de negocio o intento de modificar un campo inmutable
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                validationFailed:
+                  summary: Regla de negocio violada (ej. falta origin en TRANSPORTE, más de 5 items root)
+                  value:
+                    type: 'urn:tms:error:com-001'
+                    title: 'Validation failed'
+                    status: 400
+                    detail: 'La solicitud contiene errores de validación'
+                    instance: '/api/v1/quotations/142'
+                    code: 'COM-001'
+                    traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+                immutableField:
+                  summary: Intento de cambiar quotationType o clientId (inmutables al editar)
+                  value:
+                    type: 'urn:tms:error:quo-004'
+                    title: 'Bad Request'
+                    status: 400
+                    detail: 'El tipo de cotizacion no puede modificarse'
+                    instance: '/api/v1/quotations/142'
+                    code: 'QUO-004'
+                    traceId: '9f5a3b1c-2d4e-6f8a-0b1c-3d5e7f9a1b2c'
+        '404': { $ref: '#/components/responses/NotFound' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+    delete:
+      tags: [Quotations]
+      operationId: deleteQuotation
+      summary: Eliminar cotización
+      description: Acción restringida — solo `admin`, `general_manager` y `operations_manager`. Vendedores no pueden eliminar.
+      x-required-roles: [admin, general_manager, operations_manager]
+      responses:
+        '204':
+          description: Eliminada
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /quotations/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/IdLong'
+    patch:
+      tags: [Quotations]
+      operationId: updateQuotationStatus
+      summary: 'Cambiar el estado de una cotización (ej: marcar como enviada)'
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: '#/components/schemas/QuotationStatus' }
+      responses:
+        '200':
+          description: Estado actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /quotations/{id}/pdf:
+    parameters:
+      - $ref: '#/components/parameters/IdLong'
+    get:
+      tags: [Quotations]
+      operationId: downloadQuotationPdf
+      summary: Descargar o previsualizar el PDF de la cotización
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - name: preview
+          in: query
+          description: 'Si `true`, sirve inline (Content-Disposition inline). Si `false` o se omite, fuerza descarga.'
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: PDF generado
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="cotizacion-2026-00042.pdf"` o `inline` según `?preview`'
+              schema: { type: string }
+            ETag:
+              description: Hash del contenido para caching
+              schema: { type: string }
+            Last-Modified:
+              schema: { type: string }
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+        '304':
+          description: No modificado (cache hit por If-None-Match)
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Catalogs: Clients ---------------------------------------------------
+
+  /clients:
+    get:
+      tags: [Clients]
+      operationId: listClients
+      summary: Buscar clientes (paginado por volumen)
+      description: |
+        Listado paginado de clientes. Filtra por substring case-insensitive en
+        `name` y `ruc` cuando se envía `q` (ILIKE acelerado por GIN trgm).
+        Default sort: `name ASC`. Cuando hay `q`, ranking primario por
+        `similarity(name|ruc, q) DESC`, tiebreak `name ASC`.
+        Para no filtrar, OMITIR el parámetro `q` (no enviarlo vacío).
+        Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
+      parameters:
+        - name: q
+          in: query
+          description: Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+          schema: { type: string, minLength: 3, maxLength: 200 }
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfClient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [Clients]
+      operationId: createClient
+      summary: Crear cliente al vuelo
+      x-required-roles: [admin, general_manager, sales, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /clients/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    get:
+      tags: [Clients]
+      operationId: getClient
+      summary: Obtener cliente por ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Clients]
+      operationId: updateClient
+      summary: Actualizar cliente
+      x-required-roles: [admin, general_manager, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClientRequest' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Clients]
+      operationId: deleteClient
+      summary: Desactivar cliente (soft delete via `isActive=false`)
+      x-required-roles: [admin, general_manager]
+      responses:
+        '204':
+          description: Desactivado
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Catalogs: Currencies ------------------------------------------------
+
+  /currencies:
+    get:
+      tags: [Catalogs]
+      operationId: listCurrencies
+      summary: Listar monedas (sin paginar — pocos registros)
+      parameters:
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/CurrencyResponse' }
+    post:
+      tags: [Catalogs]
+      operationId: createCurrency
+      summary: Crear moneda
+      x-required-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CurrencyRequest' }
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrencyResponse' }
+
+  /currencies/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    put:
+      tags: [Catalogs]
+      operationId: updateCurrency
+      summary: Actualizar moneda
+      x-required-roles: [admin]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CurrencyRequest' }
+      responses:
+        '200':
+          description: Actualizada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrencyResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Catalogs: Cargo Types -----------------------------------------------
+
+  /cargo-types:
+    get:
+      tags: [CargoTypes]
+      operationId: listCargoTypes
+      summary: Buscar tipos de carga (paginado por volumen)
+      description: |
+        Listado paginado de tipos de carga. Filtra por substring case-insensitive
+        en `name` cuando se envía `q` (ILIKE acelerado por GIN trgm).
+        Default sort: `name ASC`. Cuando hay `q`, ranking primario por
+        `similarity(name, q) DESC`, tiebreak `name ASC`.
+        Para no filtrar, OMITIR el parámetro `q` (no enviarlo vacío).
+        Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
+      parameters:
+        - name: q
+          in: query
+          description: Búsqueda libre por nombre (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+          schema: { type: string, minLength: 3, maxLength: 200 }
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfCargoType' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      tags: [CargoTypes]
+      operationId: createCargoType
+      summary: Crear tipo de carga al vuelo
+      description: |
+        Crea un tipo de carga al vuelo desde el wizard de cotizaciones. El `name`
+        se almacena en mayúsculas (trim + toUpperCase). Si ya existe un tipo
+        con el mismo `name` (case-insensitive efectivo), devuelve 409 CGT-001.
+      x-required-roles: [admin, general_manager, sales, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CargoTypeRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CargoTypeResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /cargo-types/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    get:
+      tags: [CargoTypes]
+      operationId: getCargoType
+      summary: Obtener tipo de carga por ID
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CargoTypeResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [CargoTypes]
+      operationId: updateCargoType
+      summary: Actualizar tipo de carga
+      x-required-roles: [admin, general_manager, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CargoTypeRequest' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CargoTypeResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [CargoTypes]
+      operationId: deleteCargoType
+      summary: Desactivar tipo de carga
+      x-required-roles: [admin, general_manager]
+      responses:
+        '204':
+          description: Desactivado
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Catalogs: Quotation Service Types -----------------------------------
+
+  /quotation-service-types:
+    get:
+      tags: [Catalogs]
+      operationId: listQuotationServiceTypes
+      summary: Listar tipos de servicio cotizables
+      description: |
+        Devuelve el catálogo completo (24 entradas fijas). El campo `kind` viene
+        en cada item para que el frontend filtre en memoria según el
+        `quotation_type` elegido en el wizard. NO se ofrece filtro server-side
+        por kind porque el catálogo es chico y se cachea en el cliente.
+      parameters:
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+    post:
+      tags: [Catalogs]
+      operationId: createQuotationServiceType
+      summary: Crear tipo de servicio cotizable
+      x-required-roles: [admin, general_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotationServiceTypeRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+
+  /quotation-service-types/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    put:
+      tags: [Catalogs]
+      operationId: updateQuotationServiceType
+      summary: Actualizar tipo de servicio cotizable
+      x-required-roles: [admin, general_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuotationServiceTypeRequest' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Catalogs: Payment Terms ---------------------------------------------
+
+  /payment-terms:
+    get:
+      tags: [Catalogs]
+      operationId: listPaymentTerms
+      summary: Listar términos de pago
+      parameters:
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/PaymentTermResponse' }
+    post:
+      tags: [Catalogs]
+      operationId: createPaymentTerm
+      summary: Crear término de pago
+      x-required-roles: [admin, general_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentTermRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentTermResponse' }
+
+  /payment-terms/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    put:
+      tags: [Catalogs]
+      operationId: updatePaymentTerm
+      summary: Actualizar término de pago
+      x-required-roles: [admin, general_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PaymentTermRequest' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PaymentTermResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Settings ------------------------------------------------------------
+
+  /system-settings:
+    get:
+      tags: [Settings]
+      operationId: listSystemSettings
+      summary: Listar todos los settings
+      x-required-roles: [admin, general_manager]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SystemSettingResponse' }
+
+  /system-settings/{key}:
+    parameters:
+      - name: key
+        in: path
+        required: true
+        schema:
+          type: string
+          example: quotation_default_validity_days
+    get:
+      tags: [Settings]
+      operationId: getSystemSetting
+      summary: Obtener un setting por clave
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemSettingResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Settings]
+      operationId: updateSystemSetting
+      summary: Actualizar valor de un setting
+      x-required-roles: [admin, general_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: { type: string }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SystemSettingResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Health --------------------------------------------------------------
+
+  /health:
+    get:
+      tags: [Health]
+      operationId: getHealth
+      summary: Estado del servicio
+      security: []
+      responses:
+        '200':
+          description: Servicio sano
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: UP }
+                  timestamp: { type: string, format: date-time }
+
+# =============================================================================
+components:
+# =============================================================================
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT firmado con HS256/RS256. Claims esperados:
+        `sub` (userId), `username`, `role`, `iat`, `exp`.
+
+  parameters:
+    IdLong:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+    IdInt:
+      name: id
+      in: path
+      required: true
+      schema: { type: integer, format: int32 }
+    Page:
+      name: page
+      in: query
+      description: Página (base 0)
+      schema: { type: integer, default: 0, minimum: 0 }
+    Size:
+      name: size
+      in: query
+      description: Tamaño de página (máx. 100)
+      schema: { type: integer, default: 20, minimum: 1, maximum: 100 }
+    Sort:
+      name: sort
+      in: query
+      description: 'Campo y dirección, formato `campo,asc|desc`. Repetible para múltiples campos.'
+      schema:
+        type: array
+        items: { type: string }
+      example: ['createdAt,desc']
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      description: UUID único por operación. Garantiza que reintentos no dupliquen recursos.
+      schema: { type: string, format: uuid }
+    IfMatch:
+      name: If-Match
+      in: header
+      description: ETag/version del recurso para optimistic locking.
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Solicitud inválida (validación, formato, valores fuera de rango)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            validationFailed:
+              summary: Errores de validación por campo
+              value:
+                type: 'urn:tms:error:com-001'
+                title: 'Validation failed'
+                status: 400
+                detail: 'La solicitud contiene errores de validación'
+                instance: '/api/v1/quotations'
+                code: 'COM-001'
+                traceId: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+                errors:
+                  - field: 'items[0].unitPrice'
+                    message: 'debe ser mayor a 0'
+                    code: 'MIN_VALUE'
+                  - field: 'origin'
+                    message: 'requerido cuando quotationType=TRANSPORTE'
+                    code: 'REQUIRED'
+            invalidEnum:
+              summary: Valor de enum inválido
+              value:
+                type: 'urn:tms:error:com-001'
+                title: 'Validation failed'
+                status: 400
+                detail: "Valor 'OTRO' no es válido para quotationType (esperado: TRANSPORTE | ALQUILER)"
+                instance: '/api/v1/quotations'
+                code: 'COM-002'
+                traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
+    Unauthorized:
+      description: Token de acceso ausente, expirado o inválido
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            tokenExpired:
+              summary: Token de acceso expirado
+              value:
+                type: 'urn:tms:error:auth-007'
+                title: 'Token expired'
+                status: 401
+                detail: 'El token de acceso expiró. Use /auth/refresh para renovarlo.'
+                instance: '/api/v1/quotations'
+                code: 'AUTH-007'
+                traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
+            tokenInvalid:
+              summary: Token mal formado o no firmado por este servidor
+              value:
+                type: 'urn:tms:error:auth-008'
+                title: 'Token invalid'
+                status: 401
+                detail: 'El token de acceso es inválido'
+                instance: '/api/v1/quotations'
+                code: 'AUTH-008'
+                traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+            tokenMissing:
+              summary: No se envió header Authorization
+              value:
+                type: 'urn:tms:error:auth-006'
+                title: 'Token missing'
+                status: 401
+                detail: 'Falta el header Authorization con un token Bearer'
+                instance: '/api/v1/quotations'
+                code: 'AUTH-006'
+                traceId: '4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d'
+    Forbidden:
+      description: Autenticado pero sin permisos para esta operación
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            insufficientRole:
+              summary: Rol insuficiente para la operación
+              value:
+                type: 'urn:tms:error:com-003'
+                title: 'Forbidden'
+                status: 403
+                detail: 'El rol sales no puede eliminar cotizaciones'
+                instance: '/api/v1/quotations/142'
+                code: 'COM-003'
+                traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
+    NotFound:
+      description: Recurso no encontrado
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            quotationNotFound:
+              summary: Cotización inexistente
+              value:
+                type: 'urn:tms:error:quo-003'
+                title: 'Resource not found'
+                status: 404
+                detail: 'La cotización con id 999 no existe'
+                instance: '/api/v1/quotations/999'
+                code: 'QUO-003'
+                traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+    Conflict:
+      description: Conflicto (recurso ya existe, restricción de unicidad violada)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            duplicateRuc:
+              summary: RUC duplicado al crear cliente
+              value:
+                type: 'urn:tms:error:cli-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe un cliente con RUC 20123456789'
+                instance: '/api/v1/clients'
+                code: 'CLI-001'
+                traceId: '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a'
+            duplicateClientName:
+              summary: Nombre de cliente duplicado al crear cliente
+              value:
+                type: 'urn:tms:error:cli-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe un cliente con el nombre Acme Corp'
+                instance: '/api/v1/clients'
+                code: 'CLI-002'
+                traceId: '5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b'
+            duplicateQuotationCode:
+              summary: Código de cotización duplicado (race condition extrema sobre el advisory lock)
+              value:
+                type: 'urn:tms:error:quo-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'El código 2026-00042 ya está en uso, reintente'
+                instance: '/api/v1/quotations'
+                code: 'QUO-001'
+                traceId: '7e8f9a0b-1c2d-3e4f-5a6b-7c8d9e0f1a2b'
+            duplicateQuotationDetected:
+              summary: Cotización duplicada detectada (protección anti doble-click backend-side)
+              value:
+                type: 'urn:tms:error:quo-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Se detectó una cotización idéntica creada hace menos de 30 segundos'
+                instance: '/api/v1/quotations'
+                code: 'QUO-002'
+                traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
+    PreconditionFailed:
+      description: Optimistic lock — el recurso fue modificado desde que se leyó
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          examples:
+            staleVersion:
+              summary: Versión obsoleta (otro usuario editó primero)
+              value:
+                type: 'urn:tms:error:com-004'
+                title: 'Precondition failed'
+                status: 412
+                detail: 'El recurso fue modificado por otro usuario. Recargue antes de editar.'
+                instance: '/api/v1/quotations/142'
+                code: 'COM-004'
+                traceId: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+
+  schemas:
+
+    # -------- Errores RFC 7807 ---------------------------------------------
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI que identifica el tipo de error (ver catálogo de errores)
+          example: 'urn:tms:error:validation-failed'
+        title:    { type: string, example: 'Validation failed' }
+        status:   { type: integer, example: 400 }
+        detail:
+          type: [string, 'null']
+          example: 'El campo "code" no debe estar vacío'
+        instance:
+          type: [string, 'null']
+          example: '/api/v1/quotations'
+        code:
+          type: [string, 'null']
+          description: Código corto del error para que el frontend pueda matchear sin parsear `detail`.
+          example: 'VALIDATION_FAILED'
+        traceId:
+          type: [string, 'null']
+          description: Identificador de la traza para correlacionar con logs.
+          example: '7c4d2f8a-1b3e-4f9a-8c2d-5e7b1a9c3d4f'
+        errors:
+          description: Errores de validación por campo (presente solo cuando aplica).
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:   { type: string, example: 'items[0].unitPrice' }
+              message: { type: string, example: 'debe ser mayor a 0' }
+              code:    { type: [string, 'null'], example: 'MIN_VALUE' }
+
+    # -------- Paginación ----------------------------------------------------
+    PageMeta:
+      type: object
+      required: [page, size, totalElements, totalPages, numberOfElements, first, last, empty]
+      properties:
+        page:              { type: integer, format: int32, example: 0 }
+        size:              { type: integer, format: int32, example: 20 }
+        totalElements:     { type: integer, format: int64, example: 137 }
+        totalPages:        { type: integer, format: int32, example: 7 }
+        numberOfElements:  { type: integer, format: int32, description: 'Cantidad de items en la página actual', example: 20 }
+        first:             { type: boolean, description: '¿Es la primera página?' }
+        last:              { type: boolean, description: '¿Es la última página?' }
+        empty:             { type: boolean, description: '¿La página actual está vacía?' }
+
+    # -------- Enums ---------------------------------------------------------
+    QuotationType:
+      type: string
+      enum: [TRANSPORTE, ALQUILER]
+      description: |
+        - `TRANSPORTE`: requiere `origin` y `destination`. Usa tipos de servicio de transporte y complementarios.
+        - `ALQUILER`: sin ruta. Solo tipos de servicio de alquiler.
+
+    QuotationStatus:
+      type: string
+      enum: [DRAFT, SENT]
+      description: |
+        - `DRAFT`: cotización en edición, no enviada al cliente.
+        - `SENT`: ya enviada al cliente. Editable, pero queda registrado el envío.
+
+        El estado "vencida" se calcula en runtime: `createdAt + validityDays < now()`. No se almacena.
+
+    UserRole:
+      type: string
+      enum: [admin, sales, dispatcher, general_manager, operations_manager]
+
+    # -------- Auth ----------------------------------------------------------
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9._-]+$'
+          example: 'lcampos'
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 100
+
+    LoginResponse:
+      type: object
+      required: [token, expiresAt, expiresIn, user]
+      properties:
+        token:        { type: string, description: 'JWT de acceso' }
+        refreshToken: { type: [string, 'null'], description: 'Token para renovar la sesión sin re-login' }
+        expiresAt:    { type: string, format: date-time }
+        expiresIn:    { type: integer, format: int64, description: 'Segundos hasta expiración del access token', example: 3600 }
+        user:         { $ref: '#/components/schemas/UserResponse' }
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+          minLength: 200
+          maxLength: 4096
+          description: 'JWT firmado emitido previamente por /auth/login o /auth/refresh.'
+
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword: { type: string, format: password, minLength: 8, maxLength: 100 }
+        newPassword:     { type: string, format: password, minLength: 8, maxLength: 100 }
+
+    UserRef:
+      description: Referencia mínima a un usuario (para embeber en respuestas)
+      type: object
+      required: [id, username, fullName]
+      properties:
+        id:       { type: integer, format: int32 }
+        username: { type: string }
+        fullName: { type: string, example: 'Luraidis Campos' }
+        position: { type: [string, 'null'], description: 'Cargo del trabajador (ej: Ejecutiva de Ventas)', example: 'Ejecutiva de Ventas' }
+
+    UserResponse:
+      allOf:
+        - $ref: '#/components/schemas/UserRef'
+        - type: object
+          required: [role, isActive]
+          properties:
+            role:     { $ref: '#/components/schemas/UserRole' }
+            isActive: { type: boolean }
+
+    # -------- Catálogos: Client --------------------------------------------
+    ClientRef:
+      description: |
+        Referencia a un cliente con datos de contacto (live, no snapshot).
+        Si el cliente actualiza sus datos, las cotizaciones existentes verán los
+        nuevos valores en su `client` embebido, excepto `quotations.contactName`
+        (que sí se persiste como snapshot independiente).
+      type: object
+      required: [id, name, ruc]
+      properties:
+        id:          { type: integer, format: int32 }
+        name:        { type: string }
+        ruc:         { type: string, pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
+
+    ClientResponse:
+      allOf:
+        - $ref: '#/components/schemas/ClientRef'
+        - type: object
+          required: [isActive, createdAt]
+          properties:
+            isActive:  { type: boolean }
+            createdAt: { type: string, format: date-time }
+
+    ClientRequest:
+      type: object
+      required: [name, ruc]
+      properties:
+        name:        { type: string, minLength: 1, maxLength: 200 }
+        ruc:         { type: string, pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
+
+    PageOfClient:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/ClientResponse' }
+
+    # -------- Catálogos: Currency ------------------------------------------
+    CurrencyResponse:
+      type: object
+      required: [id, code, symbol, isActive]
+      properties:
+        id:       { type: integer, format: int32 }
+        code:     { type: string, pattern: '^[A-Z]{3}$', example: 'PEN' }
+        symbol:   { type: string, maxLength: 5, example: 'S/' }
+        name:     { type: [string, 'null'], maxLength: 50 }
+        isActive: { type: boolean }
+
+    CurrencyRequest:
+      type: object
+      required: [code, symbol]
+      properties:
+        code:   { type: string, pattern: '^[A-Z]{3}$' }
+        symbol: { type: string, maxLength: 5 }
+        name:   { type: [string, 'null'], maxLength: 50 }
+
+    # -------- Catálogos: CargoType -----------------------------------------
+    CargoTypeRef:
+      type: object
+      required: [id, name]
+      properties:
+        id:   { type: integer, format: int32 }
+        name: { type: string }
+
+    CargoTypeResponse:
+      allOf:
+        - $ref: '#/components/schemas/CargoTypeRef'
+        - type: object
+          required: [standardWeight, isActive]
+          properties:
+            description:    { type: [string, 'null'] }
+            standardWeight: { type: number, format: double, minimum: 0 }
+            standardLength: { type: [number, 'null'], format: double, minimum: 0 }
+            standardWidth:  { type: [number, 'null'], format: double, minimum: 0 }
+            standardHeight: { type: [number, 'null'], format: double, minimum: 0 }
+            isActive:       { type: boolean }
+
+    PageOfCargoType:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/CargoTypeResponse' }
+
+    CargoTypeRequest:
+      type: object
+      required: [name, standardWeight]
+      properties:
+        name:           { type: string, minLength: 1, maxLength: 100 }
+        description:    { type: [string, 'null'] }
+        standardWeight: { type: number, format: double, minimum: 0 }
+        standardLength: { type: [number, 'null'], format: double, minimum: 0 }
+        standardWidth:  { type: [number, 'null'], format: double, minimum: 0 }
+        standardHeight: { type: [number, 'null'], format: double, minimum: 0 }
+
+    # -------- Catálogos: QuotationServiceType ------------------------------
+    QuotationServiceKind:
+      type: string
+      enum: [SERVICIO, ALQUILER, COMPLEMENTARIO, INTEGRAL]
+      description: |
+        Categoría del servicio. El backend la **computa** desde el prefijo del
+        `code` (S→SERVICIO, A→ALQUILER, C→COMPLEMENTARIO, I→INTEGRAL): no es
+        columna en BD. Se expone en el response para que el frontend filtre sin
+        conocer la convención del prefijo.
+
+        Reglas del wizard:
+        - `quotationType=TRANSPORTE` → muestra SERVICIO + COMPLEMENTARIO + INTEGRAL
+        - `quotationType=ALQUILER`   → muestra solo ALQUILER
+
+    QuotationServiceTypeRef:
+      type: object
+      required: [id, code, name, kind]
+      properties:
+        id:   { type: integer, format: int32 }
+        code: { type: string, example: 'SCB' }
+        name: { type: string, example: 'Servicio de transporte en Cama Baja' }
+        kind: { $ref: '#/components/schemas/QuotationServiceKind' }
+
+    QuotationServiceTypeResponse:
+      allOf:
+        - $ref: '#/components/schemas/QuotationServiceTypeRef'
+        - type: object
+          required: [isActive]
+          properties:
+            description: { type: [string, 'null'] }
+            isActive:    { type: boolean }
+
+    QuotationServiceTypeRequest:
+      type: object
+      required: [code, name]
+      properties:
+        code:        { type: string, minLength: 2, maxLength: 10, pattern: '^[A-Z]{2,10}$', description: 'Debe empezar con S/A/C/I según la categoría (ver QuotationServiceKind).' }
+        name:        { type: string, maxLength: 100 }
+        description: { type: [string, 'null'] }
+
+    # -------- Catálogos: PaymentTerm ---------------------------------------
+    PaymentTermResponse:
+      type: object
+      required: [id, name, days, isActive]
+      properties:
+        id:       { type: integer, format: int32 }
+        name:     { type: string, maxLength: 100, example: '30 días' }
+        days:     { type: integer, format: int32, minimum: 0, example: 30 }
+        isActive: { type: boolean }
+
+    PaymentTermRequest:
+      type: object
+      required: [name, days]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        days: { type: integer, format: int32, minimum: 0 }
+
+    # -------- Settings ------------------------------------------------------
+    SystemSettingResponse:
+      type: object
+      required: [key, value, updatedAt]
+      properties:
+        key:       { type: string, example: 'quotation_default_validity_days' }
+        value:     { type: string }
+        updatedAt: { type: string, format: date-time }
+
+    # -------- Cotizaciones --------------------------------------------------
+    QuotationResponse:
+      type: object
+      required:
+        - id
+        - code
+        - quotationType
+        - status
+        - client
+        - currency
+        - validityDays
+        - expiresAt
+        - isExpired
+        - items
+        - totalSubtotal
+        - totalIgv
+        - totalAmount
+        - createdBy
+        - updatedBy
+        - createdAt
+        - updatedAt
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string, example: '2026-00042' }
+        quotationType: { $ref: '#/components/schemas/QuotationType' }
+        status:        { $ref: '#/components/schemas/QuotationStatus' }
+        client:        { $ref: '#/components/schemas/QuotationClientSummary' }
+        contactName:
+          type: [string, 'null']
+          description: 'Snapshot del contacto al momento de cotizar (queda fijo aunque cambie el cliente master).'
+        contactPhone:
+          type: [string, 'null']
+          pattern: '^\d{9}$'
+          description: 'Snapshot del telefono de contacto al momento de cotizar (9 digitos). Queda fijo aunque cambie el cliente master.'
+        currency:      { $ref: '#/components/schemas/QuotationCurrencySummary' }
+        paymentTerm:
+          anyOf:
+            - $ref: '#/components/schemas/QuotationPaymentTermSummary'
+            - type: 'null'
+        tentativeServiceDate: { type: [string, 'null'], format: date }
+        validityDays: { type: integer, minimum: 1, maximum: 365, example: 15 }
+        expiresAt:    { type: string, format: date-time, description: 'createdAt + validityDays (computado)' }
+        isExpired:    { type: boolean, description: 'now() > expiresAt' }
+        origin:       { type: [string, 'null'] }
+        destination:  { type: [string, 'null'] }
+        totalSubtotal: { type: number, format: double, description: 'Suma de items.subtotal' }
+        totalIgv:      { type: number, format: double, description: 'IGV total' }
+        totalAmount:   { type: number, format: double, description: 'Total = subtotal + IGV' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/QuotationItemResponse' }
+        createdBy: { $ref: '#/components/schemas/UserResponse' }
+        updatedBy: { $ref: '#/components/schemas/UserResponse' }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time, description: 'Source de la versión para optimistic locking (mismo valor que el header ETag).' }
+
+    QuotationSummary:
+      description: Versión reducida para el listado
+      type: object
+      required:
+        - id
+        - code
+        - quotationType
+        - status
+        - client
+        - currencyCode
+        - totalAmount
+        - itemsCount
+        - validityDays
+        - isExpired
+        - createdAt
+        - createdBy
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string }
+        quotationType: { $ref: '#/components/schemas/QuotationType' }
+        status:        { $ref: '#/components/schemas/QuotationStatus' }
+        client:        { $ref: '#/components/schemas/QuotationClientSummary' }
+        currencyCode:  { type: string }
+        totalAmount:   { type: number, format: double }
+        itemsCount:    { type: integer, format: int32, description: 'Cantidad de ítems root (no incluye hijos del Servicio Integral)', example: 3 }
+        validityDays:  { type: integer }
+        expiresAt:     { type: string, format: date-time }
+        isExpired:     { type: boolean }
+        origin:        { type: [string, 'null'] }
+        destination:   { type: [string, 'null'] }
+        createdAt:     { type: string, format: date-time }
+        createdBy:     { $ref: '#/components/schemas/UserResponse' }
+
+    PageOfQuotationSummary:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/QuotationSummary' }
+
+    QuotationRequest:
+      description: |
+        ## Reglas de negocio (validadas por backend)
+
+        - **Máximo 5 ítems root** (los hijos del Servicio Integral no cuentan).
+        - **Servicio Integral**: si la cotización tiene un ítem con `serviceType.code='INT'`:
+          - debe ser el primer ítem (`itemNumber=1`),
+          - debe tener al menos **2 ítems hijos** (referenciados vía `parentItemNumber=1`),
+          - los hijos deben incluir al menos **1 servicio de tipo TRANSPORTE (kind=S)** y
+            al menos **1 servicio de tipo COMPLEMENTARIO (kind=C)**,
+          - solo puede haber un Integral por cotización.
+        - **Origen/destino**: requeridos si `quotationType=TRANSPORTE`, ignorados si `ALQUILER`.
+        - **`contactName`**: obligatorio. Snapshot editable. Se precarga desde `client.contactName`
+          en el formulario, pero el usuario puede editarlo. Lo que se guarda es el valor final del
+          formulario, congelado al momento de crear/editar la cotización.
+        - **Anti-duplicado**: el backend rechaza con `409 QUO-002` si llega un POST con
+          mismo `clientId` + mismo set de `serviceTypeId`s + mismo usuario creador dentro
+          de los últimos 30 segundos (protección anti doble-click backend-side).
+      type: object
+      required: [quotationType, clientId, contactName, currencyId, validityDays, items]
+      properties:
+        quotationType:        { $ref: '#/components/schemas/QuotationType' }
+        clientId:             { type: integer, format: int32 }
+        contactName:          { type: string, minLength: 1, maxLength: 200, description: 'Obligatorio — la cotización siempre se dirige a alguien. Snapshot al momento de cotizar (se precarga del cliente, el usuario puede editarlo, queda congelado).' }
+        contactPhone:         { type: [string, 'null'], pattern: '^\d{9}$', description: 'Snapshot editable del telefono de contacto (9 digitos numericos). Se precarga del cliente y queda congelado en la cotización.' }
+        currencyId:           { type: integer, format: int32 }
+        paymentTermId:        { type: [integer, 'null'], format: int32 }
+        tentativeServiceDate: { type: [string, 'null'], format: date }
+        validityDays:         { type: integer, minimum: 1, maximum: 365, example: 15 }
+        origin:
+          type: [string, 'null']
+          description: 'Requerido si `quotationType=TRANSPORTE`. Validado por backend.'
+          maxLength: 255
+        destination:
+          type: [string, 'null']
+          description: 'Requerido si `quotationType=TRANSPORTE`. Validado por backend.'
+          maxLength: 255
+        items:
+          type: array
+          minItems: 1
+          description: 'Lista plana de ítems root e hijos. Los hijos referencian al padre vía `parentItemNumber`. Máximo 5 ítems root (validado por backend).'
+          items: { $ref: '#/components/schemas/QuotationItemRequest' }
+
+    QuotationItemResponse:
+      description: |
+        Ítem de cotización. Puede ser **root** (sin `parentItemId`) o **hijo del Servicio
+        Integral** (con `parentItemId` apuntando al padre).
+
+        **Pricing según tipo:**
+        - Ítems root: `unitPrice` es el precio que paga el cliente, IGV calculado al 18%.
+        - Hijos del Integral: `unitPrice` no aplica (siempre 0); usan `internalReferencePrice`
+          opcional, que es referencia histórica interna y NO se muestra en el PDF al cliente.
+          La suma de referencias de hijos puede exceder el precio del padre (es el descuento
+          implícito del paquete Integral).
+      type: object
+      required: [id, itemNumber, displayLabel, serviceType, quantity, igvPercentage, subtotal]
+      properties:
+        id:             { type: integer, format: int64 }
+        parentItemId:
+          type: [integer, 'null']
+          format: int64
+          description: 'NULL para ítems root. Set para ítems hijos del Servicio Integral.'
+        itemNumber:     { type: integer, format: int32 }
+        displayLabel:
+          type: string
+          description: 'Numeración de presentación jerárquica: root "1","2"; hijo del Integral "1.a","1.b". Derivada de itemNumber + jerarquía, NO persistida. El frontend la muestra; itemNumber sigue siendo la numeración técnica (plana, contigua).'
+        serviceType:    { $ref: '#/components/schemas/QuotationServiceTypeSummary' }
+        cargoType:
+          anyOf:
+            - $ref: '#/components/schemas/QuotationCargoTypeSummary'
+            - type: 'null'
+        observations:   { type: [string, 'null'] }
+        weightKg:       { type: [number, 'null'], format: double, minimum: 0 }
+        lengthMeters:   { type: [number, 'null'], format: double, minimum: 0 }
+        widthMeters:    { type: [number, 'null'], format: double, minimum: 0 }
+        heightMeters:   { type: [number, 'null'], format: double, minimum: 0 }
+        quantity:       { type: integer, minimum: 1 }
+        unitPrice:
+          type: number
+          format: double
+          minimum: 0
+          description: 'Precio unitario que paga el cliente. Aplica solo para ítems root. En hijos del Integral siempre es 0 (usar `internalReferencePrice`).'
+        internalReferencePrice:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Precio interno de referencia. Solo aplica para ítems hijos del Servicio Integral. NO se muestra en el PDF al cliente. Opcional.'
+        igvPercentage:  { type: number, format: double, minimum: 0, maximum: 100, example: 18.00 }
+        subtotal:
+          type: number
+          format: double
+          description: '`unitPrice * quantity` para root; 0 para hijos del Integral (no entran al total de la cotización).'
+        insuredAmount:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Solo aplica para ítems de tipo Seguro de Carga (SEG).'
+        standby:
+          anyOf:
+            - $ref: '#/components/schemas/QuotationStandbyCostResponse'
+            - type: 'null'
+        children:
+          description: 'Ítems hijos (presente solo en ítems padre del Servicio Integral).'
+          type: array
+          items: { $ref: '#/components/schemas/QuotationItemResponse' }
+
+    QuotationItemRequest:
+      description: |
+        Item de cotización. **`unitPrice` es requerido para ítems root**; para hijos del
+        Servicio Integral debe omitirse o enviarse como 0 (en su lugar puede enviarse
+        `internalReferencePrice`).
+      type: object
+      required: [serviceTypeId, quantity]
+      properties:
+        itemNumber:
+          type: [integer, 'null']
+          format: int32
+          description: 'Si se omite, lo asigna el backend en orden de aparición. Si la cotización tiene Integral, debe ser `1`.'
+        parentItemNumber:
+          type: [integer, 'null']
+          format: int32
+          description: 'Para ítems hijos del Integral, referencia al `itemNumber` del padre dentro del mismo request (siempre `1`).'
+        serviceTypeId: { type: integer, format: int32 }
+        cargoTypeId:   { type: [integer, 'null'], format: int32 }
+        observations:  { type: [string, 'null'] }
+        weightKg:      { type: [number, 'null'], format: double, minimum: 0 }
+        lengthMeters:  { type: [number, 'null'], format: double, minimum: 0 }
+        widthMeters:   { type: [number, 'null'], format: double, minimum: 0 }
+        heightMeters:  { type: [number, 'null'], format: double, minimum: 0 }
+        quantity:      { type: integer, minimum: 1, default: 1 }
+        unitPrice:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Requerido para ítems root. Para hijos del Integral debe omitirse o ser 0.'
+        internalReferencePrice:
+          type: [number, 'null']
+          format: double
+          minimum: 0
+          description: 'Solo válido para hijos del Integral. Opcional. NO se muestra en el PDF.'
+        # igvPercentage NO se acepta en el request — el backend lo resuelve desde
+        # config (IGV nacional uniforme). Se persiste como snapshot en cada item
+        # y se devuelve en el response.
+        insuredAmount: { type: [number, 'null'], format: double, minimum: 0, description: 'Solo válido si `serviceTypeId` corresponde a SEG.' }
+        standby:
+          anyOf:
+            - $ref: '#/components/schemas/QuotationStandbyCostRequest'
+            - type: 'null'
+
+    QuotationStandbyCostResponse:
+      type: object
+      required: [id, pricePerDay, includesIgv]
+      properties:
+        id:           { type: integer, format: int64 }
+        pricePerDay:  { type: number, format: double, minimum: 0 }
+        includesIgv:  { type: boolean }
+
+    QuotationConfigResponse:
+      description: |
+        Constantes runtime del módulo Quotations expuestas al frontend.
+        Los valores vienen del config del backend (`app.quotations.*`) o de
+        constantes del validator. Cacheable agresivamente (raramente cambian).
+      type: object
+      required: [igvPercentage, maxRootItems, defaultValidityDays]
+      properties:
+        igvPercentage:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+          description: 'IGV nacional vigente. Se persiste como snapshot en cada `quotation_items.igv_percentage` al crear.'
+          example: 18.00
+        maxRootItems:
+          type: integer
+          minimum: 1
+          description: 'Máximo de ítems root permitidos por cotización (hijos del Servicio Integral no cuentan).'
+          example: 5
+        defaultValidityDays:
+          type: integer
+          minimum: 1
+          description: 'Validez por defecto sugerida para precargar el form (el usuario puede editarla).'
+          example: 15
+
+    # ----- Quotation embedded summaries (Adapter / Anti-Corruption Layer) ---
+    # Vistas resumidas de entidades externas (Client, Currency, etc.) embebidas
+    # dentro del response de cotizacion. Subset intencional de los Response DTOs
+    # de origen — solo los campos relevantes al contexto de cotizacion. Aislan
+    # el bounded context Quotations de cambios futuros en los DTOs de otros modulos.
+
+    QuotationClientSummary:
+      type: object
+      required: [id, name, ruc]
+      properties:
+        id:   { type: integer, format: int32 }
+        name: { type: string, description: 'Razon social del cliente' }
+        ruc:  { type: string, pattern: '^\d{11}$' }
+
+    QuotationCurrencySummary:
+      type: object
+      required: [id, code, symbol]
+      properties:
+        id:     { type: integer, format: int32 }
+        code:   { type: string, description: 'Codigo ISO 4217', pattern: '^[A-Z]{3}$' }
+        symbol: { type: string, maxLength: 5 }
+
+    QuotationPaymentTermSummary:
+      type: object
+      required: [id, name, days]
+      properties:
+        id:   { type: integer, format: int32 }
+        name: { type: string }
+        days: { type: integer, minimum: 0 }
+
+    QuotationServiceTypeSummary:
+      type: object
+      required: [id, code, name, kind]
+      properties:
+        id:   { type: integer, format: int32 }
+        code: { type: string, pattern: '^[A-Z]{2,10}$' }
+        name: { type: string }
+        kind: { type: string, description: 'Categoria del servicio (SERVICIO/ALQUILER/COMPLEMENTARIO/INTEGRAL)' }
+
+    QuotationCargoTypeSummary:
+      description: |
+        Subset minimo del tipo de carga para embeber en items de la cotizacion.
+        Las dimensiones del catalogo (standardWeight/Length/Width/Height) NO se
+        incluyen aca: el item persiste su propio weightKg/lengthMeters/...
+        como snapshot. Los valores de referencia del catalogo siguen disponibles
+        via GET /catalogs/cargo-types/{id} si se necesitan.
+      type: object
+      required: [id, name]
+      properties:
+        id:   { type: integer, format: int32 }
+        name: { type: string }
+
+    QuotationStandbyCostRequest:
+      type: object
+      required: [pricePerDay]
+      properties:
+        pricePerDay: { type: number, format: double, minimum: 0 }
+        includesIgv: { type: boolean, default: false }

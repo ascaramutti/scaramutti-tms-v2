@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS public.cargo_types (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+-- GIN trgm index para busqueda fuzzy en listCargoTypes.
+-- Acelera tanto ILIKE '%pat%' como similarity(name, q) usados en el endpoint.
+-- Solo en name (no hay equivalente al ruc de clients).
+CREATE INDEX IF NOT EXISTS idx_cargo_types_name_trgm ON public.cargo_types USING GIN (name gin_trgm_ops);
+
 CREATE TABLE IF NOT EXISTS public.clients (
     id           SERIAL PRIMARY KEY,
     name         VARCHAR(200) NOT NULL UNIQUE,
@@ -45,6 +50,14 @@ CREATE TABLE IF NOT EXISTS public.clients (
     is_active    BOOLEAN NOT NULL DEFAULT true,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- GIN trgm indexes para busqueda fuzzy del endpoint listClients.
+-- gin_trgm_ops habilita los operadores `%` (similarity threshold) y `<->`
+-- (distancia) sobre name y ruc. Sin estos el matching similarity full-scanea.
+-- pg_trgm.similarity_threshold se mantiene en su default 0.3 (ajustable a
+-- nivel cluster sin redeploy).
+CREATE INDEX IF NOT EXISTS idx_clients_name_trgm ON public.clients USING GIN (name gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_clients_ruc_trgm  ON public.clients USING GIN (ruc  gin_trgm_ops);
 
 CREATE TABLE IF NOT EXISTS public.currencies (
     id        SERIAL PRIMARY KEY,
@@ -250,7 +263,7 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotation_service_types (
 );
 
 COMMENT ON TABLE cotizaciones.quotation_service_types IS
-    'Tipos de servicio que aparecen en una cotización (transporte, alquiler, complementarios, integral)';
+    'Tipos de servicio que aparecen en una cotización. La categoría (kind) se infiere del prefijo del `code`: S=SERVICIO, A=ALQUILER, C=COMPLEMENTARIO, I=INTEGRAL. El backend la computa al armar el response (no es columna). Notar que el `kind` SERVICIO es independiente del `quotation_type` TRANSPORTE de la cabecera — ver api/openapi.yaml para la regla del wizard.';
 
 CREATE TABLE IF NOT EXISTS cotizaciones.payment_terms (
     id         SERIAL PRIMARY KEY,
@@ -277,7 +290,8 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
     quotation_type         VARCHAR(20) NOT NULL DEFAULT 'TRANSPORTE',
     status                 VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
     client_id              INTEGER NOT NULL REFERENCES public.clients(id),
-    contact_name           VARCHAR(200),
+    contact_name           VARCHAR(200) NOT NULL,
+    contact_phone          VARCHAR(9),
     currency_id            INTEGER NOT NULL REFERENCES public.currencies(id),
     payment_term_id        INTEGER REFERENCES cotizaciones.payment_terms(id),
     tentative_service_date DATE,
@@ -296,7 +310,8 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
 COMMENT ON TABLE  cotizaciones.quotations               IS 'Cabecera de cotización emitida al cliente';
 COMMENT ON COLUMN cotizaciones.quotations.quotation_type IS 'TRANSPORTE (con origen/destino) | ALQUILER (sin ruta, por días/unidades)';
 COMMENT ON COLUMN cotizaciones.quotations.status        IS 'DRAFT (borrador interno) | SENT (enviada al cliente). Estado vencido se calcula desde created_at + validity_days';
-COMMENT ON COLUMN cotizaciones.quotations.contact_name  IS 'Snapshot del contacto al momento de cotizar (no se reactualiza si el cliente cambia)';
+COMMENT ON COLUMN cotizaciones.quotations.contact_name  IS 'Snapshot del contacto al momento de cotizar (obligatorio — la cotización siempre se dirige a alguien). No se reactualiza si el cliente master cambia.';
+COMMENT ON COLUMN cotizaciones.quotations.contact_phone IS 'Snapshot del telefono de contacto al momento de cotizar (9 digitos numericos, no se reactualiza si el cliente cambia)';
 COMMENT ON COLUMN cotizaciones.quotations.validity_days IS 'Días de validez de la cotización desde la fecha de creación';
 
 CREATE INDEX IF NOT EXISTS idx_quotations_client     ON cotizaciones.quotations(client_id);
@@ -305,6 +320,12 @@ CREATE INDEX IF NOT EXISTS idx_quotations_created_at ON cotizaciones.quotations(
 CREATE INDEX IF NOT EXISTS idx_quotations_status     ON cotizaciones.quotations(status);
 CREATE INDEX IF NOT EXISTS idx_quotations_type       ON cotizaciones.quotations(quotation_type);
 CREATE INDEX IF NOT EXISTS idx_quotations_created_by ON cotizaciones.quotations(created_by);
+
+-- GIN trigram para la busqueda libre `q` del listado (ILIKE %...% sobre estos campos).
+-- pg_trgm ya esta habilitado (ver seccion Extensiones). Aceleran wildcards >= 3 chars.
+CREATE INDEX IF NOT EXISTS idx_quotations_code_trgm        ON cotizaciones.quotations USING GIN (code gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_quotations_origin_trgm      ON cotizaciones.quotations USING GIN (origin gin_trgm_ops);
+CREATE INDEX IF NOT EXISTS idx_quotations_destination_trgm ON cotizaciones.quotations USING GIN (destination gin_trgm_ops);
 
 CREATE TABLE IF NOT EXISTS cotizaciones.quotation_items (
     id                        BIGSERIAL PRIMARY KEY,
@@ -344,6 +365,9 @@ COMMENT ON COLUMN cotizaciones.quotation_items.internal_reference_price IS
 
 CREATE INDEX IF NOT EXISTS idx_quotation_items_quotation ON cotizaciones.quotation_items(quotation_id);
 CREATE INDEX IF NOT EXISTS idx_quotation_items_parent    ON cotizaciones.quotation_items(parent_item_id);
+-- Para los filtros EXISTS por tipo del listado (cargoTypeId / serviceTypeId).
+CREATE INDEX IF NOT EXISTS idx_quotation_items_cargo_type   ON cotizaciones.quotation_items(cargo_type_id);
+CREATE INDEX IF NOT EXISTS idx_quotation_items_service_type ON cotizaciones.quotation_items(quotation_service_type_id);
 
 CREATE TABLE IF NOT EXISTS cotizaciones.quotation_standby_costs (
     id                BIGSERIAL PRIMARY KEY,

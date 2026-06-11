@@ -14,3 +14,12 @@ docs/
 *.log
 *.dump
 *.sql.gz
+
+# Node / Vite
+node_modules/
+dist/
+
+# Maven / Java
+target/
+.quarkus/
+*.class

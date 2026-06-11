@@ -1,0 +1,26 @@
+# Maven build output
+target/
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# Quarkus
+.quarkus/
+*.log
+
+# JWT — la clave PRIVADA nunca va al repo
+src/main/resources/keys/privatekey.pem
+
+# Env files: ningun .env* se commitea, EXCEPTO el template `.env.example`.
+# Quarkus carga `.env` del root del modulo en dev. Cada dev/CI provee el suyo.
+.env*
+!.env.example
+
+# OS
+.DS_Store
