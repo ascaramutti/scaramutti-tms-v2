@@ -120,12 +120,17 @@ public class QuotationPdfService {
     private QuotationPdfView.ItemRow rootRow(QuotationItemResponse item, String symbol) {
         BigDecimal subtotal = item.subtotal() != null ? item.subtotal() : BigDecimal.ZERO;
         BigDecimal igvPct = item.igvPercentage() != null ? item.igvPercentage() : BigDecimal.ZERO;
-        BigDecimal igv = subtotal.multiply(igvPct).divide(HUNDRED, 2, RoundingMode.HALF_UP);
-        BigDecimal total = subtotal.add(igv);
+        // Pedido del negocio (2026-06-12): las columnas P. Unit. e I.G.V. muestran
+        // valores UNITARIOS (precio unitario y su IGV); P. Total sigue siendo el
+        // total de LÍNEA (cant. × unitario + IGV), coherente con el cuadro de totales.
+        BigDecimal unitPrice = item.unitPrice() != null ? item.unitPrice() : BigDecimal.ZERO;
+        BigDecimal unitIgv = unitPrice.multiply(igvPct).divide(HUNDRED, 2, RoundingMode.HALF_UP);
+        BigDecimal lineIgv = subtotal.multiply(igvPct).divide(HUNDRED, 2, RoundingMode.HALF_UP);
+        BigDecimal total = subtotal.add(lineIgv);
         return new QuotationPdfView.ItemRow(
             item.displayLabel(), item.quantity() != null ? item.quantity() : 0,
             item.serviceType().name(), cargoSubtext(item), observationsText(item), false,
-            money(symbol, subtotal), money(symbol, igv), money(symbol, total)
+            money(symbol, unitPrice), money(symbol, unitIgv), money(symbol, total)
         );
     }
 
