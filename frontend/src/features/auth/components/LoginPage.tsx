@@ -44,14 +44,14 @@ export function LoginPage() {
   }, [setFocus])
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/cotizaciones" replace />
   }
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       const response = await withMinDuration(loginMutation.mutateAsync(values), MIN_LOADER_MS)
       setSession(response.token, response.refreshToken ?? null, response.user)
-      const from = (location.state as LocationState | null)?.from ?? '/'
+      const from = (location.state as LocationState | null)?.from ?? '/cotizaciones'
       navigate(from, { replace: true })
     } catch (error) {
       handleApiFormError(error, {
@@ -75,7 +75,7 @@ export function LoginPage() {
             </div>
           </div>
 
-          {/* Headings — h1 describe la acción de la pantalla, no rebrandea Scaramutti TMS (eso ya está en el HomePage header y title del browser) */}
+          {/* Headings — h1 describe la acción de la pantalla, no rebrandea Scaramutti TMS (eso ya está en el sidebar y title del browser) */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-semibold text-slate-900">Iniciar sesión</h1>
             <p className="text-sm text-slate-500 mt-1">Accedé al sistema con tus credenciales</p>

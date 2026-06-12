@@ -21,8 +21,7 @@ function renderProtected(
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
-            <Route path="/login" element={<div>LOGIN PAGE</div>} />
-            <Route path="/" element={<div>HOME</div>} />
+            <Route path="/cotizaciones/login" element={<div>LOGIN PAGE</div>} />
             <Route
               path="/protegida"
               element={
@@ -43,7 +42,7 @@ describe('ProtectedRoute', () => {
     tokenStorage.clear()
   })
 
-  it('redirige a /login si no hay sesion', async () => {
+  it('redirige a /cotizaciones/login si no hay sesion', async () => {
     renderProtected('/protegida')
     expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument()
     expect(screen.queryByText('CONTENIDO PROTEGIDO')).not.toBeInTheDocument()
@@ -65,7 +64,7 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByText('CONTENIDO PROTEGIDO')).toBeInTheDocument()
   })
 
-  it('redirige a /login si el token es invalido (getCurrentUser devuelve 401)', async () => {
+  it('redirige a /cotizaciones/login si el token es invalido (getCurrentUser devuelve 401)', async () => {
     tokenStorage.setTokens('expired-token', 'expired-refresh')
     server.use(
       getCurrentUserErrorResponse(401, {
@@ -79,11 +78,14 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument()
   })
 
-  it('redirige a / si el rol del usuario no esta en allowedRoles', async () => {
+  it('muestra "Sin acceso" (con link a v1) si el rol del usuario no esta en allowedRoles', async () => {
     tokenStorage.setTokens('admin-token', 'admin-refresh')
     // Default handler devuelve user con role=admin. Restringimos a solo 'sales'.
+    // NO redirige (la lista vive en /cotizaciones, protegida por rol → un
+    // redirect loopearía): renderiza la vista inline con salida hacia v1.
     renderProtected('/protegida', { allowedRoles: ['sales'] })
-    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(await screen.findByText(/sin acceso a cotizaciones/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ir a servicios/i })).toHaveAttribute('href', '/')
     expect(screen.queryByText('CONTENIDO PROTEGIDO')).not.toBeInTheDocument()
   })
 

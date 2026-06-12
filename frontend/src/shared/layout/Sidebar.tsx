@@ -1,4 +1,4 @@
-import { FileText, Home, KeyRound, Truck, Users, type LucideIcon } from 'lucide-react'
+import { FileText, KeyRound, Truck, Users, type LucideIcon } from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
@@ -12,6 +12,8 @@ interface MenuItem {
   to?: string
   /** Si se pasa, solo los roles listados ven el item. Sin restricción → visible para todos. */
   allowedRoles?: UserRole[]
+  /** Matcher custom de "activo" (ver SidebarNavItem.activeWhen). */
+  activeWhen?: (pathname: string) => boolean
 }
 
 interface MenuGroup {
@@ -24,9 +26,6 @@ interface MenuGroup {
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
 const MENU: MenuGroup[] = [
   {
-    items: [{ icon: Home, label: 'Inicio', to: '/' }],
-  },
-  {
     label: 'Comercial',
     items: [
       {
@@ -34,6 +33,10 @@ const MENU: MenuGroup[] = [
         label: 'Cotizaciones',
         to: '/cotizaciones',
         allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
+        // Prefix-matching marcaría activo también en /cotizaciones/cuenta/*
+        // (cuenta anida bajo el mismo prefijo pero no es parte del módulo).
+        activeWhen: (pathname) =>
+          pathname.startsWith('/cotizaciones') && !pathname.startsWith('/cotizaciones/cuenta'),
       },
       {
         icon: Users,
@@ -47,7 +50,7 @@ const MENU: MenuGroup[] = [
     items: [
       // Sin allowedRoles → visible para todos. Cualquier usuario puede cambiar
       // su propia contraseña, independientemente del rol.
-      { icon: KeyRound, label: 'Cambiar contraseña', to: '/cuenta/cambiar-contrasena' },
+      { icon: KeyRound, label: 'Cambiar contraseña', to: '/cotizaciones/cuenta/cambiar-contrasena' },
     ],
   },
 ]
@@ -104,6 +107,7 @@ export function Sidebar() {
                   icon={item.icon}
                   label={item.label}
                   to={item.to}
+                  activeWhen={item.activeWhen}
                 />
               ))}
             </SidebarSection>
@@ -115,6 +119,7 @@ export function Sidebar() {
                   icon={item.icon}
                   label={item.label}
                   to={item.to}
+                  activeWhen={item.activeWhen}
                 />
               ))}
             </ul>
