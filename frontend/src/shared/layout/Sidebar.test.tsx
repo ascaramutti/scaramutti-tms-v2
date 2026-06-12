@@ -46,12 +46,11 @@ describe('Sidebar - filtrado por rol', () => {
     tokenStorage.clear()
   })
 
-  it('admin ve Inicio + Cotizaciones + Clientes + Cambiar contraseña', async () => {
+  it('admin ve Cotizaciones + Clientes + Cambiar contraseña', async () => {
     renderSidebarAs('admin')
     await waitFor(() => {
       expect(screen.getByText(/usuario admin/i)).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /inicio/i })).toBeInTheDocument()
     // Cotizaciones ya está activa: es un link navegable (no el placeholder disabled).
     expect(screen.getByRole('link', { name: /cotizaciones/i })).toHaveAttribute(
       'href',
@@ -59,27 +58,28 @@ describe('Sidebar - filtrado por rol', () => {
     )
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/comercial/i)).toBeInTheDocument()
-    expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /cambiar contraseña/i })).toHaveAttribute(
+      'href',
+      '/cotizaciones/cuenta/cambiar-contrasena',
+    )
     expect(screen.getByText(/administrar cuenta/i)).toBeInTheDocument()
   })
 
-  it('sales ve Inicio + Cotizaciones + Clientes + Cambiar contraseña', async () => {
+  it('sales ve Cotizaciones + Clientes + Cambiar contraseña', async () => {
     renderSidebarAs('sales')
     await waitFor(() => {
       expect(screen.getByText(/usuario sales/i)).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /inicio/i })).toBeInTheDocument()
     expect(screen.getByText('Cotizaciones')).toBeInTheDocument()
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()
   })
 
-  it('dispatcher ve SOLO Inicio + Cambiar contraseña (sección Comercial oculta)', async () => {
+  it('dispatcher ve SOLO Cambiar contraseña (sección Comercial oculta)', async () => {
     renderSidebarAs('dispatcher')
     await waitFor(() => {
       expect(screen.getByText(/usuario dispatcher/i)).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /inicio/i })).toBeInTheDocument()
     expect(screen.queryByText('Cotizaciones')).not.toBeInTheDocument()
     expect(screen.queryByText('Clientes')).not.toBeInTheDocument()
     // La sección Comercial entera (con su <h2>) se oculta cuando queda sin items
@@ -89,23 +89,21 @@ describe('Sidebar - filtrado por rol', () => {
     expect(screen.getByText(/administrar cuenta/i)).toBeInTheDocument()
   })
 
-  it('general_manager ve Inicio + Cotizaciones + Clientes + Cambiar contraseña', async () => {
+  it('general_manager ve Cotizaciones + Clientes + Cambiar contraseña', async () => {
     renderSidebarAs('general_manager')
     await waitFor(() => {
       expect(screen.getByText(/usuario general_manager/i)).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /inicio/i })).toBeInTheDocument()
     expect(screen.getByText('Cotizaciones')).toBeInTheDocument()
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()
   })
 
-  it('operations_manager ve Inicio + Cotizaciones + Clientes + Cambiar contraseña', async () => {
+  it('operations_manager ve Cotizaciones + Clientes + Cambiar contraseña', async () => {
     renderSidebarAs('operations_manager')
     await waitFor(() => {
       expect(screen.getByText(/usuario operations_manager/i)).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /inicio/i })).toBeInTheDocument()
     expect(screen.getByText('Cotizaciones')).toBeInTheDocument()
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()

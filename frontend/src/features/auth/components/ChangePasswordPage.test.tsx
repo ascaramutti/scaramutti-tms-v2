@@ -9,7 +9,7 @@ import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
 import { changePasswordErrorResponse } from '../../../test/mocks/handlers/auth'
 
-function renderPage(initialPath = '/cuenta/cambiar-contrasena') {
+function renderPage(initialPath = '/cotizaciones/cuenta/cambiar-contrasena') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -17,8 +17,8 @@ function renderPage(initialPath = '/cuenta/cambiar-contrasena') {
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
-          <Route path="/cuenta/cambiar-contrasena" element={<ChangePasswordPage />} />
-          <Route path="/" element={<div>HOME</div>} />
+          <Route path="/cotizaciones/cuenta/cambiar-contrasena" element={<ChangePasswordPage />} />
+          <Route path="/cotizaciones" element={<div>HOME</div>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

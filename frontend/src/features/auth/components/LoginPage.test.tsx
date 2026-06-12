@@ -10,7 +10,7 @@ import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
 import { loginErrorResponse } from '../../../test/mocks/handlers/auth'
 
-function renderLogin(initialPath = '/login') {
+function renderLogin(initialPath = '/cotizaciones/login') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -19,8 +19,8 @@ function renderLogin(initialPath = '/login') {
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/" element={<div>HOME</div>} />
+            <Route path="/cotizaciones/login" element={<LoginPage />} />
+            <Route path="/cotizaciones" element={<div>HOME</div>} />
             <Route path="/clients" element={<div>CLIENTS</div>} />
           </Routes>
         </MemoryRouter>
@@ -120,9 +120,9 @@ describe('LoginPage', () => {
             <Routes>
               <Route
                 path="/redirect-from-clients"
-                element={<Navigate to="/login" replace state={{ from: '/clients' }} />}
+                element={<Navigate to="/cotizaciones/login" replace state={{ from: '/clients' }} />}
               />
-              <Route path="/login" element={<LoginPage />} />
+              <Route path="/cotizaciones/login" element={<LoginPage />} />
               <Route path="/clients" element={<div>CLIENTS</div>} />
             </Routes>
           </MemoryRouter>
