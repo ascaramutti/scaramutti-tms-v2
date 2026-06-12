@@ -58,6 +58,8 @@ describe('Sidebar - filtrado por rol', () => {
     )
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/comercial/i)).toBeInTheDocument()
+    // Cross-link a v1 (visible para todos)
+    expect(screen.getByRole('link', { name: /servicios \/ viajes/i })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: /cambiar contraseña/i })).toHaveAttribute(
       'href',
       '/cotizaciones/cuenta/cambiar-contrasena',
@@ -81,6 +83,8 @@ describe('Sidebar - filtrado por rol', () => {
       expect(screen.getByText(/usuario dispatcher/i)).toBeInTheDocument()
     })
     expect(screen.queryByText('Cotizaciones')).not.toBeInTheDocument()
+    // Pero SÍ ve el cross-link a v1 (es su lugar de trabajo)
+    expect(screen.getByRole('link', { name: /servicios \/ viajes/i })).toBeInTheDocument()
     expect(screen.queryByText('Clientes')).not.toBeInTheDocument()
     // La sección Comercial entera (con su <h2>) se oculta cuando queda sin items
     expect(screen.queryByText(/^comercial$/i)).not.toBeInTheDocument()

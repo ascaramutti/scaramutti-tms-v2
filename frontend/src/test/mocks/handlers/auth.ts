@@ -27,6 +27,16 @@ export const authHandlers = [
   http.post(`${API}/auth/change-password`, () => new HttpResponse(null, { status: 204 })),
 ]
 
+// Login exitoso con un rol específico (para tests del landing por rol).
+export function loginAsRoleResponse(role: UserResponse['role']) {
+  return http.post(`${API}/auth/login`, () =>
+    HttpResponse.json({
+      ...fakeLoginResponse,
+      user: { ...fakeUser, username: `user-${role}`, role },
+    } satisfies LoginResponse),
+  )
+}
+
 // Helpers para tests que quieren respuestas de error puntuales.
 export function loginErrorResponse(status: number, problem: Problem) {
   return http.post(`${API}/auth/login`, () =>
