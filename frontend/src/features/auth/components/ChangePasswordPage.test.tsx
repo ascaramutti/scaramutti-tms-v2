@@ -1,34 +1,49 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { http, HttpResponse } from 'msw'
 import { toast } from 'sonner'
 import { ChangePasswordPage } from './ChangePasswordPage'
+import { AuthProvider } from '../../../shared/auth/AuthContext'
+import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
-import { changePasswordErrorResponse } from '../../../test/mocks/handlers/auth'
+import { changePasswordErrorResponse, fakeUser } from '../../../test/mocks/handlers/auth'
+
+const API = 'http://localhost:8080/api/v1'
 
 function renderPage(initialPath = '/cotizaciones/cuenta/cambiar-contrasena') {
+  // La página usa useAuth (landing por rol al salir): requiere AuthProvider
+  // con sesión. El /auth/me default del server responde admin.
+  tokenStorage.setTokens('fake-access', 'fake-refresh')
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
-  return render(
+  const renderResult = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <Routes>
-          <Route path="/cotizaciones/cuenta/cambiar-contrasena" element={<ChangePasswordPage />} />
-          <Route path="/cotizaciones" element={<div>HOME</div>} />
-        </Routes>
-      </MemoryRouter>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <Routes>
+            <Route path="/cotizaciones/cuenta/cambiar-contrasena" element={<ChangePasswordPage />} />
+            <Route path="/cotizaciones" element={<div>HOME</div>} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   )
+  return { ...renderResult, queryClient }
 }
 
 describe('ChangePasswordPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
     tokenStorage.clear()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   // ----- Render -----
@@ -89,10 +104,15 @@ describe('ChangePasswordPage', () => {
     expect(await screen.findByText(/debe ser diferente a la actual/i)).toBeInTheDocument()
   })
 
-  it('NO llama al backend si el form es inválido', async () => {
+  it('NO llama al endpoint de change-password si el form es inválido', async () => {
     const user = userEvent.setup()
+    // Solo nos importa change-password: el AuthProvider sí llama a /auth/me
+    // al montar (sesión) y eso es esperado.
     const spy = vi.fn()
-    server.events.on('request:start', spy)
+    const onRequest = ({ request }: { request: Request }) => {
+      if (request.url.includes('/auth/change-password')) spy(request.url)
+    }
+    server.events.on('request:start', onRequest)
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), 'corta')
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
@@ -102,7 +122,7 @@ describe('ChangePasswordPage', () => {
       expect(errors.length).toBeGreaterThan(0)
     })
     expect(spy).not.toHaveBeenCalled()
-    server.events.removeListener('request:start', spy)
+    server.events.removeListener('request:start', onRequest)
   })
 
   // ----- Interaction -----
@@ -124,6 +144,37 @@ describe('ChangePasswordPage', () => {
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
     expect(await screen.findByText('HOME')).toBeInTheDocument()
     expect(toastSpy).toHaveBeenCalledWith('Contraseña actualizada')
+  })
+
+  // ----- Landing por rol al salir (unificación v1+v2) -----
+  it('dispatcher: cambio exitoso redirige a v1 (raíz del dominio, full page load)', async () => {
+    // El dispatcher es el caso que motivó goToLanding: navegar a /cotizaciones
+    // lo dejaba en la vista "Sin acceso" (no tiene rol para el módulo).
+    server.use(
+      http.get(`${API}/auth/me`, () =>
+        HttpResponse.json({ ...fakeUser, username: 'jdiaz', role: 'dispatcher' }),
+      ),
+    )
+    const assignSpy = vi.fn()
+    // Stub explícito: en happy-dom las props de Location son accessors del
+    // prototipo y el spread {...window.location} produce {} — no fingimos
+    // preservar el objeto, solo lo que el test usa.
+    vi.stubGlobal('location', { assign: assignSpy } as unknown as Location)
+    const user = userEvent.setup()
+    const { queryClient } = renderPage()
+    // goToLanding lee user del render vigente al click: esperar la sesión
+    // ANTES de interactuar (sin esto el rol podría no estar cargado).
+    await waitFor(() =>
+      expect(queryClient.getQueryData(currentUserQueryKey)).toMatchObject({ role: 'dispatcher' }),
+    )
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Dispatch1234')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+
+    await waitFor(() => expect(assignSpy).toHaveBeenCalledWith('/'))
+    // No navegó dentro de la SPA:
+    expect(screen.queryByText('HOME')).not.toBeInTheDocument()
   })
 
   it('AUTH-004 (contraseña actual incorrecta) asigna error al campo correspondiente', async () => {
