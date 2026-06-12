@@ -36,7 +36,7 @@ describe('AppLayout', () => {
     expect(await screen.findByText('CONTENIDO HIJO')).toBeInTheDocument()
     // El sidebar tiene la nav principal:
     expect(screen.getByRole('navigation', { name: /principal/i })).toBeInTheDocument()
-    // Inicio aparece como link activo:
-    expect(screen.getByRole('link', { name: /inicio/i })).toBeInTheDocument()
+    // El menú renderiza (admin ve Cotizaciones como link):
+    expect(await screen.findByRole('link', { name: /cotizaciones/i })).toBeInTheDocument()
   })
 })

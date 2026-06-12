@@ -9,6 +9,8 @@ import {
   type ChangePasswordFormInput,
 } from '../schemas/change-password.schema'
 import { useChangePasswordMutation } from '../hooks/useChangePasswordMutation'
+import { useAuth } from '../../../shared/auth/AuthContext'
+import { isExternalLanding, landingPathFor } from '../../../shared/auth/roleLanding'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { withMinDuration } from '../../../shared/utils/withMinDuration'
@@ -24,7 +26,20 @@ const CHANGE_PASSWORD_FIELDS: readonly FieldName[] = ['currentPassword', 'newPas
 
 export function ChangePasswordPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const mutation = useChangePasswordMutation()
+
+  // Cambiar contraseña es la única pantalla de v2 accesible para TODOS los
+  // roles: al salir (éxito o cancelar), cada rol vuelve a SU lugar de trabajo
+  // (dispatcher → v1; sin esto caía en la vista "Sin acceso" de cotizaciones).
+  const goToLanding = () => {
+    const landing = landingPathFor(user?.role)
+    if (isExternalLanding(landing)) {
+      window.location.assign(landing)
+      return
+    }
+    navigate(landing, { replace: true })
+  }
 
   const {
     register,
@@ -51,7 +66,7 @@ export function ChangePasswordPage() {
         MIN_LOADER_MS,
       )
       toast.success('Contraseña actualizada')
-      navigate('/', { replace: true })
+      goToLanding()
     } catch (error) {
       handleApiFormError(error, {
         setError,
@@ -113,7 +128,7 @@ export function ChangePasswordPage() {
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={() => navigate('/')}
+              onClick={goToLanding}
               disabled={isPending}
               className="px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >

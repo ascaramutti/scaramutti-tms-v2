@@ -7,10 +7,13 @@ import { CotizacionesListPage } from './features/quotations/pages/CotizacionesLi
 import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDetailPage'
 import { CotizacionEditPage } from './features/quotations/pages/CotizacionEditPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
-import { HomePage } from './pages/HomePage'
 
+// Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
+// con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
+// las rutas del módulo ya traían el prefijo /cotizaciones — solo login y cuenta
+// se movieron adentro. La raíz `/` del dominio pertenece a v1.
 export const router = createBrowserRouter([
-  { path: '/login', element: <LoginPage /> },
+  { path: '/cotizaciones/login', element: <LoginPage /> },
   {
     // Layout route: las rutas autenticadas comparten AppLayout (con sidebar).
     element: (
@@ -19,7 +22,6 @@ export const router = createBrowserRouter([
       </ProtectedRoute>
     ),
     children: [
-      { path: '/', element: <HomePage /> },
       {
         path: '/cotizaciones',
         element: (
@@ -54,8 +56,8 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      { path: '/cuenta/cambiar-contrasena', element: <ChangePasswordPage /> },
+      { path: '/cotizaciones/cuenta/cambiar-contrasena', element: <ChangePasswordPage /> },
     ],
   },
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '*', element: <Navigate to="/cotizaciones" replace /> },
 ])

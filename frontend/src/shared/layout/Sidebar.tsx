@@ -1,4 +1,4 @@
-import { FileText, Home, KeyRound, Truck, Users, type LucideIcon } from 'lucide-react'
+import { FileText, KeyRound, Route, Truck, Users, type LucideIcon } from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
@@ -10,8 +10,12 @@ interface MenuItem {
   label: string
   /** Si se pasa, el item es navegable. Si no, disabled. */
   to?: string
+  /** Link externo a esta SPA (ej. v1). Ver SidebarNavItem.href. */
+  href?: string
   /** Si se pasa, solo los roles listados ven el item. Sin restricción → visible para todos. */
   allowedRoles?: UserRole[]
+  /** Matcher custom de "activo" (ver SidebarNavItem.activeWhen). */
+  activeWhen?: (pathname: string) => boolean
 }
 
 interface MenuGroup {
@@ -24,7 +28,12 @@ interface MenuGroup {
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
 const MENU: MenuGroup[] = [
   {
-    items: [{ icon: Home, label: 'Inicio', to: '/' }],
+    label: 'Operaciones',
+    items: [
+      // Cross-link a v1 (servicios/viajes, otra SPA en la raíz del dominio).
+      // Visible para todos: cualquier rol puede tener trabajo en v1.
+      { icon: Route, label: 'Servicios / Viajes', href: '/' },
+    ],
   },
   {
     label: 'Comercial',
@@ -34,6 +43,10 @@ const MENU: MenuGroup[] = [
         label: 'Cotizaciones',
         to: '/cotizaciones',
         allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
+        // Prefix-matching marcaría activo también en /cotizaciones/cuenta/*
+        // (cuenta anida bajo el mismo prefijo pero no es parte del módulo).
+        activeWhen: (pathname) =>
+          pathname.startsWith('/cotizaciones') && !pathname.startsWith('/cotizaciones/cuenta'),
       },
       {
         icon: Users,
@@ -47,7 +60,7 @@ const MENU: MenuGroup[] = [
     items: [
       // Sin allowedRoles → visible para todos. Cualquier usuario puede cambiar
       // su propia contraseña, independientemente del rol.
-      { icon: KeyRound, label: 'Cambiar contraseña', to: '/cuenta/cambiar-contrasena' },
+      { icon: KeyRound, label: 'Cambiar contraseña', to: '/cotizaciones/cuenta/cambiar-contrasena' },
     ],
   },
 ]
@@ -104,6 +117,8 @@ export function Sidebar() {
                   icon={item.icon}
                   label={item.label}
                   to={item.to}
+                  href={item.href}
+                  activeWhen={item.activeWhen}
                 />
               ))}
             </SidebarSection>
@@ -115,6 +130,8 @@ export function Sidebar() {
                   icon={item.icon}
                   label={item.label}
                   to={item.to}
+                  href={item.href}
+                  activeWhen={item.activeWhen}
                 />
               ))}
             </ul>

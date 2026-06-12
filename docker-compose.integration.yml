@@ -1,0 +1,107 @@
+# ==========================================
+# Entorno de INTEGRACIÓN local (NO producción)
+# Replica la topología unificada v1+v2 en la máquina de desarrollo:
+#   gateway (:8085) → v1 (front+back) + v2 (front+back) → DB dev del host
+#
+# - Usa los MISMOS container_name que prod para validar gateway/nginx.conf
+#   tal cual se despliega (sin variantes de configuración).
+# - La DB es la dev existente del host (scaramutti-tms-db-dev, :5432),
+#   alcanzada vía host.docker.internal. Ya tiene ambos schemas + usuarios.
+# - Requiere el repo v1 como hermano: ../scaramutti-tms
+#
+# Uso:  docker compose -f docker-compose.integration.yml up -d --build
+# Ver gateway/README.md para el paso a paso completo.
+# ==========================================
+
+services:
+  # --- Gateway (mismo nginx.conf que prod) ---
+  gateway:
+    image: nginx:alpine
+    container_name: scaramutti-tms-gateway-prod
+    volumes:
+      - ./gateway/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "8085:80"
+    depends_on:
+      - v1-frontend
+      - v2-frontend
+
+  # --- v1 (repo hermano) ---
+  v1-backend:
+    build:
+      context: ../scaramutti-tms/backend
+    container_name: scaramutti-tms-backend-prod
+    networks:
+      default:
+        aliases:
+          # El nginx interno del frontend v1 referencia "backend" (su nombre
+          # de servicio en el compose prod de v1): sin este alias no resuelve
+          # y el frontend v1 entra en crash-loop.
+          - backend
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DB_HOST: host.docker.internal
+      DB_PORT: 5432
+      DB_NAME: ${INTEGRATION_DB_NAME:-scaramutti_tms_dev}
+      DB_USER: ${INTEGRATION_DB_USER:-scaramutti_user}
+      DB_PASSWORD: ${INTEGRATION_DB_PASSWORD:-changeme}
+      JWT_SECRET: integration-only-secret
+      # SSO (Fase 3): v1 valida los tokens RS256 de v2 con su clave PUBLICA.
+      # dual = acepta tambien HS256 legacy (mismo modo que tendra prod).
+      AUTH_MODE: dual
+      JWT_PUBLIC_KEY_PATH: /app/keys/v2-publickey.pem
+    volumes:
+      # Clave publica DEV de v2 (la privada nunca sale de v2)
+      - ./backend/src/main/resources/keys/publickey.pem:/app/keys/v2-publickey.pem:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "3000"
+
+  v1-frontend:
+    build:
+      context: ../scaramutti-tms/frontend
+      args:
+        VITE_API_URL: /api
+    container_name: scaramutti-tms-frontend-prod
+    depends_on:
+      - v1-backend
+    expose:
+      - "80"
+
+  # --- v2 (este repo) ---
+  v2-backend:
+    build:
+      context: ./backend
+      target: production
+    container_name: scaramutti-tms-v2-backend-prod
+    environment:
+      QUARKUS_PROFILE: prod
+      DB_JDBC_URL: jdbc:postgresql://host.docker.internal:5432/${INTEGRATION_DB_NAME:-scaramutti_tms_dev}
+      DB_USERNAME: ${INTEGRATION_DB_USER:-scaramutti_user}
+      DB_PASSWORD: ${INTEGRATION_DB_PASSWORD:-changeme}
+      CORS_ORIGINS: http://scaramutti-tms:8085,http://localhost:8085,http://127.0.0.1:8085
+      JWT_PUBLIC_KEY_LOCATION: file:/app/keys/publickey.pem
+      JWT_PRIVATE_KEY_LOCATION: file:/app/keys/privatekey.pem
+      ACCESS_TOKEN_LIFESPAN_SECONDS: 3600
+      REFRESH_TOKEN_LIFESPAN_SECONDS: 86400
+    volumes:
+      # Claves de DEV del backend (nunca las de prod)
+      - ./backend/src/main/resources/keys:/app/keys:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    expose:
+      - "8080"
+
+  v2-frontend:
+    build:
+      context: ./frontend
+      target: production
+      args:
+        VITE_API_BASE_URL: /api/v1
+    container_name: scaramutti-tms-v2-frontend-prod
+    depends_on:
+      - v2-backend
+    expose:
+      - "80"

@@ -16,8 +16,8 @@ configureHttpClient(() => {
   // /login (sin recarga via window.location.assign): el AuthContext queda
   // sincronizado y muestra el form en vez de hacer flicker con datos viejos.
   queryClient.setQueryData(currentUserQueryKey, null)
-  if (window.location.pathname !== '/login') {
-    window.location.assign('/login')
+  if (window.location.pathname !== '/cotizaciones/login') {
+    window.location.assign('/cotizaciones/login')
   }
 })
 

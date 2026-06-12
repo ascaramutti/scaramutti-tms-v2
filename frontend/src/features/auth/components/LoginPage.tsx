@@ -6,6 +6,7 @@ import { LogIn } from 'lucide-react'
 import { loginSchema, type LoginFormInput } from '../schemas/login.schema'
 import { useLoginMutation } from '../hooks/useLoginMutation'
 import { useAuth } from '../../../shared/auth/AuthContext'
+import { isExternalLanding, landingPathFor } from '../../../shared/auth/roleLanding'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { withMinDuration } from '../../../shared/utils/withMinDuration'
@@ -20,6 +21,27 @@ const MIN_LOADER_MS = import.meta.env.MODE === 'test' ? 0 : 1000
 
 interface LocationState {
   from?: string
+}
+
+/**
+ * Redirect post-autenticación según el rol del usuario (Opción 2 del plan SSO).
+ * El landing de v1 vive en otra SPA → navegación externa (window.location);
+ * los landings internos usan el router.
+ */
+function AuthenticatedLanding() {
+  const { user } = useAuth()
+  const landing = landingPathFor(user?.role)
+
+  useEffect(() => {
+    if (isExternalLanding(landing)) {
+      window.location.assign(landing)
+    }
+  }, [landing])
+
+  if (isExternalLanding(landing)) {
+    return <div role="status">Redirigiendo…</div>
+  }
+  return <Navigate to={landing} replace />
 }
 
 export function LoginPage() {
@@ -44,14 +66,21 @@ export function LoginPage() {
   }, [setFocus])
 
   if (isAuthenticated) {
-    return <Navigate to="/" replace />
+    return <AuthenticatedLanding />
   }
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       const response = await withMinDuration(loginMutation.mutateAsync(values), MIN_LOADER_MS)
       setSession(response.token, response.refreshToken ?? null, response.user)
-      const from = (location.state as LocationState | null)?.from ?? '/'
+      const landing = landingPathFor(response.user.role)
+      if (isExternalLanding(landing)) {
+        // El rol trabaja en v1 (otra SPA): full page load, ignorando `from`
+        // (un deep-link a v2 no le sirve a un rol sin acceso al módulo).
+        window.location.assign(landing)
+        return
+      }
+      const from = (location.state as LocationState | null)?.from ?? landing
       navigate(from, { replace: true })
     } catch (error) {
       handleApiFormError(error, {
@@ -75,7 +104,7 @@ export function LoginPage() {
             </div>
           </div>
 
-          {/* Headings — h1 describe la acción de la pantalla, no rebrandea Scaramutti TMS (eso ya está en el HomePage header y title del browser) */}
+          {/* Headings — h1 describe la acción de la pantalla, no rebrandea Scaramutti TMS (eso ya está en el sidebar y title del browser) */}
           <div className="text-center mb-8">
             <h1 className="text-2xl font-semibold text-slate-900">Iniciar sesión</h1>
             <p className="text-sm text-slate-500 mt-1">Accedé al sistema con tus credenciales</p>
