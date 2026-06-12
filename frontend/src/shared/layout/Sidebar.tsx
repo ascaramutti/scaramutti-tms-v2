@@ -1,4 +1,4 @@
-import { FileText, KeyRound, Truck, Users, type LucideIcon } from 'lucide-react'
+import { FileText, KeyRound, Route, Truck, Users, type LucideIcon } from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
@@ -10,6 +10,8 @@ interface MenuItem {
   label: string
   /** Si se pasa, el item es navegable. Si no, disabled. */
   to?: string
+  /** Link externo a esta SPA (ej. v1). Ver SidebarNavItem.href. */
+  href?: string
   /** Si se pasa, solo los roles listados ven el item. Sin restricción → visible para todos. */
   allowedRoles?: UserRole[]
   /** Matcher custom de "activo" (ver SidebarNavItem.activeWhen). */
@@ -25,6 +27,14 @@ interface MenuGroup {
 // Matriz de permisos del menú alineada con `x-required-roles` del contrato OpenAPI.
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
 const MENU: MenuGroup[] = [
+  {
+    label: 'Operaciones',
+    items: [
+      // Cross-link a v1 (servicios/viajes, otra SPA en la raíz del dominio).
+      // Visible para todos: cualquier rol puede tener trabajo en v1.
+      { icon: Route, label: 'Servicios / Viajes', href: '/' },
+    ],
+  },
   {
     label: 'Comercial',
     items: [
@@ -107,6 +117,7 @@ export function Sidebar() {
                   icon={item.icon}
                   label={item.label}
                   to={item.to}
+                  href={item.href}
                   activeWhen={item.activeWhen}
                 />
               ))}
@@ -119,6 +130,7 @@ export function Sidebar() {
                   icon={item.icon}
                   label={item.label}
                   to={item.to}
+                  href={item.href}
                   activeWhen={item.activeWhen}
                 />
               ))}

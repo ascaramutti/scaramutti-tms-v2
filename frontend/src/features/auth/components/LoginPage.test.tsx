@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
@@ -8,7 +8,7 @@ import { LoginPage } from './LoginPage'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
-import { loginErrorResponse } from '../../../test/mocks/handlers/auth'
+import { loginAsRoleResponse, loginErrorResponse } from '../../../test/mocks/handlers/auth'
 
 function renderLogin(initialPath = '/cotizaciones/login') {
   const queryClient = new QueryClient({
@@ -35,6 +35,12 @@ describe('LoginPage', () => {
     // Limpieza explicita por si el polyfill de setup.ts no actuo a tiempo
     // entre tests que setean sesion (race con el unmount de RTL).
     tokenStorage.clear()
+  })
+
+  // Si un test que stubea globals (ej. window.location) falla antes de su
+  // propio unstub, que no contamine a los siguientes.
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   // ----- Render -----
@@ -100,6 +106,33 @@ describe('LoginPage', () => {
     renderLogin()
     await user.type(screen.getByLabelText(/usuario/i), 'admin')
     await user.type(screen.getByLabelText(/contraseña/i), 'Admin1234')
+    await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+  })
+
+  // ----- Landing por rol (unificación v1+v2) -----
+  it('login como dispatcher redirige a v1 (raíz del dominio, full page load)', async () => {
+    server.use(loginAsRoleResponse('dispatcher'))
+    const assignSpy = vi.fn()
+    vi.stubGlobal('location', { ...window.location, assign: assignSpy })
+
+    const user = userEvent.setup()
+    renderLogin()
+    await user.type(screen.getByLabelText(/usuario/i), 'jdiaz')
+    await user.type(screen.getByLabelText(/contraseña/i), 'Dispatch1234')
+    await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+
+    await waitFor(() => expect(assignSpy).toHaveBeenCalledWith('/'))
+    // No navegó dentro de la SPA:
+    expect(screen.queryByText('HOME')).not.toBeInTheDocument()
+  })
+
+  it('login como operations_manager aterriza en cotizaciones (confirmado 2026-06-12)', async () => {
+    server.use(loginAsRoleResponse('operations_manager'))
+    const user = userEvent.setup()
+    renderLogin()
+    await user.type(screen.getByLabelText(/usuario/i), 'omanager')
+    await user.type(screen.getByLabelText(/contraseña/i), 'Manager1234')
     await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
     expect(await screen.findByText('HOME')).toBeInTheDocument()
   })
