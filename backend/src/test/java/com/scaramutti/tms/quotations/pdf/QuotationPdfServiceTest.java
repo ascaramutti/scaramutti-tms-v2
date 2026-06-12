@@ -23,6 +23,7 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -58,6 +59,29 @@ class QuotationPdfServiceTest {
         Path out = Path.of("target", "cotizacion-full-sample.pdf");
         Files.write(out, pdf);
         System.out.println(">>> PDF full: " + out.toAbsolutePath());
+    }
+
+    /**
+     * Las columnas P. Unit. e I.G.V. muestran valores UNITARIOS; P. Total sigue
+     * siendo el de LÍNEA (pedido del negocio, 2026-06-12). Se asserta sobre el
+     * texto extraído del PDF usando el root 3 del fixture (cant=2), donde
+     * unitario (3,200) y línea (6,400) difieren — el caso que distingue ambos.
+     */
+    @Test
+    void itemRow_showsUnitPriceAndUnitIgv_keepingLineTotal() throws Exception {
+        byte[] pdf = pdfService.generate(fullQuotation());
+
+        String text;
+        try (var document = org.apache.pdfbox.pdmodel.PDDocument.load(pdf)) {
+            text = new org.apache.pdfbox.text.PDFTextStripper().getText(document);
+        }
+
+        assertTrue(text.contains("P. Unit."), "header de la columna unitaria");
+        assertFalse(text.contains("P. Neto"), "el header viejo no debe aparecer");
+        // Root 3: cant=2, unitario S/ 3,200.00 → IGV unitario 576.00; total de línea 7,552.00
+        assertTrue(text.contains("S/ 3,200.00"), "P. Unit. = precio unitario (no el subtotal 6,400)");
+        assertTrue(text.contains("S/ 576.00"), "I.G.V. = 18% del unitario (no 1,152 de la línea)");
+        assertTrue(text.contains("S/ 7,552.00"), "P. Total = total de línea (cuadra con el recuadro de totales)");
     }
 
     /** Cotizacion al tope: 5 items root (MAX_ROOT_ITEMS), Integral con 4 hijos, todos los campos. */
