@@ -1,0 +1,74 @@
+# ==========================================
+# Docker Compose - Producción v2
+# Comparte la DB con v1 (scaramutti-tms-db-prod).
+# Frontend expuesto en :8080 (v1 usa :80).
+# ==========================================
+version: '3.8'
+
+services:
+  # ==========================================
+  # Backend (Quarkus)
+  # ==========================================
+  backend:
+    build:
+      context: ./backend
+      target: production
+    image: scaramutti-tms-v2-backend
+    container_name: scaramutti-tms-v2-backend-prod
+    restart: always
+    env_file:
+      - .env
+    environment:
+      QUARKUS_PROFILE: prod
+    volumes:
+      # Claves JWT montadas como volumen (no se copian al imagen)
+      - ./keys:/app/keys:ro
+    expose:
+      - "8080"
+    networks:
+      - scaramutti-tms_default
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/api/v1/q/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # ==========================================
+  # Frontend (Nginx + React)
+  # ==========================================
+  frontend:
+    build:
+      context: ./frontend
+      target: production
+      args:
+        VITE_API_BASE_URL: /api/v1
+    image: scaramutti-tms-v2-frontend
+    container_name: scaramutti-tms-v2-frontend-prod
+    restart: always
+    ports:
+      - "8080:80"
+    networks:
+      - scaramutti-tms_default
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+
+networks:
+  scaramutti-tms_default:
+    external: true
