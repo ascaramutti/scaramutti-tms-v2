@@ -179,6 +179,11 @@ public class QuotationResource {
      * (abrir en el navegador); por defecto fuerza descarga. El ETag es el {@code updatedAt}
      * (mismo que el GET): si el cliente manda {@code If-None-Match} con el ETag vigente,
      * responde 304 sin regenerar el PDF. 404 si la cotizacion no existe.
+     *
+     * <p>{@code Cache-Control: private, no-cache} es OBLIGATORIO: sin el, el browser aplica
+     * frescura heuristica y sirve el PDF cacheado SIN revalidar el ETag — tras editar la
+     * cotizacion, el preview mostraba la version vieja. {@code no-cache} = puede cachear
+     * pero debe revalidar siempre (el 304 mantiene el ahorro de no regenerar).
      */
     @GET
     @Path("/{id}/pdf")
@@ -191,7 +196,10 @@ public class QuotationResource {
         QuotationResponse quotation = getQuotationService.getById(id);
         String etag = "\"" + quotation.updatedAt().toString() + "\"";
         if (etag.equals(ifNoneMatch)) {
-            return Response.notModified().header("ETag", etag).build();
+            return Response.notModified()
+                .header("ETag", etag)
+                .header("Cache-Control", "private, no-cache")
+                .build();
         }
         byte[] pdf = pdfService.generate(quotation);
         String disposition = (preview ? "inline" : "attachment")
@@ -200,6 +208,7 @@ public class QuotationResource {
             .type("application/pdf")
             .header("Content-Disposition", disposition)
             .header("ETag", etag)
+            .header("Cache-Control", "private, no-cache")
             .header("Last-Modified", DateTimeFormatter.RFC_1123_DATE_TIME.format(quotation.updatedAt()))
             .build();
     }
