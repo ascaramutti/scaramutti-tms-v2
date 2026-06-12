@@ -74,7 +74,7 @@ describe('QuotationDetailActions', () => {
   })
 
   it('pide preview=true al Previsualizar y preview=false al Descargar', async () => {
-    const sink: { preview?: string | null } = {}
+    const sink: { preview?: string | null; cacheControl?: string | null } = {}
     server.use(quotationPdf(sink))
     vi.spyOn(window, 'open').mockReturnValue({} as Window)
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
@@ -82,6 +82,9 @@ describe('QuotationDetailActions', () => {
 
     await userEvent.click(screen.getByRole('button', { name: /previsualizar pdf/i }))
     await waitFor(() => expect(sink.preview).toBe('true'))
+    // Header de REQUEST: fuerza la revalidación del ETag en el browser (sin él,
+    // el preview servía PDFs viejos desde el cache tras editar la cotización).
+    expect(sink.cacheControl).toBe('no-cache')
 
     await userEvent.click(screen.getByRole('button', { name: /descargar pdf/i }))
     await waitFor(() => expect(sink.preview).toBe('false'))
