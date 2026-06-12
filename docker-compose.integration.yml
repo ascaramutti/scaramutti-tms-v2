@@ -47,6 +47,13 @@ services:
       DB_USER: ${INTEGRATION_DB_USER:-scaramutti_user}
       DB_PASSWORD: ${INTEGRATION_DB_PASSWORD:-changeme}
       JWT_SECRET: integration-only-secret
+      # SSO (Fase 3): v1 valida los tokens RS256 de v2 con su clave PUBLICA.
+      # dual = acepta tambien HS256 legacy (mismo modo que tendra prod).
+      AUTH_MODE: dual
+      JWT_PUBLIC_KEY_PATH: /app/keys/v2-publickey.pem
+    volumes:
+      # Clave publica DEV de v2 (la privada nunca sale de v2)
+      - ./backend/src/main/resources/keys/publickey.pem:/app/keys/v2-publickey.pem:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     expose:
