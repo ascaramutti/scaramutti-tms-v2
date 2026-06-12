@@ -667,7 +667,10 @@ paths:
               description: '`attachment; filename="cotizacion-2026-00042.pdf"` o `inline` según `?preview`'
               schema: { type: string }
             ETag:
-              description: Hash del contenido para caching
+              description: '`updatedAt` de la cotización (mismo ETag que el GET) — validador para If-None-Match'
+              schema: { type: string }
+            Cache-Control:
+              description: '`private, no-cache`: el browser puede cachear pero revalida SIEMPRE con If-None-Match (sin esto serviría PDFs viejos tras editar)'
               schema: { type: string }
             Last-Modified:
               schema: { type: string }
@@ -678,6 +681,13 @@ paths:
                 format: binary
         '304':
           description: No modificado (cache hit por If-None-Match)
+          headers:
+            ETag:
+              description: ETag vigente (igual al del 200)
+              schema: { type: string }
+            Cache-Control:
+              description: '`private, no-cache` (RFC 9110: el 304 repite los headers de cache del 200)'
+              schema: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }

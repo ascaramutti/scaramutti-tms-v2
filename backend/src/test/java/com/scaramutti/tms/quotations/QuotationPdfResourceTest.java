@@ -183,7 +183,10 @@ class QuotationPdfResourceTest {
             .statusCode(200)
             .header("ETag", notNullValue())
             .header("ETag", matchesRegex("\".+\""))
-            .header("Last-Modified", notNullValue());
+            .header("Last-Modified", notNullValue())
+            // Sin no-cache el browser sirve el PDF viejo sin revalidar el ETag
+            // (preview desactualizado tras editar la cotización).
+            .header("Cache-Control", equalTo("private, no-cache"));
     }
 
     @Test
@@ -206,7 +209,8 @@ class QuotationPdfResourceTest {
             .get("/quotations/" + id + "/pdf")
         .then()
             .statusCode(304)
-            .header("ETag", equalTo(etag));
+            .header("ETag", equalTo(etag))
+            .header("Cache-Control", equalTo("private, no-cache"));
     }
 
     @Test

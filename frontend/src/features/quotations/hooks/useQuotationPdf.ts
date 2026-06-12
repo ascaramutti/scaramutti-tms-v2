@@ -16,7 +16,16 @@ interface QuotationPdfResult {
 }
 
 async function fetchQuotationPdf({ id, preview }: QuotationPdfVars): Promise<QuotationPdfResult> {
-  const { data, headers } = await downloadQuotationPdf({ path: { id }, query: { preview }, throwOnError: true })
+  const { data, headers } = await downloadQuotationPdf({
+    path: { id },
+    query: { preview },
+    // Header de REQUEST: fuerza al browser a revalidar contra el ETag aunque
+    // tenga una entrada cacheada "fresca" (heurística). Sin esto, tras editar
+    // la cotización el preview podía servir el PDF viejo desde el cache local
+    // (incluso entradas guardadas antes del fix de Cache-Control del backend).
+    headers: { 'Cache-Control': 'no-cache' },
+    throwOnError: true,
+  })
   if (!data) {
     throw new Error('Respuesta vacía del backend en GET /quotations/{id}/pdf')
   }

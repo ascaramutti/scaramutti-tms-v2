@@ -362,11 +362,16 @@ export function updateQuotationSlow(ms = 40, response?: QuotationResponse) {
 
 // ----- PDF (GET /quotations/:id/pdf) -----
 
-/** Responde un PDF binario (blob) OK. Captura el query `preview` en `sink` si se pasa. */
-export function quotationPdf(sink?: { preview?: string | null }, content = '%PDF-1.4 mock') {
+/** Responde un PDF binario (blob) OK. Captura el query `preview` y el header
+ * `Cache-Control` del request en `sink` si se pasa. */
+export function quotationPdf(
+  sink?: { preview?: string | null; cacheControl?: string | null },
+  content = '%PDF-1.4 mock',
+) {
   return http.get(`${API}/quotations/:id/pdf`, ({ request }) => {
     if (sink) {
       sink.preview = new URL(request.url).searchParams.get('preview')
+      sink.cacheControl = request.headers.get('cache-control')
     }
     return new HttpResponse(new Blob([content], { type: 'application/pdf' }), {
       status: 200,
