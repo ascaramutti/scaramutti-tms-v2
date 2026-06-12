@@ -107,6 +107,7 @@ public class DevDataSeeder {
         ensureQuotationServiceType("CGR", "Servicio de Grúa",                                          "Servicio de grúa para carga/descarga");
         ensureQuotationServiceType("CMN", "Servicio de Montacargas",                                   "Servicio de montacargas");
         ensureQuotationServiceType("CDE", "Servicio de Desconsolidación con Maniobra",                 "Desconsolidación de carga con maniobra");
+        ensureQuotationServiceType("CAP", "Servicio de Apoyo Policial",                                "Servicio de apoyo policial para el resguardo de la carga");
 
         // Integral (prefijo I → kind=INTEGRAL)
         ensureQuotationServiceType("INT", "Servicio Integral",                                         "Servicio integral con jerarquía padre+hijos (transporte + complementarios en un solo precio con descuento)");
