@@ -36,6 +36,6 @@ USER quarkus
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD wget --quiet --tries=1 --spider http://localhost:8080/api/v1/q/health || exit 1
+    CMD wget --quiet --tries=1 --spider http://127.0.0.1:8080/api/v1/q/health || exit 1
 
 CMD ["java", "-jar", "quarkus-run.jar"]
