@@ -101,7 +101,7 @@ class CreateQuotationServiceTest {
             null, null
         ));
         return new SaveQuotationCommand(
-            QuotationType.TRANSPORTE, 1, "contact", null, 1, null, null, 15, "Lima", "Cusco", items
+            QuotationType.TRANSPORTE, 1, "contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items
         );
     }
 
@@ -186,7 +186,7 @@ class CreateQuotationServiceTest {
             100L, "2026-00001", QuotationType.TRANSPORTE,
             com.scaramutti.tms.quotations.model.QuotationStatus.DRAFT,
             null, null, null, null, null, null, 15, null, false,
-            null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+            null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
             List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
         );
     }

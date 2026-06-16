@@ -36,6 +36,8 @@ public interface QuotationResourceMapper {
     @Mapping(target = "contactPhone", source = "contactPhone", qualifiedByName = "trimToNull")
     @Mapping(target = "origin",       source = "origin",       qualifiedByName = "trimToNull")
     @Mapping(target = "destination",  source = "destination",  qualifiedByName = "trimToNull")
+    @Mapping(target = "clientNote",   source = "clientNote",   qualifiedByName = "trimToNull")
+    @Mapping(target = "internalNote", source = "internalNote", qualifiedByName = "trimToNull")
     SaveQuotationCommand toSaveQuotationCommand(QuotationRequest quotationRequest);
 
     @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")

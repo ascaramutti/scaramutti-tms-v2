@@ -100,6 +100,8 @@ public class QuotationResponseAssemblerService {
             isExpired,
             quotation.origin,
             quotation.destination,
+            quotation.clientNote,
+            quotation.internalNote,
             totals.totalSubtotal(),
             totals.totalIgv(),
             totals.totalAmount(),

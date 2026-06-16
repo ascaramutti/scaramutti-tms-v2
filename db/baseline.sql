@@ -298,13 +298,17 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
     validity_days          INTEGER NOT NULL DEFAULT 15,
     origin                 VARCHAR(255),
     destination            VARCHAR(255),
+    client_note            TEXT,
+    internal_note          TEXT,
     created_by             INTEGER NOT NULL REFERENCES public.users(id),
     updated_by             INTEGER NOT NULL REFERENCES public.users(id),
     created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT chk_quotations_type   CHECK (quotation_type IN ('TRANSPORTE','ALQUILER')),
     CONSTRAINT chk_quotations_status CHECK (status IN ('DRAFT','SENT')),
-    CONSTRAINT chk_quotations_validity_days CHECK (validity_days > 0 AND validity_days <= 365)
+    CONSTRAINT chk_quotations_validity_days CHECK (validity_days > 0 AND validity_days <= 365),
+    CONSTRAINT chk_quotations_client_note_len   CHECK (client_note   IS NULL OR char_length(client_note)   <= 500),
+    CONSTRAINT chk_quotations_internal_note_len CHECK (internal_note IS NULL OR char_length(internal_note) <= 500)
 );
 
 COMMENT ON TABLE  cotizaciones.quotations               IS 'Cabecera de cotización emitida al cliente';
@@ -313,6 +317,8 @@ COMMENT ON COLUMN cotizaciones.quotations.status        IS 'DRAFT (borrador inte
 COMMENT ON COLUMN cotizaciones.quotations.contact_name  IS 'Snapshot del contacto al momento de cotizar (obligatorio — la cotización siempre se dirige a alguien). No se reactualiza si el cliente master cambia.';
 COMMENT ON COLUMN cotizaciones.quotations.contact_phone IS 'Snapshot del telefono de contacto al momento de cotizar (9 digitos numericos, no se reactualiza si el cliente cambia)';
 COMMENT ON COLUMN cotizaciones.quotations.validity_days IS 'Días de validez de la cotización desde la fecha de creación';
+COMMENT ON COLUMN cotizaciones.quotations.client_note    IS 'Observación opcional visible para el cliente (PDF + UI). Texto libre, máx 500. Se renderiza escapada.';
+COMMENT ON COLUMN cotizaciones.quotations.internal_note  IS 'Observación opcional SOLO interna. NUNCA se renderiza en el PDF ni en salidas hacia el cliente (RN-03).';
 
 CREATE INDEX IF NOT EXISTS idx_quotations_client     ON cotizaciones.quotations(client_id);
 CREATE INDEX IF NOT EXISTS idx_quotations_code       ON cotizaciones.quotations(code);

@@ -49,6 +49,8 @@ public record QuotationResponse(
     Boolean isExpired,
     String origin,
     String destination,
+    String clientNote,
+    String internalNote,
     BigDecimal totalSubtotal,
     BigDecimal totalIgv,
     BigDecimal totalAmount,

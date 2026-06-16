@@ -91,7 +91,7 @@ class UpdateQuotationServiceTest {
             null, null
         ));
         return new SaveQuotationCommand(
-            type, clientId, "ZTEST_contact", null, 1, null, null, 15, "Lima", "Cusco", items
+            type, clientId, "ZTEST_contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items
         );
     }
 
@@ -149,7 +149,7 @@ class UpdateQuotationServiceTest {
         return new QuotationResponse(
             100L, "2026-00001", QuotationType.TRANSPORTE, QuotationStatus.DRAFT,
             null, null, null, null, null, null, 15, null, false,
-            null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+            null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
             List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
         );
     }
