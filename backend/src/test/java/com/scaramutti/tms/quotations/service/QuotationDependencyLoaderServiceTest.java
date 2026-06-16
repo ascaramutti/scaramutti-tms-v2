@@ -86,7 +86,7 @@ class QuotationDependencyLoaderServiceTest {
     private SaveQuotationCommand command(Integer paymentTermId, List<SaveQuotationCommand.Item> items) {
         return new SaveQuotationCommand(
             QuotationType.TRANSPORTE, 1, "contact", null, 1, paymentTermId,
-            null, 15, "Lima", "Cusco", items
+            null, 15, "Lima", "Cusco", null, null, items
         );
     }
 

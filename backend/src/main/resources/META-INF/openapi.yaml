@@ -1456,6 +1456,14 @@ components:
           type: [string, 'null']
           description: 'Requerido si `quotationType=TRANSPORTE`. Validado por backend.'
           maxLength: 255
+        clientNote:
+          type: [string, 'null']
+          maxLength: 500
+          description: 'Observación opcional visible para el cliente (se renderiza en el PDF tras el stand-by y en la UI). Texto libre.'
+        internalNote:
+          type: [string, 'null']
+          maxLength: 500
+          description: 'Observación opcional SOLO interna. NUNCA se incluye en el PDF ni en ninguna salida hacia el cliente (RN-03).'
         items:
           type: array
           minItems: 1
@@ -1506,6 +1514,8 @@ components:
         isExpired:    { type: boolean, description: 'now() > expiresAt' }
         origin:       { type: [string, 'null'] }
         destination:  { type: [string, 'null'] }
+        clientNote:   { type: [string, 'null'], maxLength: 500, description: 'Observación visible para el cliente (PDF + UI).' }
+        internalNote: { type: [string, 'null'], maxLength: 500, description: 'Observación SOLO interna; se devuelve a los roles que editan, nunca en el PDF (RN-03).' }
         totalSubtotal: { type: number, format: double, description: 'Suma de items.subtotal' }
         totalIgv:      { type: number, format: double, description: 'IGV total' }
         totalAmount:   { type: number, format: double, description: 'Total = subtotal + IGV' }

@@ -239,6 +239,72 @@ class QuotationResourceTest {
     }
 
     @Test
+    void create_withNotes_returns201AndEchoesThem() {
+        // Round-trip de las observaciones: se envían en el body, se persisten y vuelven en el response.
+        String token = loginAdmin();
+        String body = String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_NOTES",
+              "currencyId": %d,
+              "paymentTermId": %d,
+              "validityDays": 15,
+              "origin": "ZTEST_LIMA",
+              "destination": "ZTEST_AREQUIPA",
+              "clientNote": "Precio sujeto a variacion del combustible.",
+              "internalNote": "Margen ajustado por volatilidad.",
+              "items": [
+                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body)
+        .when()
+            .post("/quotations")
+        .then()
+            .statusCode(201)
+            .body("clientNote", equalTo("Precio sujeto a variacion del combustible."))
+            .body("internalNote", equalTo("Margen ajustado por volatilidad."));
+    }
+
+    @Test
+    void create_withClientNoteTooLong_returns400() {
+        // @Size(max=500) en el request: 501 chars debe rechazarse en la frontera (400), no en el service.
+        String token = loginAdmin();
+        String longNote = "x".repeat(501);
+        String body = String.format("""
+            {
+              "quotationType": "TRANSPORTE",
+              "clientId": %d,
+              "contactName": "ZTEST_NOTELEN",
+              "currencyId": %d,
+              "paymentTermId": %d,
+              "validityDays": 15,
+              "origin": "ZTEST_LIMA",
+              "destination": "ZTEST_AREQUIPA",
+              "clientNote": "%s",
+              "items": [
+                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+              ]
+            }
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, longNote, ST_SCB);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body)
+        .when()
+            .post("/quotations")
+        .then()
+            .statusCode(400);
+    }
+
+    @Test
     void create_withInvalidContactPhone_returns400() {
         // Bean Validation @Pattern("^\\d{9}$") rechaza formatos invalidos:
         // letras, menos/mas de 9 digitos, caracteres especiales.

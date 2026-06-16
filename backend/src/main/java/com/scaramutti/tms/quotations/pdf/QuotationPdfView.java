@@ -38,6 +38,10 @@ public record QuotationPdfView(
     String tentativeDate, // "" si no hay
     // --- Stand-by (vacio si no hay) ---
     List<StandbyRow> standby,
+    // --- Observacion para el cliente (null si no hay; se renderiza tras el stand-by) ---
+    // NOTA: la observacion INTERNA NO existe en este view a proposito (RN-03): asi es
+    // estructuralmente imposible que llegue al PDF. No agregar internalNote aca.
+    String clientNote,
     // --- Firma ---
     String signerName,
     String signerPosition,

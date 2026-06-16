@@ -115,7 +115,7 @@ class QuotationValidatorServiceTest {
     private SaveQuotationCommand command(QuotationType type, String origin, String destination,
                                             List<SaveQuotationCommand.Item> items) {
         return new SaveQuotationCommand(
-            type, 1, "contact", null, 1, 1, null, 15, origin, destination, items
+            type, 1, "contact", null, 1, 1, null, 15, origin, destination, null, null, items
         );
     }
 
