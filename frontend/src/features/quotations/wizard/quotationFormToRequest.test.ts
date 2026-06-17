@@ -197,6 +197,30 @@ describe('quotationFormToRequest', () => {
     expect(request.items[5].parentItemNumber).toBeUndefined()
   })
 
+  it('mapea clientNote/internalNote con texto (trim aplicado)', () => {
+    const request = quotationFormToRequest(
+      formWith({
+        clientNote: '  Precio sujeto a variación.  ',
+        internalNote: '  Margen ajustado.  ',
+        items: [{ ...ITEM_DEFAULTS, serviceTypeId: 3, unitPrice: 500 }],
+      }),
+    )
+    expect(request.clientNote).toBe('Precio sujeto a variación.')
+    expect(request.internalNote).toBe('Margen ajustado.')
+  })
+
+  it('colapsa clientNote/internalNote vacíos o solo whitespace a null', () => {
+    const request = quotationFormToRequest(
+      formWith({
+        clientNote: '',
+        internalNote: '   ',
+        items: [{ ...ITEM_DEFAULTS, serviceTypeId: 3, unitPrice: 500 }],
+      }),
+    )
+    expect(request.clientNote).toBeNull()
+    expect(request.internalNote).toBeNull()
+  })
+
   it('omite el stand-by si el ítem no tiene y lo mapea si lo tiene', () => {
     const request = quotationFormToRequest(
       formWith({

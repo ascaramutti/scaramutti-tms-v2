@@ -1,5 +1,21 @@
 import { z } from 'zod'
 import { QUOTATION_TYPE_VALUES } from '../schemas/quotation-filters.schema'
+import { NO_CONTROL } from '../../../shared/utils/sanitizeText'
+
+/**
+ * Observación libre (cliente o interna) a nivel cotización: opcional, máx. 500, sin caracteres
+ * de control. `.regex(NO_CONTROL)` espeja el `@Pattern` del backend (defensa por capas — la L2
+ * sanitize ya los limpia al tipear; esto es el backstop ante paste programático). `< >` y demás
+ * imprimibles se permiten (RN-04). `.optional().or(z.literal(''))` acepta el string vacío del
+ * textarea registrado; el mapper `textOrNull` lo colapsa a `null` al enviar.
+ */
+const quotationNoteField = z
+  .string()
+  .trim()
+  .max(500, 'Máximo 500 caracteres.')
+  .regex(NO_CONTROL, 'No se permiten caracteres de control.')
+  .optional()
+  .or(z.literal(''))
 
 /** Fecha de hoy en formato `YYYY-MM-DD` (horario local), para validar fechas no pasadas. */
 function todayISO(): string {
@@ -230,6 +246,11 @@ export const wizardSchema = z
   .object({
     ...step1Fields,
     items: z.array(itemSchema).min(1, 'Agrega al menos un ítem a la cotización.'),
+    // Observaciones a nivel cotización (Step 4 "Resumen"). Opcionales; el error de tope/control
+    // se muestra a nivel de campo. NO van en STEP_FIELDS (el Step 4 es read-only/neutro): el
+    // zodResolver del submit final las valida igual (red de seguridad).
+    clientNote: quotationNoteField,
+    internalNote: quotationNoteField,
   })
   .superRefine(refineRoute)
 
@@ -253,6 +274,8 @@ export const WIZARD_DEFAULTS: WizardFormInput = {
   tentativeServiceDate: '',
   validityDays: 15,
   items: [],
+  clientNote: '',
+  internalNote: '',
 }
 
 /** Defaults de un ítem nuevo. El `serviceKind` lo ajusta el Step 2 según el tipo de
