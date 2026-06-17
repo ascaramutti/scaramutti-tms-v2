@@ -1,5 +1,7 @@
 package com.scaramutti.tms.quotations.api;
 
+import com.scaramutti.tms.quotations.QuotationEtag;
+import com.scaramutti.tms.quotations.dto.ChangeQuotationStatusRequest;
 import com.scaramutti.tms.quotations.dto.QuotationConfigResponse;
 import com.scaramutti.tms.quotations.dto.QuotationRequest;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
@@ -8,6 +10,7 @@ import com.scaramutti.tms.quotations.mapper.QuotationResourceMapper;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
 import com.scaramutti.tms.quotations.pdf.QuotationPdfService;
+import com.scaramutti.tms.quotations.service.ChangeQuotationStatusService;
 import com.scaramutti.tms.quotations.service.CreateQuotationService;
 import com.scaramutti.tms.quotations.service.GetQuotationService;
 import com.scaramutti.tms.quotations.service.ListQuotationsService;
@@ -25,6 +28,7 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
+import jakarta.ws.rs.PATCH;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
@@ -46,6 +50,7 @@ public class QuotationResource {
     @Inject CreateQuotationService createQuotationService;
     @Inject GetQuotationService getQuotationService;
     @Inject UpdateQuotationService updateQuotationService;
+    @Inject ChangeQuotationStatusService changeQuotationStatusService;
     @Inject ListQuotationsService listQuotationsService;
     @Inject QuotationConfigService quotationConfigService;
     @Inject QuotationResourceMapper resourceMapper;
@@ -112,7 +117,7 @@ public class QuotationResource {
             resourceMapper.toSaveQuotationCommand(quotationRequest)
         );
         return Response.created(URI.create("/api/v1/quotations/" + quotation.id()))
-            .header("ETag", "\"" + quotation.updatedAt().toString() + "\"")
+            .header("ETag", QuotationEtag.of(quotation.updatedAt()))
             .entity(quotation)
             .build();
     }
@@ -135,8 +140,8 @@ public class QuotationResource {
      * El IGV usa el SNAPSHOT persistido en cada item (no el config actual)
      * — preserva integridad del documento firmado para cotizaciones viejas.
      *
-     * <p>{@code isExpired} se computa en runtime ({@code now() > createdAt + validityDays}),
-     * no se persiste. Las FKs (client, currency, etc.) NO se validan {@code isActive}:
+     * <p>{@code isExpired} se DERIVA del estado persistido (true SII {@code status == EXPIRED},
+     * ADR-005), no se recalcula por fechas. Las FKs (client, currency, etc.) NO se validan {@code isActive}:
      * cotizaciones viejas pueden referenciar entidades desactivadas y se exponen igual.
      */
     @GET
@@ -145,7 +150,7 @@ public class QuotationResource {
     public Response getQuotation(@PathParam("id") Long id) {
         QuotationResponse quotation = getQuotationService.getById(id);
         return Response.ok(quotation)
-            .header("ETag", "\"" + quotation.updatedAt().toString() + "\"")
+            .header("ETag", QuotationEtag.of(quotation.updatedAt()))
             .build();
     }
 
@@ -170,7 +175,33 @@ public class QuotationResource {
             id, ifMatch, resourceMapper.toSaveQuotationCommand(quotationRequest)
         );
         return Response.ok(quotation)
-            .header("ETag", "\"" + quotation.updatedAt().toString() + "\"")
+            .header("ETag", QuotationEtag.of(quotation.updatedAt()))
+            .build();
+    }
+
+    /**
+     * Cambia el estado de una cotizacion (ciclo de vida). El body lleva el {@code status}
+     * destino ({@code SENT}/{@code ACCEPTED}/{@code REJECTED} — {@code DRAFT}/{@code EXPIRED}
+     * NO son destinos de usuario) y, al rechazar, el {@code rejectionReason} (obligatorio y
+     * exclusivo de {@code REJECTED}). Requiere {@code If-Match} con el ETag vigente (mismo
+     * optimistic locking que el PUT): si la version cambio → 412 (COM-004).
+     *
+     * <p>La maquina de estados (ADR-004) valida la transicion: una transicion invalida (incluida
+     * toda salida de un terminal) → 409 (QUO-005). Devuelve la cotizacion actualizada completa
+     * (mismo armado que el GET, reusado post-flush) + el nuevo {@code ETag} ({@code updatedAt}).
+     */
+    @PATCH
+    @Path("/{id}/status")
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
+    public Response updateQuotationStatus(
+            @PathParam("id") Long id,
+            @HeaderParam("If-Match") String ifMatch,
+            @Valid @NotNull ChangeQuotationStatusRequest statusRequest) {
+        QuotationResponse quotation = changeQuotationStatusService.changeStatus(
+            id, ifMatch, resourceMapper.toChangeStatusCommand(statusRequest)
+        );
+        return Response.ok(quotation)
+            .header("ETag", QuotationEtag.of(quotation.updatedAt()))
             .build();
     }
 
@@ -194,7 +225,7 @@ public class QuotationResource {
             @QueryParam("preview") @DefaultValue("false") boolean preview,
             @HeaderParam("If-None-Match") String ifNoneMatch) {
         QuotationResponse quotation = getQuotationService.getById(id);
-        String etag = "\"" + quotation.updatedAt().toString() + "\"";
+        String etag = QuotationEtag.of(quotation.updatedAt());
         if (etag.equals(ifNoneMatch)) {
             return Response.notModified()
                 .header("ETag", etag)

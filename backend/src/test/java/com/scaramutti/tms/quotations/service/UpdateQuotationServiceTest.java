@@ -149,7 +149,7 @@ class UpdateQuotationServiceTest {
         return new QuotationResponse(
             100L, "2026-00001", QuotationType.TRANSPORTE, QuotationStatus.DRAFT,
             null, null, null, null, null, null, 15, null, false,
-            null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+            null, null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
             List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
         );
     }
@@ -259,6 +259,43 @@ class UpdateQuotationServiceTest {
         assertEquals(404, ex.status());
         verify(validator, never()).validate(any(), any());
         verify(itemPersistence, never()).persistItems(any(), any());
+    }
+
+    // ---------- Terminalidad (QUO-006) ---------------------------------------
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"ACCEPTED", "REJECTED", "EXPIRED"})
+    void update_terminalQuotation_throwsQUO006_beforeImmutablesAndPersistence(String terminalStatus) {
+        var existing = sampleExisting();
+        existing.status = terminalStatus;   // cotizacion en estado terminal
+        when(currentUser.requireId()).thenReturn(42);
+        when(quotationRepository.findByIdOptional(100L)).thenReturn(Optional.of(existing));
+
+        // El If-Match coincide (T0) → el siguiente check es la terminalidad.
+        var ex = assertThrows(ApiException.class,
+            () -> service.updateQuotation(100L, etagOf(T0), sampleCommand()));
+
+        assertEquals("QUO-006", ex.code());
+        assertEquals(409, ex.status());
+        // No toca dependencias, validacion ni persistencia.
+        verify(dependencyLoader, never()).loadFor(any());
+        verify(validator, never()).validate(any(), any());
+        verify(itemPersistence, never()).persistItems(any(), any());
+    }
+
+    @org.junit.jupiter.params.ParameterizedTest
+    @org.junit.jupiter.params.provider.ValueSource(strings = {"DRAFT", "SENT"})
+    void update_nonTerminalQuotation_passesTerminalityCheck(String liveStatus) {
+        // Regresion: DRAFT/SENT siguen editables (la terminalidad no las bloquea).
+        var existing = sampleExisting();
+        existing.status = liveStatus;
+        var command = sampleCommand();
+        stubHappyFlow(existing, command);
+
+        var response = service.updateQuotation(100L, etagOf(T0), command);
+
+        assertNotNull(response);
+        verify(itemPersistence).persistItems(eq(command), eq(existing));
     }
 
     // ---------- Inmutables (QUO-004) -----------------------------------------

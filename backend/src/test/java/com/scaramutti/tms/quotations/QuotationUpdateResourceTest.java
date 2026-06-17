@@ -159,6 +159,14 @@ class QuotationUpdateResourceTest {
             ).setParameter("active", active).setParameter("id", currencyId).executeUpdate());
     }
 
+    /** Fuerza el status en BD (bypassa la maquina) para fabricar terminales en una tx propia. */
+    private void forceStatusInDb(long id, String status) {
+        QuarkusTransaction.requiringNew().run(() ->
+            entityManager.createNativeQuery(
+                "UPDATE cotizaciones.quotations SET status = :status WHERE id = :id")
+            .setParameter("status", status).setParameter("id", id).executeUpdate());
+    }
+
     /** Reemplaza el currencyId del body (match key-specific) por el dado. */
     private String withCurrency(String body, int currencyId) {
         return body.replace("\"currencyId\": " + CURRENCY_ID, "\"currencyId\": " + currencyId);
@@ -430,6 +438,77 @@ class QuotationUpdateResourceTest {
             .body("createdBy.username", equalTo("admin"))    // createdBy original
             .body("updatedBy.username", equalTo("lcampos"))  // updatedBy = editor
             .body("createdAt", equalTo(createdAt0));         // createdAt inmutable
+    }
+
+    // ---------- Terminalidad (409 QUO-006) -----------------------------------
+
+    @Test
+    void update_acceptedQuotation_returns409_QUO006() {
+        String token = loginAdmin();
+        long id = createQuotation(token, baseTransporte());
+        forceStatusInDb(id, "ACCEPTED");
+        String etag = getEtag(token, id);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(transporteBody("ZTEST_TERMACC", 30, "1000.00"))
+        .when().put("/quotations/" + id)
+        .then().statusCode(409)
+            .contentType("application/problem+json")
+            .body("code", equalTo("QUO-006"))
+            .body("detail", equalTo("No se puede editar una cotizacion en estado ACCEPTED"));
+    }
+
+    @Test
+    void update_rejectedQuotation_returns409_QUO006() {
+        String token = loginAdmin();
+        long id = createQuotation(token, baseTransporte());
+        forceStatusInDb(id, "REJECTED");
+        String etag = getEtag(token, id);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(transporteBody("ZTEST_TERMREJ", 30, "1000.00"))
+        .when().put("/quotations/" + id)
+        .then().statusCode(409).body("code", equalTo("QUO-006"));
+    }
+
+    @Test
+    void update_expiredQuotation_returns409_QUO006() {
+        String token = loginAdmin();
+        long id = createQuotation(token, baseTransporte());
+        forceStatusInDb(id, "EXPIRED");
+        String etag = getEtag(token, id);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(transporteBody("ZTEST_TERMEXP", 30, "1000.00"))
+        .when().put("/quotations/" + id)
+        .then().statusCode(409).body("code", equalTo("QUO-006"));
+    }
+
+    @Test
+    void update_draftQuotation_stillEditable_returns200() {
+        // Regresion: DRAFT no es terminal, sigue editable.
+        String token = loginAdmin();
+        long id = createQuotation(token, baseTransporte());   // nace DRAFT
+        String etag = getEtag(token, id);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(transporteBody("ZTEST_DRAFTOK", 20, "1000.00"))
+        .when().put("/quotations/" + id)
+        .then().statusCode(200).body("status", equalTo("DRAFT"));
+    }
+
+    @Test
+    void update_sentQuotation_stillEditable_returns200() {
+        // Regresion: SENT no es terminal, sigue editable (preserva el status SENT).
+        String token = loginAdmin();
+        long id = createQuotation(token, baseTransporte());
+        forceStatusInDb(id, "SENT");
+        String etag = getEtag(token, id);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(transporteBody("ZTEST_SENTOK", 20, "1000.00"))
+        .when().put("/quotations/" + id)
+        .then().statusCode(200).body("status", equalTo("SENT"));
     }
 
     // ---------- 404 ----------------------------------------------------------

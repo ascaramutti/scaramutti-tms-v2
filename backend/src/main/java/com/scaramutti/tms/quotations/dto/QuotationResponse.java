@@ -32,6 +32,10 @@ import java.util.List;
  *    bounded context Quotations.
  *  - `createdBy` y `updatedBy` se exponen como UserResponse (sin embeber
  *    Summary — el dato del usuario es el mismo en cualquier contexto).
+ *  - `rejectionReason` (nullable): motivo del rechazo, presente solo si
+ *    `status=REJECTED`. INTERNO — se devuelve a los 4 roles pero NUNCA entra
+ *    al PDF ni a salidas hacia el cliente (ADR-007, hereda la regla de
+ *    `internalNote`).
  */
 public record QuotationResponse(
     Long id,
@@ -51,6 +55,7 @@ public record QuotationResponse(
     String destination,
     String clientNote,
     String internalNote,
+    String rejectionReason,
     BigDecimal totalSubtotal,
     BigDecimal totalIgv,
     BigDecimal totalAmount,

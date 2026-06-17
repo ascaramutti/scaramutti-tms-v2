@@ -18,6 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * del view, asi que mientras {@code internalNote} no sea un componente del record es
  * <b>estructuralmente imposible</b> que se filtre al PDF del cliente. Si un dev futuro
  * agrega un campo {@code internal*} a este view, este test se pone rojo a proposito.
+ *
+ * <p>Misma regla (ADR-007) para el <b>motivo de rechazo</b> ({@code rejectionReason}):
+ * es INTERNO y NUNCA debe entrar al PDF. Mientras no sea componente del view es
+ * estructuralmente imposible que se filtre; si un dev futuro agrega un campo
+ * {@code rejection*}, el test se pone rojo a proposito.
  */
 class QuotationPdfViewTest {
 
@@ -39,5 +44,13 @@ class QuotationPdfViewTest {
             componentNames().stream().anyMatch(name -> name.toLowerCase().contains("internal")),
             "RN-03: la observacion interna NUNCA debe existir en el view del PDF "
                 + "(seria filtrable hacia el cliente). Campos actuales: " + componentNames());
+    }
+
+    @Test
+    void view_neverExposesRejectionReason() {
+        assertFalse(
+            componentNames().stream().anyMatch(name -> name.toLowerCase().contains("rejection")),
+            "ADR-007: el motivo de rechazo (rejectionReason) NUNCA debe existir en el view del PDF "
+                + "(es INTERNO, seria filtrable hacia el cliente). Campos actuales: " + componentNames());
     }
 }
