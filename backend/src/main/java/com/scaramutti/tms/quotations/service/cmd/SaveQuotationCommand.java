@@ -9,7 +9,7 @@ import java.util.List;
 /**
  * Command interno del CreateQuotationService.
  *
- * Mapeado por ClientResourceMapper desde QuotationRequest. Diferencias:
+ * Mapeado por QuotationResourceMapper desde QuotationRequest. Diferencias:
  *  - origin/destination ya trimmed (no normalizamos uppercase — son lugares
  *    geograficos, no nombres comerciales).
  *  - contactName trimmed.
@@ -27,6 +27,8 @@ public record SaveQuotationCommand(
     Integer validityDays,
     String origin,
     String destination,
+    String clientNote,
+    String internalNote,
     List<Item> items
 ) {
 

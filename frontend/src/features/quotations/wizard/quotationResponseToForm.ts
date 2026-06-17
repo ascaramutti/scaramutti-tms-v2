@@ -119,6 +119,8 @@ export function quotationResponseToForm(quotation: QuotationResponse): WizardFor
     validityDays: quotation.validityDays,
     origin: textOrEmpty(quotation.origin),
     destination: textOrEmpty(quotation.destination),
+    clientNote: textOrEmpty(quotation.clientNote),
+    internalNote: textOrEmpty(quotation.internalNote),
     items: quotation.items.map(itemResponseToForm),
   }
 }

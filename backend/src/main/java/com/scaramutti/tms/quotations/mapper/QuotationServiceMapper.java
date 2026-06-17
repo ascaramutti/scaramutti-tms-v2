@@ -48,6 +48,8 @@ public interface QuotationServiceMapper {
     @Mapping(target = "validityDays",         source = "command.validityDays")
     @Mapping(target = "origin",               source = "command.origin")
     @Mapping(target = "destination",          source = "command.destination")
+    @Mapping(target = "clientNote",           source = "command.clientNote")
+    @Mapping(target = "internalNote",         source = "command.internalNote")
     @Mapping(target = "createdBy",            source = "userId")
     @Mapping(target = "updatedBy",            source = "userId")
     Quotation toQuotationEntity(SaveQuotationCommand command, String code, Integer userId);
@@ -77,5 +79,7 @@ public interface QuotationServiceMapper {
     @Mapping(target = "validityDays",         source = "command.validityDays")
     @Mapping(target = "origin",               source = "command.origin")
     @Mapping(target = "destination",          source = "command.destination")
+    @Mapping(target = "clientNote",           source = "command.clientNote")
+    @Mapping(target = "internalNote",         source = "command.internalNote")
     void applyUpdate(@MappingTarget Quotation quotation, SaveQuotationCommand command, Integer userId);
 }

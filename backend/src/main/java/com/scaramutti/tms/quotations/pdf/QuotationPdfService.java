@@ -97,6 +97,7 @@ public class QuotationPdfService {
             q.tentativeServiceDate() != null
                 ? q.tentativeServiceDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")) : null,
             buildStandbyRows(q, symbol),
+            q.clientNote(),
             q.createdBy() != null ? q.createdBy().fullName() : "",
             q.createdBy() != null ? q.createdBy().position() : "",
             company.terms(),

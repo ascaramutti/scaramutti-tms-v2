@@ -73,6 +73,15 @@ public class Quotation {
     @Column(length = 255)
     public String destination;
 
+    // Observaciones a nivel cotizacion (texto libre, max 500 — CHECK en BD).
+    // client_note: visible para el cliente (se renderiza en el PDF tras el stand-by).
+    // internal_note: SOLO interno — NUNCA se incluye en el PDF ni en salidas hacia el cliente.
+    @Column(name = "client_note")
+    public String clientNote;
+
+    @Column(name = "internal_note")
+    public String internalNote;
+
     @Column(name = "created_by", nullable = false)
     public Integer createdBy;
 

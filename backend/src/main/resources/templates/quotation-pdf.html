@@ -34,6 +34,9 @@
     .child-label { font-weight: bold; }
     .cargo { color: #666666; font-size: 7.5pt; font-style: italic; }
     .obs { color: #444444; font-size: 7.5pt; }
+    .obs-box { border: 1px solid #29417a; border-radius: 3px; padding: 6px 9px; margin-top: 16px; }
+    .obs-box-title { font-weight: bold; margin-bottom: 2px; }
+    .obs-box-text { color: #444444; font-size: 7.5pt; white-space: pre-wrap; word-wrap: break-word; }
     table.totals-wrap { width: 100%; border-collapse: collapse; margin-top: 16px; table-layout: fixed; }
     td.totals-spacer { width: 52%; }
     table.totals { width: 100%; background: #29417a; color: #ffffff; border-collapse: collapse; }
@@ -142,6 +145,13 @@
       {/for}
     </tbody>
   </table>
+  {/if}
+
+  {#if view.clientNote}
+  <div class="obs-box">
+    <div class="obs-box-title">Observaciones:</div>
+    <div class="obs-box-text">{view.clientNote}</div>
+  </div>
   {/if}
 
   </td></tr>

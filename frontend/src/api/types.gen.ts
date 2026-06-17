@@ -469,6 +469,14 @@ export type QuotationRequest = {
      */
     destination?: string | null;
     /**
+     * Observación opcional visible para el cliente (se renderiza en el PDF tras el stand-by y en la UI). Texto libre.
+     */
+    clientNote?: string | null;
+    /**
+     * Observación opcional SOLO interna. NUNCA se incluye en el PDF ni en ninguna salida hacia el cliente (RN-03).
+     */
+    internalNote?: string | null;
+    /**
      * Lista plana de ítems root e hijos. Los hijos referencian al padre vía `parentItemNumber`. Máximo 5 ítems root (validado por backend).
      */
     items: Array<QuotationItemRequest>;
@@ -502,6 +510,14 @@ export type QuotationResponse = {
     isExpired: boolean;
     origin?: string | null;
     destination?: string | null;
+    /**
+     * Observación visible para el cliente (PDF + UI).
+     */
+    clientNote?: string | null;
+    /**
+     * Observación SOLO interna; se devuelve a los roles que editan, nunca en el PDF (RN-03).
+     */
+    internalNote?: string | null;
     /**
      * Suma de items.subtotal
      */

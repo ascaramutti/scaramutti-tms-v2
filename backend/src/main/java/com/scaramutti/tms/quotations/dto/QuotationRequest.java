@@ -21,6 +21,7 @@ import java.util.List;
  *  - validityDays entre 1 y 365.
  *  - items: minSize 1.
  *  - origin/destination: maxLength 255.
+ *  - clientNote/internalNote: maxLength 500, opcionales (observaciones a nivel cotización).
  *  - contactName: maxLength 200.
  *
  * Validaciones de negocio (QuotationValidatorService):
@@ -67,6 +68,14 @@ public record QuotationRequest(
 
     @Size(max = 255)
     String destination,
+
+    @Size(max = 500)
+    @Pattern(regexp = "^[\\P{Cntrl}\\t\\n\\r]*$", message = "clientNote no puede contener caracteres de control")
+    String clientNote,
+
+    @Size(max = 500)
+    @Pattern(regexp = "^[\\P{Cntrl}\\t\\n\\r]*$", message = "internalNote no puede contener caracteres de control")
+    String internalNote,
 
     @NotEmpty
     @Valid

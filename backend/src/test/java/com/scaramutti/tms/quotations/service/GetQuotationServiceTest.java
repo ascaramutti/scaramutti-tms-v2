@@ -317,6 +317,7 @@ class GetQuotationServiceTest {
             com.scaramutti.tms.quotations.model.QuotationStatus.DRAFT,
             null, "Test Contact", null, null, null, null,
             15, OffsetDateTime.now(), false, "Lima", "Cusco",
+            null, null,
             BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
             List.of(), null, null,
             OffsetDateTime.now(), OffsetDateTime.now()

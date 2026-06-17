@@ -9,6 +9,7 @@ import { QuotationAuditFooter } from '../components/QuotationAuditFooter'
 import { QuotationDetailHeader } from '../components/QuotationDetailHeader'
 import { QuotationItemsSection } from '../components/QuotationItemsSection'
 import { QuotationDetailActions } from '../components/QuotationDetailActions'
+import { QuotationNotesSection } from '../components/QuotationNotesSection'
 import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationSummaryCard } from '../components/QuotationSummaryCard'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
@@ -93,6 +94,7 @@ export function CotizacionDetailPage() {
         igv={data.totalIgv}
       />
       <QuotationStandbyTable items={data.items} currencyCode={data.currency.code} />
+      <QuotationNotesSection quotation={data} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <QuotationAuditFooter
           createdBy={data.createdBy}
