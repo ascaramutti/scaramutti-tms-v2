@@ -50,6 +50,27 @@ describe('quotationResponseToForm', () => {
     expect(form.paymentTermId).toBeNull()
   })
 
+  it('mapea clientNote/internalNote con contenido a sus strings', () => {
+    const form = quotationResponseToForm(
+      getQuotationResponse({
+        clientNote: 'Precio sujeto a variación.',
+        internalNote: 'Margen ajustado por urgencia.',
+      }),
+    )
+
+    expect(form.clientNote).toBe('Precio sujeto a variación.')
+    expect(form.internalNote).toBe('Margen ajustado por urgencia.')
+  })
+
+  it('mapea clientNote/internalNote `null` a strings vacíos (no null/undefined)', () => {
+    const form = quotationResponseToForm(
+      getQuotationResponse({ clientNote: null, internalNote: null }),
+    )
+
+    expect(form.clientNote).toBe('')
+    expect(form.internalNote).toBe('')
+  })
+
   it('mapea un ítem root simple (sin componentes)', () => {
     const form = quotationResponseToForm(
       getQuotationResponse({
@@ -175,12 +196,18 @@ describe('quotationResponseToForm', () => {
   })
 
   it('round-trip: form→request preserva los campos editables y la jerarquía del Integral', () => {
-    const response = getQuotationResponse()
+    const response = getQuotationResponse({
+      clientNote: 'Nota para el cliente.',
+      internalNote: 'Nota interna.',
+    })
     const request = quotationFormToRequest(quotationResponseToForm(response))
 
     expect(request.quotationType).toBe('TRANSPORTE')
     expect(request.clientId).toBe(1)
     expect(request.currencyId).toBe(2)
+    // Las observaciones sobreviven el round-trip response→form→request.
+    expect(request.clientNote).toBe('Nota para el cliente.')
+    expect(request.internalNote).toBe('Nota interna.')
     // El Integral se aplana: padre (itemNumber 1) + 2 hijos con parentItemNumber 1.
     expect(request.items).toHaveLength(3)
     expect(request.items[0]).toMatchObject({ itemNumber: 1, serviceTypeId: 24, unitPrice: 1500 })

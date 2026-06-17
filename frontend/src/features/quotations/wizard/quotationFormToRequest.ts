@@ -109,6 +109,8 @@ export function quotationFormToRequest(form: WizardFormInput): QuotationRequest 
     validityDays: form.validityDays,
     origin: textOrNull(form.origin),
     destination: textOrNull(form.destination),
+    clientNote: textOrNull(form.clientNote),
+    internalNote: textOrNull(form.internalNote),
     items,
   }
 }

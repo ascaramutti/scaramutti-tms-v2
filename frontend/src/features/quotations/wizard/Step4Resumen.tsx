@@ -3,6 +3,7 @@ import { QuotationItemsSection } from '../components/QuotationItemsSection'
 import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
 import { Step4SummaryCard } from './Step4SummaryCard'
+import { QuotationNotesFields } from './QuotationNotesFields'
 import { quotationFormItemsToResponse, quotationTotals } from './quotationFormToResponse'
 import { montoEnLetras } from '../utils/montoEnLetras'
 import type { WizardFormInput } from './quotation-wizard.schema'
@@ -68,6 +69,8 @@ export function Step4Resumen({
           />
         </>
       )}
+
+      <QuotationNotesFields />
     </div>
   )
 }
