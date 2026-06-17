@@ -22,6 +22,15 @@ import com.scaramutti.tms.shared.exception.ApiError;
  *    El {@code quotationType} y el {@code clientId} no pueden cambiar (la cotizacion
  *    pertenece a un cliente y su tipo define las reglas de items). El caller pasa el
  *    detalle especifico con {@code toException(...)}.
+ *
+ *  - QUO-005: transicion de estado no permitida (PATCH /quotations/{id}/status). La
+ *    maquina de estados ({@code QuotationStatusMachine}, ADR-004) rechaza la transicion
+ *    origen→destino. El caller pasa el detalle nombrando origen y destino concretos con
+ *    {@code toException("No se puede pasar de REJECTED a SENT")}.
+ *
+ *  - QUO-006: intento de editar una cotizacion en estado terminal (PUT /quotations/{id}).
+ *    Una cotizacion {@code ACCEPTED}/{@code REJECTED}/{@code EXPIRED} es inmutable. El
+ *    caller pasa el detalle con el estado concreto via {@code toException(...)}.
  */
 public enum QuotationsError implements ApiError {
 
@@ -32,7 +41,11 @@ public enum QuotationsError implements ApiError {
     NOT_FOUND          ("QUO-003", 404, "Not Found",
         "La cotizacion no existe"),
     IMMUTABLE_FIELD    ("QUO-004", 400, "Bad Request",
-        "Un campo inmutable de la cotizacion no puede modificarse");
+        "Un campo inmutable de la cotizacion no puede modificarse"),
+    INVALID_TRANSITION ("QUO-005", 409, "Conflict",
+        "La transicion de estado no esta permitida"),
+    TERMINAL_NOT_EDITABLE ("QUO-006", 409, "Conflict",
+        "No se puede editar una cotizacion en estado terminal");
 
     private final String code;
     private final int status;

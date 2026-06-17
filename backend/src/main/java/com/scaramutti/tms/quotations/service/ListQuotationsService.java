@@ -18,7 +18,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -47,7 +46,8 @@ import java.util.stream.Collectors;
  * </ol>
  *
  * <p>El cliente y la moneda vienen del JOIN en la query de cabeceras (no batch
- * aparte). {@code isExpired} se computa en runtime ({@code now() > createdAt + validityDays}).
+ * aparte). {@code isExpired} se DERIVA del estado persistido ({@code status == EXPIRED},
+ * ADR-005), no se recalcula por fechas.
  */
 @ApplicationScoped
 public class ListQuotationsService {
@@ -69,13 +69,11 @@ public class ListQuotationsService {
         Map<Long, List<QuotationItem>> itemsByQuotation = loadItemsByQuotation(rows);
         Map<Integer, UserResponse> usersById = loadCreatedByUsers(rows);
 
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         List<QuotationSummaryResponse> content = rows.stream()
             .map(row -> toSummary(
                 row,
                 itemsByQuotation.getOrDefault(row.id(), List.of()),
-                usersById,
-                now
+                usersById
             ))
             .toList();
 
@@ -113,16 +111,18 @@ public class ListQuotationsService {
     private QuotationSummaryResponse toSummary(
             QuotationSummaryRow row,
             List<QuotationItem> items,
-            Map<Integer, UserResponse> usersById,
-            OffsetDateTime now) {
+            Map<Integer, UserResponse> usersById) {
 
         // totalAmount con la MISMA funcion que el detalle (snapshot IGV por item).
         QuotationCalculatorService.Totals totals = calculator.calculateFromEntities(items);
         // itemsCount = solo items root (los hijos del Integral no cuentan).
         int itemsCount = (int) items.stream().filter(item -> item.parentItemId == null).count();
 
+        // expiresAt sigue siendo informativo (createdAt + validityDays), lo expone el contrato.
         OffsetDateTime expiresAt = row.createdAt().plusDays(row.validityDays());
-        boolean isExpired = now.isAfter(expiresAt);
+        // isExpired se DERIVA del estado persistido (ADR-005): true sii status == EXPIRED
+        // (lo mantiene el QuotationExpiryJob). NO se recalcula por fechas en el read-path.
+        boolean isExpired = QuotationStatus.EXPIRED.name().equals(row.status());
 
         return new QuotationSummaryResponse(
             row.id(),

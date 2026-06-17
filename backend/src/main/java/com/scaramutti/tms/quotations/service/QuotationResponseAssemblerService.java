@@ -102,6 +102,7 @@ public class QuotationResponseAssemblerService {
             quotation.destination,
             quotation.clientNote,
             quotation.internalNote,
+            quotation.rejectionReason,
             totals.totalSubtotal(),
             totals.totalIgv(),
             totals.totalAmount(),

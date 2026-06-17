@@ -5,6 +5,7 @@ import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.quotations.QuotationsError;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
+import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
@@ -19,8 +20,6 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -41,16 +40,16 @@ import java.util.Set;
  *   <li>{@link QuotationCalculatorService#calculateFromEntities(List)} — totales
  *       usando el snapshot {@code igvPercentage} de cada item (no el config actual).</li>
  *   <li>Cargar createdBy/updatedBy users (dedup si coinciden — 1 query si son iguales).</li>
- *   <li>Computar {@code isExpired = now() > createdAt + validityDays} en UTC.</li>
+ *   <li>Derivar {@code isExpired} del estado persistido ({@code status == EXPIRED}, ADR-005).</li>
  *   <li>{@link QuotationResponseAssemblerService#assemble} — mismo helper que CREATE.</li>
  * </ol>
  *
  * <p>NO lleva {@code @Transactional}: lectura pura, Quarkus abre tx implicita si
  * Hibernate la necesita (mismo patron que {@code ClientService.findById}).
  *
- * <p>{@code isExpired} se computa aca con {@code OffsetDateTime.now(UTC)} — el
- * assembler lo recibe por parametro (es deterministic). Para tests unitarios
- * del calculo, ver {@code GetQuotationServiceTest}.
+ * <p>{@code isExpired} ya NO se computa por fechas en el read-path: se DERIVA del
+ * {@code status} (lo mantiene {@code QuotationExpiryJob}). El assembler lo recibe por
+ * parametro. Ver {@code GetQuotationServiceTest}.
  */
 @ApplicationScoped
 public class GetQuotationService {
@@ -137,13 +136,16 @@ public class GetQuotationService {
     }
 
     /**
-     * {@code isExpired = now() > createdAt + validityDays}. Comparacion en UTC.
-     * Estricto: si {@code now() == expiresAt} exacto, devuelve {@code false}
-     * (la cotizacion vence al SIGUIENTE instante).
+     * {@code isExpired} se DERIVA del estado persistido (ADR-005): {@code true} si y solo si
+     * {@code status == EXPIRED}. Una sola fuente de verdad — el {@code status} que mantiene el
+     * job de vencimiento ({@code QuotationExpiryJob}), NO un calculo por fechas en el read-path.
+     *
+     * <p>Matiz (ventana ≤24h): una {@code SENT} cuya validez ya paso sigue reportando
+     * {@code isExpired=false} hasta la proxima corrida del job (que la pasa a {@code EXPIRED}).
+     * El campo se mantiene en el response por compatibilidad con el frontend.
      */
     private boolean computeIsExpired(Quotation quotation) {
-        OffsetDateTime expiresAt = quotation.createdAt.plusDays(quotation.validityDays);
-        return OffsetDateTime.now(ZoneOffset.UTC).isAfter(expiresAt);
+        return QuotationStatus.EXPIRED.name().equals(quotation.status);
     }
 
     private Set<Integer> collectServiceTypeIds(List<QuotationItem> items) {

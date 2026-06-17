@@ -1,10 +1,12 @@
 package com.scaramutti.tms.quotations.mapper;
 
+import com.scaramutti.tms.quotations.dto.ChangeQuotationStatusRequest;
 import com.scaramutti.tms.quotations.dto.QuotationItemRequest;
 import com.scaramutti.tms.quotations.dto.QuotationRequest;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostRequest;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
+import com.scaramutti.tms.quotations.service.cmd.ChangeQuotationStatusCommand;
 import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.quotations.service.cmd.ListQuotationsQuery;
 import com.scaramutti.tms.shared.util.StringUtils;
@@ -46,6 +48,14 @@ public interface QuotationResourceMapper {
     List<SaveQuotationCommand.Item> toCommandItems(List<QuotationItemRequest> items);
 
     SaveQuotationCommand.Standby toCommandStandby(QuotationStandbyCostRequest request);
+
+    /**
+     * Traduce el body del PATCH /quotations/{id}/status a {@link ChangeQuotationStatusCommand}.
+     * El {@code rejectionReason} se trim ("" → null); la regla de obligatoriedad/exclusividad
+     * la valida el service (ADR-007), no el mapper.
+     */
+    @Mapping(target = "rejectionReason", source = "rejectionReason", qualifiedByName = "trimToNull")
+    ChangeQuotationStatusCommand toChangeStatusCommand(ChangeQuotationStatusRequest request);
 
     /**
      * Arma el query del listado desde los query-params del Resource. El `q` se

@@ -82,6 +82,12 @@ public class Quotation {
     @Column(name = "internal_note")
     public String internalNote;
 
+    // Motivo del rechazo (texto libre, max 500 — CHECK en BD). Nullable: solo se llena
+    // cuando status = 'REJECTED'. INTERNO — NUNCA se incluye en el PDF ni en salidas hacia
+    // el cliente (ADR-007, hereda la regla de internal_note).
+    @Column(name = "rejection_reason")
+    public String rejectionReason;
+
     @Column(name = "created_by", nullable = false)
     public Integer createdBy;
 

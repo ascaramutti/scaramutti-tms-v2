@@ -37,7 +37,8 @@ import static org.mockito.Mockito.when;
 /**
  * Unit del ListQuotationsService. Mockea repo/itemRepo/userRepo/calculator/mapper.
  * Aisla: mapeo de PageMeta, itemsCount root-only, totalAmount del calculator,
- * isExpired runtime, batch de users, y short-circuit en resultado vacío.
+ * isExpired derivado del estado (true SII EXPIRED, ADR-005), batch de users, y
+ * short-circuit en resultado vacío.
  *
  * NO testea el SQL (cubierto por integration). Los stubs comunes viven en
  * {@link #stubHappyPath} (Mockito strict — invocado solo donde se necesita).
@@ -62,8 +63,12 @@ class ListQuotationsServiceTest {
     }
 
     private QuotationSummaryRow row(long id, OffsetDateTime createdAt, int validityDays, int createdBy) {
+        return rowWithStatus(id, "DRAFT", createdAt, validityDays, createdBy);
+    }
+
+    private QuotationSummaryRow rowWithStatus(long id, String status, OffsetDateTime createdAt, int validityDays, int createdBy) {
         return new QuotationSummaryRow(
-            id, "2026-" + String.format("%05d", id), "TRANSPORTE", "DRAFT",
+            id, "2026-" + String.format("%05d", id), "TRANSPORTE", status,
             1, "ACME SAC", "20100100100", "USD", validityDays,
             "Lima", "Cusco", createdAt, createdBy
         );
@@ -199,12 +204,14 @@ class ListQuotationsServiceTest {
         assertEquals(new BigDecimal("9440.00"), result.content().get(0).totalAmount());
     }
 
-    // ---------- isExpired runtime -------------------------------------------
+    // ---------- isExpired derivado del estado (ADR-005) ---------------------
+    // isExpired = true SII status == EXPIRED. Ya NO se computa por fechas.
 
     @Test
-    void list_isExpiredTrue_forOldQuotation() {
-        OffsetDateTime old = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
-        stubHappyPath(List.of(row(1L, old, 15, 42)), 1L);   // venció hace 15 días
+    void list_isExpiredTrue_forStatusExpired() {
+        // EXPIRED es el UNICO estado con isExpired=true (lo deja el job). La fecha no importa.
+        OffsetDateTime fresh = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
+        stubHappyPath(List.of(rowWithStatus(1L, "EXPIRED", fresh, 15, 42)), 1L);
 
         PageResponse<QuotationSummaryResponse> result = service.list(query);
 
@@ -212,9 +219,32 @@ class ListQuotationsServiceTest {
     }
 
     @Test
-    void list_isExpiredFalse_forFreshQuotation() {
-        OffsetDateTime fresh = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
-        stubHappyPath(List.of(row(1L, fresh, 15, 42)), 1L);   // vigente
+    void list_isExpiredFalse_forOldSentQuotation_untilJobRuns() {
+        // Cambio de semantica (ADR-005): una SENT vencida por FECHA sigue isExpired=false
+        // hasta que el job la pase a EXPIRED. El read-path ya no mira createdAt+validityDays.
+        OffsetDateTime old = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
+        stubHappyPath(List.of(rowWithStatus(1L, "SENT", old, 15, 42)), 1L);
+
+        PageResponse<QuotationSummaryResponse> result = service.list(query);
+
+        assertFalse(result.content().get(0).isExpired());
+    }
+
+    @Test
+    void list_isExpiredFalse_forOldDraftQuotation() {
+        OffsetDateTime old = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
+        stubHappyPath(List.of(rowWithStatus(1L, "DRAFT", old, 15, 42)), 1L);
+
+        PageResponse<QuotationSummaryResponse> result = service.list(query);
+
+        assertFalse(result.content().get(0).isExpired());
+    }
+
+    @Test
+    void list_isExpiredFalse_forTerminalRejected() {
+        // Terminal != EXPIRED → isExpired=false (la fecha no influye).
+        OffsetDateTime old = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
+        stubHappyPath(List.of(rowWithStatus(1L, "REJECTED", old, 15, 42)), 1L);
 
         PageResponse<QuotationSummaryResponse> result = service.list(query);
 
