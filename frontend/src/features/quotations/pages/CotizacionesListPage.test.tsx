@@ -4,6 +4,10 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CotizacionesListPage } from './CotizacionesListPage'
+import { AuthProvider } from '../../../shared/auth/AuthContext'
+import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
+import { tokenStorage } from '../../../shared/auth/tokenStorage'
+import { fakeUser } from '../../../test/mocks/handlers/auth'
 import { server } from '../../../test/mocks/server'
 import {
   fakeQuotation,
@@ -26,15 +30,20 @@ function renderCotizaciones(initialPath = '/cotizaciones') {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
+  // La página vive dentro del layout autenticado: sesión admin sembrada en cache.
+  tokenStorage.setTokens('fake-access', 'fake-refresh')
+  queryClient.setQueryData(currentUserQueryKey, fakeUser)
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <Routes>
-          <Route path="/cotizaciones" element={<CotizacionesListPage />} />
-          <Route path="/cotizaciones/nueva" element={<div>NUEVA COTIZACION</div>} />
-          <Route path="/cotizaciones/:id" element={<DetalleStub />} />
-        </Routes>
-      </MemoryRouter>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <Routes>
+            <Route path="/cotizaciones" element={<CotizacionesListPage />} />
+            <Route path="/cotizaciones/nueva" element={<div>NUEVA COTIZACION</div>} />
+            <Route path="/cotizaciones/:id" element={<DetalleStub />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   )
 }
@@ -199,24 +208,37 @@ describe('CotizacionesListPage', () => {
     expect(within(row).getByText('Enviada')).toBeInTheDocument()
   })
 
-  it('badge "Vencida" cuando isExpired aunque el status sea DRAFT', async () => {
+  it('badge "Vencida" para el estado EXPIRED', async () => {
+    server.use(
+      quotationsPage([fakeQuotation({ code: '2026-00001', status: 'EXPIRED', isExpired: true })]),
+    )
+    renderCotizaciones()
+    const row = rowOf(await screen.findByText('2026-00001'))
+    expect(within(row).getByText('Vencida')).toBeInTheDocument()
+  })
+
+  it('badges "Aceptada"/"Rechazada" para los estados terminales', async () => {
+    server.use(
+      quotationsPage([
+        fakeQuotation({ id: 1, code: '2026-00001', status: 'ACCEPTED' }),
+        fakeQuotation({ id: 2, code: '2026-00002', status: 'REJECTED' }),
+      ]),
+    )
+    renderCotizaciones()
+    expect(within(rowOf(await screen.findByText('2026-00001'))).getByText('Aceptada')).toBeInTheDocument()
+    expect(within(rowOf(screen.getByText('2026-00002'))).getByText('Rechazada')).toBeInTheDocument()
+  })
+
+  // El badge ahora deriva del status: una DRAFT con isExpired=true por fecha (pero sin pasar
+  // por el job) sigue mostrándose "Borrador".
+  it('badge derivado del status: DRAFT con isExpired=true sigue "Borrador"', async () => {
     server.use(
       quotationsPage([fakeQuotation({ code: '2026-00001', status: 'DRAFT', isExpired: true })]),
     )
     renderCotizaciones()
     const row = rowOf(await screen.findByText('2026-00001'))
-    expect(within(row).getByText('Vencida')).toBeInTheDocument()
-    expect(within(row).queryByText('Borrador')).not.toBeInTheDocument()
-  })
-
-  it('badge "Vencida" cuando isExpired y status SENT', async () => {
-    server.use(
-      quotationsPage([fakeQuotation({ code: '2026-00001', status: 'SENT', isExpired: true })]),
-    )
-    renderCotizaciones()
-    const row = rowOf(await screen.findByText('2026-00001'))
-    expect(within(row).getByText('Vencida')).toBeInTheDocument()
-    expect(within(row).queryByText('Enviada')).not.toBeInTheDocument()
+    expect(within(row).getByText('Borrador')).toBeInTheDocument()
+    expect(within(row).queryByText('Vencida')).not.toBeInTheDocument()
   })
 
   // ----- Búsqueda (gate minLength 3) -----
@@ -255,6 +277,23 @@ describe('CotizacionesListPage', () => {
     renderCotizaciones()
     await user.selectOptions(screen.getByLabelText(/estado/i), 'SENT')
     await waitFor(() => expect(sink.params?.get('status')).toBe('SENT'))
+  })
+
+  it('el filtro de estado ofrece los 5 estados + "Todos"', async () => {
+    renderCotizaciones()
+    await screen.findByText('2026-00001')
+    const select = screen.getByLabelText(/estado/i)
+    const labels = Array.from(select.querySelectorAll('option')).map((o) => o.textContent)
+    expect(labels).toEqual(['Todos', 'Borrador', 'Enviada', 'Aceptada', 'Rechazada', 'Vencida'])
+  })
+
+  it('filtra por "Vencida" → GET ?status=EXPIRED', async () => {
+    const user = userEvent.setup()
+    const sink: { params?: URLSearchParams } = {}
+    server.use(quotationsCapture(sink, [fakeQuotation()]))
+    renderCotizaciones()
+    await user.selectOptions(screen.getByLabelText(/estado/i), 'EXPIRED')
+    await waitFor(() => expect(sink.params?.get('status')).toBe('EXPIRED'))
   })
 
   it('filtra por tipo (param quotationType)', async () => {

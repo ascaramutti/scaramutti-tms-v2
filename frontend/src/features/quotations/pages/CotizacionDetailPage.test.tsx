@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CotizacionDetailPage } from './CotizacionDetailPage'
+import { AuthProvider } from '../../../shared/auth/AuthContext'
+import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
+import { tokenStorage } from '../../../shared/auth/tokenStorage'
+import { fakeUser } from '../../../test/mocks/handlers/auth'
 import { server } from '../../../test/mocks/server'
 import {
+  changeQuotationStatusSuccess,
   fakeItem,
   getQuotationResponse,
   quotationDetail,
@@ -13,6 +18,7 @@ import {
   quotationDetailError,
   quotationDetailSlow,
 } from '../../../test/mocks/handlers/quotations'
+import type { ChangeStatusBody } from '../../../test/mocks/handlers/quotations'
 
 function renderDetalle(initialPath = '/cotizaciones/1') {
   const queryClient = new QueryClient({
@@ -20,14 +26,19 @@ function renderDetalle(initialPath = '/cotizaciones/1') {
     // el estado de error aparezca de inmediato en los tests.
     defaultOptions: { queries: { retry: false, retryDelay: 0 } },
   })
+  // El detalle monta <QuotationDetailActions> (usa useAuth): sesión admin sembrada en cache.
+  tokenStorage.setTokens('fake-access', 'fake-refresh')
+  queryClient.setQueryData(currentUserQueryKey, fakeUser)
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialPath]}>
-        <Routes>
-          <Route path="/cotizaciones" element={<div>LISTADO COTIZACIONES</div>} />
-          <Route path="/cotizaciones/:id" element={<CotizacionDetailPage />} />
-        </Routes>
-      </MemoryRouter>
+      <AuthProvider>
+        <MemoryRouter initialEntries={[initialPath]}>
+          <Routes>
+            <Route path="/cotizaciones" element={<div>LISTADO COTIZACIONES</div>} />
+            <Route path="/cotizaciones/:id" element={<CotizacionDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthProvider>
     </QueryClientProvider>,
   )
 }
@@ -168,20 +179,37 @@ describe('CotizacionDetailPage', () => {
     expect(screen.getByText('Enviada')).toBeInTheDocument()
   })
 
-  it('badge "Vencida" cuando isExpired aunque el status sea DRAFT', async () => {
+  it('badge "Vencida" para el estado EXPIRED', async () => {
+    server.use(quotationDetail(getQuotationResponse({ status: 'EXPIRED', isExpired: true })))
+    renderDetalle()
+    await findTitle()
+    expect(screen.getByText('Vencida')).toBeInTheDocument()
+  })
+
+  it('badge "Aceptada" para el estado ACCEPTED', async () => {
+    server.use(quotationDetail(getQuotationResponse({ status: 'ACCEPTED' })))
+    renderDetalle()
+    await findTitle()
+    expect(screen.getByText('Aceptada')).toBeInTheDocument()
+  })
+
+  it('badge "Rechazada" para el estado REJECTED', async () => {
+    server.use(quotationDetail(getQuotationResponse({ status: 'REJECTED', rejectionReason: 'Sin presupuesto' })))
+    renderDetalle()
+    await findTitle()
+    // El header y la sección de motivo usan el mismo label "Rechazada"/"Motivo del rechazo";
+    // basta con que el badge de estado esté presente.
+    expect(screen.getAllByText('Rechazada').length).toBeGreaterThan(0)
+  })
+
+  // El badge ahora deriva del `status` (eje único): una DRAFT con `isExpired=true` por fecha
+  // pero sin pasar por el job sigue mostrándose "Borrador" (el job la pondría EXPIRED).
+  it('badge derivado del status: DRAFT con isExpired=true sigue "Borrador"', async () => {
     server.use(quotationDetail(getQuotationResponse({ status: 'DRAFT', isExpired: true })))
     renderDetalle()
     await findTitle()
-    expect(screen.getByText('Vencida')).toBeInTheDocument()
-    expect(screen.queryByText('Borrador')).not.toBeInTheDocument()
-  })
-
-  it('badge "Vencida" cuando isExpired y status SENT', async () => {
-    server.use(quotationDetail(getQuotationResponse({ status: 'SENT', isExpired: true })))
-    renderDetalle()
-    await findTitle()
-    expect(screen.getByText('Vencida')).toBeInTheDocument()
-    expect(screen.queryByText('Enviada')).not.toBeInTheDocument()
+    expect(screen.getByText('Borrador')).toBeInTheDocument()
+    expect(screen.queryByText('Vencida')).not.toBeInTheDocument()
   })
 
   // ----- Totales -----
@@ -357,5 +385,59 @@ describe('CotizacionDetailPage', () => {
     expect(screen.getByRole('link', { name: /editar/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /previsualizar pdf/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /descargar pdf/i })).toBeInTheDocument()
+  })
+
+  // ----- Transiciones de estado (integración) -----
+  it('DRAFT → Enviada: badge "Enviada" y aparecen Aceptada/Rechazada', async () => {
+    const user = userEvent.setup()
+    // GET inicial DRAFT; el PATCH responde SENT (la cache del detalle se actualiza con esa
+    // versión → el badge y los botones reflejan el nuevo estado sin refetch).
+    server.use(quotationDetail(getQuotationResponse({ status: 'DRAFT' })))
+    const sink: { body?: ChangeStatusBody } = {}
+    server.use(changeQuotationStatusSuccess(sink))
+    renderDetalle()
+    await findTitle()
+
+    expect(screen.getByText('Borrador')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /enviada/i }))
+
+    expect(await screen.findByText('Enviada')).toBeInTheDocument()
+    expect(sink.body?.status).toBe('SENT')
+    expect(screen.getByRole('button', { name: /aceptada/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /^rechazada$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^enviada$/i })).not.toBeInTheDocument()
+  })
+
+  it('SENT → Rechazada: modal + motivo → badge "Rechazada", sección de motivo y sin botones', async () => {
+    const user = userEvent.setup()
+    server.use(quotationDetail(getQuotationResponse({ status: 'SENT' })))
+    const sink: { body?: ChangeStatusBody } = {}
+    server.use(changeQuotationStatusSuccess(sink))
+    renderDetalle()
+    await findTitle()
+
+    expect(screen.getByText('Enviada')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^rechazada$/i }))
+
+    // Modal abierto: escribo el motivo y confirmo.
+    const dialog = await screen.findByRole('dialog')
+    await user.type(within(dialog).getByLabelText(/motivo del rechazo/i), 'El cliente eligió otro proveedor')
+    await user.click(within(dialog).getByRole('button', { name: /registrar rechazo/i }))
+
+    // El detalle pasa a REJECTED: badge + sección de motivo + sin botones de transición.
+    expect(await screen.findByRole('heading', { name: /motivo del rechazo/i })).toBeInTheDocument()
+    expect(screen.getByText('El cliente eligió otro proveedor')).toBeInTheDocument()
+    expect(sink.body).toEqual({ status: 'REJECTED', rejectionReason: 'El cliente eligió otro proveedor' })
+    expect(screen.queryByRole('button', { name: /^rechazada$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /aceptada/i })).not.toBeInTheDocument()
+  })
+
+  it('estado terminal (ACCEPTED): no muestra botones de transición', async () => {
+    server.use(quotationDetail(getQuotationResponse({ status: 'ACCEPTED' })))
+    renderDetalle()
+    await findTitle()
+    expect(screen.queryByRole('button', { name: /^enviada$/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /aceptada/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^rechazada$/i })).not.toBeInTheDocument()
   })
 })
