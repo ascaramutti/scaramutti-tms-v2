@@ -74,6 +74,30 @@ describe('QuotationDetailActions', () => {
     expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', '/cotizaciones/1/editar')
   })
 
+  it('estado editable (SENT): Editar sigue siendo un link al wizard', () => {
+    renderActions({ status: 'SENT' })
+    expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', '/cotizaciones/1/editar')
+  })
+
+  it.each([
+    ['ACCEPTED', 'aceptada'],
+    ['REJECTED', 'rechazada'],
+    ['EXPIRED', 'vencida'],
+  ] as const)(
+    'estado terminal (%s): Editar deshabilitado, motivo en tooltip + nombre accesible, sin link',
+    (status, label) => {
+      renderActions({ status })
+      const editar = screen.getByRole('button', { name: /editar/i })
+      const reason = new RegExp(`no se puede editar una cotización ${label}`, 'i')
+      expect(editar).toBeDisabled()
+      // Tooltip propio (inmediato) con el motivo — reemplaza al `title` nativo (lento).
+      expect(screen.getByText(reason)).toBeInTheDocument()
+      // El motivo también viaja en el nombre accesible.
+      expect(editar).toHaveAccessibleName(reason)
+      expect(screen.queryByRole('link', { name: /editar/i })).not.toBeInTheDocument()
+    },
+  )
+
   it('descarga el PDF (object URL + click de <a>) al hacer click en Descargar', async () => {
     server.use(quotationPdf())
     const anchorClick = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})

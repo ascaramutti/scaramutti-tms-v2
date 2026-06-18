@@ -3,6 +3,7 @@ import type { QuotationStatus } from '../../../api'
 import { QUOTATION_STATUS_LABELS } from '../utils/quotationLabels'
 import {
   canChangeQuotationStatus,
+  isQuotationEditable,
   QUOTATION_STATUS_PRESENTATION,
 } from './quotationStatusPresentation'
 
@@ -36,6 +37,14 @@ describe('QUOTATION_STATUS_PRESENTATION', () => {
     expect(QUOTATION_STATUS_PRESENTATION.ACCEPTED.actions).toHaveLength(0)
     expect(QUOTATION_STATUS_PRESENTATION.REJECTED.actions).toHaveLength(0)
     expect(QUOTATION_STATUS_PRESENTATION.EXPIRED.actions).toHaveLength(0)
+  })
+
+  it('editable: DRAFT y SENT sí; los terminales no', () => {
+    expect(QUOTATION_STATUS_PRESENTATION.DRAFT.editable).toBe(true)
+    expect(QUOTATION_STATUS_PRESENTATION.SENT.editable).toBe(true)
+    expect(QUOTATION_STATUS_PRESENTATION.ACCEPTED.editable).toBe(false)
+    expect(QUOTATION_STATUS_PRESENTATION.REJECTED.editable).toBe(false)
+    expect(QUOTATION_STATUS_PRESENTATION.EXPIRED.editable).toBe(false)
   })
 
   it('solo el Rechazada (REJECTED) exige motivo', () => {
@@ -77,5 +86,18 @@ describe('canChangeQuotationStatus', () => {
 
   it('no permite a un rol ausente (undefined)', () => {
     expect(canChangeQuotationStatus(undefined)).toBe(false)
+  })
+})
+
+describe('isQuotationEditable', () => {
+  it('permite editar DRAFT y SENT', () => {
+    expect(isQuotationEditable('DRAFT')).toBe(true)
+    expect(isQuotationEditable('SENT')).toBe(true)
+  })
+
+  it('no permite editar los terminales (ACCEPTED/REJECTED/EXPIRED)', () => {
+    expect(isQuotationEditable('ACCEPTED')).toBe(false)
+    expect(isQuotationEditable('REJECTED')).toBe(false)
+    expect(isQuotationEditable('EXPIRED')).toBe(false)
   })
 })
