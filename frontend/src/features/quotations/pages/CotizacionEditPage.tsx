@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { FileQuestion } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Navigate, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { useQuotation } from '../hooks/useQuotation'
 import { useUpdateQuotation } from '../hooks/useUpdateQuotation'
+import { isQuotationEditable } from '../status/quotationStatusPresentation'
+import { QUOTATION_STATUS_LABELS } from '../utils/quotationLabels'
 import { quotationFormToRequest } from '../wizard/quotationFormToRequest'
 import { quotationResponseToForm } from '../wizard/quotationResponseToForm'
 import { useWizardCatalogs } from '../wizard/useWizardCatalogs'
@@ -33,6 +36,22 @@ export function CotizacionEditPage() {
   // aunque la versión no haya cambiado (si solo dependiera del ETag, sin cambios no remontaría).
   const [reloadCount, setReloadCount] = useState(0)
 
+  // Una cotización terminal (ACCEPTED/REJECTED/EXPIRED) es inmutable: el backend rechaza
+  // editarla con 409 QUO-006. El botón Editar del detalle ya está deshabilitado, pero la
+  // URL /editar sigue siendo alcanzable (link guardado, navegación manual) → avisamos y
+  // rebotamos al detalle.
+  const loadedStatus = quotation.data?.status
+  const isTerminal = loadedStatus != null && !isQuotationEditable(loadedStatus)
+  const warnedTerminal = useRef(false)
+  useEffect(() => {
+    if (isTerminal && loadedStatus && !warnedTerminal.current) {
+      warnedTerminal.current = true
+      toast.error(
+        `No se puede editar una cotización ${QUOTATION_STATUS_LABELS[loadedStatus].toLowerCase()}.`,
+      )
+    }
+  }, [isTerminal, loadedStatus])
+
   function goToList() {
     navigate('/cotizaciones')
   }
@@ -53,6 +72,12 @@ export function CotizacionEditPage() {
         />
       </div>
     )
+  }
+
+  // Terminal (ACCEPTED/REJECTED/EXPIRED) → rebote al detalle. Va antes del spinner de carga:
+  // una terminal no se edita, no tiene sentido esperar a los catálogos del wizard.
+  if (isTerminal) {
+    return <Navigate to={`/cotizaciones/${id}`} replace />
   }
 
   // Carga de la cotización o de los catálogos.

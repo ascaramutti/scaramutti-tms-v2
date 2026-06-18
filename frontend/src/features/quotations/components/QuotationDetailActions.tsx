@@ -8,6 +8,8 @@ import { useQuotationPdf } from '../hooks/useQuotationPdf'
 import { getPdfErrorMessage, openQuotationPdf, saveQuotationPdf } from '../utils/quotationPdf'
 import { QuotationStatusActions } from '../status/QuotationStatusActions'
 import { RejectQuotationModal } from '../status/RejectQuotationModal'
+import { isQuotationEditable } from '../status/quotationStatusPresentation'
+import { QUOTATION_STATUS_LABELS } from '../utils/quotationLabels'
 import type { QuotationStatus } from '../../../api'
 
 type PdfMode = 'preview' | 'download'
@@ -89,6 +91,13 @@ export function QuotationDetailActions({
   // Qué botón de PDF muestra el spinner.
   const pendingMode: PdfMode | null = isPending ? (variables?.preview ? 'preview' : 'download') : null
 
+  // Editar solo en estados no terminales (el backend rechaza editar un terminal con 409
+  // QUO-006). En terminales el botón no se oculta —es un affordance estable del detalle—
+  // sino que queda deshabilitado, con el motivo en un tooltip propio (inmediato, a diferencia
+  // del `title` nativo que tarda ~1s) y en el nombre accesible (aria-label).
+  const editable = isQuotationEditable(status)
+  const notEditableReason = `No se puede editar una cotización ${QUOTATION_STATUS_LABELS[status].toLowerCase()}`
+
   return (
     <div className="flex flex-col items-end gap-2">
       {staleConflict && (
@@ -112,10 +121,33 @@ export function QuotationDetailActions({
           onRejectClick={() => setRejectOpen(true)}
           onStatusError={handleStatusError}
         />
-        <Link to={`/cotizaciones/${quotationId}/editar`} className={SECONDARY_BUTTON}>
-          <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
-          Editar
-        </Link>
+        {editable ? (
+          <Link to={`/cotizaciones/${quotationId}/editar`} className={SECONDARY_BUTTON}>
+            <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+            Editar
+          </Link>
+        ) : (
+          <span className="group relative inline-flex">
+            <button
+              type="button"
+              disabled
+              aria-disabled
+              aria-label={`Editar — ${notEditableReason}`}
+              className={`${SECONDARY_BUTTON} ${DISABLED}`}
+            >
+              <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+              Editar
+            </button>
+            {/* Tooltip propio: aparece al instante con el hover (el `title` nativo tarda ~1s).
+                Decorativo (aria-hidden): el motivo ya viaja en el aria-label del botón. */}
+            <span
+              aria-hidden="true"
+              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-blue-700 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100"
+            >
+              {notEditableReason}
+            </span>
+          </span>
+        )}
         <button
           type="button"
           onClick={() => handlePdf('preview')}
