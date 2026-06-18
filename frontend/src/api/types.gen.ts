@@ -239,13 +239,23 @@ export type QuotationServiceTypeResponse = QuotationServiceTypeRef & {
 export type QuotationType = 'TRANSPORTE' | 'ALQUILER';
 
 /**
- * - `DRAFT`: cotización en edición, no enviada al cliente.
- * - `SENT`: ya enviada al cliente. Editable, pero queda registrado el envío.
+ * Ciclo de vida (eje único). Máquina de estados (ADR-004):
+ * `DRAFT → SENT → {ACCEPTED | REJECTED | EXPIRED}`.
  *
- * El estado "vencida" se calcula en runtime: `createdAt + validityDays < now()`. No se almacena.
+ * - `DRAFT`: cotización en edición, no enviada al cliente.
+ * - `SENT`: ya enviada al cliente. Único estado que puede vencer.
+ * - `ACCEPTED`: el cliente la aceptó. Terminal (inmutable).
+ * - `REJECTED`: el cliente la rechazó (lleva `rejectionReason`). Terminal (inmutable).
+ * - `EXPIRED`: venció sin respuesta. Terminal (inmutable). Lo produce el job, no el usuario.
+ *
+ * `isExpired` se deriva del `status`: es `true` si y solo si `status == EXPIRED`.
+ * El job de vencimiento diario (ADR-005) pasa `SENT → EXPIRED` cuando
+ * `createdAt + validityDays < now()`; mientras tanto una `SENT` vencida sigue
+ * reportando `isExpired=false` (ventana ≤24h hasta la próxima corrida). `DRAFT` y
+ * los terminales no-`EXPIRED` devuelven `false`.
  *
  */
-export type QuotationStatus = 'DRAFT' | 'SENT';
+export type QuotationStatus = 'DRAFT' | 'SENT' | 'ACCEPTED' | 'REJECTED' | 'EXPIRED';
 
 export type QuotationServiceTypeRef = {
     id: number;
@@ -505,7 +515,7 @@ export type QuotationResponse = {
      */
     expiresAt: string;
     /**
-     * now() > expiresAt
+     * status == EXPIRED (lo persiste el job diario, ADR-005; no se recalcula por fechas)
      */
     isExpired: boolean;
     origin?: string | null;
@@ -518,6 +528,10 @@ export type QuotationResponse = {
      * Observación SOLO interna; se devuelve a los roles que editan, nunca en el PDF (RN-03).
      */
     internalNote?: string | null;
+    /**
+     * Motivo del rechazo. Presente solo si status=REJECTED. INTERNO — se devuelve a los roles que editan, NUNCA en el PDF (ADR-007).
+     */
+    rejectionReason?: string | null;
     /**
      * Suma de items.subtotal
      */
@@ -1087,6 +1101,10 @@ export type UpdateQuotationErrors = {
      */
     404: Problem;
     /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+    /**
      * Optimistic lock — el recurso fue modificado desde que se leyó
      */
     412: Problem;
@@ -1102,6 +1120,70 @@ export type UpdateQuotationResponses = {
 };
 
 export type UpdateQuotationResponse = UpdateQuotationResponses[keyof UpdateQuotationResponses];
+
+export type UpdateQuotationStatusData = {
+    body: {
+        /**
+         * Destino de la transición. Solo destinos de usuario (DRAFT/EXPIRED no se exponen).
+         */
+        status: 'SENT' | 'ACCEPTED' | 'REJECTED';
+        /**
+         * Motivo del rechazo (texto libre, máx 500). Obligatorio Y exclusivo de
+         * `status=REJECTED`. INTERNO — nunca se incluye en el PDF (ADR-007).
+         *
+         */
+        rejectionReason?: string | null;
+    };
+    headers?: {
+        /**
+         * ETag/version del recurso para optimistic locking.
+         */
+        'If-Match'?: string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/quotations/{id}/status';
+};
+
+export type UpdateQuotationStatusErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type UpdateQuotationStatusError = UpdateQuotationStatusErrors[keyof UpdateQuotationStatusErrors];
+
+export type UpdateQuotationStatusResponses = {
+    /**
+     * Estado actualizado
+     */
+    200: QuotationResponse;
+};
+
+export type UpdateQuotationStatusResponse = UpdateQuotationStatusResponses[keyof UpdateQuotationStatusResponses];
 
 export type DownloadQuotationPdfData = {
     body?: never;

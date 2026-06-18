@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 // Enums espejados del contrato (QuotationStatus / QuotationType en el OpenAPI).
 // Si el contrato agrega valores, actualizar acá también.
-export const QUOTATION_STATUS_VALUES = ['DRAFT', 'SENT'] as const
+export const QUOTATION_STATUS_VALUES = ['DRAFT', 'SENT', 'ACCEPTED', 'REJECTED', 'EXPIRED'] as const
 export const QUOTATION_TYPE_VALUES = ['TRANSPORTE', 'ALQUILER'] as const
 
 /**
