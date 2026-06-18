@@ -73,6 +73,12 @@
             <artifactId>quarkus-smallrye-health</artifactId>
         </dependency>
 
+        <!-- Scheduler (cron jobs in-process, ej. vencimiento de cotizaciones) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-scheduler</artifactId>
+        </dependency>
+
         <!-- JWT (verify + emit) -->
         <dependency>
             <groupId>io.quarkus</groupId>

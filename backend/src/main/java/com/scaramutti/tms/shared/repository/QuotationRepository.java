@@ -8,6 +8,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
+import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
@@ -80,6 +81,33 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
     public List<Quotation> findRecentByCreatedByAndClient(Integer createdBy, Integer clientId, int secondsWindow) {
         OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(secondsWindow);
         return list("createdBy = ?1 AND clientId = ?2 AND createdAt >= ?3", createdBy, clientId, cutoff);
+    }
+
+    // ============== Vencimiento (job programado) ============================
+
+    /**
+     * Marca {@code EXPIRED} las cotizaciones {@code SENT} cuya validez ya paso
+     * ({@code created_at + validity_days < now()}). Solo {@code SENT} vence (ADR-004):
+     * {@code DRAFT} y los terminales ({@code ACCEPTED}/{@code REJECTED}/{@code EXPIRED})
+     * quedan excluidos estructuralmente por el {@code WHERE status='SENT'}.
+     *
+     * <p>Bulk {@code UPDATE} native — NO carga las entities una por una. Por eso NO dispara
+     * el {@code @PreUpdate} de {@link Quotation}, que es justo lo que queremos: la expiracion
+     * es del sistema, NO un cambio de usuario → NO toca {@code updated_at} ni {@code updated_by}
+     * (la cotizacion conserva su "ultimo cambio" real y su ETag no rota por el job).
+     *
+     * <p>Idempotente: una 2da corrida no encuentra {@code SENT} vencidas (ya son {@code EXPIRED})
+     * → devuelve 0. Misma condicion que el backfill del patch (ADR-008).
+     *
+     * @return cuantas filas marco {@code EXPIRED} (0 si no habia vencidas).
+     */
+    @Transactional
+    public int expireSentQuotations() {
+        return entityManager.createNativeQuery(
+            "UPDATE cotizaciones.quotations SET status = 'EXPIRED' "
+            + "WHERE status = 'SENT' "
+            + "AND created_at + (validity_days || ' days')::interval < now()"
+        ).executeUpdate();
     }
 
     // ============== Listado paginado (GET /quotations) ======================

@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesResponses, ListPaymentTermsData, ListPaymentTermsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesResponses, ListQuotationsResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses } from './types.gen';
+import type { ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesResponses, ListPaymentTermsData, ListPaymentTermsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesResponses, ListQuotationsResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -227,11 +227,13 @@ export const getQuotationConfig = <ThrowOnError extends boolean = false>(options
  *
  * Devuelve la cotización completa: cabecera + items (jerárquicos
  * con `children` del Servicio Integral) + totales calculados +
- * `expiresAt` computado + `isExpired` flag runtime (`now() > expiresAt`).
+ * `expiresAt` informativo + `isExpired` derivado del `status`.
  *
- * **`isExpired`** se recomputa en cada GET (no se cachea server-side).
- * El cliente NO debe persistir el valor — el flag puede cambiar entre
- * requests consecutivos si la cotización venció en el medio.
+ * **`isExpired`** es `true` si y solo si `status == EXPIRED`. La transición
+ * `SENT → EXPIRED` la persiste el job de vencimiento diario (ADR-005), no se
+ * recalcula por fechas en cada GET. Una cotización `SENT` cuya validez ya
+ * pasó reporta `isExpired=false` hasta la próxima corrida del job (ventana
+ * ≤24h). `expiresAt` (`createdAt + validityDays`) es solo informativo.
  *
  * **Totales** recalculados desde items: subtotal por item root, IGV
  * usando el snapshot `item.igvPercentage` persistido (no el config
@@ -261,6 +263,8 @@ export const getQuotation = <ThrowOnError extends boolean = false>(options: Opti
  * en el request).
  * - **Items**: se reemplaza la lista completa — los items y standby anteriores
  * se borran y se insertan los del request.
+ * - **Terminalidad**: una cotización en estado terminal (`ACCEPTED`/`REJECTED`/`EXPIRED`)
+ * es inmutable → **409 (QUO-006)**. `DRAFT`/`SENT` siguen editables.
  *
  * Requiere `If-Match` con el ETag vigente (optimistic locking): si la cotización
  * fue modificada desde que se leyó → **412 (COM-004)**; recargar antes de reintentar.
@@ -270,6 +274,34 @@ export const updateQuotation = <ThrowOnError extends boolean = false>(options: O
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/quotations/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Cambiar el estado de una cotización (enviar / aceptar / rechazar)
+ *
+ * Transiciona el estado de la cotización según la máquina de estados (ADR-004):
+ * `DRAFT → SENT → {ACCEPTED | REJECTED}`. El `status` del body se restringe a los
+ * **destinos de usuario** (`SENT`, `ACCEPTED`, `REJECTED`) — `DRAFT`/`EXPIRED` NO son
+ * destinos de usuario (`EXPIRED` solo lo produce el job).
+ *
+ * Requiere `If-Match` con el ETag vigente (optimistic locking, igual que el PUT):
+ * si la versión cambió → `412 COM-004`. Una transición inválida (incluida toda salida
+ * de un estado terminal, p.ej. `REJECTED → SENT`) → `409 QUO-005`.
+ *
+ * Al rechazar (`status=REJECTED`), `rejectionReason` es **obligatorio y exclusivo**:
+ * `REJECTED` sin motivo → `400 COM-001`; cualquier otro destino con motivo → `400 COM-001`.
+ * El motivo es INTERNO — se devuelve en `QuotationResponse` pero NUNCA entra al PDF (ADR-007).
+ *
+ */
+export const updateQuotationStatus = <ThrowOnError extends boolean = false>(options: Options<UpdateQuotationStatusData, ThrowOnError>) => (options.client ?? client).patch<UpdateQuotationStatusResponses, UpdateQuotationStatusErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/quotations/{id}/status',
     ...options,
     headers: {
         'Content-Type': 'application/json',

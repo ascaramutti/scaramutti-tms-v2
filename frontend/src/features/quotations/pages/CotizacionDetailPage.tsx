@@ -10,6 +10,7 @@ import { QuotationDetailHeader } from '../components/QuotationDetailHeader'
 import { QuotationItemsSection } from '../components/QuotationItemsSection'
 import { QuotationDetailActions } from '../components/QuotationDetailActions'
 import { QuotationNotesSection } from '../components/QuotationNotesSection'
+import { QuotationRejectionReasonSection } from '../components/QuotationRejectionReasonSection'
 import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationSummaryCard } from '../components/QuotationSummaryCard'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
@@ -85,7 +86,13 @@ export function CotizacionDetailPage() {
         createdAt={data.createdAt}
         expiresAt={data.expiresAt}
       />
-      <QuotationDetailActions quotationId={data.id} quotationCode={data.code} />
+      <QuotationDetailActions
+        quotationId={data.id}
+        quotationCode={data.code}
+        status={data.status}
+        etag={data._etag}
+        onRefetch={() => refetch()}
+      />
       <QuotationSummaryCard quotation={data} />
       <QuotationItemsSection
         items={data.items}
@@ -95,6 +102,7 @@ export function CotizacionDetailPage() {
       />
       <QuotationStandbyTable items={data.items} currencyCode={data.currency.code} />
       <QuotationNotesSection quotation={data} />
+      <QuotationRejectionReasonSection quotation={data} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <QuotationAuditFooter
           createdBy={data.createdBy}

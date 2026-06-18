@@ -1,22 +1,24 @@
 import { Badge } from '../../../shared/ui/Badge'
+import { QUOTATION_STATUS_PRESENTATION } from '../status/quotationStatusPresentation'
 import type { QuotationStatus } from '../../../api'
 
 interface QuotationStatusBadgeProps {
   status: QuotationStatus
-  isExpired: boolean
+  /**
+   * @deprecated Redundante: el color y el label se derivan del `status` (la expiración ya
+   * vive en el estado `EXPIRED`, que pone el job). Se mantiene en la firma para no romper
+   * los call-sites existentes; no participa en el render.
+   */
+  isExpired?: boolean
 }
 
 /**
- * Badge de estado de una cotización. La expiración (runtime) tiene prioridad
- * visual sobre el status: una cotización vencida se muestra "Vencida" aunque
- * su status sea DRAFT o SENT.
+ * Badge del estado de una cotización, derivado de la fuente de verdad única
+ * (`QUOTATION_STATUS_PRESENTATION`). Cubre los 5 estados (Borrador/Enviada/Aceptada/
+ * Rechazada/Vencida); el color nunca es el único portador de significado: siempre lleva
+ * el label textual.
  */
-export function QuotationStatusBadge({ status, isExpired }: QuotationStatusBadgeProps) {
-  if (isExpired) {
-    return <Badge variant="danger">Vencida</Badge>
-  }
-  if (status === 'SENT') {
-    return <Badge variant="success">Enviada</Badge>
-  }
-  return <Badge variant="default">Borrador</Badge>
+export function QuotationStatusBadge({ status }: QuotationStatusBadgeProps) {
+  const { label, badgeVariant } = QUOTATION_STATUS_PRESENTATION[status]
+  return <Badge variant={badgeVariant}>{label}</Badge>
 }

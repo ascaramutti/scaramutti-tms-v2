@@ -43,6 +43,6 @@ class QuotationPdfServiceErrorTest {
     private QuotationResponse responseWithCode(String code) {
         return new QuotationResponse(
             1L, code, null, null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null, null, null, null, null, null, null);
     }
 }

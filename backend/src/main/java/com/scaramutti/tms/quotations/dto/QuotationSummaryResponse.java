@@ -19,7 +19,7 @@ import java.time.OffsetDateTime;
  *    (misma funcion que el detalle → totales identicos). itemsCount cuenta solo
  *    items root (los hijos del Integral no cuentan).
  *  - {@code createdBy}: UserResponse completo (consistente con el detalle).
- *  - {@code isExpired}: computado en runtime ({@code now() > createdAt + validityDays}).
+ *  - {@code isExpired}: derivado del estado persistido (true SII {@code status == EXPIRED}, ADR-005).
  */
 public record QuotationSummaryResponse(
     Long id,

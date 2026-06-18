@@ -554,11 +554,13 @@ paths:
       description: |
         Devuelve la cotización completa: cabecera + items (jerárquicos
         con `children` del Servicio Integral) + totales calculados +
-        `expiresAt` computado + `isExpired` flag runtime (`now() > expiresAt`).
+        `expiresAt` informativo + `isExpired` derivado del `status`.
 
-        **`isExpired`** se recomputa en cada GET (no se cachea server-side).
-        El cliente NO debe persistir el valor — el flag puede cambiar entre
-        requests consecutivos si la cotización venció en el medio.
+        **`isExpired`** es `true` si y solo si `status == EXPIRED`. La transición
+        `SENT → EXPIRED` la persiste el job de vencimiento diario (ADR-005), no se
+        recalcula por fechas en cada GET. Una cotización `SENT` cuya validez ya
+        pasó reporta `isExpired=false` hasta la próxima corrida del job (ventana
+        ≤24h). `expiresAt` (`createdAt + validityDays`) es solo informativo.
 
         **Totales** recalculados desde items: subtotal por item root, IGV
         usando el snapshot `item.igvPercentage` persistido (no el config
@@ -594,6 +596,8 @@ paths:
           en el request).
         - **Items**: se reemplaza la lista completa — los items y standby anteriores
           se borran y se insertan los del request.
+        - **Terminalidad**: una cotización en estado terminal (`ACCEPTED`/`REJECTED`/`EXPIRED`)
+          es inmutable → **409 (QUO-006)**. `DRAFT`/`SENT` siguen editables.
 
         Requiere `If-Match` con el ETag vigente (optimistic locking): si la cotización
         fue modificada desde que se leyó → **412 (COM-004)**; recargar antes de reintentar.
@@ -644,6 +648,75 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /quotations/{id}/status:
+    parameters:
+      - $ref: '#/components/parameters/IdLong'
+    patch:
+      tags: [Quotations]
+      operationId: updateQuotationStatus
+      summary: 'Cambiar el estado de una cotización (enviar / aceptar / rechazar)'
+      description: |
+        Transiciona el estado de la cotización según la máquina de estados (ADR-004):
+        `DRAFT → SENT → {ACCEPTED | REJECTED}`. El `status` del body se restringe a los
+        **destinos de usuario** (`SENT`, `ACCEPTED`, `REJECTED`) — `DRAFT`/`EXPIRED` NO son
+        destinos de usuario (`EXPIRED` solo lo produce el job).
+
+        Requiere `If-Match` con el ETag vigente (optimistic locking, igual que el PUT):
+        si la versión cambió → `412 COM-004`. Una transición inválida (incluida toda salida
+        de un estado terminal, p.ej. `REJECTED → SENT`) → `409 QUO-005`.
+
+        Al rechazar (`status=REJECTED`), `rejectionReason` es **obligatorio y exclusivo**:
+        `REJECTED` sin motivo → `400 COM-001`; cualquier otro destino con motivo → `400 COM-001`.
+        El motivo es INTERNO — se devuelve en `QuotationResponse` pero NUNCA entra al PDF (ADR-007).
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [SENT, ACCEPTED, REJECTED]
+                  description: 'Destino de la transición. Solo destinos de usuario (DRAFT/EXPIRED no se exponen).'
+                rejectionReason:
+                  type: [string, 'null']
+                  maxLength: 500
+                  description: |
+                    Motivo del rechazo (texto libre, máx 500). Obligatorio Y exclusivo de
+                    `status=REJECTED`. INTERNO — nunca se incluye en el PDF (ADR-007).
+            examples:
+              markSent:
+                summary: Marcar como enviada
+                value: { status: 'SENT' }
+              accept:
+                summary: Aceptar
+                value: { status: 'ACCEPTED' }
+              reject:
+                summary: Rechazar (con motivo obligatorio)
+                value: { status: 'REJECTED', rejectionReason: 'El cliente eligió otra propuesta por precio.' }
+      responses:
+        '200':
+          description: Estado actualizado
+          headers:
+            ETag:
+              description: 'Nuevo `updatedAt` de la cotización (source del optimistic locking).'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuotationResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
 
   /quotations/{id}/pdf:
@@ -862,6 +935,26 @@ components:
                 instance: '/api/v1/quotations'
                 code: 'QUO-002'
                 traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
+            invalidStatusTransition:
+              summary: Transición de estado no permitida (PATCH /quotations/{id}/status)
+              value:
+                type: 'urn:tms:error:quo-005'
+                title: 'Conflict'
+                status: 409
+                detail: 'No se puede pasar de REJECTED a SENT'
+                instance: '/api/v1/quotations/142/status'
+                code: 'QUO-005'
+                traceId: '9a0b1c2d-3e4f-5a6b-7c8d-9e0f1a2b3c4d'
+            terminalNotEditable:
+              summary: Intento de editar una cotización en estado terminal (PUT /quotations/{id})
+              value:
+                type: 'urn:tms:error:quo-006'
+                title: 'Conflict'
+                status: 409
+                detail: 'No se puede editar una cotizacion en estado ACCEPTED'
+                instance: '/api/v1/quotations/142'
+                code: 'QUO-006'
+                traceId: 'a0b1c2d3-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
 
     NotFound:
       description: Recurso no encontrado
@@ -1204,12 +1297,22 @@ components:
 
     QuotationStatus:
       type: string
-      enum: [DRAFT, SENT]
+      enum: [DRAFT, SENT, ACCEPTED, REJECTED, EXPIRED]
       description: |
-        - `DRAFT`: cotización en edición, no enviada al cliente.
-        - `SENT`: ya enviada al cliente. Editable, pero queda registrado el envío.
+        Ciclo de vida (eje único). Máquina de estados (ADR-004):
+        `DRAFT → SENT → {ACCEPTED | REJECTED | EXPIRED}`.
 
-        El estado "vencida" se calcula en runtime: `createdAt + validityDays < now()`. No se almacena.
+        - `DRAFT`: cotización en edición, no enviada al cliente.
+        - `SENT`: ya enviada al cliente. Único estado que puede vencer.
+        - `ACCEPTED`: el cliente la aceptó. Terminal (inmutable).
+        - `REJECTED`: el cliente la rechazó (lleva `rejectionReason`). Terminal (inmutable).
+        - `EXPIRED`: venció sin respuesta. Terminal (inmutable). Lo produce el job, no el usuario.
+
+        `isExpired` se deriva del `status`: es `true` si y solo si `status == EXPIRED`.
+        El job de vencimiento diario (ADR-005) pasa `SENT → EXPIRED` cuando
+        `createdAt + validityDays < now()`; mientras tanto una `SENT` vencida sigue
+        reportando `isExpired=false` (ventana ≤24h hasta la próxima corrida). `DRAFT` y
+        los terminales no-`EXPIRED` devuelven `false`.
 
     QuotationServiceTypeRef:
       type: object
@@ -1511,11 +1614,12 @@ components:
         tentativeServiceDate: { type: [string, 'null'], format: date }
         validityDays: { type: integer, minimum: 1, maximum: 365, example: 15 }
         expiresAt:    { type: string, format: date-time, description: 'createdAt + validityDays (computado)' }
-        isExpired:    { type: boolean, description: 'now() > expiresAt' }
+        isExpired:    { type: boolean, description: 'status == EXPIRED (lo persiste el job diario, ADR-005; no se recalcula por fechas)' }
         origin:       { type: [string, 'null'] }
         destination:  { type: [string, 'null'] }
         clientNote:   { type: [string, 'null'], maxLength: 500, description: 'Observación visible para el cliente (PDF + UI).' }
         internalNote: { type: [string, 'null'], maxLength: 500, description: 'Observación SOLO interna; se devuelve a los roles que editan, nunca en el PDF (RN-03).' }
+        rejectionReason: { type: [string, 'null'], maxLength: 500, description: 'Motivo del rechazo. Presente solo si status=REJECTED. INTERNO — se devuelve a los roles que editan, NUNCA en el PDF (ADR-007).' }
         totalSubtotal: { type: number, format: double, description: 'Suma de items.subtotal' }
         totalIgv:      { type: number, format: double, description: 'IGV total' }
         totalAmount:   { type: number, format: double, description: 'Total = subtotal + IGV' }

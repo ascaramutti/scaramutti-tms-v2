@@ -46,7 +46,7 @@ import static org.mockito.Mockito.when;
  * Unit del GetQuotationService. Mockea TODOS los colaboradores. Aisla:
  *  - 404 cuando el id no existe (QUO-003) + verifyNoInteractions con
  *    colaboradores.
- *  - Calculo determinista de {@code isExpired = now() > createdAt + validityDays}.
+ *  - {@code isExpired} derivado del estado (true SII status == EXPIRED, ADR-005).
  *  - Dedup de lookup de usuarios cuando createdBy == updatedBy (1 query).
  *  - Defensa contra items vacios (no NPE).
  *  - Orfandad de User FK → COM-500 (consistente con loader behavior).
@@ -149,13 +149,13 @@ class GetQuotationServiceTest {
             dependencyLoader, calculator, assembler);
     }
 
-    // ---------- isExpired runtime ------------------------------------------
+    // ---------- isExpired derivado del estado (ADR-005) --------------------
+    // isExpired = true SII status == EXPIRED. Ya NO se computa por fechas.
 
     @Test
-    void getById_oldQuotationPastExpiry_passesIsExpiredTrueToAssembler() {
-        // 30 dias atras con validez 15 → vencida hace 15 dias.
-        quotation.createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
-        quotation.validityDays = 15;
+    void getById_statusExpired_passesIsExpiredTrueToAssembler() {
+        // EXPIRED es el UNICO estado con isExpired=true (lo deja el job).
+        quotation.status = "EXPIRED";
         when(quotationRepository.findByIdOptional(123L)).thenReturn(Optional.of(quotation));
         setupHappyPathMocks();
 
@@ -165,9 +165,11 @@ class GetQuotationServiceTest {
     }
 
     @Test
-    void getById_freshQuotation_passesIsExpiredFalseToAssembler() {
-        // Recien creada (1 dia atras) con validez 15 → vigente.
-        quotation.createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
+    void getById_sentPastValidity_passesIsExpiredFalse_untilJobRuns() {
+        // Cambio de semantica (ADR-005): una SENT vencida por FECHA sigue isExpired=false
+        // hasta que el job la pase a EXPIRED. El read-path ya no mira createdAt+validityDays.
+        quotation.status = "SENT";
+        quotation.createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
         quotation.validityDays = 15;
         when(quotationRepository.findByIdOptional(123L)).thenReturn(Optional.of(quotation));
         setupHappyPathMocks();
@@ -178,14 +180,35 @@ class GetQuotationServiceTest {
     }
 
     @Test
-    void getById_validityWithinWindow_returnsFalse() {
-        // 14 dias atras + 60s con validez 15 → vence en ~1 dia (vigente).
-        // No es el borde estricto exacto (que requeriria mockear el reloj —
-        // diferido para una iteracion futura con Clock injectable). Si que
-        // confirma que estando dentro del window por margen razonable, NO
-        // se reporta como expirado. Robusto contra flakiness por timing.
-        quotation.createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(14).plusSeconds(60);
+    void getById_draftPastValidity_passesIsExpiredFalse() {
+        quotation.status = "DRAFT";
+        quotation.createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
         quotation.validityDays = 15;
+        when(quotationRepository.findByIdOptional(123L)).thenReturn(Optional.of(quotation));
+        setupHappyPathMocks();
+
+        service.getById(123L);
+
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), eq(false));
+    }
+
+    @Test
+    void getById_terminalAcceptedPastValidity_passesIsExpiredFalse() {
+        // Terminal != EXPIRED → isExpired=false (no importa la fecha).
+        quotation.status = "ACCEPTED";
+        quotation.createdAt = OffsetDateTime.now(ZoneOffset.UTC).minusDays(30);
+        quotation.validityDays = 15;
+        when(quotationRepository.findByIdOptional(123L)).thenReturn(Optional.of(quotation));
+        setupHappyPathMocks();
+
+        service.getById(123L);
+
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), eq(false));
+    }
+
+    @Test
+    void getById_terminalRejected_passesIsExpiredFalse() {
+        quotation.status = "REJECTED";
         when(quotationRepository.findByIdOptional(123L)).thenReturn(Optional.of(quotation));
         setupHappyPathMocks();
 
@@ -317,7 +340,7 @@ class GetQuotationServiceTest {
             com.scaramutti.tms.quotations.model.QuotationStatus.DRAFT,
             null, "Test Contact", null, null, null, null,
             15, OffsetDateTime.now(), false, "Lima", "Cusco",
-            null, null,
+            null, null, null,
             BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
             List.of(), null, null,
             OffsetDateTime.now(), OffsetDateTime.now()

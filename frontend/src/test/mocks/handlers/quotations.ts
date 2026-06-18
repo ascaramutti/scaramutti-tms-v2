@@ -360,6 +360,57 @@ export function updateQuotationSlow(ms = 40, response?: QuotationResponse) {
   })
 }
 
+// ----- Cambio de estado (PATCH /quotations/:id/status) -----
+
+/** Body del PATCH de estado (lo que captura `changeQuotationStatusSuccess`). */
+export interface ChangeStatusBody {
+  status: 'SENT' | 'ACCEPTED' | 'REJECTED'
+  rejectionReason?: string | null
+}
+
+/** PATCH /quotations/:id/status OK: captura el body + headers (If-Match, Authorization) en
+ * `sink` y responde 200 con el detalle actualizado + nuevo ETag. Por defecto refleja el
+ * `status` enviado (y el `rejectionReason` si vino) sobre el fixture default. */
+export function changeQuotationStatusSuccess(
+  sink: { body?: ChangeStatusBody; ifMatch?: string | null; authorization?: string | null },
+  response?: QuotationResponse,
+) {
+  return http.patch(`${API}/quotations/:id/status`, async ({ request }) => {
+    const body = (await request.json()) as ChangeStatusBody
+    sink.body = body
+    sink.ifMatch = request.headers.get('If-Match')
+    sink.authorization = request.headers.get('Authorization')
+    const updated =
+      response ??
+      getQuotationResponse({
+        status: body.status,
+        rejectionReason: body.status === 'REJECTED' ? body.rejectionReason : null,
+      })
+    return HttpResponse.json(updated, { headers: { ETag: `"${updated.updatedAt}"` } })
+  })
+}
+
+/** Error (Problem RFC 7807) al cambiar de estado: 409 QUO-005 (transición inválida),
+ * 412 COM-004 (ETag stale), 400 COM-001 (motivo), 403/404. */
+export function changeQuotationStatusError(status: number, problem: Partial<Problem> = {}) {
+  return http.patch(`${API}/quotations/:id/status`, () =>
+    HttpResponse.json(
+      { type: 'urn:tms:error:test', title: 'Error', status, detail: 'Fallo de prueba', ...problem },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Cambio de estado con delay (para observar el spinner del botón en vuelo). */
+export function changeQuotationStatusSlow(ms = 40, response?: QuotationResponse) {
+  return http.patch(`${API}/quotations/:id/status`, async ({ request }) => {
+    const body = (await request.json()) as ChangeStatusBody
+    await delay(ms)
+    const updated = response ?? getQuotationResponse({ status: body.status })
+    return HttpResponse.json(updated, { headers: { ETag: `"${updated.updatedAt}"` } })
+  })
+}
+
 // ----- PDF (GET /quotations/:id/pdf) -----
 
 /** Responde un PDF binario (blob) OK. Captura el query `preview` y el header

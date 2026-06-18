@@ -300,25 +300,28 @@ CREATE TABLE IF NOT EXISTS cotizaciones.quotations (
     destination            VARCHAR(255),
     client_note            TEXT,
     internal_note          TEXT,
+    rejection_reason       TEXT,
     created_by             INTEGER NOT NULL REFERENCES public.users(id),
     updated_by             INTEGER NOT NULL REFERENCES public.users(id),
     created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT chk_quotations_type   CHECK (quotation_type IN ('TRANSPORTE','ALQUILER')),
-    CONSTRAINT chk_quotations_status CHECK (status IN ('DRAFT','SENT')),
+    CONSTRAINT chk_quotations_status CHECK (status IN ('DRAFT','SENT','ACCEPTED','REJECTED','EXPIRED')),
     CONSTRAINT chk_quotations_validity_days CHECK (validity_days > 0 AND validity_days <= 365),
     CONSTRAINT chk_quotations_client_note_len   CHECK (client_note   IS NULL OR char_length(client_note)   <= 500),
-    CONSTRAINT chk_quotations_internal_note_len CHECK (internal_note IS NULL OR char_length(internal_note) <= 500)
+    CONSTRAINT chk_quotations_internal_note_len CHECK (internal_note IS NULL OR char_length(internal_note) <= 500),
+    CONSTRAINT chk_quotations_rejection_reason_len CHECK (rejection_reason IS NULL OR char_length(rejection_reason) <= 500)
 );
 
 COMMENT ON TABLE  cotizaciones.quotations               IS 'Cabecera de cotización emitida al cliente';
 COMMENT ON COLUMN cotizaciones.quotations.quotation_type IS 'TRANSPORTE (con origen/destino) | ALQUILER (sin ruta, por días/unidades)';
-COMMENT ON COLUMN cotizaciones.quotations.status        IS 'DRAFT (borrador interno) | SENT (enviada al cliente). Estado vencido se calcula desde created_at + validity_days';
+COMMENT ON COLUMN cotizaciones.quotations.status        IS 'Ciclo de vida (eje único): DRAFT (borrador) | SENT (enviada) | ACCEPTED | REJECTED | EXPIRED. Terminales (ACCEPTED/REJECTED/EXPIRED) inmutables. Solo SENT vence: el job diario pasa SENT→EXPIRED (created_at + validity_days < now); isExpired se deriva de status==EXPIRED (ADR-005).';
 COMMENT ON COLUMN cotizaciones.quotations.contact_name  IS 'Snapshot del contacto al momento de cotizar (obligatorio — la cotización siempre se dirige a alguien). No se reactualiza si el cliente master cambia.';
 COMMENT ON COLUMN cotizaciones.quotations.contact_phone IS 'Snapshot del telefono de contacto al momento de cotizar (9 digitos numericos, no se reactualiza si el cliente cambia)';
 COMMENT ON COLUMN cotizaciones.quotations.validity_days IS 'Días de validez de la cotización desde la fecha de creación';
 COMMENT ON COLUMN cotizaciones.quotations.client_note    IS 'Observación opcional visible para el cliente (PDF + UI). Texto libre, máx 500. Se renderiza escapada.';
 COMMENT ON COLUMN cotizaciones.quotations.internal_note  IS 'Observación opcional SOLO interna. NUNCA se renderiza en el PDF ni en salidas hacia el cliente (RN-03).';
+COMMENT ON COLUMN cotizaciones.quotations.rejection_reason IS 'Motivo del rechazo (texto libre, máx 500). Solo presente si status=REJECTED. INTERNO — NUNCA en el PDF ni salidas hacia el cliente (ADR-007, hereda regla ADR-003).';
 
 CREATE INDEX IF NOT EXISTS idx_quotations_client     ON cotizaciones.quotations(client_id);
 CREATE INDEX IF NOT EXISTS idx_quotations_code       ON cotizaciones.quotations(code);
