@@ -28,6 +28,10 @@ interface QuotationStatusPresentation {
   /** Variante del `Badge` para este estado. El color nunca es el único portador de
    * significado: el badge siempre lleva además el `label`. */
   badgeVariant: BadgeVariant
+  /** `true` si la cotización admite edición (PUT) en este estado. Solo `DRAFT` y `SENT`;
+   * los terminales (ACCEPTED/REJECTED/EXPIRED) son inmutables → `false`. Espeja la regla
+   * del backend (409 QUO-006), que es la autoridad real. */
+  editable: boolean
   /** Transiciones que el usuario puede disparar desde este estado. Vacío en los
    * terminales (ACCEPTED/REJECTED/EXPIRED → inmutables, sin botones). */
   actions: readonly QuotationStatusAction[]
@@ -50,11 +54,13 @@ export const QUOTATION_STATUS_PRESENTATION: Record<QuotationStatus, QuotationSta
   DRAFT: {
     label: 'Borrador',
     badgeVariant: 'slate',
+    editable: true,
     actions: [{ target: 'SENT', label: 'Enviada', variant: 'primary', requiresReason: false }],
   },
   SENT: {
     label: 'Enviada',
     badgeVariant: 'info',
+    editable: true,
     actions: [
       { target: 'ACCEPTED', label: 'Aceptada', variant: 'success', requiresReason: false },
       { target: 'REJECTED', label: 'Rechazada', variant: 'danger', requiresReason: true },
@@ -63,16 +69,19 @@ export const QUOTATION_STATUS_PRESENTATION: Record<QuotationStatus, QuotationSta
   ACCEPTED: {
     label: 'Aceptada',
     badgeVariant: 'teal',
+    editable: false,
     actions: [],
   },
   REJECTED: {
     label: 'Rechazada',
     badgeVariant: 'danger',
+    editable: false,
     actions: [],
   },
   EXPIRED: {
     label: 'Vencida',
     badgeVariant: 'warning',
+    editable: false,
     actions: [],
   },
 }
@@ -96,4 +105,14 @@ const STATUS_CHANGE_ROLES: ReadonlySet<UserRole> = new Set<UserRole>([
  */
 export function canChangeQuotationStatus(role: UserRole | undefined): boolean {
   return role != null && STATUS_CHANGE_ROLES.has(role)
+}
+
+/**
+ * `true` si la cotización puede editarse (PUT /quotations/{id}) en el estado dado. Deriva
+ * del mapa único: solo `DRAFT` y `SENT`; los terminales son inmutables. Se usa para gatear
+ * el botón Editar (detalle) y la página de edición (defensa de UX; el backend es la
+ * autoridad real y responde 409 QUO-006 al intentar editar un terminal).
+ */
+export function isQuotationEditable(status: QuotationStatus): boolean {
+  return QUOTATION_STATUS_PRESENTATION[status].editable
 }

@@ -1,8 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { CotizacionEditPage } from './CotizacionEditPage'
 import { server } from '../../../test/mocks/server'
 import {
@@ -49,6 +50,10 @@ function editableQuotation(overrides = {}) {
 }
 
 describe('CotizacionEditPage', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   // ----- Pre-carga / render -----
 
   it('muestra el spinner mientras carga la cotización', async () => {
@@ -162,6 +167,29 @@ describe('CotizacionEditPage', () => {
   it('muestra "no encontrada" si el id no es numérico', async () => {
     renderEdit('abc')
     expect(await screen.findByText(/no encontrada/i)).toBeInTheDocument()
+  })
+
+  // ----- Terminal (inmutable): rebota al detalle -----
+
+  it('rebota al detalle con aviso si la cotización es terminal (ACCEPTED)', async () => {
+    const toastError = vi.spyOn(toast, 'error')
+    server.use(quotationDetail(getQuotationResponse({ status: 'ACCEPTED' })))
+    renderEdit(1)
+
+    expect(await screen.findByText(/DETALLE COTIZACION 1/i)).toBeInTheDocument()
+    // No monta el wizard de edición.
+    expect(screen.queryByText('Tipo de cotización')).not.toBeInTheDocument()
+    expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/no se puede editar.*aceptada/i))
+  })
+
+  it('rebota al detalle con aviso si la cotización está vencida (EXPIRED)', async () => {
+    const toastError = vi.spyOn(toast, 'error')
+    server.use(quotationDetail(getQuotationResponse({ status: 'EXPIRED' })))
+    renderEdit(1)
+
+    expect(await screen.findByText(/DETALLE COTIZACION 1/i)).toBeInTheDocument()
+    expect(screen.queryByText('Tipo de cotización')).not.toBeInTheDocument()
+    expect(toastError).toHaveBeenCalledWith(expect.stringMatching(/no se puede editar.*vencida/i))
   })
 
   // ----- Inmutables -----

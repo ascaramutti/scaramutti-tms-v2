@@ -429,7 +429,7 @@ describe('CotizacionDetailPage', () => {
     expect(screen.getByText('El cliente eligió otro proveedor')).toBeInTheDocument()
     expect(sink.body).toEqual({ status: 'REJECTED', rejectionReason: 'El cliente eligió otro proveedor' })
     expect(screen.queryByRole('button', { name: /^rechazada$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /aceptada/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^aceptada$/i })).not.toBeInTheDocument()
   })
 
   it('estado terminal (ACCEPTED): no muestra botones de transición', async () => {
@@ -437,7 +437,7 @@ describe('CotizacionDetailPage', () => {
     renderDetalle()
     await findTitle()
     expect(screen.queryByRole('button', { name: /^enviada$/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /aceptada/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^aceptada$/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^rechazada$/i })).not.toBeInTheDocument()
   })
 })
