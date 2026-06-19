@@ -1600,6 +1600,16 @@ components:
           minItems: 1
           description: 'Lista plana de ítems root e hijos. Los hijos referencian al padre vía `parentItemNumber`. Máximo 5 ítems root (validado por backend).'
           items: { $ref: '#/components/schemas/QuotationItemRequest' }
+        conditionIds:
+          type: [array, 'null']
+          maxItems: 20
+          description: |
+            Ids de las condiciones generales del catálogo que aplican a la cotización
+            (checkboxes en el wizard). Opcional: `null` o `[]` = sin condiciones (el usuario
+            puede desmarcar todas). Máximo 20 elementos (`400 COM-001` si se excede). Al
+            crear/editar (escritura), todas deben existir y estar **activas** (Opción B): una
+            condición desactivada → `409 QUO-007`; ids repetidos o inexistentes → `400 COM-001`.
+          items: { type: integer, format: int32 }
 
     QuotationResponse:
       type: object

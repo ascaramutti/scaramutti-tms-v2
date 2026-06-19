@@ -91,7 +91,7 @@ class UpdateQuotationServiceTest {
             null, null
         ));
         return new SaveQuotationCommand(
-            type, clientId, "ZTEST_contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items
+            type, clientId, "ZTEST_contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items, null
         );
     }
 

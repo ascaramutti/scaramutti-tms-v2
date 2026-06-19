@@ -66,6 +66,7 @@ public class CreateQuotationService {
     @Inject QuotationValidatorService validator;
     @Inject QuotationCalculatorService calculator;
     @Inject QuotationItemPersistenceService itemPersistence;
+    @Inject QuotationConditionPersistenceService conditionPersistence;
     @Inject QuotationResponseAssemblerService assembler;
     @Inject AuthServiceMapper authServiceMapper;
     @Inject QuotationServiceMapper quotationServiceMapper;
@@ -79,6 +80,9 @@ public class CreateQuotationService {
         LoadedDependencies deps = dependencyLoader.loadFor(command);
 
         validator.validate(command, deps.serviceTypesById());
+        // Condiciones: valida fail-fast (dup/inexistente→400, inactiva→409 QUO-007) ANTES de
+        // persistir nada. Atomico via @Transactional: si tira, no queda cotizacion a medio crear.
+        conditionPersistence.validate(command.conditionIds());
 
         // Lock por (createdBy, clientId) ANTES del check anti-duplicado para
         // cerrar la ventana TOCTOU: dos POST simultaneos del mismo usuario+cliente
@@ -96,6 +100,8 @@ public class CreateQuotationService {
         List<QuotationItem> persistedItems = itemPersistence.persistItems(command, quotation);
         Map<Long, QuotationStandbyCostResponse> standbyByItemId =
             itemPersistence.persistStandbyCosts(command, quotation, persistedItems);
+        // Junction de condiciones (ya validadas arriba). Necesita quotation.id (post-persist).
+        conditionPersistence.persist(command.conditionIds(), quotation.id);
 
         User user = userRepository.findById(userId);
         UserResponse currentUserResponse = authServiceMapper.toUserResponse(user);

@@ -79,6 +79,7 @@ class CreateQuotationServiceTest {
     @Mock QuotationValidatorService validator;
     @Mock QuotationCalculatorService calculator;
     @Mock QuotationItemPersistenceService itemPersistence;
+    @Mock QuotationConditionPersistenceService conditionPersistence;
     @Mock QuotationResponseAssemblerService assembler;
     @Mock AuthServiceMapper authServiceMapper;
     @Mock QuotationServiceMapper quotationServiceMapper;
@@ -101,7 +102,7 @@ class CreateQuotationServiceTest {
             null, null
         ));
         return new SaveQuotationCommand(
-            QuotationType.TRANSPORTE, 1, "contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items
+            QuotationType.TRANSPORTE, 1, "contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items, null
         );
     }
 
@@ -221,6 +222,8 @@ class CreateQuotationServiceTest {
         verify(codeGenerator).nextCode();
         verify(quotationRepository).persist(any(Quotation.class));
         verify(itemPersistence).persistItems(eq(command), any(Quotation.class));
+        verify(conditionPersistence).validate(command.conditionIds());
+        verify(conditionPersistence).persist(eq(command.conditionIds()), any());
         verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
