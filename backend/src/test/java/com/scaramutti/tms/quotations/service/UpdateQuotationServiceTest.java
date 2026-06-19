@@ -16,6 +16,7 @@ import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.repository.QuotationConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
@@ -64,12 +65,14 @@ class UpdateQuotationServiceTest {
     @Mock QuotationRepository quotationRepository;
     @Mock QuotationItemRepository quotationItemRepository;
     @Mock QuotationStandbyCostRepository quotationStandbyCostRepository;
+    @Mock QuotationConditionRepository quotationConditionRepository;
     @Mock UserRepository userRepository;
 
     @Mock QuotationDependencyLoaderService dependencyLoader;
     @Mock QuotationValidatorService validator;
     @Mock QuotationCalculatorService calculator;
     @Mock QuotationItemPersistenceService itemPersistence;
+    @Mock QuotationConditionPersistenceService conditionPersistence;
     @Mock QuotationResponseAssemblerService assembler;
     @Mock AuthServiceMapper authServiceMapper;
     @Mock QuotationServiceMapper quotationServiceMapper;
@@ -198,6 +201,20 @@ class UpdateQuotationServiceTest {
         ordered.verify(quotationStandbyCostRepository).deleteByQuotationId(100L);
         ordered.verify(quotationItemRepository).deleteByQuotationId(100L);
         ordered.verify(itemPersistence).persistItems(any(), any());
+    }
+
+    @Test
+    void update_replacesConditions_validatesDeletesAndPersists() {
+        var existing = sampleExisting();
+        var command = sampleCommand();
+        stubHappyFlow(existing, command);
+
+        service.updateQuotation(100L, etagOf(T0), command);
+
+        // Replace de condiciones: valida (fail-fast) y luego borra + reinserta los links.
+        verify(conditionPersistence).validate(command.conditionIds());
+        verify(quotationConditionRepository).deleteByQuotationId(100L);
+        verify(conditionPersistence).persist(command.conditionIds(), 100L);
     }
 
     @Test

@@ -7,6 +7,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -19,6 +20,7 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -47,9 +49,11 @@ class QuotationConditionsPersistenceResourceTest {
     private static final int ST_SCB = 1;
 
     private static final String ACTIVE_TEXT = "ZTEST_COND_ACTIVE";
+    private static final String ACTIVE_TEXT_2 = "ZTEST_COND_ACTIVE_2";
     private static final String INACTIVE_TEXT = "ZTEST_COND_INACTIVE";
 
     private Integer activeId;
+    private Integer activeId2;
     private Integer inactiveId;
 
     @BeforeEach
@@ -57,11 +61,14 @@ class QuotationConditionsPersistenceResourceTest {
         QuarkusTransaction.requiringNew().run(() -> {
             conditionRepository.delete("text like ?1", "ZTEST_COND_%");
             Condition active = newCondition(ACTIVE_TEXT, 91001, true);
+            Condition active2 = newCondition(ACTIVE_TEXT_2, 91003, true);
             Condition inactive = newCondition(INACTIVE_TEXT, 91002, false);
             conditionRepository.persist(active);
+            conditionRepository.persist(active2);
             conditionRepository.persist(inactive);
             conditionRepository.flush();
             activeId = active.id;
+            activeId2 = active2.id;
             inactiveId = inactive.id;
         });
     }
@@ -197,5 +204,93 @@ class QuotationConditionsPersistenceResourceTest {
         .then().statusCode(201).extract().path("id");
 
         assertEquals(0, countJunction(id));
+    }
+
+    // ---------- US-004: editar (replace) ---------------------------------------
+
+    /** Crea via POST con los conditionIds dados y devuelve el id (cabe en int). */
+    private int createWith(String token, String conditionIdsJson) {
+        return given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body(bodyWithConditions(conditionIdsJson))
+        .when().post("/quotations")
+        .then().statusCode(201).extract().jsonPath().getInt("id");
+    }
+
+    /** ETag opaco del GET (lo exige el If-Match del PUT). */
+    private String getEtag(String token, int id) {
+        return given().header("Authorization", "Bearer " + token)
+        .when().get("/quotations/" + id)
+        .then().statusCode(200).extract().header("ETag");
+    }
+
+    private Response putConditions(String token, int id, String etag, String conditionIdsJson) {
+        return given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(bodyWithConditions(conditionIdsJson))
+        .when().put("/quotations/" + id);
+    }
+
+    @Test
+    void edit_replacesConditions_swapsAforB() {
+        String token = loginAdmin();
+        int id = createWith(token, "[" + activeId + "]");
+        String etag = getEtag(token, id);
+
+        putConditions(token, id, etag, "[" + activeId2 + "]").then().statusCode(200);
+
+        assertEquals(1, countJunction(id));
+        assertTrue(junctionHas(id, activeId2), "deberia quedar la condicion nueva");
+        assertFalse(junctionHas(id, activeId), "la vieja deberia haberse reemplazado");
+    }
+
+    @Test
+    void edit_retainsOneAndAddsAnother_overlappingPk() {
+        String token = loginAdmin();
+        int id = createWith(token, "[" + activeId + "]");
+        String etag = getEtag(token, id);
+
+        // [A] -> [A, B]: el deleteByQuotationId borra (q,A) y el persist la reinserta en la MISMA
+        // tx. Verifica que el delete bulk es inmediato (no choca con la PK compuesta al reinsertar).
+        putConditions(token, id, etag, "[" + activeId + "," + activeId2 + "]").then().statusCode(200);
+
+        assertEquals(2, countJunction(id));
+        assertTrue(junctionHas(id, activeId));
+        assertTrue(junctionHas(id, activeId2));
+    }
+
+    @Test
+    void edit_toEmpty_removesAllConditions() {
+        String token = loginAdmin();
+        int id = createWith(token, "[" + activeId + "]");
+        String etag = getEtag(token, id);
+
+        putConditions(token, id, etag, "[]").then().statusCode(200);
+
+        assertEquals(0, countJunction(id));
+    }
+
+    @Test
+    void edit_fromEmpty_addsConditions() {
+        String token = loginAdmin();
+        int id = createWith(token, "[]");
+        String etag = getEtag(token, id);
+
+        putConditions(token, id, etag, "[" + activeId + "]").then().statusCode(200);
+
+        assertEquals(1, countJunction(id));
+        assertTrue(junctionHas(id, activeId));
+    }
+
+    @Test
+    void edit_withInactiveCondition_returns409_QUO007_andKeepsOldSelection() {
+        String token = loginAdmin();
+        int id = createWith(token, "[" + activeId + "]");
+        String etag = getEtag(token, id);
+
+        putConditions(token, id, etag, "[" + inactiveId + "]").then()
+            .statusCode(409).body("code", equalTo("QUO-007"));
+
+        // Fail-fast antes de tocar la junction: la seleccion previa se preserva (rollback).
+        assertEquals(1, countJunction(id));
+        assertTrue(junctionHas(id, activeId));
     }
 }

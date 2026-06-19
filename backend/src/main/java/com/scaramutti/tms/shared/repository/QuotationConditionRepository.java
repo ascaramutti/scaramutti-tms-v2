@@ -11,4 +11,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 public class QuotationConditionRepository
         implements PanacheRepositoryBase<QuotationCondition, QuotationCondition.Pk> {
+
+    /** Borra todos los links de una cotizacion. Usado por el REPLACE del PUT (US-004). */
+    public long deleteByQuotationId(Long quotationId) {
+        return delete("quotationId = ?1", quotationId);
+    }
 }
