@@ -1836,6 +1836,7 @@ components:
           items: { $ref: '#/components/schemas/QuotationItemRequest' }
         conditionIds:
           type: [array, 'null']
+          maxItems: 20
           description: |
             IDs de las condiciones generales (`ConditionResponse.id`) que aplican a esta
             cotización; reemplaza el set de la junction `quotation_conditions` (ADR-009/010).
@@ -1846,6 +1847,8 @@ components:
               persiste.
             - **Duplicados / id inexistente** → **400 `COM-001`** (validación; ni 500 ni fila
               duplicada — la PK compuesta lo refuerza en DB).
+            - **Más de 20 elementos** → **400 `COM-001`** (tope `maxItems`; guard de tamaño
+              para no armar un `IN` gigante contra Postgres).
             - **Ausente o lista vacía** → cotización **sin** condiciones = válido (el usuario
               puede desmarcar todas). El front normalmente manda todas las activas pre-checkeadas.
           items: { type: integer, format: int32 }

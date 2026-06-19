@@ -79,5 +79,13 @@ public record QuotationRequest(
 
     @NotEmpty
     @Valid
-    List<QuotationItemRequest> items
+    List<QuotationItemRequest> items,
+
+    // Ids de las condiciones generales que aplican (catalogo). Opcional: null/vacio = sin
+    // condiciones (el usuario puede desmarcar todas). Validacion semantica (existencia/unicidad/
+    // todas activas) en QuotationConditionPersistenceService (ADR-010). El @Size es un guard
+    // de tamano (anti-abuso: una lista enorme armaria un IN gigante / chocaria con el limite de
+    // params de Postgres). 20 sobra para el catalogo real (chico); si crece, subir el numero.
+    @Size(max = 20, message = "No se pueden seleccionar mas de 20 condiciones")
+    List<Integer> conditionIds
 ) {}

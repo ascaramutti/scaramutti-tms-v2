@@ -29,7 +29,8 @@ public record SaveQuotationCommand(
     String destination,
     String clientNote,
     String internalNote,
-    List<Item> items
+    List<Item> items,
+    List<Integer> conditionIds
 ) {
 
     /**
