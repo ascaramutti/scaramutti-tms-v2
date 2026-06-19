@@ -7,6 +7,8 @@ import com.scaramutti.tms.quotations.QuotationEtag;
 import com.scaramutti.tms.quotations.QuotationsError;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
+import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
 import com.scaramutti.tms.quotations.mapper.QuotationServiceMapper;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
@@ -15,6 +17,7 @@ import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.exception.CommonError;
+import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
@@ -53,6 +56,7 @@ public class UpdateQuotationService {
     @Inject QuotationItemRepository quotationItemRepository;
     @Inject QuotationStandbyCostRepository quotationStandbyCostRepository;
     @Inject QuotationConditionRepository quotationConditionRepository;
+    @Inject ConditionRepository conditionRepository;
     @Inject UserRepository userRepository;
 
     @Inject QuotationDependencyLoaderService dependencyLoader;
@@ -61,6 +65,7 @@ public class UpdateQuotationService {
     @Inject QuotationItemPersistenceService itemPersistence;
     @Inject QuotationConditionPersistenceService conditionPersistence;
     @Inject QuotationResponseAssemblerService assembler;
+    @Inject QuotationEmbeddedSummaryMapper summaryMapper;
     @Inject AuthServiceMapper authServiceMapper;
     @Inject QuotationServiceMapper quotationServiceMapper;
 
@@ -120,6 +125,10 @@ public class UpdateQuotationService {
         //     el delete es bulk/inmediato, no necesita un flush extra antes de reinsertar.
         quotationConditionRepository.deleteByQuotationId(id);
         conditionPersistence.persist(command.conditionIds(), id);
+        // Re-leemos las condiciones (ya reemplazadas en esta tx) para el response — misma
+        // fuente que GET/CREATE, ordenadas por displayOrder (incluye inactivas, RN-05).
+        List<QuotationConditionSummary> conditions =
+            summaryMapper.toConditionSummaries(conditionRepository.findLinkedToQuotation(id));
 
         // 9. Armar respuesta: createdBy original preservado, updatedBy = usuario actual.
         UserResponse createdBy = loadUser(quotation.createdBy);
@@ -129,7 +138,7 @@ public class UpdateQuotationService {
         boolean isExpired = computeIsExpired(quotation);
 
         return assembler.assemble(
-            quotation, persistedItems, standbyByItemId, totals, deps,
+            quotation, persistedItems, standbyByItemId, conditions, totals, deps,
             createdBy, updatedBy, isExpired
         );
     }

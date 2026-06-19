@@ -26,4 +26,19 @@ public class ConditionRepository implements PanacheRepositoryBase<Condition, Int
             isActive
         );
     }
+
+    /**
+     * Condiciones linkeadas a una cotizacion (READ-path, RN-05): TODAS las linkeadas —
+     * activas E inactivas — ordenadas por {@code display_order} ASC, {@code id} ASC como
+     * desempate estable ({@code display_order} no es UNIQUE). NO filtra {@code isActive}:
+     * el detalle/PDF muestra el snapshot historico (una condicion desactivada tras emitirse
+     * la cotizacion sigue apareciendo). Asimetrico, a proposito, con la escritura (ADR-010).
+     */
+    public List<Condition> findLinkedToQuotation(Long quotationId) {
+        return list(
+            "id in (select qc.conditionId from QuotationCondition qc where qc.quotationId = ?1)",
+            Sort.by(Condition_.DISPLAY_ORDER, Condition_.ID).ascending(),
+            quotationId
+        );
+    }
 }

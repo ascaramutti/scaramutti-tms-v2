@@ -1145,6 +1145,15 @@ components:
         displayOrder: { type: integer, format: int32, minimum: 1, example: 2 }
         isActive:     { type: boolean }
 
+    QuotationConditionResponse:
+      type: object
+      required: [id, text, displayOrder, isActive]
+      properties:
+        id:           { type: integer, format: int32, example: 3 }
+        text:         { type: string }
+        displayOrder: { type: integer, format: int32, example: 2 }
+        isActive:     { type: boolean, description: 'true salvo que la condicion se haya desactivado en el catalogo tras linkearse (snapshot historico, RN-05).' }
+
     # -------- CargoTypes ---------------------------------------------------
     CargoTypeRef:
       type: object
@@ -1624,6 +1633,7 @@ components:
         - expiresAt
         - isExpired
         - items
+        - conditions
         - totalSubtotal
         - totalIgv
         - totalAmount
@@ -1664,6 +1674,10 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/QuotationItemResponse' }
+        conditions:
+          type: array
+          description: 'Condiciones generales linkeadas, ordenadas por displayOrder ASC (RN-04). Incluye TODAS las linkeadas, activas O inactivas (RN-05, snapshot). Vacia si no hay (nunca null).'
+          items: { $ref: '#/components/schemas/QuotationConditionResponse' }
         createdBy: { $ref: '#/components/schemas/UserResponse' }
         updatedBy: { $ref: '#/components/schemas/UserResponse' }
         createdAt: { type: string, format: date-time }

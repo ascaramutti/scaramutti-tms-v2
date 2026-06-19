@@ -7,6 +7,7 @@ import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationClientSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCurrencySummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
+import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
 import com.scaramutti.tms.quotations.mapper.QuotationServiceMapper;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
@@ -16,6 +17,7 @@ import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
@@ -66,6 +68,7 @@ class UpdateQuotationServiceTest {
     @Mock QuotationItemRepository quotationItemRepository;
     @Mock QuotationStandbyCostRepository quotationStandbyCostRepository;
     @Mock QuotationConditionRepository quotationConditionRepository;
+    @Mock ConditionRepository conditionRepository;
     @Mock UserRepository userRepository;
 
     @Mock QuotationDependencyLoaderService dependencyLoader;
@@ -74,6 +77,7 @@ class UpdateQuotationServiceTest {
     @Mock QuotationItemPersistenceService itemPersistence;
     @Mock QuotationConditionPersistenceService conditionPersistence;
     @Mock QuotationResponseAssemblerService assembler;
+    @Mock QuotationEmbeddedSummaryMapper summaryMapper;
     @Mock AuthServiceMapper authServiceMapper;
     @Mock QuotationServiceMapper quotationServiceMapper;
 
@@ -153,7 +157,7 @@ class UpdateQuotationServiceTest {
             100L, "2026-00001", QuotationType.TRANSPORTE, QuotationStatus.DRAFT,
             null, null, null, null, null, null, 15, null, false,
             null, null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
+            List.of(), List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
         );
     }
 
@@ -167,7 +171,7 @@ class UpdateQuotationServiceTest {
         when(itemPersistence.persistStandbyCosts(any(), any(), any())).thenReturn(Map.of());
         when(userRepository.findById(anyInt())).thenReturn(sampleUser());
         when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
-        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
             .thenReturn(stubResponse());
     }
 
@@ -185,7 +189,7 @@ class UpdateQuotationServiceTest {
         verify(validator).validate(eq(command), any());
         verify(quotationServiceMapper).applyUpdate(eq(existing), eq(command), eq(42));
         verify(itemPersistence).persistItems(eq(command), eq(existing));
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test

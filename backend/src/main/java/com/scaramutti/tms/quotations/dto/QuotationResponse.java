@@ -2,6 +2,7 @@ package com.scaramutti.tms.quotations.dto;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationClientSummary;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCurrencySummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationPaymentTermSummary;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
@@ -60,6 +61,7 @@ public record QuotationResponse(
     BigDecimal totalIgv,
     BigDecimal totalAmount,
     List<QuotationItemResponse> items,
+    List<QuotationConditionSummary> conditions,
     UserResponse createdBy,
     UserResponse updatedBy,
     OffsetDateTime createdAt,

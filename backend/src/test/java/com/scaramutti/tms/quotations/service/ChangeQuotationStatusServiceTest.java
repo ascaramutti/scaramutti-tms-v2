@@ -82,7 +82,7 @@ class ChangeQuotationStatusServiceTest {
             100L, "2026-00001", QuotationType.TRANSPORTE, QuotationStatus.SENT,
             null, null, null, null, null, null, 15, null, false,
             null, null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
+            List.of(), List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
         );
     }
 

@@ -6,6 +6,7 @@ import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCargoTypeSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationClientSummary;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCurrencySummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationPaymentTermSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
@@ -122,7 +123,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -149,7 +150,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -164,11 +165,11 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse respFalse = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
         QuotationResponse respTrue = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, true
         );
 
@@ -184,7 +185,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("750", "135", "885"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("750", "135", "885"), deps,
             createdBy, updatedBy, false
         );
 
@@ -202,7 +203,7 @@ class QuotationResponseAssemblerServiceTest {
         ), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(parent, child1, child2), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(parent, child1, child2), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -224,7 +225,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(99, st(99, "INT"), 1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(parent, child), Map.of(), totals("500", "90", "590"), deps,
+            quotation, List.of(parent, child), Map.of(), List.of(), totals("500", "90", "590"), deps,
             createdBy, updatedBy, false
         );
 
@@ -242,7 +243,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -264,7 +265,7 @@ class QuotationResponseAssemblerServiceTest {
         IllegalStateException ex = org.junit.jupiter.api.Assertions.assertThrows(
             IllegalStateException.class,
             () -> assembler.assemble(
-                quotation, List.of(root, orphan), Map.of(), totals("100", "18", "118"), deps,
+                quotation, List.of(root, orphan), Map.of(), List.of(), totals("100", "18", "118"), deps,
                 createdBy, updatedBy, false
             )
         );
@@ -281,7 +282,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -295,7 +296,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), pt);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -310,7 +311,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -325,7 +326,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(5, ct), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -343,7 +344,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, otherUser, false
         );
 
@@ -358,7 +359,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, new ArrayList<>(), new HashMap<>(), totals("0", "0", "0"), deps,
+            quotation, new ArrayList<>(), new HashMap<>(), List.of(), totals("0", "0", "0"), deps,
             createdBy, updatedBy, false
         );
 
@@ -378,7 +379,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), standbyMap, totals("100", "18", "118"), deps,
+            quotation, List.of(item), standbyMap, List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -392,7 +393,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -407,7 +408,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(item), Map.of(), totals("100", "18", "118"), deps,
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
             createdBy, updatedBy, false
         );
 
@@ -422,7 +423,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(r1, r2, r3), Map.of(), totals("600", "108", "708"), deps,
+            quotation, List.of(r1, r2, r3), Map.of(), List.of(), totals("600", "108", "708"), deps,
             createdBy, updatedBy, false
         );
 
@@ -439,7 +440,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(99, st(99, "INT"), 1, st(1, "SCB"), 10, st(10, "CES")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(parent, child1, child2), Map.of(), totals("500", "90", "590"), deps,
+            quotation, List.of(parent, child1, child2), Map.of(), List.of(), totals("500", "90", "590"), deps,
             createdBy, updatedBy, false
         );
 
@@ -461,7 +462,7 @@ class QuotationResponseAssemblerServiceTest {
         var deps = depsWith(Map.of(99, st(99, "INT"), 1, st(1, "SCB"), 10, st(10, "CES")), Map.of(), null);
 
         QuotationResponse resp = assembler.assemble(
-            quotation, List.of(parent, child1, child2, extraRoot), Map.of(), totals("800", "144", "944"), deps,
+            quotation, List.of(parent, child1, child2, extraRoot), Map.of(), List.of(), totals("800", "144", "944"), deps,
             createdBy, updatedBy, false
         );
 
@@ -473,5 +474,73 @@ class QuotationResponseAssemblerServiceTest {
         assertEquals("1.b", integral.children().get(1).displayLabel());
         assertEquals(4, extra.itemNumber());     // itemNumber plano = 4
         assertEquals("2", extra.displayLabel());  // displayLabel de presentacion = 2
+    }
+
+    // ---------- Condiciones (US-005) -----------------------------------------
+
+    private QuotationConditionSummary cond(int id, String text, int displayOrder, boolean active) {
+        return new QuotationConditionSummary(id, text, displayOrder, active);
+    }
+
+    @Test
+    void assemble_conditions_propagatedInOrderGiven() {
+        QuotationItem item = rootItem(1L, 1, 1, new BigDecimal("100"), 1);
+        var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
+        List<QuotationConditionSummary> conditions = List.of(
+            cond(10, "Primera", 1, true), cond(11, "Segunda", 2, true)
+        );
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(item), Map.of(), conditions, totals("100", "18", "118"), deps,
+            createdBy, updatedBy, false
+        );
+
+        // El assembler respeta el orden recibido (el ORDER BY vive en el repo).
+        assertEquals(2, resp.conditions().size());
+        assertEquals(10, resp.conditions().get(0).id());
+        assertEquals(11, resp.conditions().get(1).id());
+    }
+
+    @Test
+    void assemble_conditionsEmpty_returnsEmptyListNotNull() {
+        QuotationItem item = rootItem(1L, 1, 1, new BigDecimal("100"), 1);
+        var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(item), Map.of(), List.of(), totals("100", "18", "118"), deps,
+            createdBy, updatedBy, false
+        );
+
+        assertNotNull(resp.conditions());
+        assertTrue(resp.conditions().isEmpty());
+    }
+
+    @Test
+    void assemble_conditions_isActiveFlagPreserved() {
+        QuotationItem item = rootItem(1L, 1, 1, new BigDecimal("100"), 1);
+        var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
+        List<QuotationConditionSummary> conditions = List.of(cond(10, "Desactivada", 1, false));
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(item), Map.of(), conditions, totals("100", "18", "118"), deps,
+            createdBy, updatedBy, false
+        );
+
+        assertFalse(resp.conditions().get(0).isActive());  // el assembler no toca isActive (RN-05)
+    }
+
+    @Test
+    void assemble_conditionsAndItems_coexist() {
+        QuotationItem item = rootItem(1L, 1, 1, new BigDecimal("100"), 1);
+        var deps = depsWith(Map.of(1, st(1, "SCB")), Map.of(), null);
+        List<QuotationConditionSummary> conditions = List.of(cond(10, "Cond", 1, true));
+
+        QuotationResponse resp = assembler.assemble(
+            quotation, List.of(item), Map.of(), conditions, totals("100", "18", "118"), deps,
+            createdBy, updatedBy, false
+        );
+
+        assertEquals(1, resp.items().size());
+        assertEquals(1, resp.conditions().size());
     }
 }
