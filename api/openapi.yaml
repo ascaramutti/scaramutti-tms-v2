@@ -300,6 +300,13 @@ paths:
       tags: [Quotations]
       operationId: createQuotation
       summary: Crear cotización
+      description: |
+        Crea una cotización. `conditionIds` (opcional) fija las condiciones generales que
+        aplican (se persisten en la junction `quotation_conditions`, ADR-009/010):
+        - Opción B (RN-06): toda la selección debe estar **activa**, o **409 `QUO-007`**
+          (el `detail` nombra la condición desactivada).
+        - Duplicado / id inexistente → **400 `COM-001`** (ni 500 ni fila duplicada).
+        - Ausente o vacío → cotización **sin** condiciones (válido).
       x-required-roles: [admin, sales, general_manager, operations_manager]
       requestBody:
         required: true
@@ -373,6 +380,11 @@ paths:
         usando el snapshot `item.igvPercentage` persistido (no el config
         actual) — preserva integridad del documento firmado.
 
+        **`conditions`**: condiciones generales linkeadas a la cotización, ordenadas
+        por `displayOrder` ASC. Incluye activas O inactivas (snapshot, RN-05) — cada una
+        con `isActive`. Sirve para precargar el wizard al editar y para que el PDF resuelva
+        las cláusulas. Lista vacía si no tiene condiciones (nunca `null`).
+
         El header `ETag` viene con el `updatedAt` del recurso — el cliente
         puede usarlo para futuros `PUT/PATCH` con `If-Match` (optimistic
         locking). Mismo formato exacto que el ETag del POST.
@@ -403,6 +415,10 @@ paths:
           en el request).
         - **Items**: se reemplaza la lista completa — los items y standby anteriores
           se borran y se insertan los del request.
+        - **Condiciones**: `conditionIds` **reemplaza** el set de la junction (mismo patrón
+          replace que los ítems). Opción B (RN-06): toda la selección debe estar activa, o
+          **409 (QUO-007)** nombrando la condición. Duplicado / id inexistente → **400 (COM-001)**.
+          Ausente o vacío → cotización sin condiciones (válido).
         - **Terminalidad**: una cotización en estado terminal (`ACCEPTED`/`REJECTED`/`EXPIRED`)
           es inmutable → **409 (QUO-006)**. `DRAFT`/`SENT` siguen editables.
 
@@ -887,6 +903,44 @@ paths:
               schema: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  # ----- Catalogs: Quotation Conditions --------------------------------------
+
+  /quotation-conditions:
+    get:
+      tags: [Catalogs]
+      operationId: listQuotationConditions
+      summary: Listar condiciones generales del catálogo (filtrable por isActive)
+      description: |
+        Catálogo de condiciones generales del PDF, ordenadas por `displayOrder` ascendente
+        (ADR-009/ADR-010). Sigue la **convención de filtro nullable** del resto de catálogos
+        (`listCurrencies`/`listPaymentTerms`/`listQuotationServiceTypes`):
+        - `isActive` **omitido** → todas (activas + inactivas).
+        - `isActive=true` → solo activas — lo que usa el **wizard** para elegir (RN-07).
+        - `isActive=false` → solo inactivas.
+
+        Un mismo endpoint sirve al wizard (hoy) y a un futuro CRUD admin del catálogo
+        (DA-02) sin cambios. El snapshot histórico de una cotización (incluidas las
+        inactivas linkeadas) se resuelve en su detalle (`QuotationResponse.conditions`),
+        no acá.
+
+        Acceso: cualquier usuario autenticado, igual que el resto de catálogos del módulo.
+        Cacheable (cambia raramente).
+      parameters:
+        - name: isActive
+          in: query
+          required: false
+          description: 'Filtro nullable (convención de catálogos): omitido = todas; true = solo activas (lo que usa el wizard, RN-07); false = solo inactivas.'
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ConditionResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
   # ----- Catalogs: Payment Terms ---------------------------------------------
 
   /payment-terms:
@@ -1242,6 +1296,16 @@ components:
                 instance: '/api/v1/quotations/142'
                 code: 'QUO-006'
                 traceId: 'a0b1c2d3-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+            inactiveConditionSelected:
+              summary: Condición desactivada en la selección al crear/editar (Opción B, RN-06)
+              value:
+                type: 'urn:tms:error:quo-007'
+                title: 'Conflict'
+                status: 409
+                detail: "La condición 'En caso el cliente cuente con seguro de carga...' fue desactivada; quítala para guardar"
+                instance: '/api/v1/quotations'
+                code: 'QUO-007'
+                traceId: 'b1c2d3e4-5f6a-7b8c-9d0e-1f2a3b4c5d6e'
     PreconditionFailed:
       description: Optimistic lock — el recurso fue modificado desde que se leyó
       content:
@@ -1568,6 +1632,35 @@ components:
         name: { type: string, minLength: 1, maxLength: 100 }
         days: { type: integer, format: int32, minimum: 0 }
 
+    # -------- Catálogos: Conditions ---------------------------------------
+    ConditionResponse:
+      description: |
+        Condición general del catálogo, tal como la lista `GET /quotation-conditions`.
+        Expone `isActive` (igual que `CurrencyResponse`/`PaymentTermResponse`/`QuotationServiceTypeResponse`)
+        porque el endpoint es filtrable y puede devolver inactivas (`?isActive` omitido o `false`).
+        El wizard pide `?isActive=true` y muestra solo las activas (RN-07).
+      type: object
+      required: [id, text, displayOrder, isActive]
+      properties:
+        id:           { type: integer, format: int32, example: 3 }
+        text:         { type: string, example: 'En caso el cliente cuente con seguro de carga, deberá incluir como beneficiario a Transportes Scaramutti S.A.C. ...' }
+        displayOrder: { type: integer, format: int32, description: 'Orden de impresión en el PDF (ASC, RN-04).', example: 2 }
+        isActive:     { type: boolean, description: 'Si la condición está vigente en el catálogo. El wizard filtra por true (RN-07).' }
+
+    QuotationConditionResponse:
+      description: |
+        Condición linkeada a una cotización, tal como aparece en `QuotationResponse.conditions`.
+        El detalle/PDF resuelve **todas** las linkeadas, activas O inactivas (RN-05, fidelidad
+        del snapshot), por eso este schema **sí** expone `isActive`: una condición desactivada
+        después de emitida la cotización sigue apareciendo con `isActive=false`.
+      type: object
+      required: [id, text, displayOrder, isActive]
+      properties:
+        id:           { type: integer, format: int32, example: 3 }
+        text:         { type: string }
+        displayOrder: { type: integer, format: int32, description: 'Orden de impresión en el PDF (ASC, RN-04).', example: 2 }
+        isActive:     { type: boolean, description: 'true salvo que la condición se haya desactivado en el catálogo tras linkearse (snapshot histórico, RN-05).' }
+
     # -------- Settings ------------------------------------------------------
     SystemSettingResponse:
       type: object
@@ -1591,6 +1684,7 @@ components:
         - expiresAt
         - isExpired
         - items
+        - conditions
         - totalSubtotal
         - totalIgv
         - totalAmount
@@ -1631,6 +1725,17 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/QuotationItemResponse' }
+        conditions:
+          type: array
+          description: |
+            Condiciones generales linkeadas a esta cotización, ordenadas por `displayOrder`
+            ASC (RN-04). Incluye **todas** las linkeadas, activas O inactivas (RN-05): una
+            condición desactivada en el catálogo tras emitirse la cotización sigue acá con
+            `isActive=false` (fidelidad del snapshot). Lista vacía si la cotización no tiene
+            condiciones (nunca `null`). Es la fuente que el PDF usa para las cláusulas (ya no
+            `system_settings['quotation.pdf_terms']`); la tabla de bancos `[[BANK_ACCOUNTS]]`
+            se agrega aparte, siempre (RN-09, ADR-010 §5).
+          items: { $ref: '#/components/schemas/QuotationConditionResponse' }
         createdBy: { $ref: '#/components/schemas/UserResponse' }
         updatedBy: { $ref: '#/components/schemas/UserResponse' }
         createdAt: { type: string, format: date-time }
@@ -1729,6 +1834,22 @@ components:
           minItems: 1
           description: 'Lista plana de ítems root e hijos. Los hijos referencian al padre vía `parentItemNumber`. Máximo 5 ítems root (validado por backend).'
           items: { $ref: '#/components/schemas/QuotationItemRequest' }
+        conditionIds:
+          type: [array, 'null']
+          description: |
+            IDs de las condiciones generales (`ConditionResponse.id`) que aplican a esta
+            cotización; reemplaza el set de la junction `quotation_conditions` (ADR-009/010).
+            En el `PUT` **reemplaza** el set completo (mismo patrón "replace" que los ítems).
+
+            - **Opción B (RN-06)**: todas deben estar **activas**. Si alguna está
+              `is_active=false` → **409 `QUO-007`** (el `detail` nombra la condición); no se
+              persiste.
+            - **Duplicados / id inexistente** → **400 `COM-001`** (validación; ni 500 ni fila
+              duplicada — la PK compuesta lo refuerza en DB).
+            - **Ausente o lista vacía** → cotización **sin** condiciones = válido (el usuario
+              puede desmarcar todas). El front normalmente manda todas las activas pre-checkeadas.
+          items: { type: integer, format: int32 }
+          example: [1, 3]
 
     QuotationItemResponse:
       description: |
