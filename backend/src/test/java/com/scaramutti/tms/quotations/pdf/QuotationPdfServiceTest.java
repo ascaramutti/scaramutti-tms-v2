@@ -155,6 +155,7 @@ class QuotationPdfServiceTest {
             null, null, null,
             new BigDecimal("31180.00"), new BigDecimal("5612.40"), new BigDecimal("36792.40"),
             List.of(integral, camaCuna, camaBaja, seguro, grua),
+            List.of(),
             admin, admin,
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00"),
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00")
@@ -198,6 +199,7 @@ class QuotationPdfServiceTest {
             null, null, null,
             new BigDecimal("15404.24"), new BigDecimal("2772.76"), new BigDecimal("18177.00"),
             List.of(integral, seguro),
+            List.of(),
             admin, admin,
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00"),
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00")
