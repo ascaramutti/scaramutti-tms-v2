@@ -4,6 +4,7 @@ import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.scaramutti.tms.quotations.dto.CompanyPdfSettings;
 import com.scaramutti.tms.quotations.dto.QuotationItemResponse;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
 import com.scaramutti.tms.quotations.service.PdfSettingsService;
 import com.scaramutti.tms.quotations.util.AmountToWords;
 import com.scaramutti.tms.shared.exception.CommonError;
@@ -100,9 +101,28 @@ public class QuotationPdfService {
             q.clientNote(),
             q.createdBy() != null ? q.createdBy().fullName() : "",
             q.createdBy() != null ? q.createdBy().position() : "",
-            company.terms(),
+            buildTerms(q),
             company.bankAccounts()
         );
+    }
+
+    /**
+     * CONDICIONES GENERALES del PDF: el texto de cada condicion linkeada a la cotizacion (ya
+     * ordenadas por displayOrder; incluye inactivas — snapshot historico, RN-05) + el marcador
+     * {@code [[BANK_ACCOUNTS]]} al final, para que el template inserte la tabla de cuentas
+     * bancarias. El marcador se agrega SIEMPRE: las cuentas salen aunque la cotizacion no tenga
+     * condiciones. (US-006: antes salia de system_settings['quotation.pdf_terms'], fijo a nivel
+     * empresa; ahora es por cotizacion desde el catalogo cotizaciones.conditions.)
+     */
+    private List<String> buildTerms(QuotationResponse q) {
+        List<String> terms = new ArrayList<>();
+        if (q.conditions() != null) {
+            for (QuotationConditionSummary c : q.conditions()) {
+                terms.add(c.text());
+            }
+        }
+        terms.add(QuotationPdfView.BANK_ACCOUNTS_MARKER);
+        return terms;
     }
 
     private List<QuotationPdfView.ItemRow> buildItemRows(QuotationResponse q, String symbol) {
