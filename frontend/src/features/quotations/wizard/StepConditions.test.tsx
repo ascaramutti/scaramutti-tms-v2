@@ -116,4 +116,35 @@ describe('StepConditions', () => {
     const { container } = renderStep({ conditions: [], initialSelected: [] })
     expect(await axe(container)).toHaveNoViolations()
   })
+
+  // ----- Observaciones movidas a este paso (ampliación US-007) -----
+
+  it('el paso ahora incluye los textareas de observaciones (cliente + internas)', () => {
+    renderStep()
+    expect(screen.getByLabelText('Observaciones para el cliente')).toBeInTheDocument()
+    expect(screen.getByLabelText('Observaciones internas')).toBeInTheDocument()
+  })
+
+  it('la observación interna conserva su marca de "interno" tras moverse', () => {
+    renderStep()
+    expect(screen.getByText(/interno — no se muestra al cliente/i)).toBeInTheDocument()
+  })
+
+  it('condiciones y observaciones coexisten en grupos accesibles separados', () => {
+    renderStep()
+    expect(screen.getByRole('group', { name: /condiciones generales/i })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: /observaciones/i })).toBeInTheDocument()
+  })
+
+  it('tocar las observaciones no altera la selección de condiciones', async () => {
+    renderStep()
+    await userEvent.type(screen.getByLabelText('Observaciones para el cliente'), 'Nota X')
+    // La selección pre-marcada (1,2) sigue intacta tras tipear en las notas.
+    expect(selectedIds()).toEqual([1, 2])
+  })
+
+  it('a11y: sin violaciones con condiciones + observaciones juntas', async () => {
+    const { container } = renderStep()
+    expect(await axe(container)).toHaveNoViolations()
+  })
 })

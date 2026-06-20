@@ -101,7 +101,7 @@ export function CotizacionDetailPage() {
         igv={data.totalIgv}
       />
       <QuotationStandbyTable items={data.items} currencyCode={data.currency.code} />
-      <QuotationNotesSection quotation={data} />
+      <QuotationNotesSection clientNote={data.clientNote} internalNote={data.internalNote} />
       <QuotationRejectionReasonSection quotation={data} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <QuotationAuditFooter

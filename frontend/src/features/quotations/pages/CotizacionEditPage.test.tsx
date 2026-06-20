@@ -301,6 +301,29 @@ describe('CotizacionEditPage', () => {
     expect(sink.body?.conditionIds).toEqual([2])
   })
 
+  it('edición: las observaciones se editan en el paso de condiciones y el Resumen las muestra read-only', async () => {
+    const user = userEvent.setup()
+    server.use(
+      quotationDetail(
+        editableQuotation({ clientNote: 'Cliente precargado', internalNote: 'Interno precargado' }),
+      ),
+    )
+    renderEdit(1)
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /condiciones/i }))
+    // En el paso están EDITABLES y precargadas.
+    expect((await screen.findByLabelText('Observaciones para el cliente')) as HTMLTextAreaElement).toHaveValue(
+      'Cliente precargado',
+    )
+    expect(screen.getByLabelText('Observaciones internas')).toHaveValue('Interno precargado')
+    // En el Resumen, read-only (texto, sin textarea).
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    expect(screen.getByText('Cliente precargado')).toBeInTheDocument()
+    expect(screen.getByText('Interno precargado')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Observaciones para el cliente')).not.toBeInTheDocument()
+  })
+
   it('manda el If-Match con el ETag del header del GET, no el updatedAt del body', async () => {
     const user = userEvent.setup()
     const sink: { body?: QuotationRequest; ifMatch?: string | null } = {}

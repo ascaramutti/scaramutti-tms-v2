@@ -32,10 +32,12 @@ const STEP_CONDITIONS = 3
 const STEP_SUMMARY = 4
 
 const WIZARD_STEPS: StepperStep[] = [
-  { label: 'Información General' },
+  // `\n` parte los nombres largos en 2 líneas en el stepper (ver Stepper: whitespace-pre-line),
+  // manteniendo las columnas de ancho igual sin desbordar.
+  { label: 'Información\nGeneral' },
   { label: 'Ítems' },
   { label: 'Stand-By' },
-  { label: 'Condiciones' },
+  { label: 'Observaciones y\ncondiciones' },
   { label: 'Resumen' },
 ]
 
@@ -73,7 +75,8 @@ export interface WizardFormProps {
 }
 
 /**
- * Formulario del wizard de cotización (4 pasos: General / Ítems / Stand-By / Resumen).
+ * Formulario del wizard de cotización (5 pasos: General / Ítems / Stand-By / Observaciones y
+ * condiciones / Resumen).
  * Parametrizado para servir tanto a la creación (`CotizacionWizardPage`) como a la edición
  * (`CotizacionEditPage`): los valores iniciales, la mutación, el título y los campos
  * inmutables se inyectan por props. La navegación libre entre pasos y el gate de submit no
@@ -148,7 +151,12 @@ export function WizardForm({
       return valid
     }
     const fields = STEP_FIELDS[step]
-    if (!fields) return true
+    // Paso opcional sin campos propios (ej. "Observaciones y condiciones"): siempre válido →
+    // se marca como completado al dejarlo (check verde), igual que el Stand-By sin stand-by.
+    if (!fields) {
+      setStepStatus((prev) => ({ ...prev, [step]: 'completed' }))
+      return true
+    }
     const valid = await form.trigger(fields as (keyof WizardFormInput)[])
     setStepStatus((prev) => ({ ...prev, [step]: valid ? 'completed' : 'error' }))
     return valid
@@ -227,6 +235,7 @@ export function WizardForm({
                 currencies={currencies}
                 paymentTerms={paymentTerms}
                 serviceTypes={serviceTypes}
+                conditions={conditions}
                 igvPercentage={igvPercentage}
               />
             )}
