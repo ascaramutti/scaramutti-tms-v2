@@ -236,6 +236,71 @@ describe('CotizacionEditPage', () => {
     expect(sink.body?.clientId).toBe(1)
   })
 
+  // ----- Condiciones (US-007) -----
+
+  it('pre-marca las condiciones linkeadas de la cotización (catálogo activo: 1 y 2)', async () => {
+    const user = userEvent.setup()
+    server.use(
+      quotationDetail(
+        editableQuotation({
+          conditions: [{ id: 2, text: 'Cond B', displayOrder: 2, isActive: true }],
+        }),
+      ),
+    )
+    renderEdit(1)
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /condiciones/i }))
+    // Solo la linkeada (id 2) viene marcada; la otra activa del catálogo (id 1) no.
+    expect(await screen.findByLabelText('Cond A')).not.toBeChecked()
+    expect(screen.getByLabelText<HTMLInputElement>('Cond B')).toBeChecked()
+  })
+
+  it('agregar una condición → el PUT manda el set actualizado', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: QuotationRequest } = {}
+    server.use(
+      quotationDetail(
+        editableQuotation({
+          conditions: [{ id: 2, text: 'Cond B', displayOrder: 2, isActive: true }],
+        }),
+      ),
+      updateQuotationSuccess(sink),
+    )
+    renderEdit(1)
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /condiciones/i }))
+    await user.click(await screen.findByLabelText('Cond A')) // agrega id 1
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await screen.findByText(/DETALLE COTIZACION 1/i)
+    expect(sink.body?.conditionIds?.slice().sort()).toEqual([1, 2])
+  })
+
+  it('una condición linkeada inactiva NO se pre-marca ni se reenvía (se muestra "ya no vigente")', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: QuotationRequest } = {}
+    server.use(
+      quotationDetail(
+        editableQuotation({
+          conditions: [
+            { id: 2, text: 'Cond B', displayOrder: 2, isActive: true },
+            { id: 9, text: 'Cláusula retirada', displayOrder: 3, isActive: false },
+          ],
+        }),
+      ),
+      updateQuotationSuccess(sink),
+    )
+    renderEdit(1)
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /condiciones/i }))
+    expect(await screen.findByText(/ya no vigentes/i)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
+    await screen.findByText(/DETALLE COTIZACION 1/i)
+    // La inactiva (9) NO viaja en el PUT: solo la linkeada activa (2).
+    expect(sink.body?.conditionIds).toEqual([2])
+  })
+
   it('manda el If-Match con el ETag del header del GET, no el updatedAt del body', async () => {
     const user = userEvent.setup()
     const sink: { body?: QuotationRequest; ifMatch?: string | null } = {}

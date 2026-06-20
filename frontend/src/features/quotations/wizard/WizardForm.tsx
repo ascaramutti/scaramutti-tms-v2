@@ -12,6 +12,7 @@ import {
 import { Step1InfoGeneral } from './Step1InfoGeneral'
 import { Step2Items } from './Step2Items'
 import { StepStandBy } from './StepStandBy'
+import { StepConditions } from './StepConditions'
 import { Step4Resumen } from './Step4Resumen'
 import { standbyPricePaths } from './standbyTargets'
 import { WizardNav } from './WizardNav'
@@ -23,12 +24,18 @@ import {
   type WizardFormInput,
 } from './quotation-wizard.schema'
 import type { WizardCatalogs } from './useWizardCatalogs'
-import type { ClientResponse } from '../../../api'
+import type { ClientResponse, QuotationConditionResponse } from '../../../api'
+
+// Índices de paso (evitan números mágicos al renderizar/validar — el orden importa).
+const STEP_STANDBY = 2
+const STEP_CONDITIONS = 3
+const STEP_SUMMARY = 4
 
 const WIZARD_STEPS: StepperStep[] = [
   { label: 'Información General' },
   { label: 'Ítems' },
   { label: 'Stand-By' },
+  { label: 'Condiciones' },
   { label: 'Resumen' },
 ]
 
@@ -44,6 +51,9 @@ export interface WizardFormProps {
   initialClient?: ClientResponse | null
   /** Campos bloqueados/read-only. Edición: `['quotationType', 'clientId']`. Creación: `[]`. */
   immutableFields?: ReadonlyArray<ImmutableField>
+  /** Condiciones linkeadas a la cotización (edición). El paso "Condiciones" las usa para mostrar
+   *  las que quedaron inactivas como "ya no vigentes". Creación: omitido. */
+  linkedConditions?: QuotationConditionResponse[]
   title: string
   description: string
   submitLabel: string
@@ -74,6 +84,7 @@ export function WizardForm({
   initialValues,
   initialClient = null,
   immutableFields = [],
+  linkedConditions = [],
   title,
   description,
   submitLabel,
@@ -86,7 +97,7 @@ export function WizardForm({
   onStepChange,
 }: WizardFormProps) {
   const navigate = useNavigate()
-  const { currencies, paymentTerms, serviceTypes, igvPercentage, maxRootItems, defaultValidityDays } =
+  const { currencies, paymentTerms, serviceTypes, conditions, igvPercentage, maxRootItems, defaultValidityDays } =
     catalogs
 
   // Defaults de creación (solo se usan si no hay initialValues). El array nunca está vacío
@@ -103,6 +114,8 @@ export function WizardForm({
       currencyId: defaultCurrencyId,
       paymentTermId: defaultPaymentTermId,
       validityDays: defaultValidityDays,
+      // RN-07: en creación, todas las condiciones activas vienen pre-marcadas.
+      conditionIds: conditions.map((condition) => condition.id),
     },
   })
 
@@ -125,9 +138,10 @@ export function WizardForm({
   /** Valida un paso, registra su estado (check/alerta) y devuelve si es válido. Los pasos sin
    * campos propios se consideran válidos. */
   async function markStep(step: number): Promise<boolean> {
-    // Step 3 (Stand-By, índice 2): opcional, sin campos propios en STEP_FIELDS. Se evalúa mirando
-    // SOLO los precios de los stand-by cargados (sin stand-by = válido → check).
-    if (step === 2) {
+    // Stand-By (opcional, sin campos propios en STEP_FIELDS). Se evalúa mirando SOLO los precios
+    // de los stand-by cargados (sin stand-by = válido → check). El paso "Condiciones" también es
+    // opcional y sin campos propios → cae en la rama genérica de abajo (siempre válido).
+    if (step === STEP_STANDBY) {
       const pricePaths = standbyPricePaths(form.getValues('items'))
       const valid = pricePaths.length === 0 || (await form.trigger(pricePaths))
       setStepStatus((prev) => ({ ...prev, [step]: valid ? 'completed' : 'error' }))
@@ -203,8 +217,11 @@ export function WizardForm({
                 maxRootItems={maxRootItems}
               />
             )}
-            {currentStep === 2 && <StepStandBy serviceTypes={serviceTypes} />}
-            {currentStep === 3 && (
+            {currentStep === STEP_STANDBY && <StepStandBy serviceTypes={serviceTypes} />}
+            {currentStep === STEP_CONDITIONS && (
+              <StepConditions conditions={conditions} linkedConditions={linkedConditions} />
+            )}
+            {currentStep === STEP_SUMMARY && (
               <Step4Resumen
                 selectedClient={selectedClient}
                 currencies={currencies}

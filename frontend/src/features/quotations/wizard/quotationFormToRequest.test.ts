@@ -20,6 +20,44 @@ function formWith(overrides: Partial<WizardFormInput>): WizardFormInput {
   }
 }
 
+describe('quotationFormToRequest — conditionIds', () => {
+  it('manda las condiciones marcadas en el orden del form', () => {
+    const request = quotationFormToRequest(
+      formWith({ conditionIds: [3, 1, 5], items: [{ ...ITEM_DEFAULTS, serviceTypeId: 3, unitPrice: 500 }] }),
+    )
+    expect(request.conditionIds).toEqual([3, 1, 5])
+  })
+
+  it('sin condiciones marcadas → conditionIds vacío (válido)', () => {
+    const request = quotationFormToRequest(
+      formWith({ conditionIds: [], items: [{ ...ITEM_DEFAULTS, serviceTypeId: 3, unitPrice: 500 }] }),
+    )
+    expect(request.conditionIds).toEqual([])
+  })
+
+  it('conditionIds convive con el aplanado del Integral (no se pisan)', () => {
+    const request = quotationFormToRequest(
+      formWith({
+        conditionIds: [4],
+        items: [
+          {
+            ...ITEM_DEFAULTS,
+            serviceTypeId: 24,
+            serviceKind: 'INTEGRAL',
+            unitPrice: 1500,
+            components: [
+              { ...CHILD_DEFAULTS, serviceTypeId: 3, serviceKind: 'SERVICIO', cargoTypeId: 7, weightKg: 100 },
+              { ...CHILD_DEFAULTS, serviceTypeId: 18, serviceKind: 'COMPLEMENTARIO' },
+            ],
+          },
+        ],
+      }),
+    )
+    expect(request.conditionIds).toEqual([4])
+    expect(request.items.map((item) => item.itemNumber)).toEqual([1, 2, 3])
+  })
+})
+
 describe('quotationFormToRequest', () => {
   it('mapea la cabecera y normaliza opcionales vacíos a null', () => {
     const request = quotationFormToRequest(

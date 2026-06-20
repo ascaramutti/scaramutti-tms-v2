@@ -1,5 +1,6 @@
 import { http, HttpResponse, delay } from 'msw'
 import type {
+  ConditionResponse,
   CurrencyResponse,
   PaymentTermResponse,
   QuotationConfigResponse,
@@ -33,6 +34,16 @@ export function fakeServiceType(
   }
 }
 
+export function fakeCondition(overrides: Partial<ConditionResponse> = {}): ConditionResponse {
+  return { id: 1, text: 'Condición general de ejemplo', displayOrder: 1, isActive: true, ...overrides }
+}
+
+/** Catálogo activo de condiciones (ordenado por displayOrder, como lo entrega el backend). */
+const DEFAULT_CONDITIONS: ConditionResponse[] = [
+  fakeCondition({ id: 1, text: 'Cond A', displayOrder: 1 }),
+  fakeCondition({ id: 2, text: 'Cond B', displayOrder: 2 }),
+]
+
 /** Mezcla de kinds (incluye INTEGRAL, que el Step 2 debe EXCLUIR del select por ahora). */
 const DEFAULT_SERVICE_TYPES: QuotationServiceTypeResponse[] = [
   fakeServiceType({ id: 1, code: 'SCB', name: 'Transporte de carga general', kind: 'SERVICIO' }),
@@ -55,6 +66,7 @@ export const catalogsHandlers = [
   ),
   http.get(`${API}/quotations/config`, () => HttpResponse.json(fakeConfig())),
   http.get(`${API}/quotation-service-types`, () => HttpResponse.json(DEFAULT_SERVICE_TYPES)),
+  http.get(`${API}/quotation-conditions`, () => HttpResponse.json(DEFAULT_CONDITIONS)),
 ]
 
 // ----- Overrides -----
@@ -73,6 +85,19 @@ export function configOk(overrides: Partial<QuotationConfigResponse>) {
 
 export function serviceTypesOk(items: QuotationServiceTypeResponse[]) {
   return http.get(`${API}/quotation-service-types`, () => HttpResponse.json(items))
+}
+
+export function conditionsOk(items: ConditionResponse[]) {
+  return http.get(`${API}/quotation-conditions`, () => HttpResponse.json(items))
+}
+
+export function conditionsError(status: number) {
+  return http.get(`${API}/quotation-conditions`, () =>
+    HttpResponse.json(
+      { type: 'urn:tms:error:test', title: 'Error', status, detail: 'Fallo al cargar condiciones' },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
 }
 
 export function currenciesError(status: number) {
@@ -101,6 +126,10 @@ export function catalogsSlow(ms = 40) {
     http.get(`${API}/quotation-service-types`, async () => {
       await delay(ms)
       return HttpResponse.json(DEFAULT_SERVICE_TYPES)
+    }),
+    http.get(`${API}/quotation-conditions`, async () => {
+      await delay(ms)
+      return HttpResponse.json(DEFAULT_CONDITIONS)
     }),
   ]
 }

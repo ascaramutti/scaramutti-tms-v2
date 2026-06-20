@@ -251,6 +251,10 @@ export const wizardSchema = z
     // zodResolver del submit final las valida igual (red de seguridad).
     clientNote: quotationNoteField,
     internalNote: quotationNoteField,
+    // Ids de las condiciones generales elegidas (paso "Condiciones"). Opcional: [] = sin
+    // condiciones (válido). El tope 20 espeja el @Size del backend (defensa por capas). La regla
+    // "todas activas" es server-side (409 QUO-007); el front la previene no ofreciendo inactivas.
+    conditionIds: z.array(z.number().int().positive()).max(20, 'Máximo 20 condiciones.'),
   })
   .superRefine(refineRoute)
 
@@ -276,6 +280,9 @@ export const WIZARD_DEFAULTS: WizardFormInput = {
   items: [],
   clientNote: '',
   internalNote: '',
+  // En CREACIÓN, WizardForm lo sobreescribe con todos los ids activos (pre-marcado, RN-07);
+  // en EDICIÓN, el mapper lo precarga con las linkeadas activas.
+  conditionIds: [],
 }
 
 /** Defaults de un ítem nuevo. El `serviceKind` lo ajusta el Step 2 según el tipo de

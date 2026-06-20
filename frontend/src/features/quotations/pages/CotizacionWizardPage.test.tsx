@@ -56,11 +56,12 @@ async function selectAcme(user: ReturnType<typeof userEvent.setup>) {
 
 describe('CotizacionWizardPage', () => {
   // ----- Render -----
-  it('monta el wizard con el stepper de 4 pasos y el Step 1', async () => {
+  it('monta el wizard con el stepper de 5 pasos y el Step 1', async () => {
     renderWizard()
     await waitForForm()
     expect(screen.getByText('Información General')).toBeInTheDocument()
     expect(screen.getByText('Ítems')).toBeInTheDocument()
+    expect(screen.getByText('Condiciones')).toBeInTheDocument()
     expect(screen.getByText('Resumen')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /transporte/i })).toBeInTheDocument()
   })
@@ -1152,5 +1153,59 @@ describe('CotizacionWizardPage', () => {
     await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
     const button = await screen.findByRole('button', { name: /guardando/i })
     expect(button).toBeDisabled()
+  })
+
+  // ----- Step 4: Condiciones (US-007) -----
+  it('el paso Condiciones muestra el catálogo con las activas pre-marcadas', async () => {
+    const user = userEvent.setup()
+    renderWizard()
+    await waitForForm()
+    await user.click(screen.getByRole('button', { name: /condiciones/i }))
+    expect(await screen.findByLabelText('Cond A')).toBeChecked()
+    expect(screen.getByLabelText<HTMLInputElement>('Cond B')).toBeChecked()
+  })
+
+  it('crear desmarcando una condición → el POST manda solo las que quedaron', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: QuotationRequest } = {}
+    server.use(createQuotationSuccess(sink, getQuotationResponse({ id: 42 })))
+    renderWizard()
+    await fillValidQuotation(user)
+    await user.click(screen.getByRole('button', { name: /condiciones/i }))
+    await user.click(await screen.findByLabelText('Cond A')) // destilda id 1
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
+    await screen.findByText(/DETALLE COTIZACION 42/i)
+    expect(sink.body?.conditionIds).toEqual([2])
+  })
+
+  it('crear sin tocar las condiciones → el POST manda todas las activas (RN-07)', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: QuotationRequest } = {}
+    server.use(createQuotationSuccess(sink, getQuotationResponse({ id: 7 })))
+    renderWizard()
+    await fillValidQuotation(user)
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
+    await screen.findByText(/DETALLE COTIZACION 7/i)
+    expect(sink.body?.conditionIds).toEqual([1, 2])
+  })
+
+  it('crear destildando TODAS las condiciones → el POST manda conditionIds vacío (válido)', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: QuotationRequest } = {}
+    server.use(createQuotationSuccess(sink, getQuotationResponse({ id: 8 })))
+    renderWizard()
+    await fillValidQuotation(user)
+    await user.click(screen.getByRole('button', { name: /condiciones/i }))
+    await user.click(await screen.findByLabelText('Cond A'))
+    await user.click(screen.getByLabelText('Cond B'))
+    await user.click(screen.getByRole('button', { name: /resumen/i }))
+    await screen.findByRole('heading', { name: /resumen final/i })
+    await user.click(screen.getByRole('button', { name: /guardar cotización/i }))
+    await screen.findByText(/DETALLE COTIZACION 8/i)
+    expect(sink.body?.conditionIds).toEqual([])
   })
 })
