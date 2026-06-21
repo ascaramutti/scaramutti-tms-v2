@@ -64,6 +64,31 @@ describe('CotizacionDetailPage', () => {
     expect(screen.getByRole('heading', { name: 'Detalle de ítems' })).toBeInTheDocument()
   })
 
+  it('muestra las condiciones generales de la cotización (read-only, ordenadas)', async () => {
+    server.use(
+      quotationDetail(
+        getQuotationResponse({
+          conditions: [
+            { id: 2, text: 'Condición segunda', displayOrder: 2, isActive: true },
+            { id: 1, text: 'Condición primera', displayOrder: 1, isActive: true },
+          ],
+        }),
+      ),
+    )
+    renderDetalle()
+    expect(await findTitle()).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /condiciones generales/i })).toBeInTheDocument()
+    expect(screen.getByText('Condición primera')).toBeInTheDocument()
+    expect(screen.getByText('Condición segunda')).toBeInTheDocument()
+  })
+
+  it('no muestra la sección de condiciones si la cotización no tiene', async () => {
+    server.use(quotationDetail(getQuotationResponse({ conditions: [] })))
+    renderDetalle()
+    expect(await findTitle()).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /condiciones generales/i })).not.toBeInTheDocument()
+  })
+
   it('muestra "Cotización no encontrada" en 404', async () => {
     server.use(quotationDetailError(404, { detail: 'No existe' }))
     renderDetalle('/cotizaciones/999')

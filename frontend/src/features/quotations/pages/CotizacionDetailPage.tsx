@@ -8,6 +8,7 @@ import { useQuotation } from '../hooks/useQuotation'
 import { QuotationAuditFooter } from '../components/QuotationAuditFooter'
 import { QuotationDetailHeader } from '../components/QuotationDetailHeader'
 import { QuotationItemsSection } from '../components/QuotationItemsSection'
+import { QuotationConditionsSection } from '../components/QuotationConditionsSection'
 import { QuotationDetailActions } from '../components/QuotationDetailActions'
 import { QuotationNotesSection } from '../components/QuotationNotesSection'
 import { QuotationRejectionReasonSection } from '../components/QuotationRejectionReasonSection'
@@ -102,6 +103,7 @@ export function CotizacionDetailPage() {
       />
       <QuotationStandbyTable items={data.items} currencyCode={data.currency.code} />
       <QuotationNotesSection clientNote={data.clientNote} internalNote={data.internalNote} />
+      <QuotationConditionsSection conditions={data.conditions} />
       <QuotationRejectionReasonSection quotation={data} />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <QuotationAuditFooter
