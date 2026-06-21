@@ -4,4 +4,5 @@ export const catalogKeys = {
   currencies: () => [...catalogKeys.all, 'currencies'] as const,
   paymentTerms: () => [...catalogKeys.all, 'payment-terms'] as const,
   serviceTypes: () => [...catalogKeys.all, 'service-types'] as const,
+  conditions: () => [...catalogKeys.all, 'quotation-conditions'] as const,
 }

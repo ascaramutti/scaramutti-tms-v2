@@ -1,22 +1,25 @@
-import type { QuotationResponse } from '../../../api'
-
 /** ¿La nota tiene contenido visible? (null/undefined/solo-whitespace → vacía). */
 function hasContent(value: string | null | undefined): boolean {
   return !!value?.trim()
 }
 
+interface QuotationNotesSectionProps {
+  clientNote: string | null | undefined
+  internalNote: string | null | undefined
+}
+
 /**
- * Sección de lectura de las observaciones en el Detalle. Renderiza la observación para el
- * cliente y la interna (esta SIEMPRE diferenciada: badge "🔒 interno" + azul más marcado — RN-03,
- * pantalla interna). Texto plano escapado por JSX (`{value}`) + `whitespace-pre-wrap` para
- * respetar saltos/tabs del texto libre. NUNCA `dangerouslySetInnerHTML`.
+ * Sección de lectura de las observaciones (cliente + interna). Recibe las notas como props
+ * planas para servir tanto al Detalle (que pasa `quotation.clientNote/internalNote`) como al
+ * Resumen read-only del wizard (que las lee del form). La interna SIEMPRE diferenciada: badge
+ * "🔒 interno" + azul más marcado (RN-03/ADR-003, pantalla interna). Texto plano escapado por JSX
+ * (`{value}`) + `whitespace-pre-wrap` para respetar saltos/tabs del texto libre. NUNCA
+ * `dangerouslySetInnerHTML`.
  *
  * - Ambas vacías → NO renderiza nada (RN-06: cotizaciones viejas no muestran sección huérfana).
  * - Una vacía → la sección se muestra; el vacío usa placeholder "—".
  */
-export function QuotationNotesSection({ quotation }: { quotation: QuotationResponse }) {
-  const { clientNote, internalNote } = quotation
-
+export function QuotationNotesSection({ clientNote, internalNote }: QuotationNotesSectionProps) {
   // RN-06 / D-7: si ninguna tiene contenido, no se muestra la sección.
   if (!hasContent(clientNote) && !hasContent(internalNote)) {
     return null

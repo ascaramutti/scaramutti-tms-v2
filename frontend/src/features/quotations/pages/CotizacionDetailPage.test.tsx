@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { CotizacionDetailPage } from './CotizacionDetailPage'
+import { montoEnLetras } from '../utils/montoEnLetras'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
@@ -62,6 +63,40 @@ describe('CotizacionDetailPage', () => {
     expect(await findTitle()).toBeInTheDocument()
     expect(screen.getByText('ACME S.A.C.')).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Detalle de ítems' })).toBeInTheDocument()
+  })
+
+  it('muestra el total general en letras (igual que el resumen y el PDF)', async () => {
+    server.use(
+      quotationDetail(getQuotationResponse({ totalAmount: 1500, currency: { id: 2, code: 'PEN', symbol: 'S/' } })),
+    )
+    renderDetalle()
+    expect(await findTitle()).toBeInTheDocument()
+    expect(screen.getByText(montoEnLetras(1500, 'PEN'))).toBeInTheDocument()
+  })
+
+  it('muestra las condiciones generales de la cotización (read-only, ordenadas)', async () => {
+    server.use(
+      quotationDetail(
+        getQuotationResponse({
+          conditions: [
+            { id: 2, text: 'Condición segunda', displayOrder: 2, isActive: true },
+            { id: 1, text: 'Condición primera', displayOrder: 1, isActive: true },
+          ],
+        }),
+      ),
+    )
+    renderDetalle()
+    expect(await findTitle()).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /condiciones generales/i })).toBeInTheDocument()
+    expect(screen.getByText('Condición primera')).toBeInTheDocument()
+    expect(screen.getByText('Condición segunda')).toBeInTheDocument()
+  })
+
+  it('no muestra la sección de condiciones si la cotización no tiene', async () => {
+    server.use(quotationDetail(getQuotationResponse({ conditions: [] })))
+    renderDetalle()
+    expect(await findTitle()).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: /condiciones generales/i })).not.toBeInTheDocument()
   })
 
   it('muestra "Cotización no encontrada" en 404', async () => {

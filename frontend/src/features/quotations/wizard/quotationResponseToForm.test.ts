@@ -3,6 +3,49 @@ import { quotationResponseToForm } from './quotationResponseToForm'
 import { quotationFormToRequest } from './quotationFormToRequest'
 import { fakeItem, getQuotationResponse } from '../../../test/mocks/handlers/quotations'
 
+describe('quotationResponseToForm — conditionIds', () => {
+  it('precarga los ids de las condiciones linkeadas ACTIVAS, en orden', () => {
+    const form = quotationResponseToForm(
+      getQuotationResponse({
+        conditions: [
+          { id: 1, text: 'A', displayOrder: 1, isActive: true },
+          { id: 3, text: 'C', displayOrder: 3, isActive: true },
+        ],
+      }),
+    )
+    expect(form.conditionIds).toEqual([1, 3])
+  })
+
+  it('EXCLUYE las condiciones linkeadas inactivas del pre-marcado (no re-enviables)', () => {
+    const form = quotationResponseToForm(
+      getQuotationResponse({
+        conditions: [
+          { id: 1, text: 'Vigente', displayOrder: 1, isActive: true },
+          { id: 9, text: 'Desactivada', displayOrder: 2, isActive: false },
+        ],
+      }),
+    )
+    // La inactiva (9) NO entra: re-enviarla daría 409 QUO-007.
+    expect(form.conditionIds).toEqual([1])
+  })
+
+  it('sin condiciones → conditionIds vacío', () => {
+    const form = quotationResponseToForm(getQuotationResponse({ conditions: [] }))
+    expect(form.conditionIds).toEqual([])
+  })
+
+  it('round-trip response→form→request preserva las condiciones activas', () => {
+    const response = getQuotationResponse({
+      conditions: [
+        { id: 1, text: 'A', displayOrder: 1, isActive: true },
+        { id: 2, text: 'B', displayOrder: 2, isActive: true },
+      ],
+    })
+    const request = quotationFormToRequest(quotationResponseToForm(response))
+    expect(request.conditionIds).toEqual([1, 2])
+  })
+})
+
 describe('quotationResponseToForm', () => {
   it('mapea los campos de cabecera (summaries embebidos → IDs)', () => {
     const form = quotationResponseToForm(

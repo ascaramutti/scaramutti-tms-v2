@@ -6,8 +6,9 @@ import type { WizardFormInput } from './quotation-wizard.schema'
 const NOTE_MAX_LENGTH = 500
 
 /**
- * Sección "Observaciones" del Step 4 (Resumen): observación para el cliente (va al PDF) e
- * interna (uso interno, nunca cara al cliente — RN-03). Lee del contexto del wizard
+ * Sección "Observaciones" del paso "Observaciones y condiciones": observación para el cliente
+ * (va al PDF) e interna (uso interno, nunca cara al cliente — RN-03/ADR-003). El Resumen las
+ * muestra read-only vía QuotationNotesSection. Lee del contexto del wizard
  * (`useFormContext`) → `register` para los textarea y `watch` para el contador. Las notas
  * pasan `sanitize={stripControlChars}` (L2) + `maxLength={500}` (L1); la validación zod (L3)
  * vive en el `wizardSchema`. Ambas notas van en card (tono azul); la interna se marca claramente
