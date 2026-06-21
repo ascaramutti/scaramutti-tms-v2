@@ -104,6 +104,18 @@ class QuotationPdfServiceTest {
         assertTrue(text.contains("ZTEST PDF clausula desactivada de prueba"),
             "la condicion inactiva tambien renderiza (snapshot, RN-05)");
         assertTrue(text.contains("Banco"), "la tabla de cuentas bancarias sigue (marcador [[BANK_ACCOUNTS]])");
+
+        // La cabecera de la tabla de cuentas (system_settings, NO una condicion) sale como ultima
+        // viñeta, despues de las condiciones del catalogo y justo antes de la tabla de cuentas.
+        assertTrue(text.contains("cualquiera de las siguientes cuentas"),
+            "la cabecera de la tabla de cuentas (intro) renderiza");
+        int idxCondition = text.indexOf("ZTEST PDF clausula desactivada de prueba");
+        int idxIntro = text.indexOf("cualquiera de las siguientes cuentas");
+        int idxBankTable = text.indexOf("Banco");
+        assertTrue(idxCondition >= 0 && idxCondition < idxIntro,
+            "el intro va despues de las condiciones del catalogo");
+        assertTrue(idxIntro < idxBankTable,
+            "el intro es la cabecera: va justo antes de la tabla de cuentas");
     }
 
     /**
@@ -122,6 +134,11 @@ class QuotationPdfServiceTest {
 
         assertTrue(text.contains("CONDICIONES GENERALES"), "la seccion sale aun sin condiciones");
         assertTrue(text.contains("Banco"), "la tabla de cuentas bancarias sale aun sin condiciones");
+        // La cabecera de la tabla de cuentas sale aunque la cotizacion no tenga condiciones.
+        assertTrue(text.contains("cualquiera de las siguientes cuentas"),
+            "la cabecera de la tabla de cuentas sale aun sin condiciones");
+        assertTrue(text.indexOf("cualquiera de las siguientes cuentas") < text.indexOf("Banco"),
+            "el intro va justo antes de la tabla de cuentas");
     }
 
     /** Cotizacion al tope: 5 items root (MAX_ROOT_ITEMS), Integral con 4 hijos, todos los campos. */
