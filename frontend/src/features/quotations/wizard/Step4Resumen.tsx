@@ -69,12 +69,12 @@ export function Step4Resumen({
       ) : (
         <>
           <QuotationItemsSection items={mappedItems} currencyCode={currencyCode} subtotal={subtotal} igv={igv} />
-          <QuotationStandbyTable items={mappedItems} currencyCode={currencyCode} />
           <QuotationTotalGeneral
             total={total}
             currencyCode={currencyCode}
             amountInWords={montoEnLetras(total, currencyCode)}
           />
+          <QuotationStandbyTable items={mappedItems} currencyCode={currencyCode} />
         </>
       )}
 
