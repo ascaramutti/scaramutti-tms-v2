@@ -7,6 +7,8 @@ import com.scaramutti.tms.quotations.QuotationEtag;
 import com.scaramutti.tms.quotations.QuotationsError;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
+import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
 import com.scaramutti.tms.quotations.mapper.QuotationServiceMapper;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
@@ -15,6 +17,8 @@ import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.exception.CommonError;
+import com.scaramutti.tms.shared.repository.ConditionRepository;
+import com.scaramutti.tms.shared.repository.QuotationConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
@@ -35,7 +39,7 @@ import java.util.Map;
  *   <li>optimistic locking via {@code If-Match} (412 COM-004 si la version no coincide),</li>
  *   <li>rechazo de edicion sobre cotizaciones terminales (ACCEPTED/REJECTED/EXPIRED → 409 QUO-006),</li>
  *   <li>rechazo de campos inmutables (quotationType, clientId → 400 QUO-004),</li>
- *   <li>REPLACE de items (borra los viejos e inserta los nuevos),</li>
+ *   <li>REPLACE de items y de condiciones generales (borra los viejos e inserta los nuevos),</li>
  *   <li>SIN anti-duplicado ni generacion de code (eso es solo del CREATE).</li>
  * </ul>
  *
@@ -51,13 +55,17 @@ public class UpdateQuotationService {
     @Inject QuotationRepository quotationRepository;
     @Inject QuotationItemRepository quotationItemRepository;
     @Inject QuotationStandbyCostRepository quotationStandbyCostRepository;
+    @Inject QuotationConditionRepository quotationConditionRepository;
+    @Inject ConditionRepository conditionRepository;
     @Inject UserRepository userRepository;
 
     @Inject QuotationDependencyLoaderService dependencyLoader;
     @Inject QuotationValidatorService validator;
     @Inject QuotationCalculatorService calculator;
     @Inject QuotationItemPersistenceService itemPersistence;
+    @Inject QuotationConditionPersistenceService conditionPersistence;
     @Inject QuotationResponseAssemblerService assembler;
+    @Inject QuotationEmbeddedSummaryMapper summaryMapper;
     @Inject AuthServiceMapper authServiceMapper;
     @Inject QuotationServiceMapper quotationServiceMapper;
 
@@ -91,6 +99,9 @@ public class UpdateQuotationService {
         //    (loadByIds, sin chequeo de isActive), que SI expone cotizaciones viejas con FKs inactivas.
         LoadedDependencies deps = dependencyLoader.loadFor(command);
         validator.validate(command, deps.serviceTypesById());
+        // Condiciones: misma validacion que el create (exige todas las seleccionadas activas;
+        // dup/inexistente -> 400, inactiva -> 409 QUO-007), fail-fast antes de mutar. Atomico (tx).
+        conditionPersistence.validate(command.conditionIds());
 
         // 6. Totales (reuso).
         QuotationCalculatorService.Totals totals = calculator.calculate(command.items());
@@ -109,6 +120,16 @@ public class UpdateQuotationService {
         Map<Long, QuotationStandbyCostResponse> standbyByItemId =
             itemPersistence.persistStandbyCosts(command, quotation, persistedItems);
 
+        // 8b. REPLACE de condiciones: borra los links viejos e inserta los seleccionados (ya
+        //     validados en el paso 5). Junction independiente de items (no comparte UNIQUE);
+        //     el delete es bulk/inmediato, no necesita un flush extra antes de reinsertar.
+        quotationConditionRepository.deleteByQuotationId(id);
+        conditionPersistence.persist(command.conditionIds(), id);
+        // Re-leemos las condiciones (ya reemplazadas en esta tx) para el response — misma
+        // fuente que GET/CREATE, ordenadas por displayOrder (incluye inactivas, RN-05).
+        List<QuotationConditionSummary> conditions =
+            summaryMapper.toConditionSummaries(conditionRepository.findLinkedToQuotation(id));
+
         // 9. Armar respuesta: createdBy original preservado, updatedBy = usuario actual.
         UserResponse createdBy = loadUser(quotation.createdBy);
         UserResponse updatedBy = quotation.createdBy.equals(userId)
@@ -117,7 +138,7 @@ public class UpdateQuotationService {
         boolean isExpired = computeIsExpired(quotation);
 
         return assembler.assemble(
-            quotation, persistedItems, standbyByItemId, totals, deps,
+            quotation, persistedItems, standbyByItemId, conditions, totals, deps,
             createdBy, updatedBy, isExpired
         );
     }

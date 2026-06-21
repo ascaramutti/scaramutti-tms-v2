@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { ITEM_DEFAULTS, WIZARD_DEFAULTS, wizardSchema, type WizardFormInput } from './quotation-wizard.schema'
+import {
+  ITEM_DEFAULTS,
+  STEP_FIELDS,
+  WIZARD_DEFAULTS,
+  wizardSchema,
+  type WizardFormInput,
+} from './quotation-wizard.schema'
 
 /** Form válido base con un ítem; se sobreescriben solo las notas por test. */
 function formWithNotes(clientNote: string, internalNote = ''): WizardFormInput {
@@ -60,5 +66,34 @@ describe('wizardSchema — observaciones (clientNote / internalNote)', () => {
   it('L3 — valor con tab y salto de línea (\\t \\n) → válido (se conservan)', () => {
     const form = formWithNotes('línea1\tcol2\nlínea2')
     expect(wizardSchema.safeParse(form).success).toBe(true)
+  })
+})
+
+describe('wizardSchema — conditionIds', () => {
+  function withConditions(conditionIds: number[]): WizardFormInput {
+    return { ...formWithNotes(''), conditionIds }
+  }
+
+  it('lista vacía → válido (paso opcional)', () => {
+    expect(wizardSchema.safeParse(withConditions([])).success).toBe(true)
+  })
+
+  it('ids positivos → válido', () => {
+    expect(wizardSchema.safeParse(withConditions([1, 2, 3])).success).toBe(true)
+  })
+
+  it('más de 20 ids → inválido (espeja maxItems:20 del backend)', () => {
+    const result = wizardSchema.safeParse(withConditions(Array.from({ length: 21 }, (_, i) => i + 1)))
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.find((issue) => issue.path[0] === 'conditionIds')?.message).toBe(
+        'Máximo 20 condiciones.',
+      )
+    }
+  })
+
+  it('conditionIds NO está en STEP_FIELDS (paso opcional, no bloquea ningún paso)', () => {
+    const allStepFields = Object.values(STEP_FIELDS).flat()
+    expect(allStepFields).not.toContain('conditionIds')
   })
 })

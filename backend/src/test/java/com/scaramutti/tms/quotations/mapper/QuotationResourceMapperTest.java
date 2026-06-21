@@ -57,7 +57,7 @@ class QuotationResourceMapperTest {
                                           List<QuotationItemRequest> items) {
         return new QuotationRequest(
             QuotationType.TRANSPORTE, 1, contactName, contactPhone, 1, 2,
-            LocalDate.of(2026, 6, 1), 15, origin, destination, null, null, items
+            LocalDate.of(2026, 6, 1), 15, origin, destination, null, null, items, null
         );
     }
 
@@ -94,7 +94,7 @@ class QuotationResourceMapperTest {
             QuotationType.TRANSPORTE, 1, "Juan", null, 1, 2,
             LocalDate.of(2026, 6, 1), 15, "Lima", "Cusco",
             "  Precio sujeto a variacion del combustible  ", "  margen ajustado  ",
-            List.of(sampleItemRequest(null)));
+            List.of(sampleItemRequest(null)), null);
 
         SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
@@ -108,12 +108,24 @@ class QuotationResourceMapperTest {
             QuotationType.TRANSPORTE, 1, "Juan", null, 1, 2,
             LocalDate.of(2026, 6, 1), 15, "Lima", "Cusco",
             "   ", "",
-            List.of(sampleItemRequest(null)));
+            List.of(sampleItemRequest(null)), null);
 
         SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
 
         assertNull(cmd.clientNote());
         assertNull(cmd.internalNote());
+    }
+
+    @Test
+    void toCommand_mapsConditionIds() {
+        var req = new QuotationRequest(
+            QuotationType.TRANSPORTE, 1, "Juan", null, 1, 2,
+            LocalDate.of(2026, 6, 1), 15, "Lima", "Cusco", null, null,
+            List.of(sampleItemRequest(null)), List.of(3, 7));
+
+        SaveQuotationCommand cmd = mapper.toSaveQuotationCommand(req);
+
+        assertEquals(List.of(3, 7), cmd.conditionIds());
     }
 
     @Test

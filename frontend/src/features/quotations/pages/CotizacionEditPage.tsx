@@ -168,6 +168,7 @@ export function CotizacionEditPage() {
       initialValues={quotationResponseToForm(data)}
       initialClient={initialClient}
       immutableFields={['quotationType', 'clientId']}
+      linkedConditions={data.conditions}
       title={`Editar cotización ${data.code}`}
       description="Modifica los datos y guarda los cambios."
       submitLabel="Guardar cambios"

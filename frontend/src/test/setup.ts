@@ -1,7 +1,11 @@
 import '@testing-library/jest-dom/vitest'
-import { afterAll, afterEach, beforeAll } from 'vitest'
+import { afterAll, afterEach, beforeAll, expect } from 'vitest'
 import { cleanup } from '@testing-library/react'
+import * as axeMatchers from 'vitest-axe/matchers'
 import { server } from './mocks/server'
+
+// Matcher de accesibilidad (vitest-axe): habilita `expect(await axe(container)).toHaveNoViolations()`.
+expect.extend(axeMatchers)
 
 // Polyfill de Storage en memoria.
 // Node 22+ expone `globalThis.localStorage` como un getter sin metodos cuando

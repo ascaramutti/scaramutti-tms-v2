@@ -8,6 +8,7 @@ import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationClientSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCurrencySummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
+import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
 import com.scaramutti.tms.quotations.mapper.QuotationServiceMapper;
 import com.scaramutti.tms.quotations.model.QuotationType;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
@@ -18,6 +19,7 @@ import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.exception.CommonError;
+import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
@@ -72,6 +74,7 @@ class CreateQuotationServiceTest {
 
     @Mock QuotationRepository quotationRepository;
     @Mock QuotationItemRepository quotationItemRepository;
+    @Mock ConditionRepository conditionRepository;
     @Mock UserRepository userRepository;
 
     @Mock QuotationDependencyLoaderService dependencyLoader;
@@ -79,7 +82,9 @@ class CreateQuotationServiceTest {
     @Mock QuotationValidatorService validator;
     @Mock QuotationCalculatorService calculator;
     @Mock QuotationItemPersistenceService itemPersistence;
+    @Mock QuotationConditionPersistenceService conditionPersistence;
     @Mock QuotationResponseAssemblerService assembler;
+    @Mock QuotationEmbeddedSummaryMapper summaryMapper;
     @Mock AuthServiceMapper authServiceMapper;
     @Mock QuotationServiceMapper quotationServiceMapper;
 
@@ -101,7 +106,7 @@ class CreateQuotationServiceTest {
             null, null
         ));
         return new SaveQuotationCommand(
-            QuotationType.TRANSPORTE, 1, "contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items
+            QuotationType.TRANSPORTE, 1, "contact", null, 1, null, null, 15, "Lima", "Cusco", null, null, items, null
         );
     }
 
@@ -187,7 +192,7 @@ class CreateQuotationServiceTest {
             com.scaramutti.tms.quotations.model.QuotationStatus.DRAFT,
             null, null, null, null, null, null, 15, null, false,
             null, null, null, null, null, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
+            List.of(), List.of(), null, null, OffsetDateTime.now(), OffsetDateTime.now()
         );
     }
 
@@ -211,7 +216,7 @@ class CreateQuotationServiceTest {
         when(itemPersistence.persistStandbyCosts(any(), any(), any())).thenReturn(Map.of());
         when(userRepository.findById(42)).thenReturn(sampleUser());
         when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
-        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
+        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
 
         var response = service.createQuotation(command);
 
@@ -221,7 +226,9 @@ class CreateQuotationServiceTest {
         verify(codeGenerator).nextCode();
         verify(quotationRepository).persist(any(Quotation.class));
         verify(itemPersistence).persistItems(eq(command), any(Quotation.class));
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(conditionPersistence).validate(command.conditionIds());
+        verify(conditionPersistence).persist(eq(command.conditionIds()), any());
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     // ---------- Loader propaga errores (early-fail) --------------------------
@@ -241,7 +248,7 @@ class CreateQuotationServiceTest {
         verify(calculator, never()).calculate(any());
         verify(codeGenerator, never()).nextCode();
         verify(quotationRepository, never()).persist(any(Quotation.class));
-        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     // ---------- Anti-duplicado (QUO-002) ------------------------------------
@@ -264,7 +271,7 @@ class CreateQuotationServiceTest {
 
         verify(quotationRepository, never()).persist(any(Quotation.class));
         verify(codeGenerator, never()).nextCode();
-        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     @Test
@@ -286,13 +293,13 @@ class CreateQuotationServiceTest {
             .thenReturn(stubMappedEntity("2026-00002", 42));
         when(userRepository.findById(42)).thenReturn(sampleUser());
         when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
-        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
+        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
 
         var response = service.createQuotation(command);
 
         assertNotNull(response);
         verify(quotationRepository).persist(any(Quotation.class));
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     // ---------- Validator falla aborta flow ---------------------------------
@@ -313,7 +320,7 @@ class CreateQuotationServiceTest {
         verify(quotationRepository, never()).findRecentByCreatedByAndClient(anyInt(), anyInt(), anyInt());
         verify(codeGenerator, never()).nextCode();
         verify(quotationRepository, never()).persist(any(Quotation.class));
-        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     // ---------- Defense-in-depth: UNIQUE code violation → QUO-001 ----------
@@ -352,7 +359,7 @@ class CreateQuotationServiceTest {
         assertEquals("QUO-001", ex.code());
 
         // El assembler NO debe haberse llamado (la persistencia fallo antes).
-        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler, never()).assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     // ---------- Anti-duplicate lock orden ------------------------------------
@@ -378,7 +385,7 @@ class CreateQuotationServiceTest {
             .thenReturn(stubMappedEntity("2026-00001", 42));
         when(userRepository.findById(42)).thenReturn(sampleUser());
         when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
-        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
+        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
 
         service.createQuotation(command);
 

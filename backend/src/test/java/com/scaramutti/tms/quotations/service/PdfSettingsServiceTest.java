@@ -45,7 +45,7 @@ class PdfSettingsServiceTest {
             "company.address", "Av. Siempre Viva 123",
             "company.phone", "Ofic.: 5927868",
             "company.email", "ventas@scaramutti.pe",
-            "quotation.pdf_terms", "[\"Termino uno\",\"Termino dos\"]",
+            "quotation.pdf_bank_accounts_intro", "El cliente deberá pagar en estas cuentas:",
             "quotation.pdf_bank_accounts",
                 "[{\"bank\":\"BCP - Soles\",\"account\":\"123-456\",\"cci\":\"002-123\"}]"
         ));
@@ -56,40 +56,24 @@ class PdfSettingsServiceTest {
         assertEquals("Av. Siempre Viva 123", settings.address());
         assertEquals("Ofic.: 5927868", settings.phone());
         assertEquals("ventas@scaramutti.pe", settings.email());
-        assertEquals(2, settings.terms().size());
-        assertEquals("Termino uno", settings.terms().get(0));
+        assertEquals("El cliente deberá pagar en estas cuentas:", settings.bankAccountsIntro());
         assertEquals(1, settings.bankAccounts().size());
         assertEquals("BCP - Soles", settings.bankAccounts().get(0).bank());
         assertEquals("002-123", settings.bankAccounts().get(0).cci());
     }
 
     @Test
-    void forPdf_withCorruptTermsJson_degradesToEmptyListWithoutFailing() {
+    void forPdf_withCorruptBankJson_degradesToEmptyListWithoutFailing() {
         when(repository.findAllAsMap()).thenReturn(Map.of(
             "company.legal_name", "ACME",
-            "quotation.pdf_terms", "esto no es json",
-            "quotation.pdf_bank_accounts", "[]"
-        ));
-
-        CompanyPdfSettings settings = service.forPdf();
-
-        // El setting corrupto NO tumba el PDF: terms degrada a vacio, el resto sigue OK.
-        assertTrue(settings.terms().isEmpty());
-        assertTrue(settings.bankAccounts().isEmpty());
-        assertEquals("ACME", settings.legalName());
-    }
-
-    @Test
-    void forPdf_withCorruptBankJson_degradesToEmptyList() {
-        when(repository.findAllAsMap()).thenReturn(Map.of(
-            "quotation.pdf_terms", "[\"ok\"]",
             "quotation.pdf_bank_accounts", "{no cierra"
         ));
 
         CompanyPdfSettings settings = service.forPdf();
 
-        assertEquals(1, settings.terms().size());
+        // El setting corrupto NO tumba el PDF: bankAccounts degrada a vacio, el resto sigue OK.
         assertTrue(settings.bankAccounts().isEmpty());
+        assertEquals("ACME", settings.legalName());
     }
 
     @Test
@@ -102,7 +86,19 @@ class PdfSettingsServiceTest {
         assertEquals("", settings.address());
         assertEquals("", settings.phone());
         assertEquals("", settings.email());
-        assertTrue(settings.terms().isEmpty());
+        assertEquals("", settings.bankAccountsIntro());
         assertTrue(settings.bankAccounts().isEmpty());
+    }
+
+    @Test
+    void forPdf_bankAccountsIntro_isReturnedAsPlainStringNotParsedAsJson() {
+        when(repository.findAllAsMap()).thenReturn(Map.of(
+            "quotation.pdf_bank_accounts_intro", "Pague en [cualquiera] de estas cuentas:"
+        ));
+
+        CompanyPdfSettings settings = service.forPdf();
+
+        // Es texto plano (cabecera de la tabla), no JSON: sale literal aunque tenga corchetes.
+        assertEquals("Pague en [cualquiera] de estas cuentas:", settings.bankAccountsIntro());
     }
 }

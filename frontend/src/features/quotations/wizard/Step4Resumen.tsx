@@ -3,12 +3,14 @@ import { QuotationItemsSection } from '../components/QuotationItemsSection'
 import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
 import { Step4SummaryCard } from './Step4SummaryCard'
-import { QuotationNotesFields } from './QuotationNotesFields'
+import { Step4SummaryConditions } from './Step4SummaryConditions'
+import { QuotationNotesSection } from '../components/QuotationNotesSection'
 import { quotationFormItemsToResponse, quotationTotals } from './quotationFormToResponse'
 import { montoEnLetras } from '../utils/montoEnLetras'
 import type { WizardFormInput } from './quotation-wizard.schema'
 import type {
   ClientResponse,
+  ConditionResponse,
   CurrencyResponse,
   PaymentTermResponse,
   QuotationServiceTypeResponse,
@@ -19,23 +21,29 @@ interface Step4ResumenProps {
   currencies: CurrencyResponse[]
   paymentTerms: PaymentTermResponse[]
   serviceTypes: QuotationServiceTypeResponse[]
+  conditions: ConditionResponse[]
   igvPercentage: number
 }
 
 /**
- * Step 4 (read-only): Resumen final antes de guardar. Lee del form y reusa los componentes
- * del Detalle de cotización (tabla jerárquica, stand-by, total) mapeando el form al shape de
- * la API. El botón "Guardar" + el submit (`POST /quotations`) se implementan en un PR posterior.
+ * Step 5 (read-only PURO): Resumen final antes de guardar. Lee del form y reusa los componentes
+ * del Detalle de cotización (tabla jerárquica, stand-by, total, condiciones, observaciones)
+ * mapeando el form al shape de presentación. NO edita nada — las observaciones se editan en el
+ * paso "Condiciones y observaciones"; acá se muestran read-only (RN-12).
  */
 export function Step4Resumen({
   selectedClient,
   currencies,
   paymentTerms,
   serviceTypes,
+  conditions,
   igvPercentage,
 }: Step4ResumenProps) {
   const { watch } = useFormContext<WizardFormInput>()
   const items = watch('items') ?? []
+  const conditionIds = watch('conditionIds') ?? []
+  const clientNote = watch('clientNote')
+  const internalNote = watch('internalNote')
   const currencyId = watch('currencyId')
   const currencyCode = currencies.find((currency) => currency.id === currencyId)?.code ?? 'PEN'
 
@@ -61,16 +69,18 @@ export function Step4Resumen({
       ) : (
         <>
           <QuotationItemsSection items={mappedItems} currencyCode={currencyCode} subtotal={subtotal} igv={igv} />
-          <QuotationStandbyTable items={mappedItems} currencyCode={currencyCode} />
           <QuotationTotalGeneral
             total={total}
             currencyCode={currencyCode}
             amountInWords={montoEnLetras(total, currencyCode)}
           />
+          <QuotationStandbyTable items={mappedItems} currencyCode={currencyCode} />
         </>
       )}
 
-      <QuotationNotesFields />
+      <QuotationNotesSection clientNote={clientNote} internalNote={internalNote} />
+
+      <Step4SummaryConditions conditions={conditions} selectedIds={conditionIds} />
     </div>
   )
 }

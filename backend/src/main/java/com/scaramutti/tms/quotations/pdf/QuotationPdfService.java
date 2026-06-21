@@ -4,6 +4,7 @@ import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import com.scaramutti.tms.quotations.dto.CompanyPdfSettings;
 import com.scaramutti.tms.quotations.dto.QuotationItemResponse;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
 import com.scaramutti.tms.quotations.service.PdfSettingsService;
 import com.scaramutti.tms.quotations.util.AmountToWords;
 import com.scaramutti.tms.shared.exception.CommonError;
@@ -100,9 +101,38 @@ public class QuotationPdfService {
             q.clientNote(),
             q.createdBy() != null ? q.createdBy().fullName() : "",
             q.createdBy() != null ? q.createdBy().position() : "",
-            company.terms(),
+            buildTerms(q.conditions(), company.bankAccountsIntro()),
             company.bankAccounts()
         );
+    }
+
+    /**
+     * CONDICIONES GENERALES del PDF: el texto de cada condicion linkeada a la cotizacion (ya
+     * ordenadas por displayOrder; incluye inactivas — snapshot historico, RN-05), luego la cabecera
+     * de la tabla de cuentas bancarias y el marcador {@code [[BANK_ACCOUNTS]]} al final, para que
+     * el template inserte la tabla de cuentas.
+     *
+     * <p>La cabecera ("El cliente debera realizar el pago ... en cualquiera de las siguientes
+     * cuentas:") es texto fijo de empresa (system_settings['quotation.pdf_bank_accounts_intro']),
+     * NO una condicion del catalogo: se imprime como ultima viñeta, justo antes de la tabla. Si el
+     * setting esta vacio se omite esa viñeta. El marcador se agrega SIEMPRE: las cuentas salen
+     * aunque la cotizacion no tenga condiciones. (US-006: las clausulas pasaron de un setting fijo
+     * al catalogo por cotizacion. Fix 2026-06-20: la cabecera de cuentas, que la migracion habia
+     * dejado como una condicion mas, volvio a ser texto de empresa — coherente con RN-09, que ya
+     * excluia el marcador del catalogo.)
+     */
+    List<String> buildTerms(List<QuotationConditionSummary> conditions, String bankAccountsIntro) {
+        List<String> terms = new ArrayList<>();
+        if (conditions != null) {
+            for (QuotationConditionSummary c : conditions) {
+                terms.add(c.text());
+            }
+        }
+        if (bankAccountsIntro != null && !bankAccountsIntro.isBlank()) {
+            terms.add(bankAccountsIntro);
+        }
+        terms.add(QuotationPdfView.BANK_ACCOUNTS_MARKER);
+        return terms;
     }
 
     private List<QuotationPdfView.ItemRow> buildItemRows(QuotationResponse q, String symbol) {

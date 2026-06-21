@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Lee de system_settings los datos de la empresa emisora + T&C + cuentas bancarias que el
+ * Lee de system_settings los datos de la empresa emisora + cuentas bancarias que el
  * PDF de cotizacion necesita. Editables sin redeploy (seed manual con db/seed_system_settings.sql
  * en dev y prod). Lectura directa: el PDF es on-demand y el ETag/304 del endpoint ya reduce la
  * frecuencia, asi que 1 query por PDF es aceptable.
@@ -27,13 +27,13 @@ public class PdfSettingsService {
     static final String KEY_ADDRESS = "company.address";
     static final String KEY_PHONE = "company.phone";
     static final String KEY_EMAIL = "company.email";
-    static final String KEY_TERMS = "quotation.pdf_terms";
     static final String KEY_BANK_ACCOUNTS = "quotation.pdf_bank_accounts";
+    static final String KEY_BANK_ACCOUNTS_INTRO = "quotation.pdf_bank_accounts_intro";
 
     @Inject SystemSettingRepository repository;
     @Inject ObjectMapper objectMapper;
 
-    /** Datos de empresa / T&C / bancos para el PDF (una sola query a system_settings). */
+    /** Datos de empresa / bancos para el PDF (una sola query a system_settings). */
     public CompanyPdfSettings forPdf() {
         Map<String, String> settings = repository.findAllAsMap();
         return new CompanyPdfSettings(
@@ -41,7 +41,7 @@ public class PdfSettingsService {
             settings.getOrDefault(KEY_ADDRESS, ""),
             settings.getOrDefault(KEY_PHONE, ""),
             settings.getOrDefault(KEY_EMAIL, ""),
-            parseJsonList(settings.get(KEY_TERMS), new TypeReference<List<String>>() {}, KEY_TERMS),
+            settings.getOrDefault(KEY_BANK_ACCOUNTS_INTRO, ""),
             parseJsonList(settings.get(KEY_BANK_ACCOUNTS), new TypeReference<List<BankAccount>>() {}, KEY_BANK_ACCOUNTS)
         );
     }

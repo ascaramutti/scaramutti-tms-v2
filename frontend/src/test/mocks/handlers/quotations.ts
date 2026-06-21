@@ -142,6 +142,7 @@ export function getQuotationResponse(overrides: Partial<QuotationResponse> = {})
         ],
       }),
     ],
+    conditions: [],
     createdBy: AUDIT_USER,
     updatedBy: AUDIT_USER,
     createdAt: '2026-05-20T10:00:00Z',

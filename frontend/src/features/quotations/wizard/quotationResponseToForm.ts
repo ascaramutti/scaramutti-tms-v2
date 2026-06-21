@@ -106,6 +106,13 @@ function itemResponseToForm(item: QuotationItemResponse): ItemInput {
  * El response ya devuelve el Integral primero (`itemNumber=1`); `quotationFormToRequest` lo
  * reordena defensivamente, así el round-trip GET→form→PUT preserva itemNumber/parentItemNumber.
  * `insuredAmount` se ignora (bug SEG/CSE: campo bloqueado en el front), igual que el request.
+ *
+ * `conditionIds` precarga SOLO las condiciones linkeadas que siguen ACTIVAS: una linkeada que se
+ * desactivó después no es re-elegible (la escritura exige todas activas → 409 QUO-007), así que no
+ * se pre-marca ni se reenvía. Esto es asimétrico a propósito: al guardar la edición, esa condición
+ * desactivada se pierde del set (es correcto — no se puede re-aplicar algo retirado del catálogo).
+ * Las inactivas NO se ocultan: el paso "Condiciones" las muestra aparte como "ya no vigentes"
+ * (recibe `quotation.conditions` completo por separado).
  */
 export function quotationResponseToForm(quotation: QuotationResponse): WizardFormInput {
   return {
@@ -122,5 +129,6 @@ export function quotationResponseToForm(quotation: QuotationResponse): WizardFor
     clientNote: textOrEmpty(quotation.clientNote),
     internalNote: textOrEmpty(quotation.internalNote),
     items: quotation.items.map(itemResponseToForm),
+    conditionIds: quotation.conditions.filter((c) => c.isActive).map((c) => c.id),
   }
 }

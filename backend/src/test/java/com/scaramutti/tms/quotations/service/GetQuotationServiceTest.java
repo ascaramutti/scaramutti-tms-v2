@@ -3,11 +3,13 @@ package com.scaramutti.tms.quotations.service;
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
+import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
@@ -66,10 +68,12 @@ class GetQuotationServiceTest {
     @Mock QuotationRepository quotationRepository;
     @Mock QuotationItemRepository quotationItemRepository;
     @Mock QuotationStandbyCostRepository quotationStandbyCostRepository;
+    @Mock ConditionRepository conditionRepository;
     @Mock UserRepository userRepository;
     @Mock QuotationDependencyLoaderService dependencyLoader;
     @Mock QuotationCalculatorService calculator;
     @Mock QuotationResponseAssemblerService assembler;
+    @Mock QuotationEmbeddedSummaryMapper summaryMapper;
     @Mock AuthServiceMapper authServiceMapper;
 
     @InjectMocks GetQuotationService service;
@@ -108,7 +112,7 @@ class GetQuotationServiceTest {
         // siempre el mismo objeto.
         when(authServiceMapper.toUserResponse(any())).thenAnswer(inv ->
             new UserResponse(42, "admin", "Admin Sistema", "Admin", "admin", true));
-        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
+        when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
             .thenReturn(expectedResponse);
     }
 
@@ -128,7 +132,7 @@ class GetQuotationServiceTest {
         verify(quotationStandbyCostRepository).findByQuotationId(123L);
         verify(dependencyLoader).loadByIds(any(), any(), any(), anySet(), anySet());
         verify(calculator).calculateFromEntities(any());
-        verify(assembler).assemble(eq(quotation), any(), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler).assemble(eq(quotation), any(), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     // ---------- 404 Not Found ----------------------------------------------
@@ -161,7 +165,7 @@ class GetQuotationServiceTest {
 
         service.getById(123L);
 
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), eq(true));
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), eq(true));
     }
 
     @Test
@@ -176,7 +180,7 @@ class GetQuotationServiceTest {
 
         service.getById(123L);
 
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), eq(false));
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), eq(false));
     }
 
     @Test
@@ -189,7 +193,7 @@ class GetQuotationServiceTest {
 
         service.getById(123L);
 
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), eq(false));
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), eq(false));
     }
 
     @Test
@@ -203,7 +207,7 @@ class GetQuotationServiceTest {
 
         service.getById(123L);
 
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), eq(false));
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), eq(false));
     }
 
     @Test
@@ -214,7 +218,7 @@ class GetQuotationServiceTest {
 
         service.getById(123L);
 
-        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), eq(false));
+        verify(assembler).assemble(any(), any(), any(), any(), any(), any(), any(), any(), eq(false));
     }
 
     // ---------- Dedup createdBy/updatedBy ----------------------------------
@@ -237,7 +241,7 @@ class GetQuotationServiceTest {
         ArgumentCaptor<UserResponse> createdByCaptor = ArgumentCaptor.forClass(UserResponse.class);
         ArgumentCaptor<UserResponse> updatedByCaptor = ArgumentCaptor.forClass(UserResponse.class);
         verify(assembler).assemble(
-            any(), any(), any(), any(), any(),
+            any(), any(), any(), any(), any(), any(),
             createdByCaptor.capture(), updatedByCaptor.capture(), anyBoolean()
         );
         assertSame(createdByCaptor.getValue(), updatedByCaptor.getValue(),
@@ -301,7 +305,7 @@ class GetQuotationServiceTest {
         QuotationResponse result = service.getById(123L);
 
         assertNotNull(result);
-        verify(assembler).assemble(any(), eq(List.of()), any(), any(), any(), any(), any(), anyBoolean());
+        verify(assembler).assemble(any(), eq(List.of()), any(), any(), any(), any(), any(), any(), anyBoolean());
     }
 
     // ---------- Helpers ----------------------------------------------------
@@ -342,7 +346,7 @@ class GetQuotationServiceTest {
             15, OffsetDateTime.now(), false, "Lima", "Cusco",
             null, null, null,
             BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
-            List.of(), null, null,
+            List.of(), List.of(), null, null,
             OffsetDateTime.now(), OffsetDateTime.now()
         );
     }

@@ -5,6 +5,7 @@ import com.scaramutti.tms.quotations.dto.QuotationItemResponse;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCargoTypeSummary;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
@@ -64,6 +65,7 @@ public class QuotationResponseAssemblerService {
      * @param quotation         entity persistida
      * @param persistedItems    items persistidos en orden de insercion
      * @param standbyByItemId   standby costs (ya-Response) indexados por quotationItemId
+     * @param conditions        condiciones generales linkeadas (ya-Summary, ordenadas por displayOrder; incluye inactivas, RN-05)
      * @param totals            totales calculados por QuotationCalculatorService
      * @param deps              dependencias precargadas (Response DTOs)
      * @param createdBy         usuario que crea la cotizacion
@@ -74,6 +76,7 @@ public class QuotationResponseAssemblerService {
             Quotation quotation,
             List<QuotationItem> persistedItems,
             Map<Long, QuotationStandbyCostResponse> standbyByItemId,
+            List<QuotationConditionSummary> conditions,
             QuotationCalculatorService.Totals totals,
             LoadedDependencies deps,
             UserResponse createdBy,
@@ -107,6 +110,7 @@ public class QuotationResponseAssemblerService {
             totals.totalIgv(),
             totals.totalAmount(),
             items,
+            conditions,
             createdBy,
             updatedBy,
             quotation.createdAt,

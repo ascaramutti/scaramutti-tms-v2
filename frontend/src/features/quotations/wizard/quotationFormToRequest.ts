@@ -112,5 +112,7 @@ export function quotationFormToRequest(form: WizardFormInput): QuotationRequest 
     clientNote: textOrNull(form.clientNote),
     internalNote: textOrNull(form.internalNote),
     items,
+    // [] = sin condiciones (válido; el backend lo acepta). Se envía siempre el array, igual que items.
+    conditionIds: form.conditionIds,
   }
 }

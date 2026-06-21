@@ -346,6 +346,24 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/PaymentTermResponse' }
 
+  /quotation-conditions:
+    get:
+      tags: [Catalogs]
+      operationId: listQuotationConditions
+      summary: Listar condiciones generales del catálogo (filtrable por isActive)
+      parameters:
+        - name: isActive
+          in: query
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/ConditionResponse' }
+
   /quotation-service-types:
     get:
       tags: [Catalogs]
@@ -1117,6 +1135,25 @@ components:
         days:     { type: integer, format: int32, minimum: 0, example: 30 }
         isActive: { type: boolean }
 
+    # -------- Catálogos: Condition ----------------------------------------
+    ConditionResponse:
+      type: object
+      required: [id, text, displayOrder, isActive]
+      properties:
+        id:           { type: integer, format: int32 }
+        text:         { type: string, example: 'En caso el cliente cuente con seguro de carga, deberá incluir como beneficiario a Transportes Scaramutti S.A.C. ...' }
+        displayOrder: { type: integer, format: int32, minimum: 1, example: 2 }
+        isActive:     { type: boolean }
+
+    QuotationConditionResponse:
+      type: object
+      required: [id, text, displayOrder, isActive]
+      properties:
+        id:           { type: integer, format: int32, example: 3 }
+        text:         { type: string }
+        displayOrder: { type: integer, format: int32, example: 2 }
+        isActive:     { type: boolean, description: 'true salvo que la condicion se haya desactivado en el catalogo tras linkearse (snapshot historico, RN-05).' }
+
     # -------- CargoTypes ---------------------------------------------------
     CargoTypeRef:
       type: object
@@ -1572,6 +1609,16 @@ components:
           minItems: 1
           description: 'Lista plana de ítems root e hijos. Los hijos referencian al padre vía `parentItemNumber`. Máximo 5 ítems root (validado por backend).'
           items: { $ref: '#/components/schemas/QuotationItemRequest' }
+        conditionIds:
+          type: [array, 'null']
+          maxItems: 20
+          description: |
+            Ids de las condiciones generales del catálogo que aplican a la cotización
+            (checkboxes en el wizard). Opcional: `null` o `[]` = sin condiciones (el usuario
+            puede desmarcar todas). Máximo 20 elementos (`400 COM-001` si se excede). Al
+            crear/editar (escritura), todas deben existir y estar **activas** (Opción B): una
+            condición desactivada → `409 QUO-007`; ids repetidos o inexistentes → `400 COM-001`.
+          items: { type: integer, format: int32 }
 
     QuotationResponse:
       type: object
@@ -1586,6 +1633,7 @@ components:
         - expiresAt
         - isExpired
         - items
+        - conditions
         - totalSubtotal
         - totalIgv
         - totalAmount
@@ -1626,6 +1674,10 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/QuotationItemResponse' }
+        conditions:
+          type: array
+          description: 'Condiciones generales linkeadas, ordenadas por displayOrder ASC (RN-04). Incluye TODAS las linkeadas, activas O inactivas (RN-05, snapshot). Vacia si no hay (nunca null).'
+          items: { $ref: '#/components/schemas/QuotationConditionResponse' }
         createdBy: { $ref: '#/components/schemas/UserResponse' }
         updatedBy: { $ref: '#/components/schemas/UserResponse' }
         createdAt: { type: string, format: date-time }

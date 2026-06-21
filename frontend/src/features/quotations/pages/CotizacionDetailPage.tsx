@@ -8,12 +8,14 @@ import { useQuotation } from '../hooks/useQuotation'
 import { QuotationAuditFooter } from '../components/QuotationAuditFooter'
 import { QuotationDetailHeader } from '../components/QuotationDetailHeader'
 import { QuotationItemsSection } from '../components/QuotationItemsSection'
+import { QuotationConditionsSection } from '../components/QuotationConditionsSection'
 import { QuotationDetailActions } from '../components/QuotationDetailActions'
 import { QuotationNotesSection } from '../components/QuotationNotesSection'
 import { QuotationRejectionReasonSection } from '../components/QuotationRejectionReasonSection'
 import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationSummaryCard } from '../components/QuotationSummaryCard'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
+import { montoEnLetras } from '../utils/montoEnLetras'
 
 export function CotizacionDetailPage() {
   const navigate = useNavigate()
@@ -93,25 +95,40 @@ export function CotizacionDetailPage() {
         etag={data._etag}
         onRefetch={() => refetch()}
       />
-      <QuotationSummaryCard quotation={data} />
+      <QuotationSummaryCard
+        clientName={data.client.name}
+        clientRuc={data.client.ruc}
+        contactName={data.contactName}
+        contactPhone={data.contactPhone}
+        quotationType={data.quotationType}
+        origin={data.origin}
+        destination={data.destination}
+        currencyCode={data.currency.code}
+        paymentTermName={data.paymentTerm?.name ?? null}
+        validityDays={data.validityDays}
+        tentativeServiceDate={data.tentativeServiceDate}
+      />
       <QuotationItemsSection
         items={data.items}
         currencyCode={data.currency.code}
         subtotal={data.totalSubtotal}
         igv={data.totalIgv}
       />
+      <QuotationTotalGeneral
+        total={data.totalAmount}
+        currencyCode={data.currency.code}
+        amountInWords={montoEnLetras(data.totalAmount, data.currency.code)}
+      />
       <QuotationStandbyTable items={data.items} currencyCode={data.currency.code} />
-      <QuotationNotesSection quotation={data} />
+      <QuotationNotesSection clientNote={data.clientNote} internalNote={data.internalNote} />
+      <QuotationConditionsSection conditions={data.conditions} />
       <QuotationRejectionReasonSection quotation={data} />
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <QuotationAuditFooter
-          createdBy={data.createdBy}
-          updatedBy={data.updatedBy}
-          createdAt={data.createdAt}
-          updatedAt={data.updatedAt}
-        />
-        <QuotationTotalGeneral total={data.totalAmount} currencyCode={data.currency.code} />
-      </div>
+      <QuotationAuditFooter
+        createdBy={data.createdBy}
+        updatedBy={data.updatedBy}
+        createdAt={data.createdAt}
+        updatedAt={data.updatedAt}
+      />
     </div>
   )
 }

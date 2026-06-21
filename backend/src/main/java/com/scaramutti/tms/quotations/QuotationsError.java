@@ -31,6 +31,11 @@ import com.scaramutti.tms.shared.exception.ApiError;
  *  - QUO-006: intento de editar una cotizacion en estado terminal (PUT /quotations/{id}).
  *    Una cotizacion {@code ACCEPTED}/{@code REJECTED}/{@code EXPIRED} es inmutable. El
  *    caller pasa el detalle con el estado concreto via {@code toException(...)}.
+ *
+ *  - QUO-007: la seleccion de condiciones generales (POST/PUT /quotations) incluye una
+ *    condicion DESACTIVADA (la escritura exige que todas las seleccionadas esten activas, ADR-010). El caller pasa el detalle nombrando la
+ *    condicion via {@code toException(...)}. Duplicados / ids inexistentes en la seleccion
+ *    NO usan este codigo: son 400 {@code COM-001} (validacion del request).
  */
 public enum QuotationsError implements ApiError {
 
@@ -45,7 +50,9 @@ public enum QuotationsError implements ApiError {
     INVALID_TRANSITION ("QUO-005", 409, "Conflict",
         "La transicion de estado no esta permitida"),
     TERMINAL_NOT_EDITABLE ("QUO-006", 409, "Conflict",
-        "No se puede editar una cotizacion en estado terminal");
+        "No se puede editar una cotizacion en estado terminal"),
+    INACTIVE_CONDITION_SELECTED ("QUO-007", 409, "Conflict",
+        "La seleccion incluye una condicion desactivada");
 
     private final String code;
     private final int status;

@@ -100,6 +100,23 @@ export type PaymentTermResponse = {
     isActive: boolean;
 };
 
+export type ConditionResponse = {
+    id: number;
+    text: string;
+    displayOrder: number;
+    isActive: boolean;
+};
+
+export type QuotationConditionResponse = {
+    id: number;
+    text: string;
+    displayOrder: number;
+    /**
+     * true salvo que la condicion se haya desactivado en el catalogo tras linkearse (snapshot historico, RN-05).
+     */
+    isActive: boolean;
+};
+
 export type CargoTypeRef = {
     id: number;
     name: string;
@@ -490,6 +507,15 @@ export type QuotationRequest = {
      * Lista plana de ítems root e hijos. Los hijos referencian al padre vía `parentItemNumber`. Máximo 5 ítems root (validado por backend).
      */
     items: Array<QuotationItemRequest>;
+    /**
+     * Ids de las condiciones generales del catálogo que aplican a la cotización
+     * (checkboxes en el wizard). Opcional: `null` o `[]` = sin condiciones (el usuario
+     * puede desmarcar todas). Máximo 20 elementos (`400 COM-001` si se excede). Al
+     * crear/editar (escritura), todas deben existir y estar **activas** (Opción B): una
+     * condición desactivada → `409 QUO-007`; ids repetidos o inexistentes → `400 COM-001`.
+     *
+     */
+    conditionIds?: Array<number> | null;
 };
 
 export type QuotationResponse = {
@@ -545,6 +571,10 @@ export type QuotationResponse = {
      */
     totalAmount: number;
     items: Array<QuotationItemResponse>;
+    /**
+     * Condiciones generales linkeadas, ordenadas por displayOrder ASC (RN-04). Incluye TODAS las linkeadas, activas O inactivas (RN-05, snapshot). Vacia si no hay (nunca null).
+     */
+    conditions: Array<QuotationConditionResponse>;
     createdBy: UserResponse;
     updatedBy: UserResponse;
     createdAt: string;
@@ -798,6 +828,24 @@ export type ListPaymentTermsResponses = {
 };
 
 export type ListPaymentTermsResponse = ListPaymentTermsResponses[keyof ListPaymentTermsResponses];
+
+export type ListQuotationConditionsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        isActive?: boolean;
+    };
+    url: '/quotation-conditions';
+};
+
+export type ListQuotationConditionsResponses = {
+    /**
+     * OK
+     */
+    200: Array<ConditionResponse>;
+};
+
+export type ListQuotationConditionsResponse = ListQuotationConditionsResponses[keyof ListQuotationConditionsResponses];
 
 export type ListQuotationServiceTypesData = {
     body?: never;

@@ -273,6 +273,26 @@ CREATE TABLE IF NOT EXISTS cotizaciones.payment_terms (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Catalogo versionado de condiciones generales del PDF (ADR-009). Inmutable por versionado:
+-- "editar" = is_active=false + INSERT nueva que hereda display_order; el `text` NUNCA se UPDATE-a
+-- (preserva el snapshot de cotizaciones emitidas). Patch: db/patches/2026-06-19-quotation-conditions.sql.
+CREATE TABLE IF NOT EXISTS cotizaciones.conditions (
+    id            SERIAL PRIMARY KEY,
+    text          TEXT NOT NULL,
+    display_order INTEGER NOT NULL,
+    is_active     BOOLEAN NOT NULL DEFAULT true,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+COMMENT ON TABLE cotizaciones.conditions IS
+    'Catalogo versionado de condiciones generales del PDF de cotizacion (ADR-009). Fuente de verdad de las clausulas (reemplaza system_settings[''quotation.pdf_terms''] para ese fin). Inmutable por versionado: "editar" = is_active=false + INSERT nueva que hereda display_order; el text NUNCA se UPDATE-a. El marcador [[BANK_ACCOUNTS]] NO es fila de este catalogo (RN-09). Datos: seed manual del modulo (como service_types/payment_terms).';
+COMMENT ON COLUMN cotizaciones.conditions.display_order IS
+    'Orden de impresion en el PDF (ASC). Una version nueva hereda el display_order de la que reemplaza. Reorder = diferido (DA-01).';
+COMMENT ON COLUMN cotizaciones.conditions.is_active IS
+    'Lectura (detalle/PDF) muestra activas O inactivas (snapshot, RN-05). Escritura (crear/editar) exige TODAS activas (Opcion B, RN-06 → QUO-007). El wizard lista solo activas (RN-07).';
+
+CREATE INDEX IF NOT EXISTS idx_conditions_display_order ON cotizaciones.conditions(display_order);
+
 CREATE TABLE IF NOT EXISTS cotizaciones.system_settings (
     key        VARCHAR(100) PRIMARY KEY,
     value      TEXT NOT NULL,
@@ -377,6 +397,21 @@ CREATE INDEX IF NOT EXISTS idx_quotation_items_parent    ON cotizaciones.quotati
 -- Para los filtros EXISTS por tipo del listado (cargoTypeId / serviceTypeId).
 CREATE INDEX IF NOT EXISTS idx_quotation_items_cargo_type   ON cotizaciones.quotation_items(cargo_type_id);
 CREATE INDEX IF NOT EXISTS idx_quotation_items_service_type ON cotizaciones.quotation_items(quotation_service_type_id);
+
+-- Junction FK-only (ADR-009 §3): que condiciones del catalogo aplican a cada cotizacion. PK compuesta
+-- = unicidad. SIN texto: la fila inmutable de cotizaciones.conditions ES el snapshot. CASCADE en
+-- quotation_id (dependiente, como items); NO en condition_id (las condiciones no se borran, solo se
+-- desactivan — el CASCADE romperia el snapshot). Patch: db/patches/2026-06-19-quotation-conditions.sql.
+CREATE TABLE IF NOT EXISTS cotizaciones.quotation_conditions (
+    quotation_id BIGINT  NOT NULL REFERENCES cotizaciones.quotations(id) ON DELETE CASCADE,
+    condition_id INTEGER NOT NULL REFERENCES cotizaciones.conditions(id),
+    PRIMARY KEY (quotation_id, condition_id)
+);
+
+COMMENT ON TABLE cotizaciones.quotation_conditions IS
+    'Tabla de apoyo FK-only (ADR-009 §3): condiciones del catalogo aplicadas a cada cotizacion. PK compuesta (quotation_id, condition_id) = unicidad. SIN texto: la fila inmutable de cotizaciones.conditions ES el snapshot. El PDF/detalle resuelve por JOIN ordenando por display_order ASC (RN-04), mostrando activas O inactivas (RN-05).';
+
+CREATE INDEX IF NOT EXISTS idx_quotation_conditions_condition ON cotizaciones.quotation_conditions(condition_id);
 
 CREATE TABLE IF NOT EXISTS cotizaciones.quotation_standby_costs (
     id                BIGSERIAL PRIMARY KEY,

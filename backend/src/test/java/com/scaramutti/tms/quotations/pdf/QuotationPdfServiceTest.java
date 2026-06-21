@@ -6,6 +6,7 @@ import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCargoTypeSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationClientSummary;
+import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationCurrencySummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationPaymentTermSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
@@ -84,6 +85,62 @@ class QuotationPdfServiceTest {
         assertTrue(text.contains("S/ 7,552.00"), "P. Total = total de línea (cuadra con el recuadro de totales)");
     }
 
+    /**
+     * US-006: las CONDICIONES GENERALES del PDF salen de las condiciones linkeadas a la
+     * cotizacion (q.conditions), no del setting fijo. Incluye las inactivas (snapshot, RN-05)
+     * y la tabla de cuentas bancarias sigue saliendo (marcador [[BANK_ACCOUNTS]] que agrega el codigo).
+     */
+    @Test
+    void conditions_fromQuotation_renderInPdf_includingInactive_withBankTable() throws Exception {
+        byte[] pdf = pdfService.generate(sampleQuotation());
+
+        String text;
+        try (var document = org.apache.pdfbox.pdmodel.PDDocument.load(pdf)) {
+            text = new org.apache.pdfbox.text.PDFTextStripper().getText(document);
+        }
+
+        assertTrue(text.contains("CONDICIONES GENERALES"), "la seccion de condiciones");
+        assertTrue(text.contains("ZTEST PDF clausula activa de prueba"), "condicion activa renderiza");
+        assertTrue(text.contains("ZTEST PDF clausula desactivada de prueba"),
+            "la condicion inactiva tambien renderiza (snapshot, RN-05)");
+        assertTrue(text.contains("Banco"), "la tabla de cuentas bancarias sigue (marcador [[BANK_ACCOUNTS]])");
+
+        // La cabecera de la tabla de cuentas (system_settings, NO una condicion) sale como ultima
+        // viñeta, despues de las condiciones del catalogo y justo antes de la tabla de cuentas.
+        assertTrue(text.contains("cualquiera de las siguientes cuentas"),
+            "la cabecera de la tabla de cuentas (intro) renderiza");
+        int idxCondition = text.indexOf("ZTEST PDF clausula desactivada de prueba");
+        int idxIntro = text.indexOf("cualquiera de las siguientes cuentas");
+        int idxBankTable = text.indexOf("Banco");
+        assertTrue(idxCondition >= 0 && idxCondition < idxIntro,
+            "el intro va despues de las condiciones del catalogo");
+        assertTrue(idxIntro < idxBankTable,
+            "el intro es la cabecera: va justo antes de la tabla de cuentas");
+    }
+
+    /**
+     * US-006: el marcador [[BANK_ACCOUNTS]] se agrega SIEMPRE → la seccion CONDICIONES GENERALES
+     * y la tabla de bancos salen aunque la cotizacion no tenga condiciones (fullQuotation tiene
+     * conditions=[]). Guarda la decision "marcador siempre" contra una regresion.
+     */
+    @Test
+    void conditions_empty_stillRendersBankTableSection() throws Exception {
+        byte[] pdf = pdfService.generate(fullQuotation());
+
+        String text;
+        try (var document = org.apache.pdfbox.pdmodel.PDDocument.load(pdf)) {
+            text = new org.apache.pdfbox.text.PDFTextStripper().getText(document);
+        }
+
+        assertTrue(text.contains("CONDICIONES GENERALES"), "la seccion sale aun sin condiciones");
+        assertTrue(text.contains("Banco"), "la tabla de cuentas bancarias sale aun sin condiciones");
+        // La cabecera de la tabla de cuentas sale aunque la cotizacion no tenga condiciones.
+        assertTrue(text.contains("cualquiera de las siguientes cuentas"),
+            "la cabecera de la tabla de cuentas sale aun sin condiciones");
+        assertTrue(text.indexOf("cualquiera de las siguientes cuentas") < text.indexOf("Banco"),
+            "el intro va justo antes de la tabla de cuentas");
+    }
+
     /** Cotizacion al tope: 5 items root (MAX_ROOT_ITEMS), Integral con 4 hijos, todos los campos. */
     private QuotationResponse fullQuotation() {
         var igv = new BigDecimal("18.00");
@@ -155,6 +212,7 @@ class QuotationPdfServiceTest {
             null, null, null,
             new BigDecimal("31180.00"), new BigDecimal("5612.40"), new BigDecimal("36792.40"),
             List.of(integral, camaCuna, camaBaja, seguro, grua),
+            List.of(),
             admin, admin,
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00"),
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00")
@@ -198,6 +256,10 @@ class QuotationPdfServiceTest {
             null, null, null,
             new BigDecimal("15404.24"), new BigDecimal("2772.76"), new BigDecimal("18177.00"),
             List.of(integral, seguro),
+            List.of(
+                new QuotationConditionSummary(901, "ZTEST PDF clausula activa de prueba", 1, true),
+                new QuotationConditionSummary(902, "ZTEST PDF clausula desactivada de prueba", 2, false)
+            ),
             admin, admin,
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00"),
             OffsetDateTime.parse("2026-03-11T10:00:00-05:00")
