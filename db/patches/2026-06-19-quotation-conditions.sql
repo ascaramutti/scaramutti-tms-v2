@@ -11,7 +11,8 @@
 --   4. Backfill: linkear cada cotizacion existente a TODAS las condiciones sembradas (PDF identico).
 --
 -- VERIFICACION POST-MIGRACION (manual, GATE de deploy):
---   -- semilla: debe dar (nº de strings del array de prod) − 1, y el marcador NO debe ser fila:
+--   -- semilla: debe dar (nº de strings del array de prod) − 2 (excluye el marcador [[BANK_ACCOUNTS]]
+--   --          y la cabecera de la tabla de cuentas bancarias), y el marcador NO debe ser fila:
 --   SELECT count(*) FROM cotizaciones.conditions WHERE is_active;
 --   SELECT NOT EXISTS (SELECT 1 FROM cotizaciones.conditions WHERE text = '[[BANK_ACCOUNTS]]') AS marker_excluido;
 --   -- backfill: debe ser igual a count(quotations) × count(condiciones activas):
@@ -58,9 +59,10 @@ CREATE INDEX IF NOT EXISTS idx_quotation_conditions_condition ON cotizaciones.qu
 
 -- 3. Semilla del catalogo (RN-10a) — parse-and-insert dinamico desde el setting REAL de la BD.
 --    El texto sale de system_settings (no se recopia en el patch) → cero drift con la fuente actual.
---    Excluye "[[BANK_ACCOUNTS]]" (RN-09). display_order 1..N contiguo (row_number sobre lo ya filtrado,
---    no la ordinalidad cruda — asi no queda hueco donde estaba el marcador). Idempotente: solo siembra
---    si el catalogo esta vacio.
+--    Excluye "[[BANK_ACCOUNTS]]" (RN-09) y la cabecera de la tabla de cuentas bancarias (no es una
+--    clausula; va a system_settings['quotation.pdf_bank_accounts_intro'] — fix 2026-06-20). display_order
+--    1..N contiguo (row_number sobre lo ya filtrado, no la ordinalidad cruda — asi no quedan huecos donde
+--    estaban el marcador / la cabecera). Idempotente: solo siembra si el catalogo esta vacio.
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM cotizaciones.conditions) THEN
@@ -72,6 +74,9 @@ BEGIN
                  LATERAL jsonb_array_elements_text(s.value::jsonb) WITH ORDINALITY AS elem(value, ordinality)
             WHERE s.key = 'quotation.pdf_terms'
               AND elem.value <> '[[BANK_ACCOUNTS]]'   -- RN-09: el marcador no es una condicion
+              -- La cabecera de la tabla de cuentas bancarias tampoco es una clausula (fix 2026-06-20):
+              -- va a system_settings['quotation.pdf_bank_accounts_intro'], no al catalogo.
+              AND elem.value NOT LIKE 'El cliente deberá realizar el pago de las facturas%cuentas bancarias%'
         ) filtered;
     END IF;
 END $$;

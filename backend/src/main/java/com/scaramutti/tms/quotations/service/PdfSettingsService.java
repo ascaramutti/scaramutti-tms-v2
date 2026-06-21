@@ -28,6 +28,7 @@ public class PdfSettingsService {
     static final String KEY_PHONE = "company.phone";
     static final String KEY_EMAIL = "company.email";
     static final String KEY_BANK_ACCOUNTS = "quotation.pdf_bank_accounts";
+    static final String KEY_BANK_ACCOUNTS_INTRO = "quotation.pdf_bank_accounts_intro";
 
     @Inject SystemSettingRepository repository;
     @Inject ObjectMapper objectMapper;
@@ -40,6 +41,7 @@ public class PdfSettingsService {
             settings.getOrDefault(KEY_ADDRESS, ""),
             settings.getOrDefault(KEY_PHONE, ""),
             settings.getOrDefault(KEY_EMAIL, ""),
+            settings.getOrDefault(KEY_BANK_ACCOUNTS_INTRO, ""),
             parseJsonList(settings.get(KEY_BANK_ACCOUNTS), new TypeReference<List<BankAccount>>() {}, KEY_BANK_ACCOUNTS)
         );
     }
