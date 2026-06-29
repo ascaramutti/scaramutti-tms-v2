@@ -1,0 +1,65 @@
+name: Deploy frontend to Azure
+
+# Se dispara con cada push a main que toque el frontend (o este workflow),
+# y también se puede correr a mano desde la pestaña Actions.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/deploy-frontend.yml'
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # necesario para el login OIDC (sin secretos de larga vida)
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Login a Azure (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Build de la imagen del frontend, con la URL del backend horneada.
+      - name: Build imagen base
+        run: |
+          az acr build --registry ${{ secrets.ACR_NAME }} \
+            --image frontend:${{ github.sha }} \
+            --build-arg VITE_API_BASE_URL=${{ secrets.BACKEND_URL }}/api/v1 \
+            --target production ./frontend
+
+      # Variante para Azure: nginx SIN el proxy de prod (que apunta a un host
+      # inexistente acá). DEUDA: parametrizar el nginx en el repo para no
+      # duplicar esto (queda para la limpieza de la Fase 4).
+      - name: Build variante Azure (nginx sin proxy)
+        run: |
+          mkdir -p azure-build
+          cat > azure-build/default.conf <<'NGINX'
+          server {
+              listen 80;
+              absolute_redirect off;
+              root /usr/share/nginx/html;
+              index index.html;
+              location /cotizaciones/ { try_files $uri $uri/ /cotizaciones/index.html; }
+              location = / { return 302 /cotizaciones/; }
+          }
+          NGINX
+          cat > azure-build/Dockerfile <<DOCKER
+          FROM ${{ secrets.ACR_NAME }}.azurecr.io/frontend:${{ github.sha }}
+          COPY default.conf /etc/nginx/conf.d/default.conf
+          DOCKER
+          az acr build --registry ${{ secrets.ACR_NAME }} \
+            --image frontend:${{ github.sha }}-azure ./azure-build
+
+      - name: Desplegar al Container App
+        run: |
+          az containerapp update -n frontend -g ${{ secrets.RG_NAME }} \
+            --image ${{ secrets.ACR_NAME }}.azurecr.io/frontend:${{ github.sha }}-azure
