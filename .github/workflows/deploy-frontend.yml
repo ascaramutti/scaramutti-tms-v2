@@ -28,12 +28,15 @@ jobs:
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
           subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
 
-      # Build de la imagen del frontend, con la URL del backend horneada.
+      # Build de la imagen del frontend. La URL de la API va RELATIVA (/api/v1)
+      # porque el frontend se sirve detrás del gateway (mismo origen): el gateway
+      # rutea /api/v1 al backend. NO usar la URL absoluta del backend, que ahora es
+      # internal (inaccesible directo desde el navegador) → rompería la app.
       - name: Build imagen base
         run: |
           az acr build --registry ${{ secrets.ACR_NAME }} \
             --image frontend:${{ github.sha }} \
-            --build-arg VITE_API_BASE_URL=${{ secrets.BACKEND_URL }}/api/v1 \
+            --build-arg VITE_API_BASE_URL=/api/v1 \
             --target production ./frontend
 
       # Variante para Azure: nginx SIN el proxy de prod (que apunta a un host
