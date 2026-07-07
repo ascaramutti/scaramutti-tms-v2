@@ -23,3 +23,12 @@ dist/
 target/
 .quarkus/
 *.class
+
+# Staging: el env file completado vive en el server (/opt/tms-staging), nunca en el repo
+deploy/staging/staging.env
+
+# Secretos del server (hallazgo A1.10 de la auditoría): el .env con DB_PASSWORD
+# y la carpeta keys/ de la raíz (clave JWT privada) jamás deben ser commiteables.
+# (No matchea los .env.example ni backend/src/main/resources/keys/.)
+.env
+/keys/
