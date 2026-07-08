@@ -4,11 +4,13 @@ import com.scaramutti.tms.shared.exception.ApiError;
 
 /**
  * Catalogo de errores del modulo Almacen con codigos trazables (WH-XXX).
- * Vacio en A1 (solo DB); los codigos se agregan a medida que cada endpoint
- * (A2+) los necesita, segun almacen/10_CONTRATO_ALMACEN.md.
+ * Los codigos se agregan a medida que cada endpoint los necesita, segun
+ * almacen/10_CONTRATO_ALMACEN.md.
  */
 public enum WarehouseError implements ApiError {
-    ;
+
+    PRODUCT_CATEGORY_NAME_DUPLICATED("WH-010", 409, "Conflict",
+        "Ya existe una categoría con el nombre indicado");
 
     private final String code;
     private final int status;
