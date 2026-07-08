@@ -49,8 +49,10 @@ services:
       # Front y API comparten origin (nginx hace proxy) → CORS casi no aplica,
       # pero la propiedad es obligatoria. Ej: http://<ip-tailscale>:8088
       CORS_ORIGINS: ${CORS_ORIGINS:?falta CORS_ORIGINS en el env file}
-      JWT_PUBLIC_KEY_LOCATION: /app/keys/publicKey.pem
-      JWT_PRIVATE_KEY_LOCATION: /app/keys/privateKey.pem
+      # Con esquema file: — sin él SmallRye lo trata como URL y el login
+      # revienta con MalformedURLException (mismo formato que integration)
+      JWT_PUBLIC_KEY_LOCATION: file:/app/keys/publicKey.pem
+      JWT_PRIVATE_KEY_LOCATION: file:/app/keys/privateKey.pem
       ACCESS_TOKEN_LIFESPAN_SECONDS: ${ACCESS_TOKEN_LIFESPAN_SECONDS:-900}
       REFRESH_TOKEN_LIFESPAN_SECONDS: ${REFRESH_TOKEN_LIFESPAN_SECONDS:-28800}
     volumes:
