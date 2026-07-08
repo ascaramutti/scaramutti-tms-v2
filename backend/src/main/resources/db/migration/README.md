@@ -24,5 +24,12 @@ como aplicada sin ejecutarla — solo una DB vacía (tests/CI) la ejecuta comple
 
 ## Datos, no schema
 
-Los seeds viven fuera de la cadena: `db/seed_system_settings.sql` (datos reales de la empresa,
-manual e idempotente) y `DevDataSeeder` (fixtures de dev/test, nunca en prod).
+Los seeds de **datos de negocio** viven fuera de la cadena: `db/seed_system_settings.sql` (datos
+reales de la empresa, manual e idempotente) y `DevDataSeeder` (fixtures de dev/test, nunca en prod).
+
+Excepción: los **catálogos fundacionales del módulo** (roles nuevos, listas cerradas que el
+propio módulo necesita para funcionar desde el día 1 — ej. `almacen.units_of_measure`,
+`operaciones.trip_scopes`) **sí viajan dentro de su migración** vía `INSERT` literal (ver la
+migración del schema `almacen`). Motivo: son parte del contrato del módulo, no datos operativos que
+cambien por fuera de una migración coordinada — y así llegan solos a todo entorno (dev/staging/prod)
+sin depender de un paso manual (regla del programa: cambios de DB = solo Flyway).
