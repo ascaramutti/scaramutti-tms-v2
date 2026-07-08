@@ -21,11 +21,12 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 
 /**
- * Integration tests de GET /warehouse/product-categories. Calco estructural
- * de CargoTypesResourceTest. Los seeds de A1 (7 categorias activas) ya estan
- * en la BD de test — no se re-siembran acá.
+ * Integration tests de GET/POST /warehouse/product-categories. Calco
+ * estructural de CargoTypesResourceTest. Los seeds de A1 (7 categorias
+ * activas) ya estan en la BD de test — no se re-siembran acá.
  */
 @QuarkusTest
 class WarehouseProductCategoriesResourceTest {
@@ -71,6 +72,15 @@ class WarehouseProductCategoriesResourceTest {
             .issuedAt(now)
             .expiresAt(now.plusSeconds(3600))
             .sign();
+    }
+
+    private String body(String name, String description) {
+        StringBuilder sb = new StringBuilder("{\"name\":");
+        sb.append(name == null ? "null" : "\"" + name + "\"");
+        sb.append(",\"description\":");
+        sb.append(description == null ? "null" : "\"" + description + "\"");
+        sb.append("}");
+        return sb.toString();
     }
 
     // ---------- GET: happy path / contrato ------------------------------------
@@ -261,5 +271,294 @@ class WarehouseProductCategoriesResourceTest {
         .then()
             .statusCode(403)
             .body("code", equalTo("COM-003"));
+    }
+
+    // ---------- POST: happy path ------------------------------------------------
+
+    @Test
+    void create_withValidPayload_returns201AndPersists() {
+        String name = "ZTEST_Empaques";
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(name, "Cajas y embalajes"))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201)
+            .contentType("application/json")
+            .body("id", greaterThanOrEqualTo(1))
+            .body("name", equalTo(name))
+            .body("description", equalTo("Cajas y embalajes"))
+            .body("isActive", equalTo(true));
+
+        ProductCategory persisted = productCategoryRepository.find("name", name).firstResult();
+        org.junit.jupiter.api.Assertions.assertNotNull(persisted);
+    }
+
+    @Test
+    void create_withOnlyRequiredFields_returns201WithNullDescription() {
+        String name = "ZTEST_SoloNombre";
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(name, null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201)
+            .body("description", nullValue())
+            .body("isActive", equalTo(true));
+    }
+
+    @Test
+    void create_preservesSubmittedCasing_returns201WithExactName() {
+        // Sin uppercase (a diferencia de cargo-types): los seeds de A1 son
+        // Title Case y el contrato solo exige unicidad case-insensitive, no
+        // normalizar casing.
+        String name = "ZTEST_Mixed Case Name";
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(name, null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201)
+            .body("name", equalTo(name));
+    }
+
+    @Test
+    void create_trimsWhitespaceInNameAndDescription() {
+        String stored = "ZTEST_Trim";
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("  " + stored + "  ", "   "))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201)
+            .body("name", equalTo(stored))
+            .body("description", nullValue());
+    }
+
+    // ---------- POST: duplicados (WH-010) ---------------------------------------
+
+    @Test
+    void create_withDuplicateName_returns409_WH010() {
+        String name = "ZTEST_Dup";
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(name, null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(name, "otra descripcion"))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(409)
+            .contentType("application/problem+json")
+            .body("code", equalTo("WH-010"));
+    }
+
+    @Test
+    void create_withDuplicateNameCaseInsensitive_returns409_WH010() {
+        // Cierra la brecha DDL-vs-contrato (V003, indice funcional lower(name)).
+        String stored = "ZTEST_DupCase";
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(stored, null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ztest_dupcase", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(409)
+            .body("code", equalTo("WH-010"));
+    }
+
+    @Test
+    void create_withDuplicateAgainstSeedCategory_returns409_WH010() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("filtros", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(409)
+            .body("code", equalTo("WH-010"));
+    }
+
+    // ---------- POST: validacion 400 (COM-001) -----------------------------------
+
+    @Test
+    void create_withMissingName_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body("{\"description\":\"x\"}")
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withBlankName_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("   ", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withNameTooShort_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("AB", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withNameTooLong_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+        String tooLong = "ZTEST_" + "X".repeat(100);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body(tooLong, null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withEmptyBody_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    // ---------- POST: auth / roles -----------------------------------------------
+
+    @Test
+    void create_withoutToken_returns401() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NoToken", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void create_withSalesRole_returns403_COM003() {
+        String token = login("lcampos", "Sales1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_Sales", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void create_withDispatcherRole_returns403_COM003() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("disp_test", "dispatcher"))
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_Dispatcher", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void create_withFinanceManagerRole_returns201() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("fm_test", "finance_manager"))
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_FinanceManager", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201);
+    }
+
+    @Test
+    void create_withWarehouseKeeperRole_returns201() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("wk_test", "warehouse_keeper"))
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_WarehouseKeeper", null))
+        .when()
+            .post("/warehouse/product-categories")
+        .then()
+            .statusCode(201);
     }
 }

@@ -22,4 +22,14 @@ public class ProductCategoryRepository implements PanacheRepositoryBase<ProductC
             isActive
         );
     }
+
+    /**
+     * Case-insensitive: respaldado en BD por el indice funcional
+     * uq_product_categories_name_ci (V003) — este chequeo cubre el happy path,
+     * la race condition la traduce el catch de persistOrTranslateDuplicate
+     * en el service.
+     */
+    public boolean existsByNameIgnoreCase(String name) {
+        return count("lower(" + ProductCategory_.NAME + ") = lower(?1)", name) > 0;
+    }
 }
