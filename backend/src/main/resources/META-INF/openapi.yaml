@@ -46,6 +46,8 @@ tags:
     description: Clientes — búsqueda, creación al vuelo, edición y desactivación
   - name: Quotations
     description: Cotizaciones — wizard de creación, listing, edición y PDF
+  - name: Warehouse
+    description: Almacén — catálogos del módulo, productos+stock, corte inicial, entradas, retiros, kardex, reportes
 
 # =============================================================================
 paths:
@@ -782,6 +784,26 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /warehouse/product-categories:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseProductCategories
+      summary: Listar categorías de producto
+      description: Catálogo chico — sin paginar. Orden natural `name` ASC.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Categorías
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WarehouseProductCategoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
 # =============================================================================
 components:
@@ -1682,3 +1704,12 @@ components:
         updatedBy: { $ref: '#/components/schemas/UserResponse' }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time, description: 'Source de la versión para optimistic locking (mismo valor que el header ETag).' }
+
+    WarehouseProductCategoryResponse:
+      type: object
+      required: [id, name, isActive]
+      properties:
+        id:          { type: integer }
+        name:        { type: string, maxLength: 100, example: 'Filtros' }
+        description: { type: [string, 'null'] }
+        isActive:    { type: boolean }
