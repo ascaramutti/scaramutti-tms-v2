@@ -48,16 +48,23 @@ jobs:
 
       # El backend arranca Flyway contra la copia de prod: si una migración
       # nueva rompe, el healthcheck no llega a healthy y el job falla acá.
-      - name: Esperar healthcheck del backend
+      # También se espera el frontend: su nginx tarda unos segundos en
+      # atender y el smoke inmediato daba "connection refused" espurio.
+      - name: Esperar healthcheck de backend y frontend
         run: |
-          for i in $(seq 1 36); do
-            STATUS=$(docker inspect --format '{{.State.Health.Status}}' scaramutti-tms-v2-backend-staging 2>/dev/null || echo starting)
-            [ "$STATUS" = "healthy" ] && exit 0
-            sleep 5
+          for c in scaramutti-tms-v2-backend-staging scaramutti-tms-v2-frontend-staging; do
+            HEALTHY=""
+            for i in $(seq 1 36); do
+              STATUS=$(docker inspect --format '{{.State.Health.Status}}' "$c" 2>/dev/null || echo starting)
+              [ "$STATUS" = "healthy" ] && HEALTHY=1 && break
+              sleep 5
+            done
+            if [ -z "$HEALTHY" ]; then
+              echo "::error::$c no llegó a healthy"
+              docker logs --tail 100 "$c"
+              exit 1
+            fi
           done
-          echo "::error::backend-staging no llegó a healthy"
-          docker logs --tail 100 scaramutti-tms-v2-backend-staging
-          exit 1
 
       - name: Smoke básico
         run: |
