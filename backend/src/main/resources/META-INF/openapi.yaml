@@ -841,6 +841,30 @@ paths:
                 code: 'WH-010'
                 traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
 
+  /warehouse/units-of-measure:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseUnitsOfMeasure
+      summary: Listar unidades de medida (lista CERRADA)
+      description: |
+        Catálogo chico (seed UND, LT, GAL, KG, MT, CJA, JGO) — sin paginar.
+        Orden `code` ASC. **Lista CERRADA — SIN POST** (regla del dueño
+        2026-07-04): no se crea al vuelo; agregar una unidad nueva = seed/
+        migración coordinada. El select del form es de solo selección.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Unidades de medida
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WarehouseUnitOfMeasureResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -1756,3 +1780,12 @@ components:
       properties:
         name:        { type: string, minLength: 3, maxLength: 100 }
         description: { type: [string, 'null'] }
+
+    WarehouseUnitOfMeasureResponse:
+      type: object
+      required: [id, code, name, isActive]
+      properties:
+        id:       { type: integer }
+        code:     { type: string, maxLength: 10, example: 'GAL' }
+        name:     { type: string, maxLength: 50, example: 'Galón' }
+        isActive: { type: boolean }
