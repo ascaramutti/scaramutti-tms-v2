@@ -54,6 +54,11 @@ openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
 openssl rsa -pubout -in /opt/tms-staging/keys/privateKey.pem \
   -out /opt/tms-staging/keys/publicKey.pem
 chmod 600 /opt/tms-staging/keys/privateKey.pem
+
+# El backend corre como el usuario `quarkus` (uid 1001) dentro del
+# contenedor: la clave privada debe pertenecerle o el login da 500
+sudo chown 1001 /opt/tms-staging/keys/privateKey.pem
+chmod 644 /opt/tms-staging/keys/publicKey.pem
 ```
 
 ### 2. Instalar el runner self-hosted
