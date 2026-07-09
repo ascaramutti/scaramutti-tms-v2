@@ -13,6 +13,7 @@ on:
     branches: [develop]
     paths:
       - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
   workflow_dispatch:
 
 permissions:
@@ -30,9 +31,9 @@ jobs:
     timeout-minutes: 20
 
     # Postgres efímero, misma imagen que dev/prod (paridad). Los valores son
-    # los de application-test.properties: credenciales de TEST, no secretos.
-    # Flyway migra el schema completo al boot (migrate-at-start) sobre esta DB
-    # virgen y el DevDataSeeder (perfil no-prod) siembra users/roles/catálogos.
+    # los del bloque %test. de application.properties: credenciales de TEST, no
+    # secretos. Flyway migra el schema completo al boot (migrate-at-start) sobre
+    # esta DB virgen y el DevDataSeeder (perfil no-prod) siembra users/roles/catálogos.
     services:
       postgres:
         image: postgres:16-alpine
