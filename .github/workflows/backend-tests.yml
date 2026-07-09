@@ -1,0 +1,78 @@
+name: Backend tests
+
+# CI de tests del backend (JUnit + RestAssured contra un Postgres efímero).
+# Corre en runner GitHub-hosted (ubuntu-latest): gratis en repo público y sin
+# acceso a infra propia, así que pull_request desde forks es seguro acá (la
+# regla "self-hosted nunca en pull_request" aplica solo al runner de staging).
+on:
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'backend/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un commit nuevo en la misma rama cancela el run anterior (ahorra minutos;
+# solo interesa el resultado del último push).
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Postgres efímero, misma imagen que dev/prod (paridad). Los valores son
+    # los de application-test.properties: credenciales de TEST, no secretos.
+    # Flyway migra el schema completo al boot (migrate-at-start) sobre esta DB
+    # virgen y el DevDataSeeder (perfil no-prod) siembra users/roles/catálogos.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: scaramutti_user
+          POSTGRES_PASSWORD: dev_local_only
+          POSTGRES_DB: scaramutti_tms_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scaramutti_user -d scaramutti_tms_dev"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      # La privatekey.pem está gitignoreada (nunca se commitea): se genera un
+      # par RSA fresco y consistente para el run. Pisar la publickey.pem
+      # committeada en el workspace efímero es intencional (el par debe casar).
+      - name: Generar keypair JWT de test
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+            -out backend/src/main/resources/keys/privatekey.pem
+          openssl rsa -in backend/src/main/resources/keys/privatekey.pem \
+            -pubout -out backend/src/main/resources/keys/publickey.pem
+
+      # Excluye la suite no-hermética de cotizaciones (@Tag("requires-dev-data")): esos
+      # tests asumen la data acumulada del dev-DB y sus IDs, que no se puede sembrar en una
+      # DB virgen ni versionar acá. Se siguen corriendo localmente por commit. La exclusión
+      # vive en el workflow (no oculta en el pom) y se retira al hermetizarlos.
+      - name: Ejecutar tests
+        working-directory: backend
+        run: mvn -B test -DexcludedGroups=requires-dev-data
