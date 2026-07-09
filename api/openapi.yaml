@@ -1332,11 +1332,14 @@ paths:
         parte (variantes/modelos); comparación case-insensitive y los opcionales
         vacíos cuentan como "sin valor" (el backend normaliza trim + vacío→null;
         índice con COALESCE — dos genéricos idénticos sin marca/parte también
-        chocan). Si `code` (SKU) se omite, el backend lo autogenera
-        (`PRO-0001`, correlativo); si se envía, único → `409 WH-010` (RN-WH10).
+        chocan). El `code` (SKU) lo asigna siempre el backend (`PRO-NNNN`,
+        correlativo); no se acepta en el request.
         `attributes` = objeto JSON libre clave-valor (JSONB).
         Un producto nuevo **nace con stock 0** — su primera factura es su primer
         movimiento; el corte inicial es SOLO para inventario pre-existente (RN-WH6).
+        Duplicados: el guardián es el índice único de identidad compuesta → `409
+        WH-010`; no hay cabecera de idempotencia (redundante frente al índice,
+        consistente con el resto del módulo).
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       requestBody:
         required: true
@@ -3161,7 +3164,6 @@ components:
       type: object
       required: [name, categoryId, unitOfMeasureId]
       properties:
-        code:            { type: [string, 'null'], maxLength: 30, description: 'SKU opcional; si se omite al crear, el backend lo autogenera (PRO-0001). Único.' }
         name:            { type: string, minLength: 3, maxLength: 200, description: 'Único COMPUESTO con brand+partNumber (Δ-2, RN-WH10)' }
         categoryId:      { type: integer }
         unitOfMeasureId: { type: integer }
@@ -3185,7 +3187,6 @@ components:
         2026-07-04; su edición se evaluará más adelante).
       required: [name, categoryId]
       properties:
-        code:            { type: [string, 'null'], maxLength: 30, description: 'SKU. Único (RN-WH10).' }
         name:            { type: string, minLength: 3, maxLength: 200, description: 'Único COMPUESTO con brand+partNumber (Δ-2, RN-WH10)' }
         categoryId:      { type: integer }
         brand:           { type: [string, 'null'], maxLength: 100 }
@@ -3204,7 +3205,7 @@ components:
       required: [id, code, name, category, unitOfMeasure, attributes, minStock, isActive, stock, lowStock, createdBy, createdAt, updatedAt]
       properties:
         id:   { type: integer }
-        code: { type: string, maxLength: 30, description: 'SKU (autogenerado si no se envió)' }
+        code: { type: string, maxLength: 30, description: 'SKU (autogenerado por el backend)' }
         name: { type: string, maxLength: 200 }
         category:
           type: object
