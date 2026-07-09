@@ -63,6 +63,10 @@ tags:
     description: Configuración del sistema (condiciones estándar, defaults)
   - name: Health
     description: Endpoints de salud y monitoreo
+  - name: Warehouse
+    description: Almacén — catálogos del módulo, productos+stock, corte inicial, entradas, retiros, kardex, reportes
+  - name: SharedCatalogs
+    description: Catálogos compartidos de `public` (trabajadores y flota unificada) — read-only; sin prefijo /warehouse porque los reutilizará Operaciones
 
 # =============================================================================
 paths:
@@ -1075,6 +1079,1003 @@ paths:
                   status: { type: string, example: UP }
                   timestamp: { type: string, format: date-time }
 
+  # ----- Catálogos compartidos (schema public) --------------------------------
+
+  /workers:
+    get:
+      tags: [SharedCatalogs]
+      operationId: listWorkers
+      summary: Listar trabajadores (combobox "quién recibe" del retiro)
+      description: |
+        Catálogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
+        en v1). **Solo búsqueda rápida — SIN creación al vuelo** (regla del dueño
+        2026-07-04: trabajadores y unidades de flota nunca se crean desde
+        almacén; RN-WH9). Sin paginar — plantilla chica. `q` filtra por substring
+        case-insensitive en el nombre (≥ 3 caracteres; para no filtrar, OMITIR el
+        parámetro). Cuando Operaciones lo consuma, sus roles se suman acá.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Trabajadores
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WorkerResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /fleet-units:
+    get:
+      tags: [SharedCatalogs]
+      operationId: listFleetUnits
+      summary: Listar unidades de flota unificadas (tractos + carretas + escoltas)
+      description: |
+        Vista unificada de los tres subtipos DISYUNTOS de la flota
+        (`public.tractors`, `public.trailers`, `public.escort_vehicles` — esta
+        última nace con la V003). El supertipo físico `fleet_units` llega en la
+        fase flota/RRHH; mientras tanto la unión se hace en código.
+        **Solo búsqueda rápida/selección — SIN creación al vuelo** (regla del
+        dueño 2026-07-04: la flota nunca se crea desde almacén; RN-WH9).
+
+        **`id` es el id de la tabla del SUBTIPO** — la dirección de una unidad es
+        el par `(kind, id)`; el frontend lo mapea a `tractorId | trailerId |
+        escortVehicleId` en el request del retiro. Sin paginar — flota chica.
+        Convive con los `GET /tractors|/trailers` planos del contrato de
+        Operaciones (usos distintos: allá selects por subtipo, acá el selector
+        disyunto del retiro); convergen cuando exista el supertipo físico.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - name: kind
+          in: query
+          description: Filtra por subtipo. Omitido = los tres.
+          schema: { $ref: '#/components/schemas/FleetUnitKind' }
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Unidades de flota
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FleetUnitResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ----- Warehouse: catálogos del módulo (schema almacen) ---------------------
+  # Prefijo /warehouse/* para todo lo propio del módulo (evita colisiones de
+  # paths genéricos como /products con futuros módulos). Patrón combobox
+  # buscar + crear al vuelo (RN-WH9): GET con búsqueda + POST desde el modal.
+
+  /warehouse/product-categories:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseProductCategories
+      summary: Listar categorías de producto
+      description: Catálogo chico — sin paginar. Orden natural `name` ASC.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Categorías
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WarehouseProductCategoryResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseProductCategory
+      summary: Crear categoría de producto (al vuelo desde el form)
+      description: Nombre único (case-insensitive efectivo) → `409 WH-010` (RN-WH10).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseProductCategoryRequest' }
+            example: { name: 'Filtros', description: 'Filtros de aceite, aire y combustible' }
+      responses:
+        '201':
+          description: Creada
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseProductCategoryResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Nombre duplicado → WH-010
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-010'
+                title: 'Conflict'
+                status: 409
+                detail: "Ya existe una categoría con el nombre 'Filtros'"
+                instance: '/api/v1/warehouse/product-categories'
+                code: 'WH-010'
+                traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+
+  /warehouse/units-of-measure:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseUnitsOfMeasure
+      summary: Listar unidades de medida (lista CERRADA)
+      description: |
+        Catálogo chico (seed UND, LT, GAL, KG, MT, CJA, JGO) — sin paginar.
+        Orden `code` ASC. **Lista CERRADA — SIN POST** (regla del dueño
+        2026-07-04): no se crea al vuelo; agregar una unidad nueva = seed/
+        migración coordinada. El select del form es de solo selección.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Unidades de medida
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/WarehouseUnitOfMeasureResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /warehouse/suppliers:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseSuppliers
+      summary: Buscar proveedores (paginado)
+      description: |
+        Con `q` filtra por substring case-insensitive en `name` y `ruc` (ILIKE
+        acelerado por GIN trgm `idx_suppliers_name_trgm`), ranking `similarity`
+        DESC, tiebreak `name` ASC. Multi-palabra: `q` se tokeniza por espacios y
+        cada palabra debe matchear en ALGÚN campo (AND de ORs) — RN-WH14.
+        Sin `q`: `name` ASC. Para no filtrar, OMITIR el parámetro (no enviarlo
+        vacío).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de proveedores
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseSupplier' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseSupplier
+      summary: Crear proveedor (al vuelo desde el form de factura)
+      description: '`name` y `ruc` únicos → `409 WH-010` (el `detail` dice cuál chocó).'
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseSupplierRequest' }
+            example: { name: 'REPUESTOS DIÉSEL S.A.C.', ruc: '20512345678', phone: '014567890', contactName: 'Marco Salazar' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseSupplierResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/ConflictDuplicate' }
+
+  # ----- Warehouse: productos, stock y kardex ---------------------------------
+
+  /warehouse/products:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseProducts
+      summary: Listar productos CON su stock actual (Existencias y comboboxes)
+      description: |
+        Un solo listado sirve a la pantalla Existencias y a los comboboxes de
+        producto (decisión D-4 del contrato): cada fila trae `stock` y `lowStock`
+        LEÍDOS de la VIEW `almacen.product_stock` (RN-WH1 — nunca persistidos).
+
+        `q` (≥ 3) filtra por substring case-insensitive en `name`, `code`,
+        `brand` y `partNumber` (GIN trgm en `name`), ranking `similarity` DESC,
+        tiebreak `name` ASC. Multi-palabra: cada palabra de `q` debe matchear
+        en ALGÚN campo (AND de ORs) — "aceite 15W40" encuentra name=Aceite +
+        attributes/brand con 15W40 en los campos buscados (RN-WH14). Sin `q`:
+        `name` ASC.
+        `lowStock = stock < minStock` (estricto) — derivado en código de la VIEW
+        + `min_stock`; NO es columna (RN-WH11).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: categoryId, in: query, schema: { type: integer } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - name: lowOnly
+          in: query
+          description: 'Si `true`, solo productos con `stock < minStock` (badge "Bajo").'
+          schema: { type: boolean, default: false }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de productos con stock
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseProduct' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseProduct
+      summary: Crear producto (al vuelo desde la factura o desde Existencias)
+      description: |
+        Identidad ÚNICA compuesta `(name, brand, partNumber)` → `409 WH-010`
+        (Δ-2, RN-WH10): mismo nombre y marca pueden coexistir con distinto n° de
+        parte (variantes/modelos); comparación case-insensitive y los opcionales
+        vacíos cuentan como "sin valor" (el backend normaliza trim + vacío→null;
+        índice con COALESCE — dos genéricos idénticos sin marca/parte también
+        chocan). Si `code` (SKU) se omite, el backend lo autogenera
+        (`PRO-0001`, correlativo); si se envía, único → `409 WH-010` (RN-WH10).
+        `attributes` = objeto JSON libre clave-valor (JSONB).
+        Un producto nuevo **nace con stock 0** — su primera factura es su primer
+        movimiento; el corte inicial es SOLO para inventario pre-existente (RN-WH6).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseProductRequest' }
+            example:
+              name: 'Filtro de aceite XYZ'
+              categoryId: 7
+              unitOfMeasureId: 1
+              brand: 'Bosch'
+              partNumber: 'F026407123'
+              attributes: { rosca: '3/4-16' }
+              minStock: 4
+      responses:
+        '201':
+          description: Creado
+          headers:
+            Location: { schema: { type: string }, description: URL del recurso creado }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseProductResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/ConflictDuplicate' }
+
+  /warehouse/products/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseProduct
+      summary: Obtener producto por ID (con stock actual)
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      responses:
+        '200':
+          description: Producto con stock
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseProductResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Warehouse]
+      operationId: updateWarehouseProduct
+      summary: Actualizar producto (catálogo — sin justificación)
+      description: |
+        Edición de catálogo: nombre, categoría, marca, nº de parte, atributos,
+        `minStock`, observaciones, `isActive` (soft delete). La **unidad de
+        medida NO viaja** — se fija al crear y es inmutable (P-1 respondida por
+        el dueño 2026-07-04: "solo se permite crear; la edición se verá luego").
+        NO exige justificación — la regla editar-con-justificación (RN-WH4)
+        aplica a movimientos de stock (entradas/retiros), no al catálogo
+        (RN-WH15; P-2 respondida: sin auditoría). Identidad compuesta
+        `(name, brand, partNumber)` única (Δ-2) y `code` único → `409 WH-010`.
+        No afecta el kardex (los movimientos referencian por id).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseProductUpdateRequest' }
+      responses:
+        '200':
+          description: Actualizado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseProductResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/ConflictDuplicate' }
+
+  /warehouse/products/{id}/stock:
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseProductStock
+      summary: Stock disponible en vivo (form de retiro)
+      description: |
+        Lectura puntual de la VIEW `almacen.product_stock` — el form de retiro
+        muestra el disponible al elegir producto y bloquea el submit si excede
+        (espejo UX). La validación AUTORITATIVA sigue siendo la del POST/PUT del
+        retiro en transacción (`409 WH-001`, RN-WH2).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+      responses:
+        '200':
+          description: Stock del producto
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseProductStockResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /warehouse/products/{id}/kardex:
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseProductKardex
+      summary: Kardex del producto (movimientos con saldo corrido)
+      description: |
+        Lee la VIEW `almacen.stock_movements`: APERTURA ∪ ENTRADAS activas ∪
+        SALIDAS activas — los ANULADOS no aparecen (su efecto fue revertido;
+        quedan visibles en sus listados con badge y motivo). Orden `movedAt`
+        DESC (más reciente arriba). `balance` = saldo DESPUÉS del movimiento,
+        calculado por el backend sobre la historia completa — correcto aunque se
+        pagine o filtre por fechas (RN-WH13).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: dateFrom, in: query, description: 'Desde (inclusive, América/Lima)', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: 'Hasta (inclusive del día completo, América/Lima)', schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de movimientos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseKardexMovement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ----- Warehouse: corte inicial de inventario --------------------------------
+
+  /warehouse/opening-balances:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseOpeningBalances
+      summary: Listar cortes iniciales registrados
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: productId, in: query, schema: { type: integer } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de aperturas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseOpeningBalance' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseOpeningBalance
+      summary: Registrar corte inicial de un producto ("con cuánto arranca")
+      description: |
+        RN-WH6: UNA apertura por producto e INMUTABLE (sin PUT/DELETE — una
+        corrección se hace anulando retiros o registrando una entrada). Es el
+        primer movimiento del kardex (`APERTURA`). Solo para inventario existente
+        al arranque (o al incorporar un producto que ya existía físicamente).
+
+        - Producto con apertura ya registrada → **409 `WH-009`** (UNIQUE en BD).
+        - Producto que ya tiene movimientos → **409 `WH-011`** (una apertura
+          posterior falsearía el saldo corrido — decisión D-5).
+        - Producto inexistente o inactivo → **400 `WH-004`**.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseOpeningBalanceRequest' }
+            example: { productId: 12, quantity: 6, observations: 'Conteo físico del 30/06' }
+      responses:
+        '201':
+          description: Registrado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseOpeningBalanceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: WH-009 (apertura duplicada) o WH-011 (producto con movimientos)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                openingAlreadyExists:
+                  summary: El producto ya tiene su corte inicial
+                  value:
+                    type: 'urn:tms:error:wh-009'
+                    title: 'Conflict'
+                    status: 409
+                    detail: "El producto 'Filtro de aceite XYZ' ya tiene corte inicial registrado"
+                    instance: '/api/v1/warehouse/opening-balances'
+                    code: 'WH-009'
+                    traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+                productHasMovements:
+                  summary: El producto ya tiene movimientos (la apertura falsearía el kardex)
+                  value:
+                    type: 'urn:tms:error:wh-011'
+                    title: 'Conflict'
+                    status: 409
+                    detail: "El producto 'Filtro de aceite XYZ' ya tiene movimientos; el corte inicial solo aplica a productos sin historial"
+                    instance: '/api/v1/warehouse/opening-balances'
+                    code: 'WH-011'
+                    traceId: '3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f'
+
+  # ----- Warehouse: entradas (facturas de compra) -------------------------------
+
+  /warehouse/purchase-invoices:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehousePurchaseInvoices
+      summary: Listar entradas (facturas de compra) con filtros
+      description: |
+        Orden `createdAt` DESC. Incluye las ANULADAS (badge + motivo en la UI) —
+        filtrable por `status`. `q` (≥ 3) busca substring case-insensitive en
+        `invoiceNumber`, `guideNumber` y nombre del proveedor; multi-palabra:
+        cada palabra debe matchear en ALGÚN campo (AND de ORs, RN-WH14). `total` e
+        `itemsCount` se calculan de los ítems — los totales NO se persisten
+        (patrón v2, columna eliminada en rev. 2).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: supplierId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/WarehouseRecordStatus' } }
+        - { name: dateFrom, in: query, description: '`invoiceDate` desde (inclusive)', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: '`invoiceDate` hasta (inclusive)', schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de facturas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehousePurchaseInvoiceSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehousePurchaseInvoice
+      summary: Registrar entrada — factura con N ítems (transaccional)
+      description: |
+        Crea factura + ítems en UNA transacción; cada ítem suma stock (vía VIEW).
+        Los productos se referencian por `productId` — el "crear producto al
+        vuelo" llama antes a `POST /warehouse/products` desde el modal (decisión
+        D-3: sin producto inline en este body).
+
+        - Unicidad proveedor+número **solo entre ACTIVAS** (UNIQUE parcial
+          `uq_purchase_invoices_active`): duplicado → **409 `WH-002`** (RN-WH5).
+          Una factura anulada libera su número para la corregida.
+        - Proveedor/moneda/producto inexistente o inactivo → **400 `WH-004`**.
+        - `currencyId` fija la moneda de la factura (RN-WH7 — sin conversión).
+          El select de moneda reusa `GET /currencies` de cotizaciones.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceRequest' }
+            example:
+              supplierId: 4
+              invoiceNumber: 'F001-00123'
+              invoiceDate: '2026-07-02'
+              guideNumber: 'T001-0004567'
+              currencyId: 2
+              observations: 'Compra repuestos mantenimiento preventivo'
+              items:
+                - { productId: 12, quantity: 10, unitPrice: 45.00 }
+                - { productId: 31, quantity: 24, unitPrice: 18.50 }
+      responses:
+        '201':
+          description: Creada
+          headers:
+            Location: { schema: { type: string }, description: URL del recurso creado }
+            ETag: { schema: { type: string }, description: Versión opaca para If-Match (PUT/cancel) }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Nº de factura duplicado para ese proveedor (entre ACTIVAS) → WH-002
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe la factura F001-00123 de REPUESTOS DIÉSEL S.A.C.'
+                instance: '/api/v1/warehouse/purchase-invoices'
+                code: 'WH-002'
+                traceId: '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a'
+
+  /warehouse/purchase-invoices/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Warehouse]
+      operationId: getWarehousePurchaseInvoice
+      summary: Detalle de una entrada (cabecera + ítems)
+      description: |
+        Incluye `lastEdit` (rastro del último `FIELD_EDIT` en `almacen.audit_logs`;
+        `null` si nunca se editó — decisión D-10) y los campos de anulación si
+        `status=CANCELLED`. El header `ETag` (versión opaca del `updatedAt`) es el
+        que exigen PUT y cancel vía `If-Match` — usar el HEADER, no el `updatedAt`
+        del body (lección del CRUD de cotizaciones: difieren por µs → 412 espurio).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      responses:
+        '200':
+          description: Detalle completo
+          headers:
+            ETag: { schema: { type: string }, description: Versión opaca para If-Match }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Warehouse]
+      operationId: updateWarehousePurchaseInvoice
+      summary: Editar entrada (justificación obligatoria)
+      description: |
+        RN-WH4: `reason` ≥ 10 → `almacen.audit_logs` con el diff por campo.
+        Reemplazo completo: los `items` del body sustituyen a los existentes.
+
+        - **`supplierId` INMUTABLE** — no viaja en el body (proveedor equivocado
+          = anular y re-registrar).
+        - **Guarda de stock** (misma transacción, RN-WH4): por producto afectado,
+          `entradas_tras_edición − salidas_activas ≥ 0`; si quedaría negativo →
+          **409 `WH-006`** (el `detail` nombra el producto — ej.: la factura
+          decía 10, ya se retiraron 9 → no puede bajar a 8).
+        - Anulada → **409 `WH-008`** · nº duplicado entre ACTIVAS → **409 `WH-002`**.
+        - `If-Match` obligatorio; versión vieja → **412 `COM-004`**.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceUpdateRequest' }
+      responses:
+        '200':
+          description: Actualizada
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-006 (dejaría stock negativo) / WH-008 (anulada) / WH-002 (duplicado)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                editWouldLeaveNegativeStock:
+                  summary: Ya se retiró más de lo que quedaría tras la edición
+                  value:
+                    type: 'urn:tms:error:wh-006'
+                    title: 'Conflict'
+                    status: 409
+                    detail: "De 'Filtro de aceite XYZ' ya se retiraron 9 UND y con este cambio las entradas quedarían en 8. Corrige primero los retiros."
+                    instance: '/api/v1/warehouse/purchase-invoices/12'
+                    code: 'WH-006'
+                    traceId: '5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b'
+                recordCancelled:
+                  summary: La factura está anulada (inmutable)
+                  value:
+                    type: 'urn:tms:error:wh-008'
+                    title: 'Conflict'
+                    status: 409
+                    detail: 'Una factura anulada no se puede editar'
+                    instance: '/api/v1/warehouse/purchase-invoices/12'
+                    code: 'WH-008'
+                    traceId: '6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /warehouse/purchase-invoices/{id}/cancel:
+    post:
+      tags: [Warehouse]
+      operationId: cancelWarehousePurchaseInvoice
+      summary: Anular entrada (con motivo — "eliminar" no existe)
+      description: |
+        "La factura se registró por error" (RN-WH3). Nada se borra:
+        `status→CANCELLED` + motivo + quién + cuándo (CHECK de consistencia en
+        BD). Deja de mover stock/kardex/reportes; queda visible en el listado.
+
+        - **Guarda**: el stock del producto no puede caer en negativo al
+          descontar esta factura — por producto, `apertura +
+          entradas_sin_esta_factura − salidas_activas ≥ 0`; si no →
+          **409 `WH-007`** (anular retiros o registrar otra entrada primero).
+          El stock es fungible: NO se rastrea de qué factura salió cada unidad
+          (sin lotes) — la única guarda real es el no-negativo (ruling del
+          dueño 2026-07-04).
+        - Ya anulada → **409 `WH-008`**.
+        - `If-Match` obligatorio (decisión D-7) → **412 `COM-004`**.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseCancelRequest' }
+            example: { reason: 'Factura registrada por error: correspondía al proveedor LUBRICANTES DEL PERÚ' }
+      responses:
+        '200':
+          description: Anulada
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-007 (el stock quedaría negativo al descontarla) / WH-008 (ya anulada)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-007'
+                title: 'Conflict'
+                status: 409
+                detail: "No se puede anular: el stock de 'Filtro de aceite XYZ' quedaría en -3 al descontar esta factura. Anula retiros o registra otra entrada primero."
+                instance: '/api/v1/warehouse/purchase-invoices/12/cancel'
+                code: 'WH-007'
+                traceId: '7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  # ----- Warehouse: salidas (retiros) -------------------------------------------
+
+  /warehouse/withdrawals:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseWithdrawals
+      summary: Listar retiros con filtros
+      description: |
+        Orden `withdrawnAt` DESC. Incluye los ANULADOS (badge + motivo) —
+        filtrable por `status`. Filtros de unidad excluyentes en la práctica
+        (una unidad por retiro), combinables con los demás.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: productId, in: query, schema: { type: integer } }
+        - { name: receivedByWorkerId, in: query, schema: { type: integer } }
+        - { name: tractorId, in: query, schema: { type: integer } }
+        - { name: trailerId, in: query, schema: { type: integer } }
+        - { name: escortVehicleId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/WarehouseRecordStatus' } }
+        - { name: dateFrom, in: query, description: '`withdrawnAt` desde (inclusive, América/Lima)', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: '`withdrawnAt` hasta (inclusive del día completo, América/Lima)', schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de retiros
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseWithdrawal' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseWithdrawal
+      summary: Registrar retiro (valida stock en transacción)
+      description: |
+        RN-WH2 — la regla estrella del módulo:
+        - `receivedByWorkerId` (quién recibe) **SIEMPRE obligatorio** (FK
+          `public.workers`).
+        - Unidad destino **OPCIONAL y a lo sumo UNA**: `tractorId` | `trailerId`
+          | `escortVehicleId` (subtipos disyuntos; CHECK `chk_withdrawals_one_unit`).
+          Más de una → **400 `WH-005`**.
+        - `quantity > 0` y **≤ stock disponible**, validado en la MISMA
+          transacción con lock del producto (`SELECT … FOR UPDATE` — concurrencia
+          decidida en diseño, decisión D-2/D-12, no best-effort): si excede →
+          **409 `WH-001`** con el disponible en el `detail`. Se eligió 409 sobre
+          422 por consistencia con el resto del contrato (409 = conflicto con el
+          estado actual del recurso).
+        - `withdrawnAt` lo pone el server (ahora); `registeredBy` = usuario del token.
+        - Producto/trabajador/unidad inexistente o inactivo → **400 `WH-004`**.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseWithdrawalRequest' }
+            example:
+              productId: 12
+              quantity: 2
+              receivedByWorkerId: 8
+              tractorId: 5
+              observations: 'Cambio de aceite programado'
+      responses:
+        '201':
+          description: Registrado
+          headers:
+            Location: { schema: { type: string } }
+            ETag: { schema: { type: string }, description: Versión opaca para If-Match (PUT/cancel) }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '400':
+          description: Validación — incluye WH-005 (más de una unidad) y WH-004 (catálogo)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                multipleFleetUnits:
+                  summary: Tracto y carreta a la vez (la unidad destino es disyunta)
+                  value:
+                    type: 'urn:tms:error:wh-005'
+                    title: 'Bad Request'
+                    status: 400
+                    detail: 'La unidad destino admite a lo sumo una: tracto, carreta O escolta'
+                    instance: '/api/v1/warehouse/withdrawals'
+                    code: 'WH-005'
+                    traceId: '8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e'
+                inactiveCatalog:
+                  summary: Producto, trabajador o unidad inexistente/inactivo
+                  value:
+                    type: 'urn:tms:error:wh-004'
+                    title: 'Bad Request'
+                    status: 400
+                    detail: 'El producto seleccionado no existe o está inactivo'
+                    instance: '/api/v1/warehouse/withdrawals'
+                    code: 'WH-004'
+                    traceId: '9c0d1e2f-3a4b-5c6d-7e8f-9a0b1c2d3e4f'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Stock insuficiente → WH-001
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'Stock insuficiente: solo hay 4 UND disponibles de Filtro de aceite XYZ'
+                instance: '/api/v1/warehouse/withdrawals'
+                code: 'WH-001'
+                traceId: '0d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+
+  /warehouse/withdrawals/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseWithdrawal
+      summary: Detalle de un retiro
+      description: |
+        Incluye `lastEdit` (último `FIELD_EDIT` de `almacen.audit_logs`; `null`
+        si nunca se editó) y los campos de anulación si `status=CANCELLED`.
+        Header `ETag` = versión opaca para el `If-Match` de PUT/cancel.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      responses:
+        '200':
+          description: Detalle
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Warehouse]
+      operationId: updateWarehouseWithdrawal
+      summary: Editar retiro (justificación obligatoria)
+      description: |
+        Caso real: "pidieron 10 pero usaron 7". RN-WH4: `reason` ≥ 10 →
+        `almacen.audit_logs`. Editables: cantidad, quién recibe, unidad de
+        flota, observaciones.
+
+        - **`productId` INMUTABLE** — no viaja en el body (producto equivocado =
+          anular y crear otro).
+        - **Guarda de stock**: subir la cantidad valida contra el disponible SIN
+          contar este mismo retiro (misma transacción); si excede → **409
+          `WH-001`**. Bajarla siempre es segura (devuelve stock).
+        - La unidad de flota se REEMPLAZA: a lo sumo una; los tres campos `null`
+          la quitan. Más de una → **400 `WH-005`**.
+        - Anulado → **409 `WH-008`** · `If-Match` obligatorio → **412 `COM-004`**.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseWithdrawalUpdateRequest' }
+            example:
+              quantity: 7
+              receivedByWorkerId: 8
+              tractorId: 5
+              reason: 'Se pidieron 10 filtros pero el mantenimiento usó 7; se devuelven 3'
+      responses:
+        '200':
+          description: Actualizado
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-001 (excede stock sin contar este retiro) / WH-008 (anulado)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'Stock insuficiente: solo hay 6 UND disponibles (sin contar este retiro)'
+                instance: '/api/v1/warehouse/withdrawals/31'
+                code: 'WH-001'
+                traceId: '1e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /warehouse/withdrawals/{id}/cancel:
+    post:
+      tags: [Warehouse]
+      operationId: cancelWarehouseWithdrawal
+      summary: Anular retiro (con motivo — el stock vuelve solo)
+      description: |
+        Caso real: "el camión no necesitaba el repuesto" (RN-WH3).
+        `status→CANCELLED` + motivo + quién + cuándo. SIEMPRE segura — devuelve
+        stock (las VIEWs excluyen anulados). Ya anulado → **409 `WH-008`**.
+        `If-Match` obligatorio → **412 `COM-004`**.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseCancelRequest' }
+            example: { reason: 'El tracto no necesitaba el repuesto; era un problema eléctrico' }
+      responses:
+        '200':
+          description: Anulado
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Ya anulado → WH-008
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  # ----- Warehouse: dashboard y reportes ----------------------------------------
+
+  /warehouse/stats:
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseStats
+      summary: KPIs del strip de Existencias
+      description: |
+        Contadores del mes calendario en curso (América/Lima). Solo registros
+        ACTIVOS. `lowStockCount` = productos activos con `stock < minStock` (RN-WH11).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      responses:
+        '200':
+          description: Contadores del strip
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseStatsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /warehouse/reports:
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseReport
+      summary: Reporte agregado por corte (unidad / período / producto / proveedor)
+      description: |
+        Los 4 cortes de la pantalla Reportes. Solo registros ACTIVOS. RN-WH7 —
+        **bi-moneda SIN conversión**: los montos se agregan POR MONEDA tal como
+        se registró cada factura; almacén entrega cantidades, contabilidad
+        valoriza sobre el reporte.
+
+        - `BY_UNIT` / `BY_PRODUCT` / `BY_PERIOD`: consumos (retiros activos con
+          `withdrawnAt` en el rango); el valor de cada salida usa el **último
+          precio de compra** del producto (con su moneda) como referencia.
+          `BY_PERIOD` agrupa por semana (lunes como clave, en `detail`).
+        - `BY_SUPPLIER`: compras (facturas activas por `invoiceDate` en el
+          rango), valorizadas con sus propios ítems.
+        - Rango América/Lima, ambos extremos inclusivos; `dateFrom > dateTo` →
+          400 `COM-001`. Exportación = client-side (sin endpoint, como el
+          reporte de operaciones).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: cut, in: query, required: true, schema: { $ref: '#/components/schemas/WarehouseReportCut' } }
+        - { name: dateFrom, in: query, required: true, schema: { type: string, format: date } }
+        - { name: dateTo, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Filas + totales por moneda
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -1322,6 +2323,20 @@ components:
                 instance: '/api/v1/quotations/142'
                 code: 'COM-004'
                 traceId: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+
+    ConflictDuplicate:
+      description: Duplicado de catálogo del módulo Almacén — nombre/código/RUC ya existe → WH-010
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: 'urn:tms:error:wh-010'
+            title: 'Conflict'
+            status: 409
+            detail: "Ya existe un producto con el nombre 'Filtro de aceite XYZ'"
+            instance: '/api/v1/warehouse/products'
+            code: 'WH-010'
+            traceId: 'a0b1c2d3-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
 
   schemas:
 
@@ -2052,3 +3067,549 @@ components:
       properties:
         pricePerDay: { type: number, format: double, minimum: 0 }
         includesIgv: { type: boolean, default: false }
+
+    WorkerResponse:
+      type: object
+      description: Trabajador de `public.workers` (catálogo compartido con v1; read-only desde v2).
+      required: [id, fullName, isActive]
+      properties:
+        id:       { type: integer }
+        fullName: { type: string, example: 'Juan Pérez Huamán' }
+        position: { type: [string, 'null'], example: 'Mecánico' }
+        isActive: { type: boolean }
+
+    FleetUnitKind:
+      type: string
+      enum: [TRACTOR, TRAILER, ESCORT]
+      description: |
+        Subtipo de la flota — generalización DISYUNTA y TOTAL (decisión del dueño
+        2026-07-03): toda unidad es exactamente un subtipo. `ESCORT` = vehículo
+        escolta (`public.escort_vehicles`, tabla nueva aditiva de la V003; el
+        supertipo físico `fleet_units` llega en la fase flota/RRHH).
+
+    FleetUnitRef:
+      type: object
+      description: |
+        Referencia mínima a una unidad de flota. `id` es el id de la tabla del
+        SUBTIPO — la dirección completa es el par `(kind, id)`.
+      required: [kind, id, plate]
+      properties:
+        kind:  { $ref: '#/components/schemas/FleetUnitKind' }
+        id:    { type: integer }
+        plate: { type: string, minLength: 6, maxLength: 6, description: 'Placa de 6 caracteres SIN guión (estándar del dueño; la presentación lo agrega)', example: 'ABC123' }
+
+    FleetUnitResponse:
+      allOf:
+        - $ref: '#/components/schemas/FleetUnitRef'
+        - type: object
+          required: [isActive]
+          properties:
+            brand:    { type: [string, 'null'], maxLength: 50 }
+            model:    { type: [string, 'null'], maxLength: 50 }
+            isActive: { type: boolean }
+
+    # -------- Warehouse: catálogos del módulo ----------------------------------
+    WarehouseProductCategoryResponse:
+      type: object
+      required: [id, name, isActive]
+      properties:
+        id:          { type: integer }
+        name:        { type: string, maxLength: 100, example: 'Filtros' }
+        description: { type: [string, 'null'] }
+        isActive:    { type: boolean }
+
+    WarehouseProductCategoryRequest:
+      type: object
+      required: [name]
+      properties:
+        name:        { type: string, minLength: 3, maxLength: 100 }
+        description: { type: [string, 'null'] }
+
+    WarehouseUnitOfMeasureResponse:
+      type: object
+      required: [id, code, name, isActive]
+      properties:
+        id:       { type: integer }
+        code:     { type: string, maxLength: 10, example: 'GAL' }
+        name:     { type: string, maxLength: 50, example: 'Galón' }
+        isActive: { type: boolean }
+
+    WarehouseSupplierResponse:
+      type: object
+      required: [id, name, isActive, createdAt]
+      properties:
+        id:          { type: integer }
+        name:        { type: string, maxLength: 200, example: 'REPUESTOS DIÉSEL S.A.C.' }
+        ruc:         { type: [string, 'null'], pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$', description: 'Canal peruano de 9 dígitos (estándar del dueño v9 CONFIRMADO, como clients)' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
+        isActive:    { type: boolean }
+        createdAt:   { type: string, format: date-time }
+
+    WarehouseSupplierRequest:
+      type: object
+      required: [name]
+      properties:
+        name:        { type: string, minLength: 3, maxLength: 200 }
+        ruc:         { type: [string, 'null'], pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
+
+    PageOfWarehouseSupplier:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseSupplierResponse' }
+
+    # -------- Warehouse: productos y stock --------------------------------------
+    WarehouseProductSummary:
+      type: object
+      description: Referencia mínima a un producto para embeber en ítems, retiros y aperturas.
+      required: [id, name, unitCode]
+      properties:
+        id:       { type: integer }
+        code:     { type: [string, 'null'], maxLength: 30, example: 'PRO-0012' }
+        name:     { type: string, maxLength: 200, example: 'Filtro de aceite XYZ' }
+        unitCode: { type: string, maxLength: 10, description: 'Código de la unidad de medida (para pintar cantidades)', example: 'UND' }
+
+    WarehouseProductRequest:
+      type: object
+      required: [name, categoryId, unitOfMeasureId]
+      properties:
+        code:            { type: [string, 'null'], maxLength: 30, description: 'SKU opcional; si se omite al crear, el backend lo autogenera (PRO-0001). Único.' }
+        name:            { type: string, minLength: 3, maxLength: 200, description: 'Único COMPUESTO con brand+partNumber (Δ-2, RN-WH10)' }
+        categoryId:      { type: integer }
+        unitOfMeasureId: { type: integer }
+        brand:           { type: [string, 'null'], maxLength: 100 }
+        partNumber:      { type: [string, 'null'], maxLength: 100 }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+          default: {}
+          description: 'Características flexibles clave-valor (JSONB). Objeto libre; la UI lo edita como filas clave-valor.'
+          example: { rosca: '3/4-16', viscosidad: '15W-40' }
+        minStock:     { type: number, minimum: 0, default: 0, description: 'Umbral de reposición: stock < minStock → badge "Bajo" (RN-WH11)' }
+        observations: { type: [string, 'null'] }
+        isActive:     { type: boolean, default: true, description: 'Soft delete del catálogo. En el POST se ignora (siempre nace activo).' }
+
+    WarehouseProductUpdateRequest:
+      type: object
+      description: >-
+        Como WarehouseProductRequest pero SIN unitOfMeasureId: la unidad de
+        medida se fija al crear y es inmutable (P-1 respondida por el dueño
+        2026-07-04; su edición se evaluará más adelante).
+      required: [name, categoryId]
+      properties:
+        code:            { type: [string, 'null'], maxLength: 30, description: 'SKU. Único (RN-WH10).' }
+        name:            { type: string, minLength: 3, maxLength: 200, description: 'Único COMPUESTO con brand+partNumber (Δ-2, RN-WH10)' }
+        categoryId:      { type: integer }
+        brand:           { type: [string, 'null'], maxLength: 100 }
+        partNumber:      { type: [string, 'null'], maxLength: 100 }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+          default: {}
+          description: 'Características flexibles clave-valor (JSONB). Objeto libre; la UI lo edita como filas clave-valor.'
+        minStock:     { type: number, minimum: 0, default: 0 }
+        observations: { type: [string, 'null'] }
+        isActive:     { type: boolean, default: true, description: 'Soft delete del catálogo.' }
+
+    WarehouseProductResponse:
+      type: object
+      required: [id, code, name, category, unitOfMeasure, attributes, minStock, isActive, stock, lowStock, createdBy, createdAt, updatedAt]
+      properties:
+        id:   { type: integer }
+        code: { type: string, maxLength: 30, description: 'SKU (autogenerado si no se envió)' }
+        name: { type: string, maxLength: 200 }
+        category:
+          type: object
+          required: [id, name]
+          properties:
+            id:   { type: integer }
+            name: { type: string }
+        unitOfMeasure:
+          type: object
+          required: [id, code, name]
+          properties:
+            id:   { type: integer }
+            code: { type: string }
+            name: { type: string }
+        brand:      { type: [string, 'null'], maxLength: 100 }
+        partNumber: { type: [string, 'null'], maxLength: 100 }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+          description: 'Objeto JSON libre clave-valor (JSONB). Nunca `null` (default `{}`).'
+        minStock:     { type: number, minimum: 0 }
+        observations: { type: [string, 'null'] }
+        isActive:     { type: boolean }
+        stock:        { type: number, description: 'LEÍDO de la VIEW `almacen.product_stock` (RN-WH1 — nunca persistido, siempre exacto)' }
+        lowStock:     { type: boolean, description: 'Derivado en código: `stock < minStock` (estricto). NO es columna.' }
+        createdBy:    { $ref: '#/components/schemas/UserRef' }
+        createdAt:    { type: string, format: date-time }
+        updatedAt:    { type: string, format: date-time }
+
+    PageOfWarehouseProduct:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseProductResponse' }
+
+    WarehouseProductStockResponse:
+      type: object
+      description: Lectura puntual del stock disponible (form de retiro, validación en vivo).
+      required: [productId, stock, minStock, lowStock]
+      properties:
+        productId: { type: integer }
+        stock:     { type: number, description: 'De la VIEW `almacen.product_stock`' }
+        minStock:  { type: number }
+        lowStock:  { type: boolean, description: 'Derivado: `stock < minStock`' }
+
+    # -------- Warehouse: corte inicial ------------------------------------------
+    WarehouseOpeningBalanceRequest:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId:    { type: integer }
+        quantity:     { type: number, minimum: 0, description: 'Puede ser 0 (deja constancia del conteo)' }
+        observations: { type: [string, 'null'] }
+
+    WarehouseOpeningBalanceResponse:
+      type: object
+      required: [id, product, quantity, registeredBy, registeredAt]
+      properties:
+        id:           { type: integer }
+        product:      { $ref: '#/components/schemas/WarehouseProductSummary' }
+        quantity:     { type: number, minimum: 0 }
+        observations: { type: [string, 'null'] }
+        registeredBy: { $ref: '#/components/schemas/UserRef' }
+        registeredAt: { type: string, format: date-time }
+
+    PageOfWarehouseOpeningBalance:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseOpeningBalanceResponse' }
+
+    # -------- Warehouse: kardex --------------------------------------------------
+    WarehouseKardexMovementType:
+      type: string
+      enum: [APERTURA, ENTRADA, SALIDA]
+      description: |
+        Tipo de movimiento de la VIEW `almacen.stock_movements`: `APERTURA`
+        (corte inicial, +), `ENTRADA` (ítem de factura activa, +), `SALIDA`
+        (retiro activo, −). Valores en español porque son los literales de la
+        VIEW del DDL congelado.
+
+    WarehouseKardexMovementResponse:
+      type: object
+      required: [movementType, quantity, balance, movedAt, registeredBy, reference]
+      properties:
+        movementType: { $ref: '#/components/schemas/WarehouseKardexMovementType' }
+        quantity:     { type: number, description: 'SIEMPRE positiva (el signo lo da movementType)' }
+        balance:      { type: number, description: 'Saldo corrido DESPUÉS del movimiento (RN-WH13 — server-side sobre la historia completa)' }
+        movedAt:      { type: string, format: date-time }
+        sourceId:     { type: [integer, 'null'], description: 'Id del origen: factura (ENTRADA) o retiro (SALIDA); null para APERTURA' }
+        reference:    { type: string, description: 'Etiqueta legible compuesta por el backend (es-PE). Ej: "Factura F001-00123 · REPUESTOS DIÉSEL S.A.C." o "Retiro · recibe Juan Pérez · ABC123"' }
+        registeredBy: { $ref: '#/components/schemas/UserRef' }
+
+    PageOfWarehouseKardexMovement:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseKardexMovementResponse' }
+
+    # -------- Warehouse: comunes de edición/anulación ----------------------------
+    WarehouseRecordStatus:
+      type: string
+      enum: [ACTIVE, CANCELLED]
+      description: |
+        Estado de entradas y retiros (columna + CHECK, patrón ratificado).
+        `CANCELLED` = anulado con motivo/quién/cuándo (CHECK de consistencia en
+        BD); no mueve stock/kardex/reportes pero queda visible en los listados.
+
+    WarehouseEditTrace:
+      type: object
+      description: |
+        Rastro del ÚLTIMO cambio — derivado del `FIELD_EDIT` más reciente en
+        `almacen.audit_logs` (decisión D-10; el historial completo queda en la
+        tabla, sin endpoint en fase 1 — pregunta abierta P-3).
+      required: [by, at, reason]
+      properties:
+        by:     { $ref: '#/components/schemas/UserRef' }
+        at:     { type: string, format: date-time }
+        reason: { type: string, description: 'Justificación dada al editar (≥ 10 caracteres)' }
+
+    WarehouseCancelRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500, description: 'Motivo de anulación (RN-WH3). Va a `cancel_reason` y a `almacen.audit_logs` (CANCELLED).' }
+
+    # -------- Warehouse: entradas (facturas) -------------------------------------
+    WarehouseInvoiceItemRequest:
+      type: object
+      required: [productId, quantity, unitPrice]
+      properties:
+        productId: { type: integer }
+        quantity:  { type: number, exclusiveMinimum: 0 }
+        unitPrice: { type: number, minimum: 0, description: 'En la moneda de la factura. Puede ser 0 (bonificación).' }
+
+    WarehousePurchaseInvoiceRequest:
+      type: object
+      required: [supplierId, invoiceNumber, invoiceDate, currencyId, items]
+      properties:
+        supplierId:    { type: integer }
+        invoiceNumber: { type: string, minLength: 1, maxLength: 50, example: 'F001-00123' }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'], maxLength: 50, description: 'Guía de remisión (1 factura → 1 guía; dato de finanzas)', example: 'T001-0004567' }
+        currencyId:    { type: integer, description: 'Fija la moneda de la factura (RN-WH7 — reportes agregan por moneda, sin conversión)' }
+        observations:  { type: [string, 'null'] }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
+
+    WarehousePurchaseInvoiceUpdateRequest:
+      type: object
+      description: |
+        Body del PUT. **SIN `supplierId`** — el proveedor es INMUTABLE (RN-WH4:
+        proveedor equivocado = anular y re-registrar). Los `items` REEMPLAZAN a
+        los existentes.
+      required: [invoiceNumber, invoiceDate, currencyId, items, reason]
+      properties:
+        invoiceNumber: { type: string, minLength: 1, maxLength: 50 }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'], maxLength: 50 }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'] }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
+        reason: { type: string, minLength: 10, maxLength: 500, description: 'Justificación de la edición (RN-WH4). Va a `almacen.audit_logs` con el diff por campo.' }
+
+    WarehouseInvoiceItemResponse:
+      type: object
+      required: [id, product, quantity, unitPrice, subtotal]
+      properties:
+        id:        { type: integer }
+        product:   { $ref: '#/components/schemas/WarehouseProductSummary' }
+        quantity:  { type: number }
+        unitPrice: { type: number }
+        subtotal:  { type: number, description: '`quantity * unitPrice` — derivado en código, no persistido' }
+
+    WarehousePurchaseInvoiceResponse:
+      type: object
+      required: [id, supplier, invoiceNumber, invoiceDate, currency, items, total, status, registeredBy, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        supplier:
+          type: object
+          required: [id, name]
+          properties:
+            id:   { type: integer }
+            name: { type: string }
+            ruc:  { type: [string, 'null'], pattern: '^\d{11}$' }
+        invoiceNumber: { type: string }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'] }
+        currency:
+          type: object
+          required: [id, code, symbol]
+          properties:
+            id:     { type: integer }
+            code:   { type: string, pattern: '^[A-Z]{3}$', example: 'PEN' }
+            symbol: { type: string, maxLength: 5, example: 'S/' }
+        observations: { type: [string, 'null'] }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/WarehouseInvoiceItemResponse' }
+        total:        { type: number, description: 'Σ items.subtotal en la moneda de la factura — derivado en código, NUNCA persistido (patrón v2)' }
+        status:       { $ref: '#/components/schemas/WarehouseRecordStatus' }
+        cancelReason: { type: [string, 'null'], description: 'Presente solo si status=CANCELLED' }
+        cancelledBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        cancelledAt: { type: [string, 'null'], format: date-time }
+        lastEdit:
+          anyOf:
+            - $ref: '#/components/schemas/WarehouseEditTrace'
+            - type: 'null'
+        registeredBy: { $ref: '#/components/schemas/UserRef' }
+        createdAt:    { type: string, format: date-time }
+        updatedAt:    { type: string, format: date-time, description: 'Source de la versión — usar el header ETag opaco en If-Match, NO este valor (lección de cotizaciones)' }
+
+    WarehousePurchaseInvoiceSummary:
+      type: object
+      description: Fila del listado de Entradas.
+      required: [id, supplier, invoiceNumber, invoiceDate, currencyCode, itemsCount, total, status, registeredBy, createdAt]
+      properties:
+        id: { type: integer }
+        supplier:
+          type: object
+          required: [id, name]
+          properties:
+            id:   { type: integer }
+            name: { type: string }
+        invoiceNumber: { type: string }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'] }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$' }
+        itemsCount:    { type: integer }
+        total:         { type: number, description: 'Derivado de los ítems (no persistido)' }
+        status:        { $ref: '#/components/schemas/WarehouseRecordStatus' }
+        cancelReason:  { type: [string, 'null'] }
+        registeredBy:  { $ref: '#/components/schemas/UserRef' }
+        createdAt:     { type: string, format: date-time }
+
+    PageOfWarehousePurchaseInvoiceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehousePurchaseInvoiceSummary' }
+
+    # -------- Warehouse: retiros ---------------------------------------------------
+    WarehouseWithdrawalRequest:
+      type: object
+      description: |
+        RN-WH2: `receivedByWorkerId` SIEMPRE obligatorio; unidad destino OPCIONAL
+        y a lo sumo UNA (`tractorId` | `trailerId` | `escortVehicleId` — subtipos
+        disyuntos, CHECK en BD; más de una → 400 WH-005). `withdrawnAt` lo asigna
+        el server.
+      required: [productId, quantity, receivedByWorkerId]
+      properties:
+        productId:          { type: integer }
+        quantity:           { type: number, exclusiveMinimum: 0, description: '> 0 y ≤ stock disponible (en transacción → 409 WH-001)' }
+        receivedByWorkerId: { type: integer, description: 'Quién recibe (FK public.workers). Obligatorio.' }
+        tractorId:          { type: [integer, 'null'] }
+        trailerId:          { type: [integer, 'null'] }
+        escortVehicleId:    { type: [integer, 'null'] }
+        observations:       { type: [string, 'null'] }
+
+    WarehouseWithdrawalUpdateRequest:
+      type: object
+      description: |
+        Body del PUT. **SIN `productId`** — el producto es INMUTABLE (RN-WH4:
+        producto equivocado = anular y crear otro). La unidad de flota se
+        REEMPLAZA (los tres campos `null` la quitan; a lo sumo una).
+      required: [quantity, receivedByWorkerId, reason]
+      properties:
+        quantity:           { type: number, exclusiveMinimum: 0, description: 'Subirla valida contra el disponible SIN contar este retiro (409 WH-001); bajarla siempre es segura' }
+        receivedByWorkerId: { type: integer }
+        tractorId:          { type: [integer, 'null'] }
+        trailerId:          { type: [integer, 'null'] }
+        escortVehicleId:    { type: [integer, 'null'] }
+        observations:       { type: [string, 'null'] }
+        reason:             { type: string, minLength: 10, maxLength: 500, description: 'Justificación de la edición (RN-WH4). Va a `almacen.audit_logs`.' }
+
+    WarehouseWithdrawalResponse:
+      type: object
+      required: [id, product, quantity, withdrawnAt, receivedBy, status, registeredBy, updatedAt]
+      properties:
+        id:          { type: integer }
+        product:     { $ref: '#/components/schemas/WarehouseProductSummary' }
+        quantity:    { type: number }
+        withdrawnAt: { type: string, format: date-time, description: 'Lo asigna el server al registrar' }
+        receivedBy:  { $ref: '#/components/schemas/WorkerResponse' }
+        fleetUnit:
+          anyOf:
+            - $ref: '#/components/schemas/FleetUnitRef'
+            - type: 'null'
+          description: 'Unidad destino (a lo sumo una); null si el retiro no se asignó a una unidad'
+        observations: { type: [string, 'null'] }
+        status:       { $ref: '#/components/schemas/WarehouseRecordStatus' }
+        cancelReason: { type: [string, 'null'], description: 'Presente solo si status=CANCELLED' }
+        cancelledBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        cancelledAt: { type: [string, 'null'], format: date-time }
+        lastEdit:
+          anyOf:
+            - $ref: '#/components/schemas/WarehouseEditTrace'
+            - type: 'null'
+        registeredBy: { $ref: '#/components/schemas/UserRef' }
+        updatedAt:    { type: string, format: date-time, description: 'Source de la versión — usar el header ETag opaco en If-Match' }
+
+    PageOfWarehouseWithdrawal:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+
+    # -------- Warehouse: dashboard y reportes ---------------------------------------
+    WarehouseStatsResponse:
+      type: object
+      description: KPIs del strip de Existencias. Mes calendario en curso (América/Lima); solo ACTIVOS.
+      required: [activeProducts, lowStockCount, entriesThisMonth, withdrawalsThisMonth]
+      properties:
+        activeProducts:       { type: integer }
+        lowStockCount:        { type: integer, description: 'Productos activos con stock < minStock (RN-WH11)' }
+        entriesThisMonth:     { type: integer, description: 'Facturas ACTIVAS registradas este mes' }
+        withdrawalsThisMonth: { type: integer, description: 'Retiros ACTIVOS registrados este mes' }
+
+    WarehouseReportCut:
+      type: string
+      enum: [BY_UNIT, BY_PERIOD, BY_PRODUCT, BY_SUPPLIER]
+      description: |
+        Corte del reporte (los 4 de la pantalla Reportes):
+        - `BY_UNIT`: consumo por unidad de flota (retiros sin unidad → fila "Sin unidad asignada")
+        - `BY_PERIOD`: consumo por semana (lunes como clave, en `detail`)
+        - `BY_PRODUCT`: consumo por producto (`count` = unidades retiradas)
+        - `BY_SUPPLIER`: compras por proveedor (facturas activas por `invoiceDate`)
+
+    WarehouseReportRowResponse:
+      type: object
+      description: |
+        Fila agregada. RN-WH7 — bi-moneda SIN conversión: `amountPEN` y
+        `amountUSD` acumulan por separado según la moneda registrada (hoy el
+        catálogo activo es PEN + USD — decisión D-6; agregar una moneda = cambio
+        de contrato).
+      required: [label, count, amountPEN, amountUSD]
+      properties:
+        label:     { type: string, description: 'Etiqueta del grupo (ej: "Tracto ABC123", "Semana del 22/06", producto, proveedor)' }
+        detail:    { type: [string, 'null'], description: 'Dato secundario (unidad de medida en BY_PRODUCT, fecha ISO del lunes en BY_PERIOD)' }
+        count:     { type: number, description: 'Nº de movimientos (o unidades retiradas en BY_PRODUCT)' }
+        amountPEN: { type: number, description: 'Valorización de referencia en PEN (salidas: último precio de compra del producto)' }
+        amountUSD: { type: number, description: 'Valorización de referencia en USD' }
+
+    WarehouseReportResponse:
+      type: object
+      required: [cut, dateFrom, dateTo, rows, totalPEN, totalUSD, totalCount]
+      properties:
+        cut:      { $ref: '#/components/schemas/WarehouseReportCut' }
+        dateFrom: { type: string, format: date }
+        dateTo:   { type: string, format: date }
+        rows:
+          type: array
+          description: 'Orden: BY_PERIOD cronológico ASC; el resto por monto total DESC. Lista vacía si no hubo movimientos (nunca null).'
+          items: { $ref: '#/components/schemas/WarehouseReportRowResponse' }
+        totalPEN:   { type: number }
+        totalUSD:   { type: number }
+        totalCount: { type: number }
