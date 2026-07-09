@@ -8,6 +8,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -26,6 +27,9 @@ import static org.hamcrest.Matchers.equalTo;
  */
 @QuarkusTest
 @TestProfile(QuotationAntiDuplicateResourceTest.AntiDupWindowProfile.class)
+// No-hermetica: fija IDs de la data acumulada del dev-DB (client=1, cargoType=1, ...).
+// Excluida del CI (excludedGroups); se sigue corriendo en la suite local.
+@Tag("requires-dev-data")
 class QuotationAntiDuplicateResourceTest {
 
     public static class AntiDupWindowProfile implements QuarkusTestProfile {

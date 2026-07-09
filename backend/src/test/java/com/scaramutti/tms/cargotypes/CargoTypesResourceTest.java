@@ -8,6 +8,7 @@ import io.restassured.http.ContentType;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -81,6 +82,8 @@ class CargoTypesResourceTest {
     // ---------- Happy path / shape del response ------------------------------
 
     @Test
+    // Asume >=20 cargo_types ambientales (no los siembra); excluida del CI por su tag.
+    @Tag("requires-dev-data")
     void list_withoutQueryParams_returnsFirstPageWithDefaults() {
         // BD prod tiene 69 cargo_types reales. Verifica defaults page=0, size=20.
         String token = login("admin", "Admin1234");
