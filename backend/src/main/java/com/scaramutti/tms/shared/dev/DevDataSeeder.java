@@ -67,7 +67,7 @@ public class DevDataSeeder {
         ensureRole("operations_manager", "Gerente de Operaciones");
 
         ensureUser("admin",    "Admin1234",    "Admin",    "TMS",      "00000001", "Administrador del sistema", admin, true,  dniId);
-        ensureUser("lcampos",  "Sales1234",    "Luraidis", "Campos",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
+        ensureUser("lcampos",  "Sales1234",    "Carolina", "Campos",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
         ensureUser("inactivo", "Inactivo1234", "Usuario",  "Inactivo", "00000003", "Inactivo de prueba",        sales, false, dniId);
 
         ensureCurrency("USD", "$",  "Dólar Estadounidense");
