@@ -3,6 +3,7 @@ package com.scaramutti.tms.shared.repository;
 import com.scaramutti.tms.clients.service.cmd.ListClientsQuery;
 import com.scaramutti.tms.shared.entity.Client;
 import com.scaramutti.tms.shared.entity.Client_;
+import com.scaramutti.tms.shared.util.StringUtils;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -117,23 +118,12 @@ public class ClientRepository implements PanacheRepositoryBase<Client, Integer> 
             // El similarity() del ORDER BY usa :qRank sin escapar — es fuzzy ranking,
             // no patron LIKE, los wildcards no le aplican.
             conditions.add("(name ILIKE :qLike ESCAPE '\\' OR ruc ILIKE :qLike ESCAPE '\\')");
-            params.put("qLike", "%" + escapeLikeWildcards(q) + "%");
+            params.put("qLike", "%" + StringUtils.escapeLikeWildcards(q) + "%");
         }
         if (isActive != null) {
             conditions.add("is_active = :isActive");
             params.put("isActive", isActive);
         }
         return conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);
-    }
-
-    /**
-     * Escapa los metacaracteres de LIKE/ILIKE ({@code \ % _}) para que el input
-     * de busqueda se trate como literal. El backslash primero (es el char de
-     * escape, no debe duplicarse despues). Usado con {@code ESCAPE '\'} en el SQL.
-     * (Mismo helper que {@code QuotationRepository.escapeLikeWildcards} — si
-     * aparece un 3er repo con ILIKE, mover a un util compartido.)
-     */
-    private static String escapeLikeWildcards(String value) {
-        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }

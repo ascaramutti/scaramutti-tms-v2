@@ -2,6 +2,7 @@ package com.scaramutti.tms.shared.repository;
 
 import com.scaramutti.tms.quotations.service.cmd.ListQuotationsQuery;
 import com.scaramutti.tms.shared.entity.Quotation;
+import com.scaramutti.tms.shared.util.StringUtils;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -121,9 +122,8 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
      *
      * Native query (no Panache JPQL) por los JOINs a clients/currencies y para
      * proyectar columnas que no son campos de la entity. Patron analogo a
-     * {@code ClientRepository.searchPaged} — con una diferencia: aca el filtro q
-     * escapa los wildcards de LIKE ({@link #escapeLikeWildcards}); ClientRepository
-     * aun NO lo hace (misma vulnerabilidad de sobre-match, deuda pendiente).
+     * {@code ClientRepository.searchPaged}, incluido el escape de wildcards de
+     * LIKE ({@link StringUtils#escapeLikeWildcards}).
      */
     public List<QuotationSummaryRow> searchPaged(ListQuotationsQuery listQuotationsQuery) {
         Map<String, Object> params = new HashMap<>();
@@ -188,7 +188,7 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
             conditions.add("(qt.code ILIKE :qLike ESCAPE '\\' OR cli.name ILIKE :qLike ESCAPE '\\' "
                 + "OR cli.ruc ILIKE :qLike ESCAPE '\\' OR qt.origin ILIKE :qLike ESCAPE '\\' "
                 + "OR qt.destination ILIKE :qLike ESCAPE '\\')");
-            params.put("qLike", "%" + escapeLikeWildcards(q.q()) + "%");
+            params.put("qLike", "%" + StringUtils.escapeLikeWildcards(q.q()) + "%");
         }
         if (q.status() != null) {
             conditions.add("qt.status = :status");
@@ -233,15 +233,6 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
         }
 
         return conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);
-    }
-
-    /**
-     * Escapa los metacaracteres de LIKE/ILIKE ({@code \ % _}) para que el input
-     * de busqueda se trate como literal. El backslash primero (es el char de
-     * escape, no debe duplicarse despues). Usado con {@code ESCAPE '\'} en el SQL.
-     */
-    private static String escapeLikeWildcards(String value) {
-        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     /**
