@@ -77,6 +77,17 @@ class WarehouseSuppliersResourceTest {
             .sign();
     }
 
+    private String body(String name, String ruc, String phone, String contactName) {
+        StringBuilder sb = new StringBuilder("{");
+        if (name != null) sb.append("\"name\":\"").append(name).append("\",");
+        if (ruc != null) sb.append("\"ruc\":\"").append(ruc).append("\",");
+        if (phone != null) sb.append("\"phone\":\"").append(phone).append("\",");
+        if (contactName != null) sb.append("\"contactName\":\"").append(contactName).append("\",");
+        if (sb.charAt(sb.length() - 1) == ',') sb.deleteCharAt(sb.length() - 1);
+        sb.append("}");
+        return sb.toString();
+    }
+
     // ---------- GET: shape / paginacion -----------------------------------------
 
     @Test
@@ -426,5 +437,323 @@ class WarehouseSuppliersResourceTest {
         .then()
             .statusCode(403)
             .body("code", equalTo("COM-003"));
+    }
+
+    // ---------- POST: happy path ------------------------------------------------
+
+    @Test
+    void create_withFullPayload_returns201AndPersists() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_Repuestos Diesel SAC", "99911100011", "987654321", "Marco Salazar"))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201)
+            .contentType("application/json")
+            .body("id", notNullValue())
+            .body("name", equalTo("ZTEST_REPUESTOS DIESEL SAC"))
+            .body("ruc", equalTo("99911100011"))
+            .body("phone", equalTo("987654321"))
+            .body("contactName", equalTo("Marco Salazar"))
+            .body("isActive", equalTo(true))
+            .body("createdAt", notNullValue());
+
+        Supplier persisted = supplierRepository.find("name", "ZTEST_REPUESTOS DIESEL SAC").firstResult();
+        assertNotNull(persisted);
+    }
+
+    @Test
+    void create_withOnlyRequiredName_returns201WithNullOptionalFields() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_SoloNombreProv", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201)
+            .body("ruc", nullValue())
+            .body("phone", nullValue())
+            .body("contactName", nullValue())
+            .body("isActive", equalTo(true));
+    }
+
+    @Test
+    void create_uppercasesName_sameCriteriaAsClients() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ztest_mixed case", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201)
+            .body("name", equalTo("ZTEST_MIXED CASE"));
+    }
+
+    @Test
+    void create_trimsWhitespaceInNameAndContactName() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("  ZTEST_Trim  ", null, null, "   "))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201)
+            .body("name", equalTo("ZTEST_TRIM"))
+            .body("contactName", nullValue());
+    }
+
+    @Test
+    void create_withTwoNullRucSuppliers_bothSucceed_noFalseConflict() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NullRuc1", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NullRuc2", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201);
+    }
+
+    // ---------- POST: duplicados (WH-010) ---------------------------------------
+
+    @Test
+    void create_withDuplicateName_returns409_WH010() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_DupName", "99922200001", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ztest_dupname", "99922200002", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(409)
+            .contentType("application/problem+json")
+            .body("code", equalTo("WH-010"));
+    }
+
+    @Test
+    void create_withDuplicateRuc_returns409_WH010() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_RucOwner", "99933300003", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_RucChallenger", "99933300003", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(409)
+            .body("code", equalTo("WH-010"));
+    }
+
+    @Test
+    void create_withDuplicateNameAndRuc_returns409_WH010() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_Both", "99944400004", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201);
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_Both", "99944400004", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(409)
+            .body("code", equalTo("WH-010"));
+    }
+
+    // ---------- POST: validacion 400 (COM-001) -----------------------------------
+
+    @Test
+    void create_withMissingName_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body("{\"phone\":\"987654321\"}")
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withNameTooShort_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("AB", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withInvalidRucPattern_letters_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_InvalidRuc", "2051234567A", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withRucWrongLength_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_RucCorto", "2051234567", null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withInvalidPhonePattern_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_PhoneInvalido", null, "12345", null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void create_withEmptyBody_returns400_COM001() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"));
+    }
+
+    // ---------- POST: auth / roles -----------------------------------------------
+
+    @Test
+    void create_withoutToken_returns401() {
+        given()
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_NoToken", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void create_withSalesRole_returns403_COM003() {
+        String token = login("lcampos", "Sales1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_Sales", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void create_withDispatcherRole_returns403_COM003() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("disp_test", "dispatcher"))
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_Dispatcher", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void create_withWarehouseKeeperRole_returns201() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("wk_test", "warehouse_keeper"))
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_WarehouseKeeper", null, null, null))
+        .when()
+            .post("/warehouse/suppliers")
+        .then()
+            .statusCode(201);
     }
 }

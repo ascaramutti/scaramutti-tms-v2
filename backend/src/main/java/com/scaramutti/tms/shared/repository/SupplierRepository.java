@@ -32,6 +32,14 @@ public class SupplierRepository implements PanacheRepositoryBase<Supplier, Integ
     @Inject
     EntityManager entityManager;
 
+    public boolean existsByNameIgnoreCase(String name) {
+        return count("lower(" + Supplier_.NAME + ") = lower(?1)", name) > 0;
+    }
+
+    public boolean existsByRucIgnoreCase(String ruc) {
+        return count("lower(" + Supplier_.RUC + ") = lower(?1)", ruc) > 0;
+    }
+
     /**
      * Busca proveedores paginados. `q` (si viene) tokenizado por espacios:
      * cada token agrega su propia condicion `(name ILIKE OR ruc ILIKE)` al

@@ -10,7 +10,11 @@ import com.scaramutti.tms.shared.exception.ApiError;
 public enum WarehouseError implements ApiError {
 
     PRODUCT_CATEGORY_NAME_DUPLICATED("WH-010", 409, "Conflict",
-        "Ya existe una categoría con el nombre indicado");
+        "Ya existe una categoría con el nombre indicado"),
+    SUPPLIER_NAME_DUPLICATED        ("WH-010", 409, "Conflict",
+        "Ya existe un proveedor con el nombre indicado"),
+    SUPPLIER_RUC_DUPLICATED         ("WH-010", 409, "Conflict",
+        "Ya existe un proveedor con el RUC indicado");
 
     private final String code;
     private final int status;
