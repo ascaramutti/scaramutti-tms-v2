@@ -862,8 +862,57 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/WarehouseUnitOfMeasureResponse' }
+  /warehouse/suppliers:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseSuppliers
+      summary: Buscar proveedores (paginado)
+      description: |
+        Con `q` filtra por substring case-insensitive en `name` y `ruc` (ILIKE
+        acelerado por GIN trgm `idx_suppliers_name_trgm`), ranking `similarity`
+        DESC, tiebreak `name` ASC. Multi-palabra: `q` se tokeniza por espacios y
+        cada palabra debe matchear en ALGÚN campo (AND de ORs) — RN-WH14.
+        Sin `q`: `name` ASC. Para no filtrar, OMITIR el parámetro (no enviarlo
+        vacío).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de proveedores
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseSupplier' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseSupplier
+      summary: Crear proveedor (al vuelo desde el form de factura)
+      description: '`name` y `ruc` únicos → `409 WH-010` (el `detail` dice cuál chocó).'
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseSupplierRequest' }
+            example: { name: 'REPUESTOS DIÉSEL S.A.C.', ruc: '20512345678', phone: '014567890', contactName: 'Marco Salazar' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseSupplierResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/ConflictDuplicate' }
 
 # =============================================================================
 components:
@@ -1088,6 +1137,21 @@ components:
                 instance: '/api/v1/quotations/142'
                 code: 'COM-004'
                 traceId: '0a1b2c3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+
+    ConflictDuplicate:
+      description: Duplicado de catálogo del módulo Almacén — nombre/código/RUC ya existe → WH-010
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: 'urn:tms:error:wh-010'
+            title: 'Conflict'
+            status: 409
+            detail: 'Ya existe un registro con ese valor en el catálogo'
+            instance: '/api/v1/warehouse/suppliers'
+            code: 'WH-010'
+            traceId: 'a0b1c2d3-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+
 
   schemas:
 
@@ -1789,3 +1853,34 @@ components:
         code:     { type: string, maxLength: 10, example: 'GAL' }
         name:     { type: string, maxLength: 50, example: 'Galón' }
         isActive: { type: boolean }
+
+    WarehouseSupplierResponse:
+      type: object
+      required: [id, name, isActive, createdAt]
+      properties:
+        id:          { type: integer }
+        name:        { type: string, maxLength: 200, example: 'REPUESTOS DIÉSEL S.A.C.' }
+        ruc:         { type: [string, 'null'], pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
+        isActive:    { type: boolean }
+        createdAt:   { type: string, format: date-time }
+
+    WarehouseSupplierRequest:
+      type: object
+      required: [name]
+      properties:
+        name:        { type: string, minLength: 3, maxLength: 200 }
+        ruc:         { type: [string, 'null'], pattern: '^\d{11}$' }
+        phone:       { type: [string, 'null'], pattern: '^\d{9}$' }
+        contactName: { type: [string, 'null'], maxLength: 100 }
+
+    PageOfWarehouseSupplier:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseSupplierResponse' }

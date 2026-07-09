@@ -34,4 +34,24 @@ public final class StringUtils {
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
+
+    /**
+     * Escapa los metacaracteres de LIKE/ILIKE ({@code \ % _}) para que un
+     * input de búsqueda se trate como literal en un patrón {@code ILIKE
+     * :param ESCAPE '\'}. El backslash primero (es el char de escape, no debe
+     * duplicarse después). Usado por los repos con búsqueda `q` (Client,
+     * Quotation, Supplier) — antes duplicado en cada uno, extraído acá al
+     * aparecer el 3er caso.
+     *
+     * @Named aunque ningún mapper lo invoque hoy vía qualifiedByName: sin él,
+     * MapStruct lo trata como candidato AUTOMATICO para cualquier campo
+     * String→String sin anotar en los mappers que usan `uses = StringUtils.class`
+     * (ej. ruc/phone "pasan tal cual" en ClientResourceMapper) — pisaba el
+     * passthrough directo con un escape no pedido (bug real, cazado por los
+     * tests de create al agregar este método).
+     */
+    @Named("escapeLikeWildcards")
+    public static String escapeLikeWildcards(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
 }
