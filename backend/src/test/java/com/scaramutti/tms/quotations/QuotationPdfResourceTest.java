@@ -9,6 +9,7 @@ import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -34,6 +35,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @QuarkusTest
 @TestProfile(QuotationPdfResourceTest.AntiDupDisabledProfile.class)
+// No-hermetica: fija IDs de la data acumulada del dev-DB (client=1, cargoType=1, ...).
+// Excluida del CI (excludedGroups); se sigue corriendo en la suite local.
+@Tag("requires-dev-data")
 class QuotationPdfResourceTest {
 
     /** Igual que QuotationResourceTest: desactiva el anti-duplicate window para crear fixtures. */

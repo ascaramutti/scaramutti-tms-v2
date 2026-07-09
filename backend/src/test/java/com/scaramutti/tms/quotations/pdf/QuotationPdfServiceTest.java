@@ -14,6 +14,7 @@ import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -91,6 +92,8 @@ class QuotationPdfServiceTest {
      * y la tabla de cuentas bancarias sigue saliendo (marcador [[BANK_ACCOUNTS]] que agrega el codigo).
      */
     @Test
+    // La tabla de cuentas se arma de system_settings (data del dev-DB); excluida del CI por su tag.
+    @Tag("requires-dev-data")
     void conditions_fromQuotation_renderInPdf_includingInactive_withBankTable() throws Exception {
         byte[] pdf = pdfService.generate(sampleQuotation());
 
@@ -124,6 +127,8 @@ class QuotationPdfServiceTest {
      * conditions=[]). Guarda la decision "marcador siempre" contra una regresion.
      */
     @Test
+    // La tabla de cuentas se arma de system_settings (data del dev-DB); excluida del CI por su tag.
+    @Tag("requires-dev-data")
     void conditions_empty_stillRendersBankTableSection() throws Exception {
         byte[] pdf = pdfService.generate(fullQuotation());
 
