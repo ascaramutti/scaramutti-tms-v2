@@ -910,6 +910,50 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/ConflictDuplicate' }
 
+  /warehouse/products:
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseProduct
+      summary: Crear producto (al vuelo desde la factura o desde Existencias)
+      description: |
+        Identidad ÚNICA compuesta `(name, brand, partNumber)` → `409 WH-010`
+        (Δ-2, RN-WH10): mismo nombre y marca pueden coexistir con distinto n° de
+        parte (variantes/modelos); comparación case-insensitive y los opcionales
+        vacíos cuentan como "sin valor" (el backend normaliza trim + vacío→null;
+        índice con COALESCE — dos genéricos idénticos sin marca/parte también
+        chocan). El `code` (SKU) lo asigna siempre el backend (`PRO-NNNN`,
+        correlativo); no se acepta en el request.
+        `attributes` = objeto JSON libre clave-valor (JSONB).
+        Un producto nuevo **nace con stock 0** — su primera factura es su primer
+        movimiento; el corte inicial es SOLO para inventario pre-existente (RN-WH6).
+        Duplicados: el guardián es el índice único de identidad compuesta → `409
+        WH-010`; no hay cabecera de idempotencia (redundante frente al índice,
+        consistente con el resto del módulo).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseProductRequest' }
+            example:
+              name: 'Filtro de aceite XYZ'
+              categoryId: 7
+              unitOfMeasureId: 1
+              brand: 'Bosch'
+              partNumber: 'F026407123'
+              attributes: { rosca: '3/4-16' }
+              minStock: 4
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseProductResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/ConflictDuplicate' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -1880,3 +1924,57 @@ components:
             content:
               type: array
               items: { $ref: '#/components/schemas/WarehouseSupplierResponse' }
+
+    WarehouseProductRequest:
+      type: object
+      required: [name, categoryId, unitOfMeasureId]
+      properties:
+        name:            { type: string, minLength: 3, maxLength: 200, description: 'Único COMPUESTO con brand+partNumber (Δ-2, RN-WH10)' }
+        categoryId:      { type: integer }
+        unitOfMeasureId: { type: integer }
+        brand:           { type: [string, 'null'], maxLength: 100 }
+        partNumber:      { type: [string, 'null'], maxLength: 100 }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+          default: {}
+          description: 'Características flexibles clave-valor (JSONB). Objeto libre; la UI lo edita como filas clave-valor.'
+          example: { rosca: '3/4-16', viscosidad: '15W-40' }
+        minStock:     { type: number, minimum: 0, default: 0, description: 'Umbral de reposición: stock < minStock → badge "Bajo" (RN-WH11)' }
+        observations: { type: [string, 'null'] }
+        isActive:     { type: boolean, default: true, description: 'Soft delete del catálogo. En el POST se ignora (siempre nace activo).' }
+
+    WarehouseProductResponse:
+      type: object
+      required: [id, code, name, category, unitOfMeasure, attributes, minStock, isActive, stock, lowStock, createdBy, createdAt, updatedAt]
+      properties:
+        id:   { type: integer }
+        code: { type: string, maxLength: 30, description: 'SKU (autogenerado por el backend)' }
+        name: { type: string, maxLength: 200 }
+        category:
+          type: object
+          required: [id, name]
+          properties:
+            id:   { type: integer }
+            name: { type: string }
+        unitOfMeasure:
+          type: object
+          required: [id, code, name]
+          properties:
+            id:   { type: integer }
+            code: { type: string }
+            name: { type: string }
+        brand:      { type: [string, 'null'], maxLength: 100 }
+        partNumber: { type: [string, 'null'], maxLength: 100 }
+        attributes:
+          type: object
+          additionalProperties: { type: string }
+          description: 'Objeto JSON libre clave-valor (JSONB). Nunca `null` (default `{}`).'
+        minStock:     { type: number, minimum: 0 }
+        observations: { type: [string, 'null'] }
+        isActive:     { type: boolean }
+        stock:        { type: number, description: 'LEÍDO de la VIEW `almacen.product_stock` (RN-WH1 — nunca persistido, siempre exacto)' }
+        lowStock:     { type: boolean, description: 'Derivado en código: `stock < minStock` (estricto). NO es columna.' }
+        createdBy:    { $ref: '#/components/schemas/UserResponse' }
+        createdAt:    { type: string, format: date-time }
+        updatedAt:    { type: string, format: date-time }
