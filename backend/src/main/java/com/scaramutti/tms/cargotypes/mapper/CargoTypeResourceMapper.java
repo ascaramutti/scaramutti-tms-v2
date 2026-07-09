@@ -7,7 +7,6 @@ import com.scaramutti.tms.shared.util.StringUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
-import org.mapstruct.Named;
 import org.mapstruct.NullValueMappingStrategy;
 
 /**
@@ -46,13 +45,4 @@ public interface CargoTypeResourceMapper {
     @Mapping(target = "name",        source = "name",        qualifiedByName = "trimUpperOrNull")
     @Mapping(target = "description", source = "description", qualifiedByName = "trimToNull")
     CreateCargoTypeCommand toCreateCargoTypeCommand(CargoTypeRequest cargoTypeRequest);
-
-    /**
-     * Trim + uppercase. Delega normalizacion vacio → null a `StringUtils.trimToNull`.
-     */
-    @Named("trimUpperOrNull")
-    default String trimUpperOrNull(String value) {
-        String trimmed = StringUtils.trimToNull(value);
-        return trimmed == null ? null : trimmed.toUpperCase();
-    }
 }

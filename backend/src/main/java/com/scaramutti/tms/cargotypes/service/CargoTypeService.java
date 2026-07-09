@@ -80,7 +80,7 @@ public class CargoTypeService {
 
     /**
      * Guarda invariante: el name no puede llegar vacio al service.
-     * Por el flow REST normal, CargoTypeResourceMapper.trimUpperOrNull ya convierte
+     * Por el flow REST normal, StringUtils.trimUpperOrNull (via el ResourceMapper) ya convierte
      * "   " → null antes de armar el Command, asi que el branch isEmpty() aqui
      * solo dispara para callers que bypassen el mapper. Defense-in-depth.
      */

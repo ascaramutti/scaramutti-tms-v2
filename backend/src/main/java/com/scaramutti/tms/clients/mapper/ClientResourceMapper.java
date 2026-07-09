@@ -7,7 +7,6 @@ import com.scaramutti.tms.shared.util.StringUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
-import org.mapstruct.Named;
 import org.mapstruct.NullValueMappingStrategy;
 
 /**
@@ -48,14 +47,4 @@ public interface ClientResourceMapper {
 
     @Mapping(target = "q", source = "q", qualifiedByName = "trimUpperOrNull")
     ListClientsQuery toListClientsQuery(String q, Boolean isActive, int page, int size);
-
-    /**
-     * Trim + uppercase. Delega normalización vacío → null a `StringUtils.trimToNull`.
-     * Usado para `name` (razón social): se almacena en mayúsculas en BD.
-     */
-    @Named("trimUpperOrNull")
-    default String trimUpperOrNull(String value) {
-        String trimmed = StringUtils.trimToNull(value);
-        return trimmed == null ? null : trimmed.toUpperCase();
-    }
 }

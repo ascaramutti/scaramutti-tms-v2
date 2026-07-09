@@ -74,7 +74,7 @@ public class ClientService {
     /**
      * Guarda invariante del dominio: el name no puede llegar vacío al service.
      *
-     * Por el flow REST normal, `ClientResourceMapper.trimUpperOrNull` ya convierte
+     * Por el flow REST normal, `StringUtils.trimUpperOrNull` (via el ResourceMapper) ya convierte
      * "   " → null antes de armar el Command, asi que el branch `isEmpty()` aqui
      * solo dispara para callers que bypasean el mapper (batch importers, otros
      * services internos, tests unitarios directos). Es defense-in-depth.

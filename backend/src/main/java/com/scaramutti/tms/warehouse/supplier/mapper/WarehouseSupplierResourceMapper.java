@@ -7,7 +7,6 @@ import com.scaramutti.tms.warehouse.supplier.service.cmd.ListWarehouseSuppliersQ
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
-import org.mapstruct.Named;
 import org.mapstruct.NullValueMappingStrategy;
 
 /**
@@ -33,10 +32,4 @@ public interface WarehouseSupplierResourceMapper {
 
     @Mapping(target = "q", source = "q", qualifiedByName = "trimUpperOrNull")
     ListWarehouseSuppliersQuery toListWarehouseSuppliersQuery(String q, Boolean isActive, int page, int size);
-
-    @Named("trimUpperOrNull")
-    default String trimUpperOrNull(String value) {
-        String trimmed = StringUtils.trimToNull(value);
-        return trimmed == null ? null : trimmed.toUpperCase();
-    }
 }
