@@ -26,7 +26,7 @@ info:
 
     ## Roles
 
-    Cinco roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`.
+    Siete roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`, `finance_manager`, `warehouse_keeper`.
 
 servers:
   - url: http://localhost:8080/api/v1
@@ -810,8 +810,6 @@ paths:
       summary: Crear categoría de producto (al vuelo desde el form)
       description: Nombre único (case-insensitive efectivo) → `409 WH-010` (RN-WH10).
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
-      parameters:
-        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
@@ -895,8 +893,6 @@ paths:
       summary: Crear proveedor (al vuelo desde el form de factura)
       description: '`name` y `ruc` únicos → `409 WH-010` (el `detail` dice cuál chocó).'
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
-      parameters:
-        - { name: Idempotency-Key, in: header, schema: { type: string, format: uuid } }
       requestBody:
         required: true
         content:
@@ -1195,7 +1191,7 @@ components:
     # -------- Enums ---------------------------------------------------------
     UserRole:
       type: string
-      enum: [admin, sales, dispatcher, general_manager, operations_manager]
+      enum: [admin, sales, dispatcher, general_manager, operations_manager, finance_manager, warehouse_keeper]
 
     # -------- Auth ----------------------------------------------------------
     LoginRequest:
