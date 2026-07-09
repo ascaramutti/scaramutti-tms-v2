@@ -36,6 +36,21 @@ public final class StringUtils {
     }
 
     /**
+     * `trimToNull` + uppercase. Para campos que se almacenan en mayúsculas
+     * (razón social de clientes/proveedores, nombre de cargo-types): se
+     * uppercasea porque el ranking por `similarity()` (pg_trgm) es
+     * case-sensitive, así la query matchea contra el valor ya guardado en
+     * mayúsculas. Antes duplicado como método `default` idéntico en
+     * ClientResourceMapper, CargoTypeResourceMapper y
+     * WarehouseSupplierResourceMapper; extraído acá al 3er caso.
+     */
+    @Named("trimUpperOrNull")
+    public static String trimUpperOrNull(String value) {
+        String trimmed = trimToNull(value);
+        return trimmed == null ? null : trimmed.toUpperCase();
+    }
+
+    /**
      * Escapa los metacaracteres de LIKE/ILIKE ({@code \ % _}) para que un
      * input de búsqueda se trate como literal en un patrón {@code ILIKE
      * :param ESCAPE '\'}. El backslash primero (es el char de escape, no debe
