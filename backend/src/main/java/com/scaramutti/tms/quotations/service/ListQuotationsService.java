@@ -1,7 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.quotations.dto.QuotationSummaryResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationClientSummary;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
@@ -9,18 +8,16 @@ import com.scaramutti.tms.quotations.model.QuotationType;
 import com.scaramutti.tms.quotations.service.cmd.ListQuotationsQuery;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.entity.QuotationItem;
-import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository.QuotationSummaryRow;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.service.UserLookup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -37,8 +34,8 @@ import java.util.stream.Collectors;
  *       agrupan por quotationId y se calcula totalAmount (via
  *       {@link QuotationCalculatorService#calculateFromEntities} — MISMA funcion
  *       que el detalle → totales identicos) + itemsCount (items root).</li>
- *   <li>{@code userRepository.list("id IN")} — createdBy de toda la pagina (1 query,
- *       dedup por Set). Nota: las asociaciones EAGER de {@code User} (worker, role)
+ *   <li>{@link UserLookup#requireAllById} — createdBy de toda la pagina (1 query,
+ *       dedup). Nota: las asociaciones EAGER de {@code User} (worker, role)
  *       generan SELECTs extra de Hibernate por cada creador distinto K — no escala
  *       con el page size (K = tamaño del equipo de ventas), mismo costo que el
  *       login y el GET by id. Si se quisiera colapsar, {@code batch-fetch-size}
@@ -54,9 +51,8 @@ public class ListQuotationsService {
 
     @Inject QuotationRepository quotationRepository;
     @Inject QuotationItemRepository quotationItemRepository;
-    @Inject UserRepository userRepository;
+    @Inject UserLookup userLookup;
     @Inject QuotationCalculatorService calculator;
-    @Inject AuthServiceMapper authServiceMapper;
 
     public PageResponse<QuotationSummaryResponse> list(ListQuotationsQuery listQuotationsQuery) {
         List<QuotationSummaryRow> rows = quotationRepository.searchPaged(listQuotationsQuery);
@@ -67,7 +63,9 @@ public class ListQuotationsService {
         }
 
         Map<Long, List<QuotationItem>> itemsByQuotation = loadItemsByQuotation(rows);
-        Map<Integer, UserResponse> usersById = loadCreatedByUsers(rows);
+        Map<Integer, UserResponse> usersById = userLookup.requireAllById(
+            rows.stream().map(QuotationSummaryRow::createdBy).toList()
+        );
 
         List<QuotationSummaryResponse> content = rows.stream()
             .map(row -> toSummary(
@@ -87,25 +85,6 @@ public class ListQuotationsService {
         List<Long> quotationIds = rows.stream().map(QuotationSummaryRow::id).toList();
         return quotationItemRepository.findByQuotationIds(quotationIds).stream()
             .collect(Collectors.groupingBy(item -> item.quotationId));
-    }
-
-    /**
-     * Batch-load de los usuarios creadores de toda la pagina (1 query, dedup).
-     *
-     * <p>Invariante asumida: los usuarios NO se borran en duro (created_by es FK
-     * NOT NULL y la baja es logica via isActive). Por eso {@code usersById.get}
-     * siempre resuelve y {@code createdBy} del summary nunca queda null (consistente
-     * con el {@code required} del contrato). Si en el futuro se introdujera
-     * hard-delete de usuarios, este metodo deberia fallar explicito o usar un
-     * placeholder "usuario eliminado".
-     */
-    private Map<Integer, UserResponse> loadCreatedByUsers(List<QuotationSummaryRow> rows) {
-        Set<Integer> createdByIds = rows.stream()
-            .map(QuotationSummaryRow::createdBy)
-            .collect(Collectors.toSet());
-        List<User> users = userRepository.list("id IN ?1", createdByIds);
-        return users.stream()
-            .collect(Collectors.toMap(user -> user.id, authServiceMapper::toUserResponse));
     }
 
     private QuotationSummaryResponse toSummary(

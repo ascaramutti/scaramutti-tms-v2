@@ -1,7 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationClientSummary;
@@ -14,15 +13,13 @@ import com.scaramutti.tms.quotations.model.QuotationType;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
 import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.entity.Quotation;
-import com.scaramutti.tms.shared.entity.User;
-import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.service.UserLookup;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InOrder;
@@ -69,7 +66,7 @@ class UpdateQuotationServiceTest {
     @Mock QuotationStandbyCostRepository quotationStandbyCostRepository;
     @Mock QuotationConditionRepository quotationConditionRepository;
     @Mock ConditionRepository conditionRepository;
-    @Mock UserRepository userRepository;
+    @Mock UserLookup userLookup;
 
     @Mock QuotationDependencyLoaderService dependencyLoader;
     @Mock QuotationValidatorService validator;
@@ -78,7 +75,6 @@ class UpdateQuotationServiceTest {
     @Mock QuotationConditionPersistenceService conditionPersistence;
     @Mock QuotationResponseAssemblerService assembler;
     @Mock QuotationEmbeddedSummaryMapper summaryMapper;
-    @Mock AuthServiceMapper authServiceMapper;
     @Mock QuotationServiceMapper quotationServiceMapper;
 
     @Mock CurrentUser currentUser;
@@ -138,16 +134,6 @@ class UpdateQuotationServiceTest {
         );
     }
 
-    private User sampleUser() {
-        User u = new User();
-        u.id = 42;
-        u.username = "admin";
-        Worker w = new Worker();
-        w.id = 1; w.firstName = "Admin"; w.lastName = "Sistema"; w.position = "Admin";
-        u.worker = w;
-        return u;
-    }
-
     private UserResponse sampleUserResponse() {
         return new UserResponse(42, "admin", "Admin Sistema", "Admin", "admin", true);
     }
@@ -169,8 +155,7 @@ class UpdateQuotationServiceTest {
         when(calculator.calculate(any())).thenReturn(sampleTotals());
         when(itemPersistence.persistItems(any(), any())).thenReturn(List.of());
         when(itemPersistence.persistStandbyCosts(any(), any(), any())).thenReturn(Map.of());
-        when(userRepository.findById(anyInt())).thenReturn(sampleUser());
-        when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
+        when(userLookup.require(anyInt())).thenReturn(sampleUserResponse());
         when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
             .thenReturn(stubResponse());
     }

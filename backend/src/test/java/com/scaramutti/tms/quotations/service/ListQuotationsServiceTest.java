@@ -1,16 +1,14 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.quotations.dto.QuotationSummaryResponse;
 import com.scaramutti.tms.quotations.service.cmd.ListQuotationsQuery;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.entity.QuotationItem;
-import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository.QuotationSummaryRow;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.service.UserLookup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -27,8 +25,6 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,9 +44,8 @@ class ListQuotationsServiceTest {
 
     @Mock QuotationRepository quotationRepository;
     @Mock QuotationItemRepository quotationItemRepository;
-    @Mock UserRepository userRepository;
+    @Mock UserLookup userLookup;
     @Mock QuotationCalculatorService calculator;
-    @Mock AuthServiceMapper authServiceMapper;
 
     @InjectMocks ListQuotationsService service;
 
@@ -88,12 +83,6 @@ class ListQuotationsServiceTest {
         return it;
     }
 
-    private User user(int id) {
-        User u = new User();
-        u.id = id;
-        return u;
-    }
-
     private UserResponse userResponse(int id) {
         return new UserResponse(id, "admin", "Admin Sistema", "Admin", "admin", true);
     }
@@ -104,8 +93,7 @@ class ListQuotationsServiceTest {
         when(quotationRepository.countSearch(query)).thenReturn(total);
         when(quotationItemRepository.findByQuotationIds(any()))
             .thenReturn(rows.stream().map(r -> rootItem(r.id())).toList());
-        when(userRepository.list(anyString(), any(Object.class))).thenReturn(List.of(user(42)));
-        when(authServiceMapper.toUserResponse(any())).thenReturn(userResponse(42));
+        when(userLookup.requireAllById(any())).thenReturn(java.util.Map.of(42, userResponse(42)));
         when(calculator.calculateFromEntities(any()))
             .thenReturn(new QuotationCalculatorService.Totals(
                 new BigDecimal("1000.00"), new BigDecimal("180.00"), new BigDecimal("1180.00")));
@@ -126,7 +114,7 @@ class ListQuotationsServiceTest {
         assertTrue(result.first());
         assertTrue(result.last());
         // Short-circuit: no carga items ni users si no hay filas.
-        verifyNoInteractions(quotationItemRepository, userRepository, calculator, authServiceMapper);
+        verifyNoInteractions(quotationItemRepository, userLookup, calculator);
     }
 
     // ---------- Mapeo + PageMeta --------------------------------------------
@@ -171,8 +159,7 @@ class ListQuotationsServiceTest {
             .thenReturn(List.of(row(1L, OffsetDateTime.now(ZoneOffset.UTC), 15, 42)));
         when(quotationRepository.countSearch(lastPageQuery)).thenReturn(50L);
         when(quotationItemRepository.findByQuotationIds(any())).thenReturn(List.of(rootItem(1L)));
-        when(userRepository.list(anyString(), any(Object.class))).thenReturn(List.of(user(42)));
-        when(authServiceMapper.toUserResponse(any())).thenReturn(userResponse(42));
+        when(userLookup.requireAllById(any())).thenReturn(java.util.Map.of(42, userResponse(42)));
         when(calculator.calculateFromEntities(any()))
             .thenReturn(new QuotationCalculatorService.Totals(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
 
@@ -192,8 +179,7 @@ class ListQuotationsServiceTest {
         when(quotationRepository.countSearch(query)).thenReturn(1L);
         when(quotationItemRepository.findByQuotationIds(any()))
             .thenReturn(List.of(rootItem(1L), childItem(1L), childItem(1L)));
-        when(userRepository.list(anyString(), any(Object.class))).thenReturn(List.of(user(42)));
-        when(authServiceMapper.toUserResponse(any())).thenReturn(userResponse(42));
+        when(userLookup.requireAllById(any())).thenReturn(java.util.Map.of(42, userResponse(42)));
         when(calculator.calculateFromEntities(any()))
             .thenReturn(new QuotationCalculatorService.Totals(
                 new BigDecimal("8000.00"), new BigDecimal("1440.00"), new BigDecimal("9440.00")));
@@ -255,22 +241,22 @@ class ListQuotationsServiceTest {
 
     @Test
     void list_loadsUsersInOneBatchQuery() {
-        // 2 filas con el mismo createdBy → 1 sola query de users (Set dedup).
+        // 2 filas con el mismo createdBy → 1 sola llamada al batch de users.
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC).minusDays(1);
         when(quotationRepository.searchPaged(query))
             .thenReturn(List.of(row(1L, now, 15, 42), row(2L, now, 15, 42)));
         when(quotationRepository.countSearch(query)).thenReturn(2L);
         when(quotationItemRepository.findByQuotationIds(any()))
             .thenReturn(List.of(rootItem(1L), rootItem(2L)));
-        when(userRepository.list(anyString(), any(Object.class))).thenReturn(List.of(user(42)));
-        when(authServiceMapper.toUserResponse(any())).thenReturn(userResponse(42));
+        when(userLookup.requireAllById(any())).thenReturn(java.util.Map.of(42, userResponse(42)));
         when(calculator.calculateFromEntities(any()))
             .thenReturn(new QuotationCalculatorService.Totals(BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
 
         service.list(query);
 
-        // Una sola query de items (batch) y una sola de users (batch) — sin N+1.
+        // Una sola query de items (batch) y una sola llamada al batch de users — sin N+1.
+        // La dedup por Set del createdBy vive ahora en UserLookup (su unit test la cubre).
         verify(quotationItemRepository, times(1)).findByQuotationIds(any());
-        verify(userRepository, times(1)).list(anyString(), any(Object.class));
+        verify(userLookup, times(1)).requireAllById(any());
     }
 }

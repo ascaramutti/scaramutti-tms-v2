@@ -1,7 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.quotations.QuotationEtag;
 import com.scaramutti.tms.quotations.QuotationsError;
@@ -15,18 +14,15 @@ import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.Lo
 import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
-import com.scaramutti.tms.shared.entity.User;
-import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.service.UserLookup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
-import org.jboss.logging.Logger;
 
 import java.util.List;
 import java.util.Map;
@@ -50,14 +46,12 @@ import java.util.Map;
 @ApplicationScoped
 public class UpdateQuotationService {
 
-    private static final Logger LOG = Logger.getLogger(UpdateQuotationService.class);
-
     @Inject QuotationRepository quotationRepository;
     @Inject QuotationItemRepository quotationItemRepository;
     @Inject QuotationStandbyCostRepository quotationStandbyCostRepository;
     @Inject QuotationConditionRepository quotationConditionRepository;
     @Inject ConditionRepository conditionRepository;
-    @Inject UserRepository userRepository;
+    @Inject UserLookup userLookup;
 
     @Inject QuotationDependencyLoaderService dependencyLoader;
     @Inject QuotationValidatorService validator;
@@ -66,7 +60,6 @@ public class UpdateQuotationService {
     @Inject QuotationConditionPersistenceService conditionPersistence;
     @Inject QuotationResponseAssemblerService assembler;
     @Inject QuotationEmbeddedSummaryMapper summaryMapper;
-    @Inject AuthServiceMapper authServiceMapper;
     @Inject QuotationServiceMapper quotationServiceMapper;
 
     @Inject CurrentUser currentUser;
@@ -131,10 +124,10 @@ public class UpdateQuotationService {
             summaryMapper.toConditionSummaries(conditionRepository.findLinkedToQuotation(id));
 
         // 9. Armar respuesta: createdBy original preservado, updatedBy = usuario actual.
-        UserResponse createdBy = loadUser(quotation.createdBy);
+        UserResponse createdBy = userLookup.require(quotation.createdBy);
         UserResponse updatedBy = quotation.createdBy.equals(userId)
             ? createdBy                                       // dedup: mismo usuario → 1 query
-            : loadUser(userId);
+            : userLookup.require(userId);
         boolean isExpired = computeIsExpired(quotation);
 
         return assembler.assemble(
@@ -185,17 +178,5 @@ public class UpdateQuotationService {
      */
     private boolean computeIsExpired(Quotation quotation) {
         return QuotationStatus.EXPIRED.name().equals(quotation.status);
-    }
-
-    /** Carga el {@link User} por id. FK huerfana (usuario borrado) → COM-500 (bug de integridad). */
-    private UserResponse loadUser(Integer userId) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            LOG.errorf("Orphan FK in quotation UPDATE path: user not found, userId=%s", userId);
-            throw CommonError.INTERNAL_ERROR.toException(
-                "La cotizacion referencia un usuario inexistente (id=" + userId + "). Reporte a soporte."
-            );
-        }
-        return authServiceMapper.toUserResponse(user);
     }
 }

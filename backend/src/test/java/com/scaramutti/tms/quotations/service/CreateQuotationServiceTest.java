@@ -1,7 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.quotations.QuotationsError;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
@@ -15,14 +14,12 @@ import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.Lo
 import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
-import com.scaramutti.tms.shared.entity.User;
-import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.service.UserLookup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -75,7 +72,7 @@ class CreateQuotationServiceTest {
     @Mock QuotationRepository quotationRepository;
     @Mock QuotationItemRepository quotationItemRepository;
     @Mock ConditionRepository conditionRepository;
-    @Mock UserRepository userRepository;
+    @Mock UserLookup userLookup;
 
     @Mock QuotationDependencyLoaderService dependencyLoader;
     @Mock QuotationCodeGeneratorService codeGenerator;
@@ -85,7 +82,6 @@ class CreateQuotationServiceTest {
     @Mock QuotationConditionPersistenceService conditionPersistence;
     @Mock QuotationResponseAssemblerService assembler;
     @Mock QuotationEmbeddedSummaryMapper summaryMapper;
-    @Mock AuthServiceMapper authServiceMapper;
     @Mock QuotationServiceMapper quotationServiceMapper;
 
     @Mock CurrentUser currentUser;
@@ -126,15 +122,6 @@ class CreateQuotationServiceTest {
         return new UserResponse(42, "admin", "Admin Sistema", "Admin", "admin", true);
     }
 
-    private User sampleUser() {
-        User u = new User();
-        u.id = 42;
-        u.username = "admin";
-        Worker w = new Worker();
-        w.id = 1; w.firstName = "Admin"; w.lastName = "Sistema"; w.position = "Admin";
-        u.worker = w;
-        return u;
-    }
 
     private Quotation sampleQuotation() {
         Quotation q = new Quotation();
@@ -214,8 +201,7 @@ class CreateQuotationServiceTest {
             .thenReturn(stubMappedEntity("2026-00001", 42));
         when(itemPersistence.persistItems(any(), any())).thenReturn(List.of());
         when(itemPersistence.persistStandbyCosts(any(), any(), any())).thenReturn(Map.of());
-        when(userRepository.findById(42)).thenReturn(sampleUser());
-        when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
+        when(userLookup.require(42)).thenReturn(sampleUserResponse());
         when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
 
         var response = service.createQuotation(command);
@@ -291,8 +277,7 @@ class CreateQuotationServiceTest {
         when(codeGenerator.nextCode()).thenReturn("2026-00002");
         when(quotationServiceMapper.toQuotationEntity(any(), eq("2026-00002"), eq(42)))
             .thenReturn(stubMappedEntity("2026-00002", 42));
-        when(userRepository.findById(42)).thenReturn(sampleUser());
-        when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
+        when(userLookup.require(42)).thenReturn(sampleUserResponse());
         when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
 
         var response = service.createQuotation(command);
@@ -383,8 +368,7 @@ class CreateQuotationServiceTest {
         when(codeGenerator.nextCode()).thenReturn("2026-00001");
         when(quotationServiceMapper.toQuotationEntity(any(), eq("2026-00001"), eq(42)))
             .thenReturn(stubMappedEntity("2026-00001", 42));
-        when(userRepository.findById(42)).thenReturn(sampleUser());
-        when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(sampleUserResponse());
+        when(userLookup.require(42)).thenReturn(sampleUserResponse());
         when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean())).thenReturn(stubAssembledResponse());
 
         service.createQuotation(command);
