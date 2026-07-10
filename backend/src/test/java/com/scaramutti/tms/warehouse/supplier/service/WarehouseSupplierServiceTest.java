@@ -132,7 +132,7 @@ class WarehouseSupplierServiceTest {
     // ---------- createSupplier — validacion + duplicados + race condition -------
 
     private CreateWarehouseSupplierCommand sampleCommand() {
-        return new CreateWarehouseSupplierCommand("ZTEST_Repuestos Diesel", "20512345678", "987654321", "Marco Salazar");
+        return new CreateWarehouseSupplierCommand("ZTEST_Repuestos Diesel", "20512345678", "987654321", "Juan Ramos");
     }
 
     @Test

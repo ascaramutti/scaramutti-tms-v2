@@ -9,7 +9,7 @@ public record UserResponse(
     @Schema(description = "Username (unico)", example = "lcampos")
     String username,
 
-    @Schema(description = "Nombre completo (snapshot del Worker)", example = "Carolina Campos")
+    @Schema(description = "Nombre completo (snapshot del Worker)", example = "Valeria Torres")
     String fullName,
 
     @Schema(description = "Cargo (Worker.position)", example = "Ejecutiva de Ventas")
