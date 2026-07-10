@@ -12,9 +12,13 @@ import com.scaramutti.tms.quotations.dto.embedded.QuotationPaymentTermSummary;
 import com.scaramutti.tms.quotations.dto.embedded.QuotationServiceTypeSummary;
 import com.scaramutti.tms.quotations.model.QuotationStatus;
 import com.scaramutti.tms.quotations.model.QuotationType;
+import com.scaramutti.tms.shared.entity.SystemSetting;
+import com.scaramutti.tms.shared.repository.SystemSettingRepository;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -34,6 +38,80 @@ class QuotationPdfServiceTest {
 
     @Inject
     QuotationPdfService pdfService;
+
+    @Inject
+    SystemSettingRepository systemSettingRepository;
+
+    // Mismas keys que PdfSettingsService (package-private ahí, se repiten acá para el fixture).
+    private static final String KEY_BANK_ACCOUNTS = "quotation.pdf_bank_accounts";
+    private static final String KEY_BANK_ACCOUNTS_INTRO = "quotation.pdf_bank_accounts_intro";
+
+    // Fixture sintético (repo público: NUNCA cuentas/CCI reales) que alcanza para que
+    // el marcador [[BANK_ACCOUNTS]] renderice "Banco" + la tabla en el PDF.
+    private static final String BANK_ACCOUNTS_INTRO_FIXTURE =
+        "El cliente deberá realizar el pago de las facturas en cualquiera de las siguientes cuentas bancarias de prueba:";
+    private static final String BANK_ACCOUNTS_FIXTURE =
+        "[{\"bank\":\"BANCO DEMO\",\"account\":\"000-0000000000-0-00\",\"cci\":\"00000000000000000000\"}]";
+
+    // Valor previo de cada key (null = no existía) para restaurar en @AfterEach; si la dev-DB
+    // ya tenía las keys (restore de prod), NO las pisamos permanentemente.
+    private String previousBankAccountsIntro;
+    private String previousBankAccounts;
+
+    /**
+     * Siembra fixtures sintéticos de system_settings para que la tabla de cuentas del PDF
+     * (marcador [[BANK_ACCOUNTS]], armado en {@code PdfSettingsService} desde
+     * {@code cotizaciones.system_settings}) renderice en una DB virgen (follow-up D-1).
+     * Guarda el valor previo de cada key para restaurarlo en {@link #restoreBankAccountSettings()}.
+     */
+    @BeforeEach
+    void seedBankAccountSettings() {
+        QuarkusTransaction.requiringNew().run(() -> {
+            previousBankAccountsIntro = upsertSetting(KEY_BANK_ACCOUNTS_INTRO, BANK_ACCOUNTS_INTRO_FIXTURE);
+            previousBankAccounts = upsertSetting(KEY_BANK_ACCOUNTS, BANK_ACCOUNTS_FIXTURE);
+        });
+    }
+
+    /** Restaura el valor previo de cada key (o la borra si no existía antes del seed). */
+    @AfterEach
+    void restoreBankAccountSettings() {
+        QuarkusTransaction.requiringNew().run(() -> {
+            restoreSetting(KEY_BANK_ACCOUNTS_INTRO, previousBankAccountsIntro);
+            restoreSetting(KEY_BANK_ACCOUNTS, previousBankAccounts);
+        });
+    }
+
+    /** Upsertea la key con el valor de fixture; devuelve el valor previo (null si no existía). */
+    private String upsertSetting(String key, String value) {
+        SystemSetting existing = systemSettingRepository.findById(key);
+        String previousValue = existing == null ? null : existing.value;
+        if (existing == null) {
+            // value y updatedAt son NOT NULL: hay que setearlos ANTES de persist
+            // (en DB virgen el INSERT corre con estos campos, no en un UPDATE posterior).
+            existing = new SystemSetting();
+            existing.key = key;
+            existing.value = value;
+            existing.updatedAt = OffsetDateTime.now();
+            systemSettingRepository.persist(existing);
+        } else {
+            existing.value = value;
+            existing.updatedAt = OffsetDateTime.now();
+        }
+        return previousValue;
+    }
+
+    /** Restaura el valor previo; si la key no existía antes del seed, la borra. */
+    private void restoreSetting(String key, String previousValue) {
+        if (previousValue == null) {
+            systemSettingRepository.deleteById(key);
+            return;
+        }
+        SystemSetting existing = systemSettingRepository.findById(key);
+        if (existing != null) {
+            existing.value = previousValue;
+            existing.updatedAt = OffsetDateTime.now();
+        }
+    }
 
     @Test
     void generates_validPdf_andWritesSample() throws Exception {
@@ -92,8 +170,6 @@ class QuotationPdfServiceTest {
      * y la tabla de cuentas bancarias sigue saliendo (marcador [[BANK_ACCOUNTS]] que agrega el codigo).
      */
     @Test
-    // La tabla de cuentas se arma de system_settings (data del dev-DB); excluida del CI por su tag.
-    @Tag("requires-dev-data")
     void conditions_fromQuotation_renderInPdf_includingInactive_withBankTable() throws Exception {
         byte[] pdf = pdfService.generate(sampleQuotation());
 
@@ -127,8 +203,6 @@ class QuotationPdfServiceTest {
      * conditions=[]). Guarda la decision "marcador siempre" contra una regresion.
      */
     @Test
-    // La tabla de cuentas se arma de system_settings (data del dev-DB); excluida del CI por su tag.
-    @Tag("requires-dev-data")
     void conditions_empty_stillRendersBankTableSection() throws Exception {
         byte[] pdf = pdfService.generate(fullQuotation());
 
