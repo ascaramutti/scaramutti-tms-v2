@@ -70,10 +70,9 @@ jobs:
           openssl rsa -in backend/src/main/resources/keys/privatekey.pem \
             -pubout -out backend/src/main/resources/keys/publickey.pem
 
-      # Excluye la suite no-hermética de cotizaciones (@Tag("requires-dev-data")): esos
-      # tests asumen la data acumulada del dev-DB y sus IDs, que no se puede sembrar en una
-      # DB virgen ni versionar acá. Se siguen corriendo localmente por commit. La exclusión
-      # vive en el workflow (no oculta en el pom) y se retira al hermetizarlos.
+      # La suite completa corre sin exclusiones: los tests de cotizaciones/auth/cargotypes
+      # que asumían la data del dev-DB fueron hermetizados (follow-up D-1) — resuelven los
+      # catálogos por clave natural y siembran sus propios client/cargo_type/system_settings.
       - name: Ejecutar tests
         working-directory: backend
-        run: mvn -B test -DexcludedGroups=requires-dev-data
+        run: mvn -B test
