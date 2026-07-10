@@ -1,17 +1,16 @@
 package com.scaramutti.tms.warehouse.product.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.shared.entity.Product;
 import com.scaramutti.tms.shared.entity.ProductCategory;
 import com.scaramutti.tms.shared.entity.UnitOfMeasure;
-import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ProductCategoryRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.service.UserLookup;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductServiceMapper;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
@@ -50,11 +49,10 @@ class WarehouseProductServiceTest {
     @Mock ProductRepository productRepository;
     @Mock ProductCategoryRepository productCategoryRepository;
     @Mock UnitOfMeasureRepository unitOfMeasureRepository;
-    @Mock UserRepository userRepository;
+    @Mock UserLookup userLookup;
     @Mock CurrentUser currentUser;
     @Mock WarehouseProductCodeGeneratorService warehouseProductCodeGeneratorService;
     @Mock WarehouseProductServiceMapper warehouseProductServiceMapper;
-    @Mock AuthServiceMapper authServiceMapper;
     @InjectMocks WarehouseProductService warehouseProductService;
 
     private static final int USER_ID = 7;
@@ -98,12 +96,6 @@ class WarehouseProductServiceTest {
         return product;
     }
 
-    private User user() {
-        User user = new User();
-        user.id = USER_ID;
-        return user;
-    }
-
     private UserResponse userResponse() {
         return new UserResponse(USER_ID, "admin", "Administrador", "Gerente", "admin", true);
     }
@@ -125,8 +117,7 @@ class WarehouseProductServiceTest {
         when(productRepository.existsByIdentityIgnoreCase("ZTEST_Filtro", "Bosch", "P1")).thenReturn(false);
         when(warehouseProductCodeGeneratorService.nextCode()).thenReturn("PRO-0005");
         when(warehouseProductServiceMapper.toProductEntity(command, "PRO-0005", USER_ID)).thenReturn(entity);
-        when(userRepository.findById(USER_ID)).thenReturn(user());
-        when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(userResponse());
+        when(userLookup.require(USER_ID)).thenReturn(userResponse());
 
         WarehouseProductResponse response = warehouseProductService.createProduct(command);
 
@@ -152,8 +143,7 @@ class WarehouseProductServiceTest {
         when(productRepository.existsByIdentityIgnoreCase(any(), any(), any())).thenReturn(false);
         when(warehouseProductCodeGeneratorService.nextCode()).thenReturn("PRO-0006");
         when(warehouseProductServiceMapper.toProductEntity(command, "PRO-0006", USER_ID)).thenReturn(entity);
-        when(userRepository.findById(USER_ID)).thenReturn(user());
-        when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(userResponse());
+        when(userLookup.require(USER_ID)).thenReturn(userResponse());
 
         WarehouseProductResponse response = warehouseProductService.createProduct(command);
 
@@ -246,14 +236,16 @@ class WarehouseProductServiceTest {
     // ---------- FK huerfana de usuario (COM-500) ---------------------------------
 
     @Test
-    void create_whenAuthenticatedUserNotFound_throwsInternalError() {
+    void create_whenAuthenticatedUserNotFound_propagatesInternalError() {
+        // La resolucion del createdBy vive ahora en UserLookup: su orphan → COM-500
+        // se testea en UserLookupTest; aca solo verificamos que el service lo propaga.
         CreateWarehouseProductCommand command = command(null, null, BigDecimal.ZERO);
         Product entity = mappedEntity("PRO-0009", BigDecimal.ZERO);
         stubFksActive();
         when(productRepository.existsByIdentityIgnoreCase(any(), any(), any())).thenReturn(false);
         when(warehouseProductCodeGeneratorService.nextCode()).thenReturn("PRO-0009");
         when(warehouseProductServiceMapper.toProductEntity(command, "PRO-0009", USER_ID)).thenReturn(entity);
-        when(userRepository.findById(USER_ID)).thenReturn(null);
+        when(userLookup.require(USER_ID)).thenThrow(CommonError.INTERNAL_ERROR.toException("orphan"));
 
         ApiException ex = assertThrows(ApiException.class, () -> warehouseProductService.createProduct(command));
         assertEquals("COM-500", ex.code());

@@ -1,23 +1,23 @@
 package com.scaramutti.tms.warehouse.product.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
+import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.entity.Product;
 import com.scaramutti.tms.shared.entity.ProductCategory;
 import com.scaramutti.tms.shared.entity.UnitOfMeasure;
-import com.scaramutti.tms.shared.entity.User;
-import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ProductCategoryRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
+import com.scaramutti.tms.shared.repository.ProductRepository.ProductStockView;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.service.UserLookup;
 import com.scaramutti.tms.warehouse.WarehouseError;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.CategoryRef;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.UnitOfMeasureRef;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductServiceMapper;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
+import com.scaramutti.tms.warehouse.product.service.cmd.ListWarehouseProductsQuery;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
@@ -26,14 +26,25 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.jboss.logging.Logger;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
- * Alta de producto (RN-WH6/WH10/WH11). Un producto nuevo nace con stock 0 (su
- * primera factura es su primer movimiento), así que stock/lowStock del response
- * se derivan en código sin tocar la VIEW {@code product_stock}.
+ * Productos de almacén: alta (RN-WH6/WH10/WH11) y listado paginado con stock.
  *
- * Duplicados: pre-check happy path ({@code existsBy...}) + traducción de la
- * constraint en la race ({@code persistOrTranslateDuplicate}), mismo patrón que
+ * <p>Alta: un producto nuevo nace con stock 0 (su primera factura es su primer
+ * movimiento), así que su lowStock se deriva de esa constante trivial; la
+ * definición CANÓNICA de lowStock (RN-WH11) vive en la VIEW {@code product_stock}
+ * y es la que consume el listado.
+ *
+ * <p>Listado: {@code searchPaged} hidrata las entities de la página y el service
+ * las enriquece batch (categoría, unidad, stock/lowStock de la VIEW, createdBy)
+ * sin N+1 por page size, mismo patrón que {@code ListQuotationsService}.
+ *
+ * <p>Duplicados (alta): pre-check happy path ({@code existsBy...}) + traducción de
+ * la constraint en la race ({@code persistOrTranslateDuplicate}), mismo patrón que
  * {@code WarehouseSupplierService}. El guardián real es el índice único de BD.
  */
 @ApplicationScoped
@@ -46,11 +57,60 @@ public class WarehouseProductService {
     @Inject ProductRepository productRepository;
     @Inject ProductCategoryRepository productCategoryRepository;
     @Inject UnitOfMeasureRepository unitOfMeasureRepository;
-    @Inject UserRepository userRepository;
+    @Inject UserLookup userLookup;
     @Inject CurrentUser currentUser;
     @Inject WarehouseProductCodeGeneratorService warehouseProductCodeGeneratorService;
     @Inject WarehouseProductServiceMapper warehouseProductServiceMapper;
-    @Inject AuthServiceMapper authServiceMapper;
+
+    /**
+     * Listado paginado con stock (GET /warehouse/products). Read-only, sin
+     * {@code @Transactional} (misma convención que ListQuotationsService).
+     * 6 queries fijas (page + count + categorías + unidades + stock + users),
+     * ninguna N+1 por page size.
+     */
+    public PageResponse<WarehouseProductResponse> listProducts(ListWarehouseProductsQuery query) {
+        List<Product> products = productRepository.searchPaged(query);
+        long totalElements = productRepository.countSearch(query);
+
+        if (products.isEmpty()) {
+            return PageResponse.of(List.of(), query.page(), query.size(), totalElements);
+        }
+
+        Map<Integer, ProductCategory> categoriesById = productCategoryRepository
+            .list("id in ?1", products.stream().map(p -> p.categoryId).collect(Collectors.toSet()))
+            .stream().collect(Collectors.toMap(category -> category.id, category -> category));
+        Map<Integer, UnitOfMeasure> unitsById = unitOfMeasureRepository
+            .list("id in ?1", products.stream().map(p -> p.unitOfMeasureId).collect(Collectors.toSet()))
+            .stream().collect(Collectors.toMap(unit -> unit.id, unit -> unit));
+        Map<Integer, ProductStockView> stockById = productRepository.findStockByProductIds(
+            products.stream().map(p -> p.id).collect(Collectors.toSet()));
+        Map<Integer, UserResponse> usersById = userLookup.requireAllById(
+            products.stream().map(p -> p.createdBy).collect(Collectors.toSet()));
+
+        List<WarehouseProductResponse> content = products.stream()
+            .map(product -> toResponse(
+                product,
+                categoriesById.get(product.categoryId),
+                unitsById.get(product.unitOfMeasureId),
+                stockOf(stockById, product),
+                usersById.get(product.createdBy)
+            ))
+            .toList();
+
+        return PageResponse.of(content, query.page(), query.size(), totalElements);
+    }
+
+    /**
+     * Stock/lowStock de un producto desde la VIEW. Fallback defensivo (stock 0,
+     * lowStock recomputado) por si la fila de la VIEW faltara — no debería, es un
+     * LEFT JOIN sobre todos los productos, pero evita un NPE si algo cambiara.
+     */
+    private ProductStockView stockOf(Map<Integer, ProductStockView> stockById, Product product) {
+        ProductStockView stock = stockById.get(product.id);
+        return stock != null
+            ? stock
+            : new ProductStockView(INITIAL_STOCK, INITIAL_STOCK.compareTo(product.minStock) < 0);
+    }
 
     @Transactional
     public WarehouseProductResponse createProduct(CreateWarehouseProductCommand createWarehouseProductCommand) {
@@ -66,7 +126,12 @@ public class WarehouseProductService {
         );
         persistOrTranslateDuplicate(product);
 
-        return buildResponse(product, category, unitOfMeasure, loadCreatedByUser(userId));
+        // Un producto recién creado nace con stock 0 (RN-WH6): su lowStock se
+        // deriva de esa constante trivial. La definición canónica de lowStock
+        // (RN-WH11) vive en la VIEW product_stock, que consume el listado.
+        ProductStockView initialStock = new ProductStockView(
+            INITIAL_STOCK, INITIAL_STOCK.compareTo(product.minStock) < 0);
+        return toResponse(product, category, unitOfMeasure, initialStock, userLookup.require(userId));
     }
 
     // ---------- Validación de FKs (WH-004) -----------------------------------
@@ -134,21 +199,15 @@ public class WarehouseProductService {
 
     // ---------- Ensamblado del response --------------------------------------
 
-    private UserResponse loadCreatedByUser(Integer userId) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            LOG.errorf("Orphan FK in product CREATE path: user not found, userId=%s", userId);
-            throw CommonError.INTERNAL_ERROR.toException(
-                "El producto referencia un usuario inexistente (createdBy id=" + userId + "). Reporte a soporte."
-            );
-        }
-        return authServiceMapper.toUserResponse(user);
-    }
-
-    private WarehouseProductResponse buildResponse(
-        Product product, ProductCategory category, UnitOfMeasure unitOfMeasure, UserResponse createdBy
+    /**
+     * Arma el response combinando la entity con sus refs (categoría, unidad),
+     * el stock/lowStock de la VIEW y el createdBy. Compartido por el alta (stock
+     * inicial 0) y el listado (stock real de la VIEW) — una sola forma del DTO.
+     */
+    private WarehouseProductResponse toResponse(
+        Product product, ProductCategory category, UnitOfMeasure unitOfMeasure,
+        ProductStockView stock, UserResponse createdBy
     ) {
-        boolean lowStock = INITIAL_STOCK.compareTo(product.minStock) < 0;
         return new WarehouseProductResponse(
             product.id,
             product.code,
@@ -161,8 +220,8 @@ public class WarehouseProductService {
             product.minStock,
             product.observations,
             product.isActive,
-            INITIAL_STOCK,
-            lowStock,
+            stock.stock(),
+            stock.lowStock(),
             createdBy,
             product.createdAt,
             product.updatedAt
