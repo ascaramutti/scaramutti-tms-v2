@@ -10,6 +10,7 @@ import jakarta.inject.Inject;
 import org.jboss.logging.Logger;
 
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -56,6 +57,10 @@ public class UserLookup {
      * indexados por id. Pensado para el read-path de listados paginados: evita
      * el N+1 de resolver el {@code createdBy} fila por fila.
      *
+     * <p>Enforcement (mismo contrato que {@link #require}): si algún id del lote no
+     * resuelve es un orphan FK real → {@code INTERNAL_ERROR} listando los faltantes,
+     * en vez de omitirlo en silencio del mapa.
+     *
      * <p>Nota de performance (igual que antes en ListQuotationsService): las
      * asociaciones EAGER de {@code User} (worker, role) generan SELECTs extra de
      * Hibernate por cada creador distinto K, no por page size — K = tamaño del
@@ -67,7 +72,20 @@ public class UserLookup {
         if (distinctIds.isEmpty()) {
             return Map.of();
         }
-        return userRepository.list("id IN ?1", distinctIds).stream()
+        Map<Integer, UserResponse> byId = userRepository.list("id IN ?1", distinctIds).stream()
             .collect(Collectors.toMap(user -> user.id, authServiceMapper::toUserResponse));
+
+        // Enforcement (mismo contrato que require): si algún id no resolvió es un
+        // orphan FK real (restore malo, cirugía manual, cascade futuro) → COM-500
+        // ruidoso con los ids faltantes, en vez de dejar createdBy=null en silencio.
+        if (byId.size() != distinctIds.size()) {
+            Set<Integer> missing = new HashSet<>(distinctIds);
+            missing.removeAll(byId.keySet());
+            LOG.errorf("Orphan FK (batch): usuarios no encontrados, ids=%s — algún registro referencia usuarios que ya no existen", missing);
+            throw CommonError.INTERNAL_ERROR.toException(
+                "Uno o más registros referencian usuarios inexistentes (ids=" + missing + "). Reporte a soporte."
+            );
+        }
+        return byId;
     }
 }

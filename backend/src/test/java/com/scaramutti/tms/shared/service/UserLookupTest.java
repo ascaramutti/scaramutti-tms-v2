@@ -102,6 +102,23 @@ class UserLookupTest {
     }
 
     @Test
+    void requireAllById_orphanInBatch_throwsInternalError_listingMissingIds() {
+        // 2 ids pedidos, la query devuelve solo 1 → el faltante es orphan FK:
+        // COM-500 ruidoso con el id, no un createdBy=null silencioso.
+        when(userRepository.list("id IN ?1", (Object) java.util.Set.of(42, 99)))
+            .thenReturn(List.of(user(42)));
+        when(authServiceMapper.toUserResponse(any(User.class))).thenReturn(response(42));
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> userLookup.requireAllById(List.of(42, 99)));
+
+        assertEquals("COM-500", ex.code());
+        assertEquals(500, ex.status());
+        assertTrue(ex.getMessage().contains("99"),
+            "El message debe listar el id huerfano para soporte");
+    }
+
+    @Test
     void requireAllById_emptyInput_returnsEmptyMap_withoutQuery() {
         Map<Integer, UserResponse> result = userLookup.requireAllById(List.of());
 
