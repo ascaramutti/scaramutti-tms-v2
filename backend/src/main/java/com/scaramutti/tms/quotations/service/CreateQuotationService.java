@@ -1,7 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.quotations.QuotationsError;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
@@ -13,11 +12,10 @@ import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.Lo
 import com.scaramutti.tms.quotations.service.cmd.SaveQuotationCommand;
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
-import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.auth.service.UserLookup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
@@ -62,7 +60,7 @@ public class CreateQuotationService {
     @Inject QuotationRepository quotationRepository;
     @Inject QuotationItemRepository quotationItemRepository;
     @Inject ConditionRepository conditionRepository;
-    @Inject UserRepository userRepository;
+    @Inject UserLookup userLookup;
 
     // Services del modulo Quotations (cada uno con SRP, ver bitacora).
     @Inject QuotationDependencyLoaderService dependencyLoader;
@@ -73,7 +71,6 @@ public class CreateQuotationService {
     @Inject QuotationConditionPersistenceService conditionPersistence;
     @Inject QuotationResponseAssemblerService assembler;
     @Inject QuotationEmbeddedSummaryMapper summaryMapper;
-    @Inject AuthServiceMapper authServiceMapper;
     @Inject QuotationServiceMapper quotationServiceMapper;
 
     @Inject CurrentUser currentUser;
@@ -112,8 +109,7 @@ public class CreateQuotationService {
         List<QuotationConditionSummary> conditions =
             summaryMapper.toConditionSummaries(conditionRepository.findLinkedToQuotation(quotation.id));
 
-        User user = userRepository.findById(userId);
-        UserResponse currentUserResponse = authServiceMapper.toUserResponse(user);
+        UserResponse currentUserResponse = userLookup.require(userId);
         // En CREATE, createdBy == updatedBy y la cotizacion recien-creada NO esta
         // expirada (isExpired siempre false al instante). El assembler recibe ambos
         // explicitamente para que pueda ser reusado en UPDATE/GET sin cambiar firma.

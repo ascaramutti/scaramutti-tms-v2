@@ -1,7 +1,6 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.quotations.QuotationsError;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.dto.QuotationStandbyCostResponse;
@@ -12,16 +11,13 @@ import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.Lo
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
 import com.scaramutti.tms.shared.entity.QuotationStandbyCost;
-import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
-import com.scaramutti.tms.shared.exception.CommonError;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.auth.service.UserLookup;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import org.jboss.logging.Logger;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,19 +53,16 @@ import java.util.Set;
 @ApplicationScoped
 public class GetQuotationService {
 
-    private static final Logger LOG = Logger.getLogger(GetQuotationService.class);
-
     @Inject QuotationRepository quotationRepository;
     @Inject QuotationItemRepository quotationItemRepository;
     @Inject QuotationStandbyCostRepository quotationStandbyCostRepository;
     @Inject ConditionRepository conditionRepository;
-    @Inject UserRepository userRepository;
+    @Inject UserLookup userLookup;
 
     @Inject QuotationDependencyLoaderService dependencyLoader;
     @Inject QuotationCalculatorService calculator;
     @Inject QuotationResponseAssemblerService assembler;
     @Inject QuotationEmbeddedSummaryMapper summaryMapper;
-    @Inject AuthServiceMapper authServiceMapper;
 
     /**
      * Devuelve la cotizacion con el id dado. Lanza {@code QUO-003} (404) si
@@ -95,10 +88,10 @@ public class GetQuotationService {
 
         QuotationCalculatorService.Totals totals = calculator.calculateFromEntities(items);
 
-        UserResponse createdBy = loadUser(quotation.createdBy);
+        UserResponse createdBy = userLookup.require(quotation.createdBy);
         UserResponse updatedBy = quotation.createdBy.equals(quotation.updatedBy)
             ? createdBy                                       // dedup: 1 query
-            : loadUser(quotation.updatedBy);
+            : userLookup.require(quotation.updatedBy);
 
         boolean isExpired = computeIsExpired(quotation);
 
@@ -126,22 +119,6 @@ public class GetQuotationService {
         return byItemId;
     }
 
-    /**
-     * Carga el {@link User} por id. Si no existe (FK huerfana porque alguien
-     * borro el row de {@code users}), es bug de integridad referencial — log
-     * error + COM-500. Mismo tratamiento que las otras FKs en
-     * {@link QuotationDependencyLoaderService#loadByIds(Integer, Integer, Integer, java.util.Set, java.util.Set)}.
-     */
-    private UserResponse loadUser(Integer userId) {
-        User user = userRepository.findById(userId);
-        if (user == null) {
-            LOG.errorf("Orphan FK in quotation READ path: user not found, userId=%s — la cotizacion referencia un usuario que ya no existe", userId);
-            throw CommonError.INTERNAL_ERROR.toException(
-                "La cotizacion referencia un usuario inexistente (createdBy/updatedBy id=" + userId + "). Reporte a soporte."
-            );
-        }
-        return authServiceMapper.toUserResponse(user);
-    }
 
     /**
      * {@code isExpired} se DERIVA del estado persistido (ADR-005): {@code true} si y solo si

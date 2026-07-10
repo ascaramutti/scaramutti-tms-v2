@@ -18,9 +18,15 @@ CREATE OR REPLACE VIEW almacen.stock_movements AS
     FROM almacen.withdrawals w
    WHERE w.status = 'ACTIVE';
 
--- Stock actual por producto (nunca persistido -- siempre exacto).
+-- Stock actual por producto (nunca persistido -- siempre exacto) y lowStock.
+-- low_stock (RN-WH11): stock < min_stock, desigualdad ESTRICTA. Se define UNA
+-- sola vez aca (definicion canonica): los consumidores la LEEN, nadie la
+-- recalcula ad-hoc. GROUP BY p.id alcanza porque es PK (min_stock queda
+-- funcionalmente determinado, Postgres lo permite en el SELECT).
 CREATE OR REPLACE VIEW almacen.product_stock AS
-  SELECT p.id AS product_id, COALESCE(SUM(m.quantity), 0) AS stock
+  SELECT p.id AS product_id,
+         COALESCE(SUM(m.quantity), 0) AS stock,
+         COALESCE(SUM(m.quantity), 0) < p.min_stock AS low_stock
     FROM almacen.products p
     LEFT JOIN almacen.stock_movements m ON m.product_id = p.id
    GROUP BY p.id;

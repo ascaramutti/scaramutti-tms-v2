@@ -3,6 +3,7 @@ package com.scaramutti.tms.warehouse.product.mapper;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
+import com.scaramutti.tms.warehouse.product.service.cmd.ListWarehouseProductsQuery;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
@@ -38,6 +39,17 @@ public interface WarehouseProductResourceMapper {
     @Mapping(target = "minStock",
              expression = "java(warehouseProductRequest.minStock() != null ? warehouseProductRequest.minStock() : java.math.BigDecimal.ZERO)")
     CreateWarehouseProductCommand toCreateWarehouseProductCommand(WarehouseProductRequest warehouseProductRequest);
+
+    /**
+     * q se normaliza con trimToNull (NO uppercase, a diferencia de suppliers): el
+     * name de producto se almacena tal cual y la búsqueda es case-insensitive via
+     * ILIKE, con ranking similarity(lower(...)) en el repo. lowOnly/page/size/
+     * categoryId/isActive pasan tal cual.
+     */
+    @Mapping(target = "q", source = "q", qualifiedByName = "trimToNull")
+    ListWarehouseProductsQuery toListWarehouseProductsQuery(
+        String q, Integer categoryId, Boolean isActive, boolean lowOnly, int page, int size
+    );
 
     /** Copia defensiva y default {}: attributes es JSONB NOT NULL en BD. */
     default Map<String, String> defaultAttributes(Map<String, String> attributes) {

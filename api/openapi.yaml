@@ -1297,8 +1297,8 @@ paths:
         `q` (≥ 3) filtra por substring case-insensitive en `name`, `code`,
         `brand` y `partNumber` (GIN trgm en `name`), ranking `similarity` DESC,
         tiebreak `name` ASC. Multi-palabra: cada palabra de `q` debe matchear
-        en ALGÚN campo (AND de ORs) — "aceite 15W40" encuentra name=Aceite +
-        attributes/brand con 15W40 en los campos buscados (RN-WH14). Sin `q`:
+        en ALGÚN campo (AND de ORs) — "filtro bosch" encuentra name=Filtro +
+        brand=Bosch (RN-WH14). `attributes` (JSONB) NO se busca. Sin `q`:
         `name` ASC.
         `lowStock = stock < minStock` (estricto) — derivado en código de la VIEW
         + `min_stock`; NO es columna (RN-WH11).
