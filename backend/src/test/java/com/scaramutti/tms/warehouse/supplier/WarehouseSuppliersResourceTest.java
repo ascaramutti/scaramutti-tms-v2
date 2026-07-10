@@ -448,7 +448,7 @@ class WarehouseSuppliersResourceTest {
         given()
             .header("Authorization", "Bearer " + token)
             .contentType(ContentType.JSON)
-            .body(body("ZTEST_Repuestos Diesel SAC", "99911100011", "987654321", "Marco Salazar"))
+            .body(body("ZTEST_Repuestos Diesel SAC", "99911100011", "987654321", "Juan Ramos"))
         .when()
             .post("/warehouse/suppliers")
         .then()
@@ -458,7 +458,7 @@ class WarehouseSuppliersResourceTest {
             .body("name", equalTo("ZTEST_REPUESTOS DIESEL SAC"))
             .body("ruc", equalTo("99911100011"))
             .body("phone", equalTo("987654321"))
-            .body("contactName", equalTo("Marco Salazar"))
+            .body("contactName", equalTo("Juan Ramos"))
             .body("isActive", equalTo(true))
             .body("createdAt", notNullValue());
 

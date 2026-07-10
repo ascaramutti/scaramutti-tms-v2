@@ -6,10 +6,11 @@ import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import io.smallrye.jwt.build.Jwt;
+import com.scaramutti.tms.support.HermeticTestData;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -33,9 +34,6 @@ import static org.hamcrest.Matchers.nullValue;
 
 @QuarkusTest
 @TestProfile(QuotationResourceTest.AntiDupDisabledProfile.class)
-// No-hermetica: fija IDs de la data acumulada del dev-DB (client=1, cargoType=1, ...).
-// Excluida del CI (excludedGroups); se sigue corriendo en la suite local.
-@Tag("requires-dev-data")
 class QuotationResourceTest {
 
     /**
@@ -54,26 +52,39 @@ class QuotationResourceTest {
     }
 
     @Inject EntityManager entityManager;
+    @Inject HermeticTestData fixtures;
 
-    // IDs reales de la BD prod (compartida con dev). Verificados al armar tests:
-    // - clientId 1: IPH TRANSPORTES SAC
-    // - currencyId 1: USD, 2: PEN
-    // - paymentTermId 1: Contado
-    // - serviceTypeId 1: SCB (kind=SERVICIO/TRANSPORTE)
-    // - serviceTypeId 3: SPL (kind=SERVICIO)
-    // - serviceTypeId 6: SCH (kind=SERVICIO)
-    // - serviceTypeId 18: CES (kind=COMPLEMENTARIO)
-    // - serviceTypeId 24: INT (kind=INTEGRAL)
-    private static final int CLIENT_ID = 1;
-    private static final int CURRENCY_ID = 1;
-    private static final int PAYMENT_TERM_ID = 1;
-    private static final int ST_SCB = 1;
-    private static final int ST_SPL = 3;
-    private static final int ST_CES = 18;
-    private static final int ST_INT = 24;
+    // IDs resueltos hermeticamente (follow-up D-1): catalogos por clave natural via
+    // HermeticTestData, fixtures sintéticos ZTEST_ para lo que no siembra el DevDataSeeder.
+    private int CLIENT_ID;
+    private int CURRENCY_ID;
+    private int PAYMENT_TERM_ID;
+    private int ST_SCB;
+    private int ST_SPL;
+    private int ST_CES;
+    private int ST_INT;
+    private int CARGO_TYPE_ID;
+    private int CURRENCY_PEN_ID;
+    private int ST_ACB;
+    private int ST_SCH;
 
     /** Zona del negocio — los filtros de fecha del listado se interpretan aca (igual que el backend). */
     private static final ZoneId LIMA = ZoneId.of("America/Lima");
+
+    @BeforeEach
+    void resolveHermeticIds() {
+        CURRENCY_ID = fixtures.currencyId("USD");
+        CURRENCY_PEN_ID = fixtures.currencyId("PEN");
+        PAYMENT_TERM_ID = fixtures.paymentTermId("Contado");
+        ST_SCB = fixtures.serviceTypeId("SCB");
+        ST_SPL = fixtures.serviceTypeId("SPL");
+        ST_CES = fixtures.serviceTypeId("CES");
+        ST_INT = fixtures.serviceTypeId("INT");
+        ST_ACB = fixtures.serviceTypeId("ACB");
+        ST_SCH = fixtures.serviceTypeId("SCH");
+        CLIENT_ID = fixtures.seedClient();
+        CARGO_TYPE_ID = fixtures.seedCargoType();
+    }
 
     @AfterEach
     void cleanupQuotations() {
@@ -89,6 +100,7 @@ class QuotationResourceTest {
                 + "   OR destination LIKE 'ZTEST_%'"
             ).executeUpdate();
         });
+        fixtures.cleanup();
     }
 
     private String loginAdmin() {
@@ -131,14 +143,14 @@ class QuotationResourceTest {
               "items": [
                 {
                   "serviceTypeId": %d,
-                  "cargoTypeId": 1,
+                  "cargoTypeId": %d,
                   "weightKg": 10.00,
                   "quantity": 1,
                   "unitPrice": %s
                 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, origin, destination, serviceTypeId, unitPrice);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, origin, destination, serviceTypeId, CARGO_TYPE_ID, unitPrice);
     }
 
     // ---------- Happy path TRANSPORTE ----------------------------------------
@@ -225,10 +237,10 @@ class QuotationResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_AREQUIPA",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB, CARGO_TYPE_ID);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -259,10 +271,10 @@ class QuotationResourceTest {
               "clientNote": "Precio sujeto a variacion del combustible.",
               "internalNote": "Margen ajustado por volatilidad.",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB, CARGO_TYPE_ID);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -293,10 +305,10 @@ class QuotationResourceTest {
               "destination": "ZTEST_AREQUIPA",
               "clientNote": "%s",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, longNote, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, longNote, ST_SCB, CARGO_TYPE_ID);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -354,10 +366,10 @@ class QuotationResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_AREQUIPA",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB, CARGO_TYPE_ID);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -383,10 +395,10 @@ class QuotationResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_AREQUIPA",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -414,7 +426,7 @@ class QuotationResourceTest {
                 { "serviceTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, 9 /* ACB - kind=ALQUILER */);
+            """, CLIENT_ID, CURRENCY_ID, ST_ACB);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -441,10 +453,10 @@ class QuotationResourceTest {
               "origin": "ZTEST_O",
               "destination": "ZTEST_D",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "quantity": 1, "unitPrice": 200.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "quantity": 1, "unitPrice": 200.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_CES);
+            """, CLIENT_ID, CURRENCY_ID, ST_CES, CARGO_TYPE_ID);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -516,7 +528,7 @@ class QuotationResourceTest {
                 { "serviceTypeId": %d, "quantity": 5, "unitPrice": 500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, 9 /* ACB - kind=ALQUILER */);
+            """, CLIENT_ID, CURRENCY_ID, ST_ACB);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -548,11 +560,11 @@ class QuotationResourceTest {
               "destination": "ZTEST_DEST",
               "items": [
                 { "itemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 5000.00 },
-                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 3000.00 },
+                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 3000.00 },
                 { "itemNumber": 3, "parentItemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, ST_CES);
+            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, CARGO_TYPE_ID, ST_CES);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -619,10 +631,10 @@ class QuotationResourceTest {
               "destination": "ZTEST_D",
               "items": [
                 { "itemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 5000.00 },
-                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1 }
+                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, CARGO_TYPE_ID);
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -843,7 +855,7 @@ class QuotationResourceTest {
 
     private String alquilerBody() {
         // ALQUILER no requiere origin/destination/cargoType/weight — todo nullable.
-        // serviceTypeId 9 es ACB (kind=ALQUILER, verificado en BD prod).
+        // serviceTypeId ST_ACB es ACB (kind=ALQUILER).
         return String.format("""
             {
               "quotationType": "ALQUILER",
@@ -852,10 +864,10 @@ class QuotationResourceTest {
               "currencyId": %d,
               "validityDays": 30,
               "items": [
-                { "serviceTypeId": 9, "quantity": 5, "unitPrice": 500.00 }
+                { "serviceTypeId": %d, "quantity": 5, "unitPrice": 500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID);
+            """, CLIENT_ID, CURRENCY_ID, ST_ACB);
     }
 
     private String integralBody() {
@@ -871,13 +883,13 @@ class QuotationResourceTest {
               "destination": "ZTEST_CUSCO",
               "items": [
                 { "itemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 8000.00 },
-                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1,
+                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": %d,
                   "weightKg": 25.00, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 5000.00 },
                 { "itemNumber": 3, "parentItemNumber": 1, "serviceTypeId": %d, "quantity": 1,
                   "unitPrice": 0, "internalReferencePrice": 1500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, ST_CES);
+            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, CARGO_TYPE_ID, ST_CES);
     }
 
     private String transporteWithStandbyBody() {
@@ -892,13 +904,13 @@ class QuotationResourceTest {
               "destination": "ZTEST_TUMBES",
               "items": [
                 {
-                  "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 12.00,
+                  "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 12.00,
                   "quantity": 1, "unitPrice": 1500.00,
                   "standby": { "pricePerDay": 200.00, "includesIgv": false }
                 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID);
     }
 
     private String multiRootBody() {
@@ -913,12 +925,12 @@ class QuotationResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_TRUJILLO",
               "items": [
-                { "itemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 },
-                { "itemNumber": 2, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1500.00 },
-                { "itemNumber": 3, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 2000.00 }
+                { "itemNumber": 1, "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 },
+                { "itemNumber": 2, "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 1500.00 },
+                { "itemNumber": 3, "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 2000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_SCB, ST_SPL, 6 /* ST_SCH */);
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID, ST_SPL, CARGO_TYPE_ID, ST_SCH, CARGO_TYPE_ID);
     }
 
     private String transporteBodyWithoutPaymentTerm() {
@@ -933,10 +945,10 @@ class QuotationResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_ICA",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID);
     }
 
     // ---------- Happy paths -------------------------------------------------
@@ -1317,10 +1329,10 @@ class QuotationResourceTest {
               "origin": "%s",
               "destination": "%s_DEST",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": %s }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": %s }
               ]
             }
-            """, CLIENT_ID, currencyId, origin, origin, serviceTypeId, unitPrice);
+            """, CLIENT_ID, currencyId, origin, origin, serviceTypeId, CARGO_TYPE_ID, unitPrice);
     }
 
     // ---------- Paginación + shape ------------------------------------------
@@ -1571,12 +1583,12 @@ class QuotationResourceTest {
     void list_filterByCurrencyId_returnsOnlyThatCurrency() {
         String token = loginAdmin();
         createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CUR_USD", CURRENCY_ID, ST_SCB, "1000.00"));
-        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CUR_PEN", 2, ST_SCB, "1000.00"));
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_CUR_PEN", CURRENCY_PEN_ID, ST_SCB, "1000.00"));
 
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/quotations?q=ZTEST_LST_CUR&currencyId=2")
+            .get("/quotations?q=ZTEST_LST_CUR&currencyId=" + CURRENCY_PEN_ID)
         .then()
             .statusCode(200)
             .body("content.currencyCode", everyItem(equalTo("PEN")))
@@ -1623,7 +1635,7 @@ class QuotationResourceTest {
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/quotations?q=ZTEST_LST_CTID&cargoTypeId=1")
+            .get("/quotations?q=ZTEST_LST_CTID&cargoTypeId=" + CARGO_TYPE_ID)
         .then()
             .statusCode(200)
             .body("content.origin", hasItem("ZTEST_LST_CTID"));
@@ -1761,14 +1773,14 @@ class QuotationResourceTest {
     @Test
     void list_multifilter_currencyAndServiceType_combinesWithAnd() {
         String token = loginAdmin();
-        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_HIT", 2, ST_SPL, "1000.00"));      // PEN + SPL → matchea
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_HIT", CURRENCY_PEN_ID, ST_SPL, "1000.00"));      // PEN + SPL → matchea
         createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_USD", CURRENCY_ID, ST_SPL, "1000.00")); // USD → excluido
-        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_SCB", 2, ST_SCB, "1000.00"));      // SCB → excluido
+        createQuotationAndReturnId(token, transporteListBody("ZTEST_LST_M2_SCB", CURRENCY_PEN_ID, ST_SCB, "1000.00"));      // SCB → excluido
 
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/quotations?q=ZTEST_LST_M2&currencyId=2&serviceTypeId=" + ST_SPL)
+            .get("/quotations?q=ZTEST_LST_M2&currencyId=" + CURRENCY_PEN_ID + "&serviceTypeId=" + ST_SPL)
         .then()
             .statusCode(200)
             .body("content.origin", hasItem("ZTEST_LST_M2_HIT"))
@@ -1883,12 +1895,12 @@ class QuotationResourceTest {
               "destination": "%s_DEST",
               "items": [
                 { "itemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 8000.00 },
-                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1,
+                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": %d,
                   "weightKg": 25.00, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 5000.00 },
                 { "itemNumber": 3, "parentItemNumber": 1, "serviceTypeId": %d, "quantity": 1,
                   "unitPrice": 0, "internalReferencePrice": 1500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, origin, origin, ST_INT, ST_SCB, ST_CES);
+            """, CLIENT_ID, CURRENCY_ID, origin, origin, ST_INT, ST_SCB, CARGO_TYPE_ID, ST_CES);
     }
 }

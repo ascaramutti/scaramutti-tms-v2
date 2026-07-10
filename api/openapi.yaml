@@ -1270,7 +1270,7 @@ paths:
         content:
           application/json:
             schema: { $ref: '#/components/schemas/WarehouseSupplierRequest' }
-            example: { name: 'REPUESTOS DIÉSEL S.A.C.', ruc: '20512345678', phone: '014567890', contactName: 'Marco Salazar' }
+            example: { name: 'REPUESTOS DIÉSEL S.A.C.', ruc: '20512345678', phone: '014567890', contactName: 'Juan Ramos' }
       responses:
         '201':
           description: Creado
@@ -2457,7 +2457,7 @@ components:
       properties:
         id:       { type: integer, format: int32 }
         username: { type: string }
-        fullName: { type: string, example: 'Luraidis Campos' }
+        fullName: { type: string, example: 'Valeria Torres' }
         position: { type: [string, 'null'], description: 'Cargo del trabajador (ej: Ejecutiva de Ventas)', example: 'Ejecutiva de Ventas' }
 
     UserResponse:

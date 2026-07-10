@@ -20,7 +20,7 @@ public record WarehouseSupplierRequest(
     @Pattern(regexp = "^\\d{9}$")
     String phone,
 
-    @Schema(description = "Nombre del contacto principal (opcional)", example = "Marco Salazar", maxLength = 100, nullable = true)
+    @Schema(description = "Nombre del contacto principal (opcional)", example = "Juan Ramos", maxLength = 100, nullable = true)
     @Size(max = 100)
     String contactName
 ) {}

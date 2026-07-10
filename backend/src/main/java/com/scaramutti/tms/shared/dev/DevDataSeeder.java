@@ -39,8 +39,11 @@ import java.time.OffsetDateTime;
  *
  * Cuando la BD viene de un restore de prod, los usuarios admin/lcampos ya existen
  * con sus password hashes reales (desconocidos). En dev forzamos el password al
- * documentado para que el equipo pueda autenticarse. Esto es seguro porque el
- * seeder no corre en prod (@UnlessBuildProfile("prod")).
+ * documentado para que el equipo pueda autenticarse, Y forzamos el nombre de
+ * display al valor SINTÉTICO de acá (de-realificación): así ningún nombre real
+ * queda en la dev/test-DB y el mismo valor determinista vale en DB virgen (CI) y
+ * en la restaurada. Todo seguro porque el seeder no corre en prod
+ * (@UnlessBuildProfile("prod")).
  */
 @ApplicationScoped
 @UnlessBuildProfile("prod")
@@ -67,7 +70,7 @@ public class DevDataSeeder {
         ensureRole("operations_manager", "Gerente de Operaciones");
 
         ensureUser("admin",    "Admin1234",    "Admin",    "TMS",      "00000001", "Administrador del sistema", admin, true,  dniId);
-        ensureUser("lcampos",  "Sales1234",    "Carolina", "Campos",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
+        ensureUser("lcampos",  "Sales1234",    "Valeria",  "Torres",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
         ensureUser("inactivo", "Inactivo1234", "Usuario",  "Inactivo", "00000003", "Inactivo de prueba",        sales, false, dniId);
 
         ensureCurrency("USD", "$",  "Dólar Estadounidense");
@@ -187,8 +190,9 @@ public class DevDataSeeder {
 
     /**
      * Garantiza un user dev con credenciales conocidas.
-     * - Si el user existe (ej. viene del restore de prod): solo actualiza
-     *   passwordHash + isActive. Respeta worker/role/nombres reales.
+     * - Si el user existe (ej. viene del restore de prod): actualiza passwordHash +
+     *   isActive Y el nombre del worker al valor sintético (de-realificación —
+     *   dev/test nunca muestra el nombre real). Respeta role.
      * - Si no existe: lo crea junto con su worker.
      */
     private void ensureUser(String username, String password,
@@ -199,6 +203,10 @@ public class DevDataSeeder {
             User user = existing.get();
             user.passwordHash = passwordService.hash(password);
             user.isActive = isActive;
+            if (user.worker != null) {
+                user.worker.firstName = firstName;
+                user.worker.lastName = lastName;
+            }
             return;
         }
         Worker worker = new Worker();

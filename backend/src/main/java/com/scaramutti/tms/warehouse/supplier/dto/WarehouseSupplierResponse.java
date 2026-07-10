@@ -17,7 +17,7 @@ public record WarehouseSupplierResponse(
     @Schema(description = "Teléfono de contacto", example = "014567890", pattern = "^\\d{9}$", nullable = true)
     String phone,
 
-    @Schema(description = "Nombre del contacto principal", example = "Marco Salazar", maxLength = 100, nullable = true)
+    @Schema(description = "Nombre del contacto principal", example = "Juan Ramos", maxLength = 100, nullable = true)
     String contactName,
 
     @Schema(description = "Indica si el proveedor está activo", example = "true")

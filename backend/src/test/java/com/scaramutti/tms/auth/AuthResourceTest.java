@@ -30,7 +30,7 @@ class AuthResourceTest {
             .body("expiresIn", equalTo(3600))
             .body("user.username", equalTo("lcampos"))
             .body("user.role", equalTo("sales"))
-            .body("user.fullName", equalTo("Carolina Campos"));
+            .body("user.fullName", equalTo("Valeria Torres"));
     }
 
     @Test
