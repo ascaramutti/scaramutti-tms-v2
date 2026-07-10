@@ -1,4 +1,4 @@
-package com.scaramutti.tms.shared.service;
+package com.scaramutti.tms.auth.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.mapper.AuthServiceMapper;

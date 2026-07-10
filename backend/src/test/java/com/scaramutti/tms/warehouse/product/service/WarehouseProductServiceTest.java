@@ -10,7 +10,7 @@ import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ProductCategoryRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
-import com.scaramutti.tms.shared.service.UserLookup;
+import com.scaramutti.tms.auth.service.UserLookup;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductServiceMapper;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;

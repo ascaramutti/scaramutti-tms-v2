@@ -19,7 +19,7 @@ import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
-import com.scaramutti.tms.shared.service.UserLookup;
+import com.scaramutti.tms.auth.service.UserLookup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
