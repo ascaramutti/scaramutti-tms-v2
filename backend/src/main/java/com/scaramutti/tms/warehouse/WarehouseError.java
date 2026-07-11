@@ -15,14 +15,14 @@ public enum WarehouseError implements ApiError {
         "Ya existe un proveedor con el nombre indicado"),
     SUPPLIER_RUC_DUPLICATED         ("WH-010", 409, "Conflict",
         "Ya existe un proveedor con el RUC indicado"),
+    PRODUCT_NOT_FOUND               ("WH-003", 404, "Not Found",
+        "El producto indicado no existe"),
     PRODUCT_CATEGORY_NOT_FOUND      ("WH-004", 400, "Bad Request",
         "La categoría indicada no existe o está inactiva"),
     PRODUCT_UNIT_NOT_FOUND          ("WH-004", 400, "Bad Request",
         "La unidad de medida indicada no existe o está inactiva"),
     PRODUCT_IDENTITY_DUPLICATED     ("WH-010", 409, "Conflict",
-        "Ya existe un producto con el mismo nombre, marca y número de parte"),
-    PRODUCT_NOT_FOUND               ("WH-003", 404, "Not Found",
-        "El producto indicado no existe");
+        "Ya existe un producto con el mismo nombre, marca y número de parte");
 
     private final String code;
     private final int status;

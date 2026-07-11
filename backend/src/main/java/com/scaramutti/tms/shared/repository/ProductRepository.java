@@ -212,7 +212,9 @@ public class ProductRepository implements PanacheRepositoryBase<Product, Integer
     /**
      * Stock actual y lowStock de UN producto, leído de la VIEW {@code product_stock}
      * (mismo criterio que {@link #findStockByProductIds}). Devuelve {@code null} si
-     * la fila no existe (no debería, LEFT JOIN sobre todos los productos).
+     * la fila no existe (no debería, LEFT JOIN sobre todos los productos); el caller
+     * ({@code WarehouseProductService.currentStockOf}) resuelve ese {@code null} con
+     * su fallback defensivo, por eso acá no hace falta un {@code Optional}.
      */
     public ProductStockView findStockByProductId(Integer id) {
         return findStockByProductIds(java.util.Set.of(id)).get(id);
