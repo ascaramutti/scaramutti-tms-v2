@@ -1,8 +1,11 @@
 package com.scaramutti.tms.warehouse.product.api;
 
 import com.scaramutti.tms.shared.dto.PageResponse;
+import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductStockResponse;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductUpdateRequest;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductResourceMapper;
 import com.scaramutti.tms.warehouse.product.service.WarehouseProductService;
 import jakarta.annotation.security.RolesAllowed;
@@ -15,11 +18,15 @@ import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.ResponseStatus;
 
 @Path("/warehouse/products")
@@ -52,5 +59,53 @@ public class WarehouseProductResource {
         return warehouseProductService.createProduct(
             warehouseProductResourceMapper.toCreateWarehouseProductCommand(warehouseProductRequest)
         );
+    }
+
+    /**
+     * Header {@code ETag} con el {@code updatedAt} del recurso (mismo formato que
+     * {@code WarehouseProductEtag.verify}): el frontend debe usarlo para el futuro
+     * PUT con {@code If-Match} (optimistic locking).
+     */
+    @GET
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response getProduct(@PathParam("id") Integer id) {
+        WarehouseProductResponse product = warehouseProductService.getById(id);
+        return Response.ok(product)
+            .header("ETag", WarehouseProductEtag.of(product.updatedAt()))
+            .build();
+    }
+
+    /**
+     * Edición de catálogo. {@code If-Match} obligatorio (optimistic locking): el
+     * ETag a enviar es el HEADER del GET o del PUT anterior, NO el {@code updatedAt}
+     * del body. Devuelve el producto actualizado + el nuevo {@code ETag}.
+     */
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response updateProduct(
+        @PathParam("id") Integer id,
+        @HeaderParam("If-Match") String ifMatch,
+        @Valid @NotNull WarehouseProductUpdateRequest warehouseProductUpdateRequest
+    ) {
+        WarehouseProductResponse product = warehouseProductService.updateProduct(
+            id, ifMatch,
+            warehouseProductResourceMapper.toUpdateWarehouseProductCommand(warehouseProductUpdateRequest)
+        );
+        return Response.ok(product)
+            .header("ETag", WarehouseProductEtag.of(product.updatedAt()))
+            .build();
+    }
+
+    /**
+     * Stock disponible en vivo (form de retiro): la validación AUTORITATIVA
+     * sigue siendo la del POST/PUT del retiro en transacción (409 WH-001).
+     */
+    @GET
+    @Path("/{id}/stock")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public WarehouseProductStockResponse getProductStock(@PathParam("id") Integer id) {
+        return warehouseProductService.getStock(id);
     }
 }

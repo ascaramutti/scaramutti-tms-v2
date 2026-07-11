@@ -2238,6 +2238,16 @@ components:
                 instance: '/api/v1/quotations/999'
                 code: 'QUO-003'
                 traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+            productNotFound:
+              summary: Producto de almacén inexistente
+              value:
+                type: 'urn:tms:error:wh-003'
+                title: 'Resource not found'
+                status: 404
+                detail: 'El producto con id 999 no existe'
+                instance: '/api/v1/warehouse/products/999'
+                code: 'WH-003'
+                traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
     Conflict:
       description: Conflicto (recurso ya existe, restricción de unicidad violada)
       content:

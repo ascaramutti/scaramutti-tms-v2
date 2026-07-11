@@ -2,8 +2,10 @@ package com.scaramutti.tms.warehouse.product.mapper;
 
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductUpdateRequest;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
 import com.scaramutti.tms.warehouse.product.service.cmd.ListWarehouseProductsQuery;
+import com.scaramutti.tms.warehouse.product.service.cmd.UpdateWarehouseProductCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
@@ -50,6 +52,23 @@ public interface WarehouseProductResourceMapper {
     ListWarehouseProductsQuery toListWarehouseProductsQuery(
         String q, Integer categoryId, Boolean isActive, boolean lowOnly, int page, int size
     );
+
+    /**
+     * Misma normalización que el create, más {@code isActive}: null → true (el
+     * PUT es un replace del objeto completo — decisión Nivel A: el form manda el
+     * objeto entero, no un patch parcial).
+     */
+    @Mapping(target = "name",         source = "name",         qualifiedByName = "trimToNull")
+    @Mapping(target = "brand",        source = "brand",        qualifiedByName = "trimToNull")
+    @Mapping(target = "partNumber",   source = "partNumber",   qualifiedByName = "trimToNull")
+    @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")
+    @Mapping(target = "attributes",
+             expression = "java(defaultAttributes(warehouseProductUpdateRequest.attributes()))")
+    @Mapping(target = "minStock",
+             expression = "java(warehouseProductUpdateRequest.minStock() != null ? warehouseProductUpdateRequest.minStock() : java.math.BigDecimal.ZERO)")
+    @Mapping(target = "isActive",
+             expression = "java(warehouseProductUpdateRequest.isActive() != null ? warehouseProductUpdateRequest.isActive() : Boolean.TRUE)")
+    UpdateWarehouseProductCommand toUpdateWarehouseProductCommand(WarehouseProductUpdateRequest warehouseProductUpdateRequest);
 
     /** Copia defensiva y default {}: attributes es JSONB NOT NULL en BD. */
     default Map<String, String> defaultAttributes(Map<String, String> attributes) {

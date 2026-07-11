@@ -14,6 +14,7 @@ import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 /**
@@ -81,9 +82,15 @@ public class Product {
     @Column(name = "updated_at", nullable = false)
     public OffsetDateTime updatedAt;
 
+    // updatedAt es la "version" del ETag (optimistic locking). Se trunca a
+    // MICROSEGUNDOS porque Postgres (timestamptz) guarda esa precisión: si se
+    // dejara en nanos, el ETag del POST (valor en memoria) no coincidiría con el
+    // del GET (releído de la BD) en JVMs con reloj de nanosegundos (Linux) → 412
+    // espurio / test de ETag rojo. Truncar acá hace que el valor en memoria sea
+    // idéntico al persistido en todas las plataformas.
     @PrePersist
     public void onCreate() {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
         if (createdAt == null) {
             createdAt = now;
         }
@@ -94,6 +101,6 @@ public class Product {
 
     @PreUpdate
     public void onUpdate() {
-        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        updatedAt = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
     }
 }
