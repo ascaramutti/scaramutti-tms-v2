@@ -1,6 +1,9 @@
 package com.scaramutti.tms.warehouse.product.api;
 
 import com.scaramutti.tms.shared.dto.PageResponse;
+import com.scaramutti.tms.warehouse.kardex.dto.WarehouseKardexMovementResponse;
+import com.scaramutti.tms.warehouse.kardex.mapper.WarehouseKardexResourceMapper;
+import com.scaramutti.tms.warehouse.kardex.service.WarehouseKardexService;
 import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
@@ -29,6 +32,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.ResponseStatus;
 
+import java.time.LocalDate;
+
 @Path("/warehouse/products")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -36,6 +41,8 @@ public class WarehouseProductResource {
 
     @Inject WarehouseProductService warehouseProductService;
     @Inject WarehouseProductResourceMapper warehouseProductResourceMapper;
+    @Inject WarehouseKardexService warehouseKardexService;
+    @Inject WarehouseKardexResourceMapper warehouseKardexResourceMapper;
 
     @GET
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
@@ -107,5 +114,26 @@ public class WarehouseProductResource {
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
     public WarehouseProductStockResponse getProductStock(@PathParam("id") Integer id) {
         return warehouseProductService.getStock(id);
+    }
+
+    /**
+     * Kardex del producto: movimientos con saldo corrido (RN-WH13, calculado
+     * server-side sobre la historia completa — ver {@code WarehouseKardexRepository}).
+     * {@code dateFrom > dateTo} NO es 400: produce una pagina vacia (mismo
+     * criterio que el listado de cotizaciones, que tampoco valida cross-field).
+     */
+    @GET
+    @Path("/{id}/kardex")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public PageResponse<WarehouseKardexMovementResponse> getProductKardex(
+        @PathParam("id")   Integer id,
+        @QueryParam("dateFrom")                                        LocalDate dateFrom,
+        @QueryParam("dateTo")                                          LocalDate dateTo,
+        @QueryParam("page") @DefaultValue("0")  @Min(0)                int page,
+        @QueryParam("size") @DefaultValue("20") @Min(1) @Max(100)      int size
+    ) {
+        return warehouseKardexService.getKardex(
+            warehouseKardexResourceMapper.toGetWarehouseKardexQuery(id, dateFrom, dateTo, page, size)
+        );
     }
 }

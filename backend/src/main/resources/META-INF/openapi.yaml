@@ -1070,6 +1070,35 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /warehouse/products/{id}/kardex:
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseProductKardex
+      summary: Kardex del producto (movimientos con saldo corrido)
+      description: |
+        Lee la VIEW `almacen.stock_movements`: APERTURA ∪ ENTRADAS activas ∪
+        SALIDAS activas (los ANULADOS no aparecen). Orden `movedAt` DESC.
+        `balance` = saldo DESPUÉS del movimiento, calculado por el backend sobre
+        la historia completa: correcto aunque se pagine o filtre por fechas
+        (RN-WH13). `quantity` siempre positiva (el signo lo da `movementType`).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: dateFrom, in: query, description: 'Desde (inclusive, América/Lima)', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: 'Hasta (inclusive del día completo, América/Lima)', schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de movimientos
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseKardexMovement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -2151,3 +2180,34 @@ components:
         stock:     { type: number, description: 'De la VIEW `almacen.product_stock`' }
         minStock:  { type: number }
         lowStock:  { type: boolean, description: 'Derivado: `stock < minStock`' }
+
+    WarehouseKardexMovementType:
+      type: string
+      enum: [APERTURA, ENTRADA, SALIDA]
+      description: |
+        Tipo de movimiento de la VIEW `almacen.stock_movements`: `APERTURA`
+        (corte inicial, +), `ENTRADA` (ítem de factura activa, +), `SALIDA`
+        (retiro activo, −). Valores en español porque son los literales de la
+        VIEW del DDL congelado.
+
+    WarehouseKardexMovementResponse:
+      type: object
+      required: [movementType, quantity, balance, movedAt, registeredBy, reference]
+      properties:
+        movementType: { $ref: '#/components/schemas/WarehouseKardexMovementType' }
+        quantity:     { type: number, description: 'SIEMPRE positiva (el signo lo da movementType)' }
+        balance:      { type: number, description: 'Saldo corrido DESPUÉS del movimiento (RN-WH13 — server-side sobre la historia completa)' }
+        movedAt:      { type: string, format: date-time }
+        sourceId:     { type: [integer, 'null'], description: 'Id del origen: factura (ENTRADA) o retiro (SALIDA); null para APERTURA' }
+        reference:    { type: string, description: 'Etiqueta legible compuesta por el backend (es-PE)' }
+        registeredBy: { $ref: '#/components/schemas/UserResponse' }
+
+    PageOfWarehouseKardexMovement:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseKardexMovementResponse' }
