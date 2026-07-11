@@ -32,8 +32,14 @@ info:
     - **POST**: el backend previene altas duplicadas según la regla de negocio de cada
       recurso (índice único, o heurística anti doble-click) y responde `409 Conflict`.
       No hay cabecera de idempotencia.
-    - **PUT/PATCH/DELETE**: acepta header `If-Match` con la versión (ETag) del recurso para
-      optimistic locking. Si el recurso fue modificado, responde `412 Precondition Failed`.
+    - **PUT/PATCH/DELETE** sobre recursos de negocio versionados (cotizaciones, facturas de
+      compra, retiros, productos): `If-Match` con la versión (ETag) del recurso es
+      obligatorio. Si el recurso fue modificado entretanto, responde `412 Precondition Failed`
+      (`COM-004`). El ETag viaja en el header de la respuesta (GET/POST/PUT); usar ese header,
+      no el `updatedAt` del body (difieren por µs entre memoria y BD y provocan 412 espurios).
+    - **Catálogos simples** (categorías, unidades, proveedores) NO versionan hoy: last-write-wins,
+      sin `If-Match` ni `412`. Si en el futuro requieren concurrencia controlada, se promueven al
+      esquema versionado de arriba.
 
     ## Roles
 
@@ -1372,10 +1378,17 @@ paths:
       tags: [Warehouse]
       operationId: getWarehouseProduct
       summary: Obtener producto por ID (con stock actual)
+      description: |
+        El header `ETag` (versión opaca del `updatedAt`) es el que exige el PUT
+        vía `If-Match` para el optimistic locking. Usar el HEADER, no el
+        `updatedAt` del body (lección del CRUD de cotizaciones: difieren por µs
+        entre memoria y BD y provocan un 412 espurio).
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       responses:
         '200':
           description: Producto con stock
+          headers:
+            ETag: { schema: { type: string }, description: Versión opaca para If-Match }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WarehouseProductResponse' }
@@ -1396,7 +1409,11 @@ paths:
         (RN-WH15; P-2 respondida: sin auditoría). Identidad compuesta
         `(name, brand, partNumber)` única (Δ-2) y `code` único → `409 WH-010`.
         No afecta el kardex (los movimientos referencian por id).
+        `If-Match` obligatorio (optimistic locking): versión vieja → `412
+        COM-004`. El ETag a enviar es el HEADER del GET o del PUT anterior.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
       requestBody:
         required: true
         content:
@@ -1405,6 +1422,8 @@ paths:
       responses:
         '200':
           description: Actualizado
+          headers:
+            ETag: { schema: { type: string }, description: Nueva versión opaca para el próximo If-Match }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WarehouseProductResponse' }
@@ -1413,6 +1432,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/ConflictDuplicate' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
 
   /warehouse/products/{id}/stock:
     get:
@@ -3233,7 +3253,13 @@ components:
         lowStock:     { type: boolean, description: 'Derivado en código: `stock < minStock` (estricto). NO es columna.' }
         createdBy:    { $ref: '#/components/schemas/UserResponse' }
         createdAt:    { type: string, format: date-time }
-        updatedAt:    { type: string, format: date-time }
+        updatedAt:
+          type: string
+          format: date-time
+          description: >-
+            Versión del recurso (source del optimistic locking). Para el
+            `If-Match` del PUT usar el header `ETag` del GET/PUT, NO este campo
+            del body (difieren por µs entre memoria y BD → 412 espurio).
 
     PageOfWarehouseProduct:
       allOf:
