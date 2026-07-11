@@ -1,0 +1,27 @@
+# Gemelo no-op de backend-tests.yml, receta oficial de GitHub para required
+# checks con paths filter ("Handling skipped but required checks"). El check
+# `test` es required en la branch protection de develop, pero el workflow real
+# solo corre si el PR toca backend/**: en un PR sin backend nunca reporta y el
+# merge queda bloqueado en "Expected / Waiting for status to be reported".
+# Este gemelo usa el MISMO name y el MISMO job id (el nombre del check sale de
+# ahí) con paths-ignore espejo de los paths del real: corre exactamente cuando
+# el real no, y reporta `test` en verde al instante. En un PR mixto corren los
+# dos y queda el resultado del real (termina después). Si se cambian los paths
+# del real, cambiar este espejo a la par.
+name: Backend tests
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sin cambios de backend
+        run: echo "El PR no toca backend/**, no hay nada que testear."
