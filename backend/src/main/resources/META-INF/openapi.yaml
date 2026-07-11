@@ -1277,6 +1277,16 @@ components:
                 instance: '/api/v1/quotations/999'
                 code: 'QUO-003'
                 traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+            productNotFound:
+              summary: Producto de almacén inexistente
+              value:
+                type: 'urn:tms:error:wh-003'
+                title: 'Resource not found'
+                status: 404
+                detail: 'El producto con id 999 no existe'
+                instance: '/api/v1/warehouse/products/999'
+                code: 'WH-003'
+                traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
     PreconditionFailed:
       description: Optimistic lock — el recurso fue modificado desde que se leyó
       content:
@@ -2124,7 +2134,13 @@ components:
         lowStock:     { type: boolean, description: 'Derivado en código: `stock < minStock` (estricto). NO es columna.' }
         createdBy:    { $ref: '#/components/schemas/UserResponse' }
         createdAt:    { type: string, format: date-time }
-        updatedAt:    { type: string, format: date-time }
+        updatedAt:
+          type: string
+          format: date-time
+          description: >-
+            Versión del recurso (source del optimistic locking). Para el
+            `If-Match` del PUT usar el header `ETag` del GET/PUT, NO este campo
+            del body (difieren por µs entre memoria y BD → 412 espurio).
 
     WarehouseProductStockResponse:
       type: object
