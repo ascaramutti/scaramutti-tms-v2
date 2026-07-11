@@ -190,6 +190,15 @@ public class ProductRepository implements PanacheRepositoryBase<Product, Integer
             : "ORDER BY p.name ASC";
     }
 
+    /**
+     * Stock actual y lowStock de UN producto, leído de la VIEW {@code product_stock}
+     * (mismo criterio que {@link #findStockByProductIds}). Devuelve {@code null} si
+     * la fila no existe (no debería, LEFT JOIN sobre todos los productos).
+     */
+    public ProductStockView findStockByProductId(Integer id) {
+        return findStockByProductIds(java.util.Set.of(id)).get(id);
+    }
+
     /** Proyección de la VIEW product_stock: stock actual + lowStock (RN-WH11), ambos derivados. */
     public record ProductStockView(BigDecimal stock, boolean lowStock) {}
 }

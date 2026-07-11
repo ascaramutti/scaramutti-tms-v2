@@ -20,7 +20,9 @@ public enum WarehouseError implements ApiError {
     PRODUCT_UNIT_NOT_FOUND          ("WH-004", 400, "Bad Request",
         "La unidad de medida indicada no existe o está inactiva"),
     PRODUCT_IDENTITY_DUPLICATED     ("WH-010", 409, "Conflict",
-        "Ya existe un producto con el mismo nombre, marca y número de parte");
+        "Ya existe un producto con el mismo nombre, marca y número de parte"),
+    PRODUCT_NOT_FOUND               ("WH-003", 404, "Not Found",
+        "El producto indicado no existe");
 
     private final String code;
     private final int status;

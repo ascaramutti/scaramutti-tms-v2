@@ -112,6 +112,33 @@ public class WarehouseProductService {
             : new ProductStockView(INITIAL_STOCK, INITIAL_STOCK.compareTo(product.minStock) < 0);
     }
 
+    /**
+     * Detalle de un producto (GET /warehouse/products/{id}), con stock actual de
+     * la VIEW. Read-only, sin {@code @Transactional} (misma convención que
+     * listProducts).
+     */
+    public WarehouseProductResponse getById(Integer id) {
+        Product product = productRepository.findByIdOptional(id)
+            .orElseThrow(WarehouseError.PRODUCT_NOT_FOUND::toException);
+
+        ProductCategory category = productCategoryRepository.findById(product.categoryId);
+        UnitOfMeasure unitOfMeasure = unitOfMeasureRepository.findById(product.unitOfMeasureId);
+        ProductStockView stock = currentStockOf(product);
+
+        return toResponse(product, category, unitOfMeasure, stock, userLookup.require(product.createdBy));
+    }
+
+    /**
+     * Stock/lowStock actual de un producto individual desde la VIEW (GET by id y
+     * PUT). Fallback defensivo igual que {@link #stockOf}, sin necesitar un mapa.
+     */
+    private ProductStockView currentStockOf(Product product) {
+        ProductStockView stock = productRepository.findStockByProductId(product.id);
+        return stock != null
+            ? stock
+            : new ProductStockView(INITIAL_STOCK, INITIAL_STOCK.compareTo(product.minStock) < 0);
+    }
+
     @Transactional
     public WarehouseProductResponse createProduct(CreateWarehouseProductCommand createWarehouseProductCommand) {
         Integer userId = currentUser.requireId();

@@ -1,6 +1,7 @@
 package com.scaramutti.tms.warehouse.product.api;
 
 import com.scaramutti.tms.shared.dto.PageResponse;
+import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductResourceMapper;
@@ -17,9 +18,11 @@ import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.ResponseStatus;
 
 @Path("/warehouse/products")
@@ -52,5 +55,20 @@ public class WarehouseProductResource {
         return warehouseProductService.createProduct(
             warehouseProductResourceMapper.toCreateWarehouseProductCommand(warehouseProductRequest)
         );
+    }
+
+    /**
+     * Header {@code ETag} con el {@code updatedAt} del recurso (mismo formato que
+     * {@code WarehouseProductEtag.verify}): el frontend debe usarlo para el futuro
+     * PUT con {@code If-Match} (optimistic locking).
+     */
+    @GET
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response getProduct(@PathParam("id") Integer id) {
+        WarehouseProductResponse product = warehouseProductService.getById(id);
+        return Response.ok(product)
+            .header("ETag", WarehouseProductEtag.of(product.updatedAt()))
+            .build();
     }
 }
