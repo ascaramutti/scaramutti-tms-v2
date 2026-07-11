@@ -32,14 +32,17 @@ info:
     - **POST**: el backend previene altas duplicadas según la regla de negocio de cada
       recurso (índice único, o heurística anti doble-click) y responde `409 Conflict`.
       No hay cabecera de idempotencia.
-    - **PUT/PATCH/DELETE** sobre recursos de negocio versionados (cotizaciones, facturas de
-      compra, retiros, productos): `If-Match` con la versión (ETag) del recurso es
-      obligatorio. Si el recurso fue modificado entretanto, responde `412 Precondition Failed`
-      (`COM-004`). El ETag viaja en el header de la respuesta (GET/POST/PUT); usar ese header,
-      no el `updatedAt` del body (difieren por µs entre memoria y BD y provocan 412 espurios).
-    - **Catálogos simples** (categorías, unidades, proveedores) NO versionan hoy: last-write-wins,
-      sin `If-Match` ni `412`. Si en el futuro requieren concurrencia controlada, se promueven al
-      esquema versionado de arriba.
+    - **Recursos de negocio versionados** (cotizaciones, facturas de compra, retiros,
+      productos): sus **PUT/PATCH y acciones de estado (cancel)** exigen `If-Match` con la
+      versión (ETag) del recurso. Si el recurso fue modificado entretanto, responde `412
+      Precondition Failed` (`COM-004`). El ETag viaja en el header de las respuestas que
+      devuelven el recurso (GET del detalle, PUT, y POST/PATCH donde el flujo lo aprovecha);
+      usar ese header, no el `updatedAt` del body (difieren por µs entre memoria y BD y
+      provocan 412 espurios).
+    - **Catálogos y maestros simples** (clientes, monedas, tipos de carga, tipos de servicio,
+      condiciones de pago, system-settings; en almacén: categorías, unidades, proveedores) NO
+      versionan hoy: last-write-wins, sin `If-Match` ni `412`. Si en el futuro requieren
+      concurrencia controlada, se promueven al esquema versionado de arriba.
 
     ## Roles
 
