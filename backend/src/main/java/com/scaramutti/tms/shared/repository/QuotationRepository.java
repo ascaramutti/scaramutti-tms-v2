@@ -2,6 +2,7 @@ package com.scaramutti.tms.shared.repository;
 
 import com.scaramutti.tms.quotations.service.cmd.ListQuotationsQuery;
 import com.scaramutti.tms.shared.entity.Quotation;
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.shared.util.StringUtils;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -12,7 +13,6 @@ import jakarta.persistence.Tuple;
 import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,9 +35,6 @@ import java.util.Map;
  */
 @ApplicationScoped
 public class QuotationRepository implements PanacheRepositoryBase<Quotation, Long> {
-
-    /** Zona horaria del negocio (Peru). Los filtros de fecha se interpretan aca. */
-    private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     @Inject
     EntityManager entityManager;
@@ -224,12 +221,12 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
         if (q.dateFrom() != null) {
             // Inicio del dia en zona Lima → instante UTC para comparar contra created_at (timestamptz).
             conditions.add("qt.created_at >= :dateFrom");
-            params.put("dateFrom", q.dateFrom().atStartOfDay(LIMA).toOffsetDateTime());
+            params.put("dateFrom", q.dateFrom().atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
         }
         if (q.dateTo() != null) {
             // dateTo inclusivo del dia completo → < inicio del dia siguiente (Lima).
             conditions.add("qt.created_at < :dateToExclusive");
-            params.put("dateToExclusive", q.dateTo().plusDays(1).atStartOfDay(LIMA).toOffsetDateTime());
+            params.put("dateToExclusive", q.dateTo().plusDays(1).atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
         }
 
         return conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);
@@ -252,21 +249,9 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
             ((Number) t.get(8)).intValue(),       // validity_days
             (String) t.get(9),                    // origin
             (String) t.get(10),                   // destination
-            toOffsetDateTime(t.get(11)),          // created_at
+            DateUtils.toOffsetDateTime(t.get(11)), // created_at
             ((Number) t.get(12)).intValue()       // created_by
         );
-    }
-
-    /**
-     * Conversion defensiva del created_at native a OffsetDateTime. Hibernate/PG
-     * puede devolver OffsetDateTime, Instant o Timestamp segun version/driver.
-     */
-    private static OffsetDateTime toOffsetDateTime(Object value) {
-        if (value instanceof OffsetDateTime odt) return odt;
-        if (value instanceof java.time.Instant inst) return inst.atOffset(ZoneOffset.UTC);
-        if (value instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(ZoneOffset.UTC);
-        throw new IllegalStateException("Unexpected created_at type: "
-            + (value == null ? "null" : value.getClass().getName()));
     }
 
     /**

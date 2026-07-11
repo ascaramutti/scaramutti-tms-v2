@@ -1,5 +1,6 @@
 package com.scaramutti.tms.shared.repository;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.warehouse.kardex.service.cmd.GetWarehouseKardexQuery;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -9,8 +10,6 @@ import jakarta.persistence.Tuple;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -39,9 +38,6 @@ import java.util.Map;
  */
 @ApplicationScoped
 public class WarehouseKardexRepository {
-
-    /** Zona horaria del negocio (Peru), mismo criterio que QuotationRepository. */
-    private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     private static final String TYPE_PRIORITY =
         "CASE movement_type WHEN 'APERTURA' THEN 0 WHEN 'ENTRADA' THEN 1 WHEN 'SALIDA' THEN 2 END";
@@ -123,12 +119,12 @@ public class WarehouseKardexRepository {
         List<String> conditions = new ArrayList<>();
         if (query.dateFrom() != null) {
             conditions.add("moved_at >= :dateFrom");
-            params.put("dateFrom", query.dateFrom().atStartOfDay(LIMA).toOffsetDateTime());
+            params.put("dateFrom", query.dateFrom().atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
         }
         if (query.dateTo() != null) {
             // dateTo inclusivo del dia completo -> < inicio del dia siguiente (Lima).
             conditions.add("moved_at < :dateToExclusive");
-            params.put("dateToExclusive", query.dateTo().plusDays(1).atStartOfDay(LIMA).toOffsetDateTime());
+            params.put("dateToExclusive", query.dateTo().plusDays(1).atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
         }
         if (conditions.isEmpty()) {
             return "";
@@ -213,23 +209,10 @@ public class WarehouseKardexRepository {
             (String) t.get(0),                    // movement_type
             (BigDecimal) t.get(1),                // quantity (ya ABS)
             (BigDecimal) t.get(2),                // balance
-            toOffsetDateTime(t.get(3)),           // moved_at
+            DateUtils.toOffsetDateTime(t.get(3)), // moved_at
             t.get(4) == null ? null : ((Number) t.get(4)).intValue(), // source_id
             ((Number) t.get(5)).intValue()        // registered_by
         );
-    }
-
-    /**
-     * Conversion defensiva del moved_at native a OffsetDateTime (mismo criterio
-     * que QuotationRepository.toOffsetDateTime): Hibernate/PG puede devolver
-     * OffsetDateTime, Instant o Timestamp segun version/driver.
-     */
-    private static OffsetDateTime toOffsetDateTime(Object value) {
-        if (value instanceof OffsetDateTime odt) return odt;
-        if (value instanceof java.time.Instant inst) return inst.atOffset(ZoneOffset.UTC);
-        if (value instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(ZoneOffset.UTC);
-        throw new IllegalStateException("Unexpected moved_at type: "
-            + (value == null ? "null" : value.getClass().getName()));
     }
 
     /** Proyeccion de una fila del CTE history, ya con quantity ABS y balance corrido. */
