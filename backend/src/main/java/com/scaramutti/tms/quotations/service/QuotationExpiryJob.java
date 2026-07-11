@@ -1,6 +1,7 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.shared.repository.QuotationRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -41,7 +42,7 @@ public class QuotationExpiryJob {
      * Corre el flip de vencimiento. Loguea cuantas cotizaciones marco {@code EXPIRED}
      * (idempotente: lo normal es 0 salvo el dia que alguna {@code SENT} cruza su validez).
      */
-    @Scheduled(cron = "0 0 3 * * ?", timeZone = "America/Lima")
+    @Scheduled(cron = "0 0 3 * * ?", timeZone = DateUtils.LIMA_ZONE_ID)
     public void expireQuotations() {
         int expired = quotationRepository.expireSentQuotations();
         if (expired > 0) {
