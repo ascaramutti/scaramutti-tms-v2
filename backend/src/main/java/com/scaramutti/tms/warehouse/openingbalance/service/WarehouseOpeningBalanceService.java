@@ -70,7 +70,7 @@ public class WarehouseOpeningBalanceService {
 
     /**
      * Listado paginado (GET /warehouse/opening-balances). Read-only, sin
-     * {@code @Transactional} (misma convención que listProducts). 4 queries
+     * {@code @Transactional} (misma convención que listProducts). 5 queries
      * fijas (page + count + products + units + users), ninguna N+1 por page size.
      */
     public PageResponse<WarehouseOpeningBalanceResponse> listOpeningBalances(ListWarehouseOpeningBalancesQuery query) {

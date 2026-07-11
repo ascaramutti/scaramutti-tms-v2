@@ -1144,7 +1144,32 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/ConflictDuplicate' }
+        '409':
+          description: WH-009 (apertura duplicada) o WH-011 (producto con movimientos)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                openingAlreadyExists:
+                  summary: El producto ya tiene su corte inicial
+                  value:
+                    type: 'urn:tms:error:wh-009'
+                    title: 'Conflict'
+                    status: 409
+                    detail: "El producto 'Filtro de aceite XYZ' ya tiene corte inicial registrado"
+                    instance: '/api/v1/warehouse/opening-balances'
+                    code: 'WH-009'
+                    traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+                productHasMovements:
+                  summary: El producto ya tiene movimientos (la apertura falsearía el kardex)
+                  value:
+                    type: 'urn:tms:error:wh-011'
+                    title: 'Conflict'
+                    status: 409
+                    detail: "El producto 'Filtro de aceite XYZ' ya tiene movimientos; el corte inicial solo aplica a productos sin historial"
+                    instance: '/api/v1/warehouse/opening-balances'
+                    code: 'WH-011'
+                    traceId: '3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f'
 
 # =============================================================================
 components:
