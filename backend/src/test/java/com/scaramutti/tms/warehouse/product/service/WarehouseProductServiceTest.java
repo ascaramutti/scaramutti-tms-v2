@@ -9,11 +9,14 @@ import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ProductCategoryRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
+import com.scaramutti.tms.shared.repository.ProductRepository.ProductStockView;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
 import com.scaramutti.tms.auth.service.UserLookup;
+import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductServiceMapper;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
+import com.scaramutti.tms.warehouse.product.service.cmd.UpdateWarehouseProductCommand;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,6 +26,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -260,4 +264,211 @@ class WarehouseProductServiceTest {
             );
         return new jakarta.persistence.PersistenceException(hibernateCve);
     }
+
+    // ---------- getById -----------------------------------------------------------
+
+    @Test
+    void getById_existingProduct_buildsResponseWithStockFromView() {
+        Product entity = mappedEntity("PRO-0010", new BigDecimal("4"));
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        when(productCategoryRepository.findById(4)).thenReturn(activeCategory());
+        when(unitOfMeasureRepository.findById(1)).thenReturn(activeUnit());
+        when(productRepository.findStockByProductId(100)).thenReturn(new ProductStockView(new BigDecimal("6"), false));
+        when(userLookup.require(USER_ID)).thenReturn(userResponse());
+
+        WarehouseProductResponse response = warehouseProductService.getById(100);
+
+        assertEquals(100, response.id());
+        assertEquals(new BigDecimal("6"), response.stock());
+        assertFalse(response.lowStock());
+    }
+
+    @Test
+    void getById_nonexistentProduct_throwsWH003() {
+        when(productRepository.findByIdOptional(999)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class, () -> warehouseProductService.getById(999));
+
+        assertEquals("WH-003", ex.code());
+        assertEquals(404, ex.status());
+    }
+
+    // ---------- updateProduct: helpers ----------------------------------------
+
+    private UpdateWarehouseProductCommand updateCommand(String brand, String partNumber, BigDecimal minStock) {
+        return new UpdateWarehouseProductCommand(
+            "ZTEST_Filtro Editado", 4, brand, partNumber, Map.of(), minStock, null, true
+        );
+    }
+
+    private Product persistedEntity() {
+        Product product = new Product();
+        product.id = 100;
+        product.code = "PRO-0005";
+        product.name = "ZTEST_Filtro";
+        product.categoryId = 4;
+        product.unitOfMeasureId = 1;
+        product.brand = "Bosch";
+        product.partNumber = "P1";
+        product.attributes = Map.of();
+        product.minStock = new BigDecimal("4");
+        product.isActive = true;
+        product.createdBy = USER_ID;
+        product.createdAt = OffsetDateTime.parse("2026-06-01T10:00:00.000000Z");
+        product.updatedAt = OffsetDateTime.parse("2026-06-01T10:00:00.000000Z");
+        return product;
+    }
+
+    private String etagOf(Product product) {
+        return WarehouseProductEtag.of(product);
+    }
+
+    // ---------- updateProduct: happy path --------------------------------------
+
+    @Test
+    void updateProduct_appliesChangesAndRebuildsResponse() {
+        Product entity = persistedEntity();
+        String validEtag = etagOf(entity);
+        UpdateWarehouseProductCommand command = updateCommand("Denso", "P2", new BigDecimal("9"));
+
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        when(productCategoryRepository.findById(4)).thenReturn(activeCategory());
+        when(productRepository.existsByIdentityIgnoreCaseExcludingId(
+            "ZTEST_Filtro Editado", "Denso", "P2", 100)).thenReturn(false);
+        when(unitOfMeasureRepository.findById(1)).thenReturn(activeUnit());
+        when(productRepository.findStockByProductId(100)).thenReturn(new ProductStockView(new BigDecimal("2"), true));
+        when(userLookup.require(USER_ID)).thenReturn(userResponse());
+
+        WarehouseProductResponse response = warehouseProductService.updateProduct(100, validEtag, command);
+
+        verify(warehouseProductServiceMapper).applyUpdate(entity, command);
+        verify(productRepository).flush();
+        assertEquals(100, response.id());
+        assertEquals(new BigDecimal("2"), response.stock());
+        assertTrue(response.lowStock());
+    }
+
+    // ---------- updateProduct: optimistic locking (COM-004) ---------------------
+
+    @Test
+    void updateProduct_withNullIfMatch_throwsCOM004_doesNotFlush() {
+        Product entity = persistedEntity();
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> warehouseProductService.updateProduct(100, null, updateCommand("Denso", "P2", BigDecimal.ZERO)));
+
+        assertEquals("COM-004", ex.code());
+        assertEquals(412, ex.status());
+        verify(productRepository, never()).flush();
+        verify(warehouseProductServiceMapper, never()).applyUpdate(any(), any());
+    }
+
+    @Test
+    void updateProduct_withStaleIfMatch_throwsCOM004_doesNotFlush() {
+        Product entity = persistedEntity();
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        String staleEtag = WarehouseProductEtag.of(entity.updatedAt.minusHours(1));
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> warehouseProductService.updateProduct(100, staleEtag, updateCommand("Denso", "P2", BigDecimal.ZERO)));
+
+        assertEquals("COM-004", ex.code());
+        verify(productRepository, never()).flush();
+    }
+
+    // ---------- updateProduct: 404 ------------------------------------------------
+
+    @Test
+    void updateProduct_nonexistentProduct_throwsWH003() {
+        when(productRepository.findByIdOptional(999)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> warehouseProductService.updateProduct(999, "\"any\"", updateCommand(null, null, BigDecimal.ZERO)));
+
+        assertEquals("WH-003", ex.code());
+        assertEquals(404, ex.status());
+    }
+
+    // ---------- updateProduct: FKs (WH-004) ---------------------------------------
+
+    @Test
+    void updateProduct_whenCategoryNotFound_throwsWH004_doesNotFlush() {
+        Product entity = persistedEntity();
+        String validEtag = etagOf(entity);
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        when(productCategoryRepository.findById(4)).thenReturn(null);
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> warehouseProductService.updateProduct(100, validEtag, updateCommand("Denso", "P2", BigDecimal.ZERO)));
+
+        assertEquals("WH-004", ex.code());
+        verify(productRepository, never()).flush();
+    }
+
+    // ---------- updateProduct: identidad (WH-010) ----------------------------------
+
+    @Test
+    void updateProduct_whenIdentityDuplicatePreCheck_excludesOwnId_throwsWH010_doesNotFlush() {
+        Product entity = persistedEntity();
+        String validEtag = etagOf(entity);
+        UpdateWarehouseProductCommand command = updateCommand("Denso", "P2", BigDecimal.ZERO);
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        when(productCategoryRepository.findById(4)).thenReturn(activeCategory());
+        when(productRepository.existsByIdentityIgnoreCaseExcludingId(
+            "ZTEST_Filtro Editado", "Denso", "P2", 100)).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> warehouseProductService.updateProduct(100, validEtag, command));
+
+        assertEquals("WH-010", ex.code());
+        assertEquals(409, ex.status());
+        verify(productRepository, never()).flush();
+        // Verifica que el check EXCLUYE el propio id (no el metodo del create).
+        verify(productRepository).existsByIdentityIgnoreCaseExcludingId(
+            "ZTEST_Filtro Editado", "Denso", "P2", 100);
+        verify(productRepository, never()).existsByIdentityIgnoreCase(any(), any(), any());
+    }
+
+    @Test
+    void updateProduct_whenIdentityUnchangedForSameId_doesNotThrow() {
+        // Precheck usa existsByIdentityIgnoreCaseExcludingId(..., id): al no encontrar
+        // otro producto con la misma identidad (el unico match es el propio, excluido),
+        // el update sigue de largo.
+        Product entity = persistedEntity();
+        String validEtag = etagOf(entity);
+        UpdateWarehouseProductCommand command = updateCommand("Bosch", "P1", new BigDecimal("4"));
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        when(productCategoryRepository.findById(4)).thenReturn(activeCategory());
+        when(productRepository.existsByIdentityIgnoreCaseExcludingId(
+            "ZTEST_Filtro Editado", "Bosch", "P1", 100)).thenReturn(false);
+        when(unitOfMeasureRepository.findById(1)).thenReturn(activeUnit());
+        when(productRepository.findStockByProductId(100)).thenReturn(new ProductStockView(BigDecimal.ZERO, false));
+        when(userLookup.require(USER_ID)).thenReturn(userResponse());
+
+        WarehouseProductResponse response = warehouseProductService.updateProduct(100, validEtag, command);
+
+        assertEquals(100, response.id());
+        verify(productRepository).flush();
+    }
+
+    // ---------- updateProduct: race condition (WH-010) ------------------------------
+
+    @Test
+    void updateProduct_whenFlushThrowsConstraintViolationOnIdentity_translatesToWH010() {
+        Product entity = persistedEntity();
+        String validEtag = etagOf(entity);
+        UpdateWarehouseProductCommand command = updateCommand("Denso", "P2", BigDecimal.ZERO);
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        when(productCategoryRepository.findById(4)).thenReturn(activeCategory());
+        when(productRepository.existsByIdentityIgnoreCaseExcludingId(
+            "ZTEST_Filtro Editado", "Denso", "P2", 100)).thenReturn(false);
+        doThrow(wrapConstraint("uq_products_identity")).when(productRepository).flush();
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> warehouseProductService.updateProduct(100, validEtag, command));
+
+        assertEquals("WH-010", ex.code());
+    }
+
 }

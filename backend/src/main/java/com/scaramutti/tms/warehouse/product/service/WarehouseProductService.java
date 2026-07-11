@@ -12,12 +12,14 @@ import com.scaramutti.tms.shared.repository.ProductRepository.ProductStockView;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
 import com.scaramutti.tms.auth.service.UserLookup;
 import com.scaramutti.tms.warehouse.WarehouseError;
+import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.CategoryRef;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.UnitOfMeasureRef;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductServiceMapper;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
 import com.scaramutti.tms.warehouse.product.service.cmd.ListWarehouseProductsQuery;
+import com.scaramutti.tms.warehouse.product.service.cmd.UpdateWarehouseProductCommand;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
@@ -161,6 +163,33 @@ public class WarehouseProductService {
         return toResponse(product, category, unitOfMeasure, initialStock, userLookup.require(userId));
     }
 
+    /**
+     * Edición de catálogo (PUT /warehouse/products/{id}): nombre, categoría,
+     * marca, nº de parte, atributos, minStock, observaciones, isActive. La
+     * unidad de medida NO viaja (P-1, inmutable). Orden: 404 → 412 (If-Match) →
+     * 400 WH-004 (categoría) → 409 WH-010 (identidad, happy path) → aplicar →
+     * flush (traduciendo la race a WH-010) → reensamblar response.
+     */
+    @Transactional
+    public WarehouseProductResponse updateProduct(Integer id, String ifMatch, UpdateWarehouseProductCommand command) {
+        Product product = productRepository.findByIdOptional(id)
+            .orElseThrow(WarehouseError.PRODUCT_NOT_FOUND::toException);
+
+        WarehouseProductEtag.verify(ifMatch, product);
+
+        ProductCategory category = requireActiveCategory(command.categoryId());
+        rejectDuplicateIdentityExcludingSelf(command, id);
+
+        warehouseProductServiceMapper.applyUpdate(product, command);
+        flushOrTranslateDuplicate(product);
+
+        // La unidad de medida es inmutable (P-1) y puede estar inactiva desde que
+        // el producto la fijó al crear: se busca SIN el filtro isActive del alta.
+        UnitOfMeasure unitOfMeasure = unitOfMeasureRepository.findById(product.unitOfMeasureId);
+        ProductStockView stock = currentStockOf(product);
+        return toResponse(product, category, unitOfMeasure, stock, userLookup.require(product.createdBy));
+    }
+
     // ---------- Validación de FKs (WH-004) -----------------------------------
 
     private ProductCategory requireActiveCategory(Integer categoryId) {
@@ -191,6 +220,18 @@ public class WarehouseProductService {
     }
 
     /**
+     * Igual que {@link #rejectDuplicateIdentity} pero EXCLUYENDO el propio id
+     * (PUT): editar un producto sin cambiar su identidad no debe chocar contra
+     * si mismo.
+     */
+    private void rejectDuplicateIdentityExcludingSelf(UpdateWarehouseProductCommand command, Integer id) {
+        if (productRepository.existsByIdentityIgnoreCaseExcludingId(
+                command.name(), command.brand(), command.partNumber(), id)) {
+            throw WarehouseError.PRODUCT_IDENTITY_DUPLICATED.toException();
+        }
+    }
+
+    /**
      * Cubre la race donde dos requests pasan rejectDuplicateIdentity simultáneamente
      * con la misma identidad: el índice único uq_products_identity (V002) garantiza
      * que Postgres rechaza el segundo INSERT. El `code` es system-owned (correlativo
@@ -201,19 +242,42 @@ public class WarehouseProductService {
             productRepository.persist(product);
             productRepository.flush();
         } catch (PersistenceException ex) {
-            ConstraintViolationException cve = extractConstraintViolation(ex);
-            if (cve == null) {
-                throw ex;
-            }
-            String constraintName = cve.getConstraintName();
-            if (constraintName != null && constraintName.contains("identity")) {
-                LOG.warnf("Race condition: UNIQUE identity violation [name=%s brand=%s partNumber=%s]",
-                    product.name, product.brand, product.partNumber);
-                throw WarehouseError.PRODUCT_IDENTITY_DUPLICATED.toException();
-            }
-            LOG.errorf(ex, "Unhandled DB constraint violation [constraint=%s]", constraintName);
+            translateDuplicateOrRethrow(ex, product);
+        }
+    }
+
+    /**
+     * Camino de update: la entity ya está gestionada (no hace falta persist),
+     * solo flush para forzar el UPDATE dentro de la tx y capturar la race de
+     * identidad, con la MISMA traducción que el alta.
+     */
+    private void flushOrTranslateDuplicate(Product product) {
+        try {
+            productRepository.flush();
+        } catch (PersistenceException ex) {
+            translateDuplicateOrRethrow(ex, product);
+        }
+    }
+
+    /**
+     * Cuerpo compartido de traducción de la constraint de identidad, extraído de
+     * {@code persistOrTranslateDuplicate} (create) y {@code flushOrTranslateDuplicate}
+     * (update): mismo catch, mismo criterio (constraint "identity" → WH-010),
+     * mismo re-throw para cualquier otra violación no contemplada.
+     */
+    private void translateDuplicateOrRethrow(PersistenceException ex, Product product) {
+        ConstraintViolationException cve = extractConstraintViolation(ex);
+        if (cve == null) {
             throw ex;
         }
+        String constraintName = cve.getConstraintName();
+        if (constraintName != null && constraintName.contains("identity")) {
+            LOG.warnf("Race condition: UNIQUE identity violation [name=%s brand=%s partNumber=%s]",
+                product.name, product.brand, product.partNumber);
+            throw WarehouseError.PRODUCT_IDENTITY_DUPLICATED.toException();
+        }
+        LOG.errorf(ex, "Unhandled DB constraint violation [constraint=%s]", constraintName);
+        throw ex;
     }
 
     private ConstraintViolationException extractConstraintViolation(PersistenceException ex) {

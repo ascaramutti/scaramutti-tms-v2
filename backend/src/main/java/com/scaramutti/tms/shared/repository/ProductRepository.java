@@ -52,6 +52,25 @@ public class ProductRepository implements PanacheRepositoryBase<Product, Integer
     }
 
     /**
+     * Identidad compuesta case-insensitive EXCLUYENDO el propio id (PUT): mismo
+     * WHERE que {@link #existsByIdentityIgnoreCase} + {@code and id <> ?4}. El
+     * de creacion no excluye id porque en un alta el producto todavia no existe;
+     * en una edicion sin cambio de identidad, no excluir daria un 409 espurio
+     * contra si mismo.
+     */
+    public boolean existsByIdentityIgnoreCaseExcludingId(String name, String brand, String partNumber, Integer id) {
+        String brandKey = brand == null ? "" : brand;
+        String partNumberKey = partNumber == null ? "" : partNumber;
+        return count(
+            "lower(name) = lower(?1) "
+            + "and lower(coalesce(brand, '')) = lower(?2) "
+            + "and lower(coalesce(partNumber, '')) = lower(?3) "
+            + "and id <> ?4",
+            name, brandKey, partNumberKey, id
+        ) > 0;
+    }
+
+    /**
      * Advisory lock por-transaccion que serializa la generacion del SKU
      * correlativo (mismo mecanismo que {@code QuotationRepository.acquireYearLock},
      * aca con clave fija porque el contador de productos no se particiona).

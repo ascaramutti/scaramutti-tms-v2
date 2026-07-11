@@ -4,6 +4,7 @@ import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductUpdateRequest;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductResourceMapper;
 import com.scaramutti.tms.warehouse.product.service.WarehouseProductService;
 import jakarta.annotation.security.RolesAllowed;
@@ -16,7 +17,9 @@ import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -67,6 +70,28 @@ public class WarehouseProductResource {
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
     public Response getProduct(@PathParam("id") Integer id) {
         WarehouseProductResponse product = warehouseProductService.getById(id);
+        return Response.ok(product)
+            .header("ETag", WarehouseProductEtag.of(product.updatedAt()))
+            .build();
+    }
+
+    /**
+     * Edición de catálogo. {@code If-Match} obligatorio (optimistic locking): el
+     * ETag a enviar es el HEADER del GET o del PUT anterior, NO el {@code updatedAt}
+     * del body. Devuelve el producto actualizado + el nuevo {@code ETag}.
+     */
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response updateProduct(
+        @PathParam("id") Integer id,
+        @HeaderParam("If-Match") String ifMatch,
+        @Valid @NotNull WarehouseProductUpdateRequest warehouseProductUpdateRequest
+    ) {
+        WarehouseProductResponse product = warehouseProductService.updateProduct(
+            id, ifMatch,
+            warehouseProductResourceMapper.toUpdateWarehouseProductCommand(warehouseProductUpdateRequest)
+        );
         return Response.ok(product)
             .header("ETag", WarehouseProductEtag.of(product.updatedAt()))
             .build();
