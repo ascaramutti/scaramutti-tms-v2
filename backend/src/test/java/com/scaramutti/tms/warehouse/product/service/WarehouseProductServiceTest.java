@@ -471,4 +471,29 @@ class WarehouseProductServiceTest {
         assertEquals("WH-010", ex.code());
     }
 
+    // ---------- getStock -----------------------------------------------------------
+
+    @Test
+    void getStock_existingProduct_returnsStockFromViewAndMinStockFromEntity() {
+        Product entity = mappedEntity("PRO-0011", new BigDecimal("4"));
+        when(productRepository.findByIdOptional(100)).thenReturn(Optional.of(entity));
+        when(productRepository.findStockByProductId(100)).thenReturn(new ProductStockView(new BigDecimal("1"), true));
+
+        var response = warehouseProductService.getStock(100);
+
+        assertEquals(100, response.productId());
+        assertEquals(new BigDecimal("1"), response.stock());
+        assertEquals(new BigDecimal("4"), response.minStock());
+        assertTrue(response.lowStock());
+    }
+
+    @Test
+    void getStock_nonexistentProduct_throwsWH003() {
+        when(productRepository.findByIdOptional(999)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class, () -> warehouseProductService.getStock(999));
+
+        assertEquals("WH-003", ex.code());
+        assertEquals(404, ex.status());
+    }
 }

@@ -625,4 +625,107 @@ class WarehouseProductByIdResourceTest {
             .statusCode(200)
             .body("name", equalTo("ZTEST_PutWk Edited"));
     }
+
+    // ---------- GET stock: happy path ---------------------------------------------
+
+    @Test
+    void getStock_lowStockTrue_whenStockZeroAndMinStockPositive() {
+        int id = seedProduct("ZTEST_StockLow", "5");
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/warehouse/products/" + id + "/stock")
+        .then()
+            .statusCode(200)
+            .body("productId", equalTo(id))
+            .body("stock", equalTo(0))
+            .body("minStock", equalTo(5.0f))
+            .body("lowStock", equalTo(true));
+    }
+
+    @Test
+    void getStock_lowStockFalse_whenStockAboveMinStock() {
+        int id = seedProduct("ZTEST_StockOk", "1");
+        seedOpeningBalance(id, "50");
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/warehouse/products/" + id + "/stock")
+        .then()
+            .statusCode(200)
+            .body("stock", equalTo(50.0f))
+            .body("lowStock", equalTo(false));
+    }
+
+    @Test
+    void getStock_lowStockFalse_whenStockEqualsMinStock_strictInequality() {
+        int id = seedProduct("ZTEST_StockExact", "5");
+        seedOpeningBalance(id, "5");
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/warehouse/products/" + id + "/stock")
+        .then()
+            .statusCode(200)
+            .body("stock", equalTo(5.0f))
+            .body("minStock", equalTo(5.0f))
+            .body("lowStock", equalTo(false));
+    }
+
+    @Test
+    void getStock_nonexistentProduct_returns404() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/warehouse/products/999999/stock")
+        .then()
+            .statusCode(404)
+            .body("code", equalTo("WH-003"));
+    }
+
+    @Test
+    void getStock_withoutToken_returns401() {
+        int id = seedProduct("ZTEST_StockNoToken", "0");
+
+        given()
+        .when()
+            .get("/warehouse/products/" + id + "/stock")
+        .then()
+            .statusCode(401);
+    }
+
+    @Test
+    void getStock_withSalesRole_returns403_COM003() {
+        int id = seedProduct("ZTEST_StockSales", "0");
+        String token = login("lcampos", "Sales1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/warehouse/products/" + id + "/stock")
+        .then()
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void getStock_withWarehouseKeeperRole_returns200() {
+        int id = seedProduct("ZTEST_StockWk", "0");
+
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("wk_test", "warehouse_keeper"))
+        .when()
+            .get("/warehouse/products/" + id + "/stock")
+        .then()
+            .statusCode(200)
+            .body("productId", equalTo(id));
+    }
 }

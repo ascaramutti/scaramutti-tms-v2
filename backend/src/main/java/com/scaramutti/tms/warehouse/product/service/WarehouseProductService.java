@@ -16,6 +16,7 @@ import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.CategoryRef;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.UnitOfMeasureRef;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductStockResponse;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductServiceMapper;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
 import com.scaramutti.tms.warehouse.product.service.cmd.ListWarehouseProductsQuery;
@@ -188,6 +189,19 @@ public class WarehouseProductService {
         UnitOfMeasure unitOfMeasure = unitOfMeasureRepository.findById(product.unitOfMeasureId);
         ProductStockView stock = currentStockOf(product);
         return toResponse(product, category, unitOfMeasure, stock, userLookup.require(product.createdBy));
+    }
+
+    /**
+     * Stock puntual de un producto (GET /warehouse/products/{id}/stock), para el
+     * form de retiro. Read-only, sin {@code @Transactional}. La validación
+     * AUTORITATIVA del retiro (409 WH-001, RN-WH2) sigue viviendo en su propia
+     * transacción; esto es solo lectura para la UX.
+     */
+    public WarehouseProductStockResponse getStock(Integer id) {
+        Product product = productRepository.findByIdOptional(id)
+            .orElseThrow(WarehouseError.PRODUCT_NOT_FOUND::toException);
+        ProductStockView stock = currentStockOf(product);
+        return new WarehouseProductStockResponse(product.id, stock.stock(), product.minStock, stock.lowStock());
     }
 
     // ---------- Validación de FKs (WH-004) -----------------------------------

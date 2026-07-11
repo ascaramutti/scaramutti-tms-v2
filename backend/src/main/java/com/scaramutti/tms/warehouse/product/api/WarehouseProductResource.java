@@ -4,6 +4,7 @@ import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductStockResponse;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductUpdateRequest;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductResourceMapper;
 import com.scaramutti.tms.warehouse.product.service.WarehouseProductService;
@@ -95,5 +96,16 @@ public class WarehouseProductResource {
         return Response.ok(product)
             .header("ETag", WarehouseProductEtag.of(product.updatedAt()))
             .build();
+    }
+
+    /**
+     * Stock disponible en vivo (form de retiro): la validación AUTORITATIVA
+     * sigue siendo la del POST/PUT del retiro en transacción (409 WH-001).
+     */
+    @GET
+    @Path("/{id}/stock")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public WarehouseProductStockResponse getProductStock(@PathParam("id") Integer id) {
+        return warehouseProductService.getStock(id);
     }
 }
