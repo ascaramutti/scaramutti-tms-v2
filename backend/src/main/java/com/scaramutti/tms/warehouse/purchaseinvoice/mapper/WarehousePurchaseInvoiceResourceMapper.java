@@ -29,6 +29,12 @@ import java.time.LocalDate;
 )
 public interface WarehousePurchaseInvoiceResourceMapper {
 
+    // invoiceNumber se trimea aunque sea obligatorio: es EL campo de unicidad (proveedor
+    // + número, RN-WH5), así que un espacio de borde (copy-paste de Excel de finanzas)
+    // no debe registrar la misma factura dos veces ni burlar el UNIQUE. Solo trim, SIN
+    // upper: el índice de V002 es case-sensitive y el código espeja la BD. @NotBlank ya
+    // garantiza contenido no-blank antes del mapper, así que trimToNull nunca da null.
+    @Mapping(target = "invoiceNumber", source = "invoiceNumber", qualifiedByName = "trimToNull")
     @Mapping(target = "guideNumber",  source = "guideNumber",  qualifiedByName = "trimToNull")
     @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")
     CreateWarehousePurchaseInvoiceCommand toCreateWarehousePurchaseInvoiceCommand(

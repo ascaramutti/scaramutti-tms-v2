@@ -328,6 +328,35 @@ class WarehousePurchaseInvoiceResourceTest {
     }
 
     @Test
+    void create_invoiceNumberWithBorderSpaces_isTrimmed_thenSameNumberConflicts() {
+        int supplierId = seedSupplier("ZTEST_Proveedor Trim");
+        int productId = seedProduct("ZTEST_PI Trim");
+        String token = login("admin", "Admin1234");
+
+        // El número llega con espacios de borde (copy-paste de Excel): se registra trimmed.
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(invoiceBody(supplierId, "  ZTEST-TRIM-001  ", currencyId("USD"), itemJson(productId, "1", "1.00")))
+        .when()
+            .post("/warehouse/purchase-invoices")
+        .then()
+            .statusCode(201)
+            .body("invoiceNumber", equalTo("ZTEST-TRIM-001"));
+
+        // La misma factura tipeada sin espacios debe chocar (no registrarse dos veces).
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(invoiceBody(supplierId, "ZTEST-TRIM-001", currencyId("USD"), itemJson(productId, "1", "1.00")))
+        .when()
+            .post("/warehouse/purchase-invoices")
+        .then()
+            .statusCode(409)
+            .body("code", equalTo("WH-002"));
+    }
+
+    @Test
     void create_sameNumberDifferentSupplier_returns201NoConflict() {
         int supplierA = seedSupplier("ZTEST_Proveedor NumA");
         int supplierB = seedSupplier("ZTEST_Proveedor NumB");
