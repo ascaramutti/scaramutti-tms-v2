@@ -54,8 +54,11 @@ public class PurchaseInvoiceRepository implements PanacheRepositoryBase<Purchase
      */
     public List<PurchaseInvoice> searchPaged(ListWarehousePurchaseInvoicesQuery query) {
         Map<String, Object> params = new HashMap<>();
+        // Desempate por id: created_at va truncado a MICROS, así que dos facturas en el
+        // mismo microsegundo (carga inicial Excel one-shot, inserts en lote) tendrían orden
+        // no determinista entre páginas sin él (mismo criterio que movement_seq del kardex).
         String sql = "SELECT pi.* " + fromAndWhere(query, params)
-            + " ORDER BY pi.created_at DESC LIMIT :pageSize OFFSET :pageOffset";
+            + " ORDER BY pi.created_at DESC, pi.id DESC LIMIT :pageSize OFFSET :pageOffset";
 
         Query nativeQuery = entityManager.createNativeQuery(sql, PurchaseInvoice.class);
         params.forEach(nativeQuery::setParameter);
