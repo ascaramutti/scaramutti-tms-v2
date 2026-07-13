@@ -1,6 +1,7 @@
 package com.scaramutti.tms.warehouse.purchaseinvoice.api;
 
 import com.scaramutti.tms.shared.dto.PageResponse;
+import com.scaramutti.tms.shared.util.Etag;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceRequest;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceResponse;
@@ -58,11 +59,10 @@ public class WarehousePurchaseInvoiceResource {
         WarehousePurchaseInvoiceResponse response = warehousePurchaseInvoiceService.createPurchaseInvoice(
             warehousePurchaseInvoiceResourceMapper.toCreateWarehousePurchaseInvoiceCommand(warehousePurchaseInvoiceRequest)
         );
-        // ETag = updatedAt (la "versión") entre comillas, formato opaco para el
-        // If-Match del PUT/cancel (A9). Inline: único uso en A8; cuando A9 sume el
-        // verify() del If-Match (2° uso) se extrae a un WarehousePurchaseInvoiceEtag.
+        // ETag = updatedAt (la "versión"), formato opaco compartido para el If-Match
+        // del PUT/cancel (A9), vía el helper único Etag de shared/util.
         return Response.status(Response.Status.CREATED)
-            .header("ETag", "\"" + response.updatedAt().toString() + "\"")
+            .header("ETag", Etag.of(response.updatedAt()))
             .entity(response)
             .build();
     }
