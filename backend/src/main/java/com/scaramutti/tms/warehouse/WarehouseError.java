@@ -28,7 +28,13 @@ public enum WarehouseError implements ApiError {
     OPENING_BALANCE_DUPLICATED      ("WH-009", 409, "Conflict",
         "El producto ya tiene una apertura de inventario registrada"),
     OPENING_BALANCE_HAS_MOVEMENTS   ("WH-011", 409, "Conflict",
-        "El producto ya tiene movimientos registrados; la apertura debe ser el primer movimiento");
+        "El producto ya tiene movimientos registrados; la apertura debe ser el primer movimiento"),
+    SUPPLIER_NOT_FOUND_OR_INACTIVE  ("WH-004", 400, "Bad Request",
+        "El proveedor indicado no existe o está inactivo"),
+    CURRENCY_NOT_FOUND_OR_INACTIVE  ("WH-004", 400, "Bad Request",
+        "La moneda indicada no existe o está inactiva"),
+    PURCHASE_INVOICE_DUPLICATED_ACTIVE("WH-002", 409, "Conflict",
+        "Ya existe una factura activa con ese número para el proveedor indicado");
 
     private final String code;
     private final int status;
