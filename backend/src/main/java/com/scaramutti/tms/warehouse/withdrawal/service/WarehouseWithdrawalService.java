@@ -3,6 +3,7 @@ package com.scaramutti.tms.warehouse.withdrawal.service;
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.UserLookup;
+import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
 import com.scaramutti.tms.shared.entity.EscortVehicle;
 import com.scaramutti.tms.shared.entity.Product;
@@ -26,17 +27,23 @@ import com.scaramutti.tms.warehouse.withdrawal.dto.FleetUnitRef;
 import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalResponse;
 import com.scaramutti.tms.warehouse.withdrawal.mapper.WarehouseWithdrawalServiceMapper;
 import com.scaramutti.tms.warehouse.withdrawal.service.cmd.CreateWarehouseWithdrawalCommand;
+import com.scaramutti.tms.warehouse.withdrawal.service.cmd.ListWarehouseWithdrawalsQuery;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * Retiros de almacén (salidas de stock): alta transaccional. RN-WH2, la regla estrella:
  * {@code quantity ≤ stock disponible} se valida BAJO un lock de fila del producto
  * ({@code SELECT ... FOR UPDATE}) para que dos retiros concurrentes del mismo producto no
- * pasen ambos por una race (no best-effort, D-2/D-12).
+ * pasen ambos por una race: el chequeo de stock es serializado por el lock, no best-effort.
  *
  * <p>Orden de validación: WH-005 (a lo sumo una unidad, estructural y barato) → WH-004
  * (producto, trabajador y unidad, activos) → lock + WH-001 (stock insuficiente, con el
@@ -79,7 +86,88 @@ public class WarehouseWithdrawalService {
         Withdrawal withdrawal = warehouseWithdrawalServiceMapper.toWithdrawalEntity(command, userId);
         withdrawalRepository.persist(withdrawal);
 
-        return toResponse(withdrawal, product, unit, worker, fleetUnit, userLookup.require(userId));
+        // Retiro recién creado: ACTIVE, sin anular (cancelledBy null).
+        return toResponse(withdrawal, product, unit, worker, fleetUnit, userLookup.require(userId), null);
+    }
+
+    /**
+     * Listado paginado (GET /warehouse/withdrawals). Read-only, sin {@code @Transactional}.
+     * Queries fijas (page + count + productos/unidades + trabajadores + usuarios + las 3
+     * flotas), ninguna N+1 por page size. {@code lastEdit} viaja null (aún no hay edición).
+     */
+    public PageResponse<WarehouseWithdrawalResponse> listWithdrawals(ListWarehouseWithdrawalsQuery query) {
+        List<Withdrawal> withdrawals = withdrawalRepository.searchPaged(query);
+        long totalElements = withdrawalRepository.countSearch(query);
+
+        if (withdrawals.isEmpty()) {
+            return PageResponse.of(List.of(), query.page(), query.size(), totalElements);
+        }
+
+        Map<Integer, Product> productsById = productRepository
+            .list("id in ?1", withdrawals.stream().map(w -> w.productId).collect(Collectors.toSet()))
+            .stream().collect(Collectors.toMap(product -> product.id, product -> product));
+        Map<Integer, UnitOfMeasure> unitsById = unitOfMeasureRepository
+            .list("id in ?1", productsById.values().stream().map(p -> p.unitOfMeasureId).collect(Collectors.toSet()))
+            .stream().collect(Collectors.toMap(unit -> unit.id, unit -> unit));
+        Map<Integer, Worker> workersById = workerRepository
+            .list("id in ?1", withdrawals.stream().map(w -> w.receivedBy).collect(Collectors.toSet()))
+            .stream().collect(Collectors.toMap(worker -> worker.id, worker -> worker));
+
+        Set<Integer> userIds = new HashSet<>();
+        withdrawals.forEach(w -> {
+            userIds.add(w.registeredBy);
+            if (w.cancelledBy != null) {
+                userIds.add(w.cancelledBy);
+            }
+        });
+        Map<Integer, UserResponse> usersById = userLookup.requireAllById(userIds);
+
+        Set<Integer> tractorIds = idsOf(withdrawals, w -> w.tractorId);
+        Set<Integer> trailerIds = idsOf(withdrawals, w -> w.trailerId);
+        Set<Integer> escortIds = idsOf(withdrawals, w -> w.escortVehicleId);
+        // Solo se consulta el subtipo que aparece en la página (evita 3 round-trips fijos).
+        Map<Integer, Tractor> tractorsById = tractorIds.isEmpty() ? Map.of() : tractorRepository
+            .list("id in ?1", tractorIds).stream().collect(Collectors.toMap(t -> t.id, t -> t));
+        Map<Integer, Trailer> trailersById = trailerIds.isEmpty() ? Map.of() : trailerRepository
+            .list("id in ?1", trailerIds).stream().collect(Collectors.toMap(t -> t.id, t -> t));
+        Map<Integer, EscortVehicle> escortsById = escortIds.isEmpty() ? Map.of() : escortVehicleRepository
+            .list("id in ?1", escortIds).stream().collect(Collectors.toMap(e -> e.id, e -> e));
+
+        List<WarehouseWithdrawalResponse> content = withdrawals.stream()
+            .map(withdrawal -> {
+                Product product = productsById.get(withdrawal.productId);
+                return toResponse(
+                    withdrawal, product, unitsById.get(product.unitOfMeasureId),
+                    workersById.get(withdrawal.receivedBy),
+                    resolveFleetUnit(withdrawal, tractorsById, trailersById, escortsById),
+                    usersById.get(withdrawal.registeredBy),
+                    withdrawal.cancelledBy != null ? usersById.get(withdrawal.cancelledBy) : null);
+            })
+            .toList();
+
+        return PageResponse.of(content, query.page(), query.size(), totalElements);
+    }
+
+    /** Ids no-null de un campo de flota de la página (vacío si ningún retiro usa ese subtipo). */
+    private Set<Integer> idsOf(List<Withdrawal> withdrawals, java.util.function.Function<Withdrawal, Integer> field) {
+        return withdrawals.stream().map(field).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private FleetUnitRef resolveFleetUnit(Withdrawal withdrawal, Map<Integer, Tractor> tractors,
+                                          Map<Integer, Trailer> trailers, Map<Integer, EscortVehicle> escorts) {
+        if (withdrawal.tractorId != null) {
+            Tractor t = tractors.get(withdrawal.tractorId);
+            return t != null ? new FleetUnitRef(FleetUnitKind.TRACTOR, t.id, t.plate) : null;
+        }
+        if (withdrawal.trailerId != null) {
+            Trailer t = trailers.get(withdrawal.trailerId);
+            return t != null ? new FleetUnitRef(FleetUnitKind.TRAILER, t.id, t.plate) : null;
+        }
+        if (withdrawal.escortVehicleId != null) {
+            EscortVehicle e = escorts.get(withdrawal.escortVehicleId);
+            return e != null ? new FleetUnitRef(FleetUnitKind.ESCORT, e.id, e.plate) : null;
+        }
+        return null;
     }
 
     // ---------- WH-005 (a lo sumo una unidad de flota) ------------------------
@@ -147,7 +235,7 @@ public class WarehouseWithdrawalService {
 
     private WarehouseWithdrawalResponse toResponse(
         Withdrawal withdrawal, Product product, UnitOfMeasure unit, Worker worker,
-        FleetUnitRef fleetUnit, UserResponse registeredBy
+        FleetUnitRef fleetUnit, UserResponse registeredBy, UserResponse cancelledBy
     ) {
         return new WarehouseWithdrawalResponse(
             withdrawal.id,
@@ -159,11 +247,12 @@ public class WarehouseWithdrawalService {
             withdrawal.observations,
             WarehouseRecordStatus.valueOf(withdrawal.status),
             withdrawal.cancelReason,
-            null,
+            cancelledBy,
             withdrawal.cancelledAt,
+            // lastEdit null: aún no hay edición de retiros. La versión (ETag) es withdrawnAt
+            // (la tabla no tiene updated_at; el retiro recién creado no se editó).
             null,
             registeredBy,
-            // El retiro recién creado no se editó: su versión (ETag) es withdrawnAt.
             withdrawal.withdrawnAt
         );
     }

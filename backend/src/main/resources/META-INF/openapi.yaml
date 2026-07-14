@@ -1384,6 +1384,34 @@ paths:
         '412': { $ref: '#/components/responses/PreconditionFailed' }
 
   /warehouse/withdrawals:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehouseWithdrawals
+      summary: Listar retiros con filtros
+      description: |
+        Orden `withdrawnAt` DESC. Incluye los ANULADOS (badge + motivo), filtrable por
+        `status`. Filtros de unidad excluyentes en la practica (una unidad por retiro).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: productId, in: query, schema: { type: integer } }
+        - { name: receivedByWorkerId, in: query, schema: { type: integer } }
+        - { name: tractorId, in: query, schema: { type: integer } }
+        - { name: trailerId, in: query, schema: { type: integer } }
+        - { name: escortVehicleId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/WarehouseRecordStatus' } }
+        - { name: dateFrom, in: query, description: '`withdrawnAt` desde (inclusive, America/Lima)', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: '`withdrawnAt` hasta (inclusive del dia completo, America/Lima)', schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Pagina de retiros
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehouseWithdrawal' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Warehouse]
       operationId: createWarehouseWithdrawal
@@ -2813,3 +2841,13 @@ components:
         lastEdit:     { $ref: '#/components/schemas/WarehouseEditTrace' }
         registeredBy: { $ref: '#/components/schemas/UserResponse' }
         updatedAt:    { type: string, format: date-time, description: 'Source de la version, usar el header ETag opaco en If-Match' }
+
+    PageOfWarehouseWithdrawal:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
