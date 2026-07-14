@@ -84,6 +84,29 @@ public class ProductRepository implements PanacheRepositoryBase<Product, Integer
     }
 
     /**
+     * Lock exclusivo por-fila del producto ({@code SELECT ... FOR UPDATE}) para SERIALIZAR el
+     * check-and-insert de stock: el stock es una VIEW derivada (no lockeable), pero todo
+     * movimiento del producto referencia la fila real {@code almacen.products(id)}. Al tomar el
+     * lock al inicio de la tx, dos transacciones sobre el MISMO producto se serializan (la 2da
+     * bloquea hasta el COMMIT de la 1ra), así que al releer el stock ya ve el movimiento
+     * committeado: el retiro no puede pasar el chequeo de stock por una race (RN-WH2, no
+     * best-effort). Productos distintos no se estorban. Lo reusa la guarda de la edición de
+     * entradas además del alta de retiros.
+     *
+     * <p>Correcto bajo READ COMMITTED (el default de Postgres/Quarkus): el INSERT del movimiento
+     * no modifica la fila lockeada, pero al liberarse el lock la 2da tx re-snapshotea en su
+     * siguiente statement y lee el stock ya committeado. Bajo REPEATABLE READ NO alcanzaría (el
+     * snapshot viejo persistiría) — el módulo asume READ COMMITTED.
+     *
+     * <p>CRITICAL: debe llamarse DENTRO de una tx activa (el lock es de tx).
+     */
+    public void lockProductRow(Integer productId) {
+        entityManager.createNativeQuery("SELECT id FROM almacen.products WHERE id = :id FOR UPDATE")
+            .setParameter("id", productId)
+            .getSingleResult();
+    }
+
+    /**
      * MAX del sufijo numerico de los codes autogenerados ({@code PRO-NNNN}).
      * El filtro {@code ~ '^PRO-[0-9]{1,9}$'} excluye los SKU provistos por el
      * usuario con otro formato (un cast de "PRO-abc" reventaria) y acota a 9

@@ -1383,6 +1383,81 @@ paths:
                 traceId: '7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
 
+  /warehouse/withdrawals:
+    post:
+      tags: [Warehouse]
+      operationId: createWarehouseWithdrawal
+      summary: Registrar retiro (valida stock en transaccion)
+      description: |
+        RN-WH2: `receivedByWorkerId` SIEMPRE obligatorio (FK public.workers). Unidad
+        destino OPCIONAL y a lo sumo UNA (`tractorId` | `trailerId` | `escortVehicleId`,
+        subtipos disyuntos); mas de una -> 400 WH-005. `quantity > 0` y <= stock
+        disponible, validado en la MISMA transaccion con lock del producto
+        (SELECT ... FOR UPDATE); si excede -> 409 WH-001 con el disponible en el detail.
+        `withdrawnAt` lo pone el server; `registeredBy` = usuario del token. Producto/
+        trabajador/unidad inexistente o inactivo -> 400 WH-004.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseWithdrawalRequest' }
+            example:
+              productId: 12
+              quantity: 2
+              receivedByWorkerId: 8
+              tractorId: 5
+              observations: 'Cambio de aceite programado'
+      responses:
+        '201':
+          description: Registrado
+          headers:
+            ETag: { schema: { type: string }, description: Version opaca para If-Match (PUT/cancel) }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '400':
+          description: Validacion, incluye WH-005 (mas de una unidad) y WH-004 (catalogo)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                multipleFleetUnits:
+                  summary: Tracto y carreta a la vez (la unidad destino es disyunta)
+                  value:
+                    type: 'urn:tms:error:wh-005'
+                    title: 'Bad Request'
+                    status: 400
+                    detail: 'La unidad destino admite a lo sumo una: tracto, carreta O escolta'
+                    instance: '/api/v1/warehouse/withdrawals'
+                    code: 'WH-005'
+                    traceId: '8b9c0d1e-2f3a-4b5c-6d7e-8f9a0b1c2d3e'
+                inactiveCatalog:
+                  summary: Producto, trabajador o unidad inexistente/inactivo
+                  value:
+                    type: 'urn:tms:error:wh-004'
+                    title: 'Bad Request'
+                    status: 400
+                    detail: 'El producto seleccionado no existe o esta inactivo'
+                    instance: '/api/v1/warehouse/withdrawals'
+                    code: 'WH-004'
+                    traceId: '9c0d1e2f-3a4b-5c6d-7e8f-9a0b1c2d3e4f'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Stock insuficiente -> WH-001
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-001'
+                title: 'Conflict'
+                status: 409
+                detail: 'Stock insuficiente: solo hay 4 UND disponibles de Filtro de aceite XYZ'
+                instance: '/api/v1/warehouse/withdrawals'
+                code: 'WH-001'
+                traceId: '0d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
+
 # =============================================================================
 components:
 # =============================================================================
@@ -2678,3 +2753,63 @@ components:
             content:
               type: array
               items: { $ref: '#/components/schemas/WarehousePurchaseInvoiceSummary' }
+
+    # -------- Warehouse: retiros ---------------------------------------------------
+    WorkerResponse:
+      type: object
+      description: Trabajador de public.workers (catalogo compartido con v1, read-only desde v2).
+      required: [id, fullName, isActive]
+      properties:
+        id:       { type: integer }
+        fullName: { type: string, example: 'Juan Pérez Huamán' }
+        position: { type: [string, 'null'], example: 'Mecánico' }
+        isActive: { type: boolean }
+
+    FleetUnitKind:
+      type: string
+      enum: [TRACTOR, TRAILER, ESCORT]
+      description: Subtipo de la flota (disyunto y total). ESCORT = vehiculo escolta.
+
+    FleetUnitRef:
+      type: object
+      description: Referencia minima a una unidad de flota; la direccion completa es el par (kind, id).
+      required: [kind, id, plate]
+      properties:
+        kind:  { $ref: '#/components/schemas/FleetUnitKind' }
+        id:    { type: integer }
+        plate: { type: string, minLength: 6, maxLength: 6, example: 'ABC123' }
+
+    WarehouseWithdrawalRequest:
+      type: object
+      description: |
+        RN-WH2: `receivedByWorkerId` SIEMPRE obligatorio; unidad destino OPCIONAL y a lo
+        sumo UNA (tractorId | trailerId | escortVehicleId, subtipos disyuntos; mas de una
+        -> 400 WH-005). `withdrawnAt` lo asigna el server.
+      required: [productId, quantity, receivedByWorkerId]
+      properties:
+        productId:          { type: integer }
+        quantity:           { type: number, exclusiveMinimum: 0, description: '> 0 y <= stock disponible (en transaccion -> 409 WH-001)' }
+        receivedByWorkerId: { type: integer, description: 'Quien recibe (FK public.workers). Obligatorio.' }
+        tractorId:          { type: [integer, 'null'] }
+        trailerId:          { type: [integer, 'null'] }
+        escortVehicleId:    { type: [integer, 'null'] }
+        observations:       { type: [string, 'null'] }
+
+    WarehouseWithdrawalResponse:
+      type: object
+      required: [id, product, quantity, withdrawnAt, receivedBy, status, registeredBy, updatedAt]
+      properties:
+        id:          { type: integer }
+        product:     { $ref: '#/components/schemas/WarehouseProductSummary' }
+        quantity:    { type: number }
+        withdrawnAt: { type: string, format: date-time, description: 'Lo asigna el server al registrar' }
+        receivedBy:  { $ref: '#/components/schemas/WorkerResponse' }
+        fleetUnit:   { $ref: '#/components/schemas/FleetUnitRef' }
+        observations: { type: [string, 'null'] }
+        status:       { $ref: '#/components/schemas/WarehouseRecordStatus' }
+        cancelReason: { type: [string, 'null'], description: 'Presente solo si status=CANCELLED' }
+        cancelledBy:  { $ref: '#/components/schemas/UserResponse' }
+        cancelledAt:  { type: [string, 'null'], format: date-time }
+        lastEdit:     { $ref: '#/components/schemas/WarehouseEditTrace' }
+        registeredBy: { $ref: '#/components/schemas/UserResponse' }
+        updatedAt:    { type: string, format: date-time, description: 'Source de la version, usar el header ETag opaco en If-Match' }
