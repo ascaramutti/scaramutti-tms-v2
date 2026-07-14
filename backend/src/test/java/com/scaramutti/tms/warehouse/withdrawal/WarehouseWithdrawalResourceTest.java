@@ -64,7 +64,7 @@ class WarehouseWithdrawalResourceTest {
             entityManager.createNativeQuery("DELETE FROM almacen.products WHERE name LIKE ?1")
                 .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
             // Flota de test: borrado quirúrgico por su estado propio (ZTEST_STATUS), NO por prefijo
-            // de placa — tractors/trailers/escort viven en public COMPARTIDO con v1 y un prefijo de
+            // de placa. tractors/trailers/escort viven en public COMPARTIDO con v1 y un prefijo de
             // 2 chars podría matchear una placa real (y reventar el cleanup por FKs de v1).
             String byTestStatus = "WHERE status_id = (SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS')";
             entityManager.createNativeQuery("DELETE FROM public.tractors " + byTestStatus).executeUpdate();

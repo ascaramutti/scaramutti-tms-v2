@@ -96,7 +96,7 @@ public class ProductRepository implements PanacheRepositoryBase<Product, Integer
      * <p>Correcto bajo READ COMMITTED (el default de Postgres/Quarkus): el INSERT del movimiento
      * no modifica la fila lockeada, pero al liberarse el lock la 2da tx re-snapshotea en su
      * siguiente statement y lee el stock ya committeado. Bajo REPEATABLE READ NO alcanzaría (el
-     * snapshot viejo persistiría) — el módulo asume READ COMMITTED.
+     * snapshot viejo persistiría): el módulo asume READ COMMITTED.
      *
      * <p>CRITICAL: debe llamarse DENTRO de una tx activa (el lock es de tx).
      */

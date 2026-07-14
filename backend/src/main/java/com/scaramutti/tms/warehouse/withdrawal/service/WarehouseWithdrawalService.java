@@ -36,7 +36,9 @@ import java.math.BigDecimal;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
@@ -149,8 +151,8 @@ public class WarehouseWithdrawalService {
     }
 
     /** Ids no-null de un campo de flota de la página (vacío si ningún retiro usa ese subtipo). */
-    private Set<Integer> idsOf(List<Withdrawal> withdrawals, java.util.function.Function<Withdrawal, Integer> field) {
-        return withdrawals.stream().map(field).filter(java.util.Objects::nonNull).collect(Collectors.toSet());
+    private Set<Integer> idsOf(List<Withdrawal> withdrawals, Function<Withdrawal, Integer> field) {
+        return withdrawals.stream().map(field).filter(Objects::nonNull).collect(Collectors.toSet());
     }
 
     private FleetUnitRef resolveFleetUnit(Withdrawal withdrawal, Map<Integer, Tractor> tractors,
