@@ -1171,6 +1171,88 @@ paths:
                     code: 'WH-011'
                     traceId: '3c4d5e6f-7a8b-9c0d-1e2f-3a4b5c6d7e8f'
 
+  /warehouse/purchase-invoices:
+    get:
+      tags: [Warehouse]
+      operationId: listWarehousePurchaseInvoices
+      summary: Listar entradas (facturas de compra) con filtros
+      description: |
+        Orden `createdAt` DESC. Incluye las ANULADAS (badge + motivo en la UI),
+        filtrable por `status`. `q` (>= 3) busca substring case-insensitive en
+        `invoiceNumber`, `guideNumber` y nombre del proveedor; multi-palabra:
+        cada palabra debe matchear en algun campo (AND de ORs, RN-WH14). `total`
+        e `itemsCount` se calculan de los items (los totales NO se persisten).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: supplierId, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/WarehouseRecordStatus' } }
+        - { name: dateFrom, in: query, description: '`invoiceDate` desde (inclusive)', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: '`invoiceDate` hasta (inclusive)', schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Pagina de facturas
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfWarehousePurchaseInvoiceSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Warehouse]
+      operationId: createWarehousePurchaseInvoice
+      summary: Registrar entrada, factura con N items (transaccional)
+      description: |
+        Crea factura + items en UNA transaccion; cada item suma stock (via VIEW).
+        Los productos se referencian por `productId` (crear-al-vuelo llama antes a
+        `POST /warehouse/products` desde el modal, decision D-3).
+        - Unicidad proveedor+numero solo entre ACTIVAS (UNIQUE parcial): duplicado
+          -> 409 `WH-002` (RN-WH5). Una anulada libera su numero.
+        - Proveedor/moneda/producto inexistente o inactivo -> 400 `WH-004`.
+        - `currencyId` fija la moneda de la factura (RN-WH7, sin conversion).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceRequest' }
+            example:
+              supplierId: 4
+              invoiceNumber: 'F001-00123'
+              invoiceDate: '2026-07-02'
+              guideNumber: 'T001-0004567'
+              currencyId: 2
+              observations: 'Compra repuestos mantenimiento preventivo'
+              items:
+                - { productId: 12, quantity: 10, unitPrice: 45.00 }
+                - { productId: 31, quantity: 24, unitPrice: 18.50 }
+      responses:
+        '201':
+          description: Creada
+          headers:
+            ETag: { schema: { type: string }, description: Version opaca para If-Match (PUT/cancel) }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: Nº de factura duplicado para ese proveedor (entre ACTIVAS) -> WH-002
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe la factura F001-00123 de ese proveedor'
+                instance: '/api/v1/warehouse/purchase-invoices'
+                code: 'WH-002'
+                traceId: '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a'
+
 # =============================================================================
 components:
 # =============================================================================
@@ -2322,3 +2404,122 @@ components:
             content:
               type: array
               items: { $ref: '#/components/schemas/WarehouseOpeningBalanceResponse' }
+
+    WarehouseRecordStatus:
+      type: string
+      enum: [ACTIVE, CANCELLED]
+      description: |
+        Estado de entradas y retiros (columna + CHECK). `CANCELLED` = anulado con
+        motivo/quien/cuando; no mueve stock/kardex/reportes pero queda visible.
+
+    WarehouseEditTrace:
+      type: object
+      description: Rastro del ultimo cambio, derivado del FIELD_EDIT mas reciente en almacen.audit_logs.
+      required: [by, at, reason]
+      properties:
+        by:     { $ref: '#/components/schemas/UserResponse' }
+        at:     { type: string, format: date-time }
+        reason: { type: string, description: 'Justificacion dada al editar (>= 10 caracteres)' }
+
+    WarehouseInvoiceItemRequest:
+      type: object
+      required: [productId, quantity, unitPrice]
+      properties:
+        productId: { type: integer }
+        quantity:  { type: number, exclusiveMinimum: 0 }
+        unitPrice: { type: number, minimum: 0, description: 'En la moneda de la factura. Puede ser 0 (bonificacion).' }
+
+    WarehousePurchaseInvoiceRequest:
+      type: object
+      required: [supplierId, invoiceNumber, invoiceDate, currencyId, items]
+      properties:
+        supplierId:    { type: integer }
+        invoiceNumber: { type: string, minLength: 1, maxLength: 50, example: 'F001-00123' }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'], maxLength: 50, description: 'Guia de remision (1 factura -> 1 guia; dato de finanzas)', example: 'T001-0004567' }
+        currencyId:    { type: integer, description: 'Fija la moneda de la factura (RN-WH7)' }
+        observations:  { type: [string, 'null'] }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
+
+    WarehouseInvoiceItemResponse:
+      type: object
+      required: [id, product, quantity, unitPrice, subtotal]
+      properties:
+        id:        { type: integer }
+        product:   { $ref: '#/components/schemas/WarehouseProductSummary' }
+        quantity:  { type: number }
+        unitPrice: { type: number }
+        subtotal:  { type: number, description: '`quantity * unitPrice`, derivado en codigo, no persistido' }
+
+    WarehousePurchaseInvoiceResponse:
+      type: object
+      required: [id, supplier, invoiceNumber, invoiceDate, currency, items, total, status, registeredBy, createdAt, updatedAt]
+      properties:
+        id: { type: integer }
+        supplier:
+          type: object
+          required: [id, name]
+          properties:
+            id:   { type: integer }
+            name: { type: string }
+            ruc:  { type: [string, 'null'], pattern: '^\d{11}$' }
+        invoiceNumber: { type: string }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'] }
+        currency:
+          type: object
+          required: [id, code, symbol]
+          properties:
+            id:     { type: integer }
+            code:   { type: string, pattern: '^[A-Z]{3}$', example: 'PEN' }
+            symbol: { type: string, maxLength: 5, example: 'S/' }
+        observations: { type: [string, 'null'] }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/WarehouseInvoiceItemResponse' }
+        total:        { type: number, description: 'Suma de items.subtotal en la moneda de la factura, derivado en codigo, nunca persistido' }
+        status:       { $ref: '#/components/schemas/WarehouseRecordStatus' }
+        cancelReason: { type: [string, 'null'], description: 'Presente solo si status=CANCELLED' }
+        cancelledBy:  { $ref: '#/components/schemas/UserResponse' }
+        cancelledAt:  { type: [string, 'null'], format: date-time }
+        lastEdit:     { $ref: '#/components/schemas/WarehouseEditTrace' }
+        registeredBy: { $ref: '#/components/schemas/UserResponse' }
+        createdAt:    { type: string, format: date-time }
+        updatedAt:    { type: string, format: date-time, description: 'Source de la version, usar el header ETag opaco en If-Match, NO este valor' }
+
+    WarehousePurchaseInvoiceSummary:
+      type: object
+      description: Fila del listado de Entradas.
+      required: [id, supplier, invoiceNumber, invoiceDate, currencyCode, itemsCount, total, status, registeredBy, createdAt]
+      properties:
+        id: { type: integer }
+        supplier:
+          type: object
+          required: [id, name]
+          properties:
+            id:   { type: integer }
+            name: { type: string }
+        invoiceNumber: { type: string }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'] }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$' }
+        itemsCount:    { type: integer }
+        total:         { type: number, description: 'Derivado de los items (no persistido)' }
+        status:        { $ref: '#/components/schemas/WarehouseRecordStatus' }
+        cancelReason:  { type: [string, 'null'] }
+        registeredBy:  { $ref: '#/components/schemas/UserResponse' }
+        createdAt:     { type: string, format: date-time }
+
+    PageOfWarehousePurchaseInvoiceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/WarehousePurchaseInvoiceSummary' }
