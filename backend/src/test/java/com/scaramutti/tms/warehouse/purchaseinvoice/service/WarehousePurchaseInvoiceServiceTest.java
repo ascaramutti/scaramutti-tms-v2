@@ -487,4 +487,58 @@ class WarehousePurchaseInvoiceServiceTest {
         verify(purchaseInvoiceItemRepository, never()).deleteByInvoiceId(any());
         verify(auditLogRepository, never()).persist(any(com.scaramutti.tms.shared.entity.AuditLog.class));
     }
+
+    // ---------- CANCEL ----------
+
+    @Test
+    void cancel_nonexistentId_throwsWH003() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.empty());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(INVOICE_ID, "\"x\"", "Motivo suficientemente largo"));
+
+        assertEquals("WH-003", ex.code());
+    }
+
+    @Test
+    void cancel_alreadyCancelled_throwsWH008() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(cancelledInvoice()));
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(INVOICE_ID, "\"x\"", "Motivo suficientemente largo"));
+
+        assertEquals("WH-008", ex.code());
+    }
+
+    @Test
+    void cancel_staleIfMatch_throwsCOM004() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoiceEntity()));
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(INVOICE_ID, "\"stale\"", "Motivo suficientemente largo"));
+
+        assertEquals("COM-004", ex.code());
+        assertEquals(412, ex.status());
+    }
+
+    @Test
+    void cancel_stockGuardNegative_throwsWH007_doesNotMutate() {
+        PurchaseInvoice invoice = invoiceEntity();
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        // Contribución 10, stock actual 1 → 1 - 10 = -9 < 0
+        when(purchaseInvoiceItemRepository.sumQuantityByProductForInvoice(INVOICE_ID))
+            .thenReturn(Map.of(PRODUCT_ID, new BigDecimal("10")));
+        when(productRepository.findStockByProductIds(anyCollection()))
+            .thenReturn(Map.of(PRODUCT_ID, new ProductRepository.ProductStockView(new BigDecimal("1"), false)));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(activeProduct());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(
+            INVOICE_ID, Etag.of(invoice.updatedAt), "Motivo suficientemente largo"));
+
+        assertEquals("WH-007", ex.code());
+        assertEquals(409, ex.status());
+        assertEquals("ACTIVE", invoice.status);
+        verify(auditLogRepository, never()).persist(any(com.scaramutti.tms.shared.entity.AuditLog.class));
+    }
 }

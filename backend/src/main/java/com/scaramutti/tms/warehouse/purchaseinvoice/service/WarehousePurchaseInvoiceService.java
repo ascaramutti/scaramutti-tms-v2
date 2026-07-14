@@ -374,6 +374,30 @@ public class WarehousePurchaseInvoiceService {
         return assembleResponse(invoice);
     }
 
+    /**
+     * Anulación de una entrada (POST /{id}/cancel). 404 WH-003 → WH-008 (ya anulada) →
+     * 412 If-Match → 409 WH-007 (guarda de stock) → status→CANCELLED + motivo/quién/cuándo
+     * + fila CANCELLED en audit_logs. Nada se borra (RN-WH3).
+     */
+    @Transactional
+    public WarehousePurchaseInvoiceResponse cancelPurchaseInvoice(Integer id, String ifMatch, String reason) {
+        Integer userId = currentUser.requireId();
+        PurchaseInvoice invoice = loadInvoiceOrThrow(id);
+        rejectIfCancelled(invoice);
+        Etag.verify(ifMatch, invoice.updatedAt);
+        guardCancelKeepsStockNonNegative(invoice);
+
+        invoice.status = WarehouseRecordStatus.CANCELLED.name();
+        invoice.cancelReason = reason;
+        invoice.cancelledBy = userId;
+        invoice.cancelledAt = DateUtils.nowUtcMicros();
+        // Anular no cambia proveedor/número → sin riesgo del UNIQUE parcial; flush simple.
+        purchaseInvoiceRepository.flush();
+
+        writeCancelLog(invoice.id, reason, userId);
+        return assembleResponse(invoice);
+    }
+
     // ---------- Carga / precondiciones ----------------------------------------
 
     private PurchaseInvoice loadInvoiceOrThrow(Integer id) {
@@ -409,6 +433,24 @@ public class WarehousePurchaseInvoiceService {
                 .add(newContrib.getOrDefault(productId, BigDecimal.ZERO));
             if (after.signum() < 0) {
                 throw stockGuardException(WarehouseError.PURCHASE_INVOICE_EDIT_NEGATIVE_STOCK, productId, after);
+            }
+        }
+    }
+
+    /**
+     * WH-007: descontar esta factura (sus ítems ACTIVE) no puede dejar ningún producto en
+     * negativo. {@code stock_después = stock_actual − contribución_de_esta_factura}.
+     */
+    private void guardCancelKeepsStockNonNegative(PurchaseInvoice invoice) {
+        Map<Integer, BigDecimal> contrib = purchaseInvoiceItemRepository.sumQuantityByProductForInvoice(invoice.id);
+        if (contrib.isEmpty()) {
+            return;
+        }
+        Map<Integer, ProductRepository.ProductStockView> stockById = productRepository.findStockByProductIds(contrib.keySet());
+        for (Map.Entry<Integer, BigDecimal> entry : contrib.entrySet()) {
+            BigDecimal after = currentStockOrZero(stockById, entry.getKey()).subtract(entry.getValue());
+            if (after.signum() < 0) {
+                throw stockGuardException(WarehouseError.PURCHASE_INVOICE_CANCEL_NEGATIVE_STOCK, entry.getKey(), after);
             }
         }
     }
@@ -449,6 +491,16 @@ public class WarehousePurchaseInvoiceService {
         log.fieldLabel = fieldLabel;
         log.oldValue = oldValue;
         log.newValue = newValue;
+        log.reason = reason;
+        log.changedBy = userId;
+        auditLogRepository.persist(log);
+    }
+
+    private void writeCancelLog(Integer invoiceId, String reason, Integer userId) {
+        AuditLog log = new AuditLog();
+        log.entityType = AuditEntityType.PURCHASE_INVOICE.name();
+        log.entityId = invoiceId;
+        log.changeType = AuditChangeType.CANCELLED.name();
         log.reason = reason;
         log.changedBy = userId;
         auditLogRepository.persist(log);

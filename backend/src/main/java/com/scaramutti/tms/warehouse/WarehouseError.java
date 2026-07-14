@@ -39,6 +39,8 @@ public enum WarehouseError implements ApiError {
         "La factura indicada no existe"),
     PURCHASE_INVOICE_EDIT_NEGATIVE_STOCK("WH-006", 409, "Conflict",
         "La edición dejaría el stock del producto en negativo (ya se retiró más de lo que quedaría)"),
+    PURCHASE_INVOICE_CANCEL_NEGATIVE_STOCK("WH-007", 409, "Conflict",
+        "La anulación dejaría el stock del producto en negativo al descontar esta factura"),
     PURCHASE_INVOICE_ALREADY_CANCELLED("WH-008", 409, "Conflict",
         "La factura está anulada: no se puede editar ni volver a anular");
 

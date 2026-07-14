@@ -3,6 +3,7 @@ package com.scaramutti.tms.warehouse.purchaseinvoice.api;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.util.Etag;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
+import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseCancelRequest;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceRequest;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceResponse;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceSummary;
@@ -89,6 +90,20 @@ public class WarehousePurchaseInvoiceResource {
     ) {
         WarehousePurchaseInvoiceResponse response = warehousePurchaseInvoiceService.updatePurchaseInvoice(
             warehousePurchaseInvoiceResourceMapper.toUpdateWarehousePurchaseInvoiceCommand(id, ifMatch, request)
+        );
+        return Response.ok(response).header("ETag", Etag.of(response.updatedAt())).build();
+    }
+
+    @POST
+    @Path("/{id}/cancel")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response cancelPurchaseInvoice(
+        @PathParam("id") Integer id,
+        @HeaderParam("If-Match") String ifMatch,
+        @Valid @NotNull WarehouseCancelRequest request
+    ) {
+        WarehousePurchaseInvoiceResponse response = warehousePurchaseInvoiceService.cancelPurchaseInvoice(
+            id, ifMatch, request.reason()
         );
         return Response.ok(response).header("ETag", Etag.of(response.updatedAt())).build();
     }

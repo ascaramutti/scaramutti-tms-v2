@@ -1335,6 +1335,54 @@ paths:
                     traceId: '6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
 
+  /warehouse/purchase-invoices/{id}/cancel:
+    post:
+      tags: [Warehouse]
+      operationId: cancelWarehousePurchaseInvoice
+      summary: Anular entrada (con motivo, "eliminar" no existe)
+      description: |
+        RN-WH3: nada se borra, status→CANCELLED + motivo + quien + cuando. Deja de mover
+        stock/kardex/reportes; queda visible. Guarda: el stock del producto no puede caer en
+        negativo al descontar esta factura (apertura + entradas_sin_esta_factura -
+        salidas_activas >= 0); si no → 409 WH-007. Ya anulada → 409 WH-008. If-Match
+        obligatorio → 412 COM-004.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseCancelRequest' }
+            example: { reason: 'Factura registrada por error: correspondia al proveedor LUBRICANTES DEL PERU' }
+      responses:
+        '200':
+          description: Anulada
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-007 (el stock quedaria negativo al descontarla) / WH-008 (ya anulada)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-007'
+                title: 'Conflict'
+                status: 409
+                detail: "No se puede anular: el stock de 'Filtro de aceite XYZ' quedaria en -3 al descontar esta factura. Anula retiros o registra otra entrada primero."
+                instance: '/api/v1/warehouse/purchase-invoices/12/cancel'
+                code: 'WH-007'
+                traceId: '7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -2545,6 +2593,12 @@ components:
           maxItems: 200
           items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
         reason: { type: string, minLength: 10, maxLength: 500, description: 'Justificacion de la edicion (RN-WH4). Va a almacen.audit_logs con el diff por campo.' }
+
+    WarehouseCancelRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500, description: 'Motivo de anulacion (RN-WH3). Va a cancel_reason y a almacen.audit_logs (CANCELLED).' }
 
     WarehouseInvoiceItemResponse:
       type: object

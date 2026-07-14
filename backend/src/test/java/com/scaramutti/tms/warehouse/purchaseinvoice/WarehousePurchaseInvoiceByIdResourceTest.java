@@ -631,4 +631,129 @@ class WarehousePurchaseInvoiceByIdResourceTest {
         .when().put("/warehouse/purchase-invoices/" + id)
         .then().statusCode(200);
     }
+
+    // ---------- POST /{id}/cancel -------------------------------------------------
+
+    @Test
+    void cancel_activeNoWithdrawals_returns200_stockDrops() {
+        int supplierId = seedSupplier("ZTEST_Prov Cancel");
+        int productId = seedProduct("ZTEST_PI Cancel");
+        String token = login("admin", "Admin1234");
+        int id = createInvoice(supplierId, "ZTEST-CAN-001", itemJson(productId, "10", "1.00"), token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag).contentType(ContentType.JSON)
+            .body("{\"reason\":\"Factura registrada por error de proveedor\"}")
+        .when().post("/warehouse/purchase-invoices/" + id + "/cancel")
+        .then().statusCode(200)
+            .body("status", equalTo("CANCELLED"))
+            .body("cancelReason", equalTo("Factura registrada por error de proveedor"))
+            .body("cancelledBy.username", equalTo("admin"))
+            .body("cancelledAt", notNullValue());
+
+        assertStock(productId, "0", token);
+    }
+
+    @Test
+    void cancel_withWithdrawalsCoveredByOtherInvoice_returns200() {
+        int supplierId = seedSupplier("ZTEST_Prov CancelCovered");
+        int productId = seedProduct("ZTEST_PI CancelCovered");
+        int workerId = seedWorker("ZTESTW204");
+        String token = login("admin", "Admin1234");
+        int idA = createInvoice(supplierId, "ZTEST-CC-A", itemJson(productId, "10", "1.00"), token);
+        createInvoice(supplierId, "ZTEST-CC-B", itemJson(productId, "5", "1.00"), token);   // otra entrada cubre
+        seedWithdrawal(productId, "4", workerId, false);                                     // stock = 11
+        String etagA = etagOf(idA, token);
+
+        // cancelar A: 11 - 10 = 1 >= 0 → OK
+        given().header("Authorization", "Bearer " + token).header("If-Match", etagA).contentType(ContentType.JSON)
+            .body("{\"reason\":\"Se duplicó el registro de la compra\"}")
+        .when().post("/warehouse/purchase-invoices/" + idA + "/cancel")
+        .then().statusCode(200);
+
+        assertStock(productId, "1", token);   // apertura 0 + B(5) - salidas(4)
+    }
+
+    @Test
+    void cancel_wouldLeaveNegativeStock_returns409_WH007() {
+        int supplierId = seedSupplier("ZTEST_Prov WH007");
+        int productId = seedProduct("ZTEST_PI WH007");
+        int workerId = seedWorker("ZTESTW205");
+        String token = login("admin", "Admin1234");
+        int id = createInvoice(supplierId, "ZTEST-007-001", itemJson(productId, "10", "1.00"), token);
+        seedWithdrawal(productId, "9", workerId, false);   // stock = 1
+        String etag = etagOf(id, token);
+
+        // cancelar la única entrada: 1 - 10 = -9 < 0 → WH-007
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag).contentType(ContentType.JSON)
+            .body("{\"reason\":\"Intento de anular con retiros pendientes\"}")
+        .when().post("/warehouse/purchase-invoices/" + id + "/cancel")
+        .then().statusCode(409).body("code", equalTo("WH-007"));
+    }
+
+    @Test
+    void cancel_alreadyCancelled_returns409_WH008() {
+        int supplierId = seedSupplier("ZTEST_Prov ReCancel");
+        int productId = seedProduct("ZTEST_PI ReCancel");
+        String token = login("admin", "Admin1234");
+        int id = seedCancelledInvoice(supplierId, "ZTEST-RC-001", productId);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag).contentType(ContentType.JSON)
+            .body("{\"reason\":\"Intento de re-anular una anulada\"}")
+        .when().post("/warehouse/purchase-invoices/" + id + "/cancel")
+        .then().statusCode(409).body("code", equalTo("WH-008"));
+    }
+
+    @Test
+    void cancel_withoutIfMatch_returns412_COM004() {
+        int supplierId = seedSupplier("ZTEST_Prov CancelNoMatch");
+        int productId = seedProduct("ZTEST_PI CancelNoMatch");
+        String token = login("admin", "Admin1234");
+        int id = createInvoice(supplierId, "ZTEST-CNM-001", itemJson(productId, "1", "1.00"), token);
+
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body("{\"reason\":\"Anular sin If-Match presente\"}")
+        .when().post("/warehouse/purchase-invoices/" + id + "/cancel")
+        .then().statusCode(412).body("code", equalTo("COM-004"));
+    }
+
+    @Test
+    void cancel_reasonTooShort_returns400_COM001() {
+        int supplierId = seedSupplier("ZTEST_Prov CancelShort");
+        int productId = seedProduct("ZTEST_PI CancelShort");
+        String token = login("admin", "Admin1234");
+        int id = createInvoice(supplierId, "ZTEST-CS-001", itemJson(productId, "1", "1.00"), token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag).contentType(ContentType.JSON)
+            .body("{\"reason\":\"corto\"}")
+        .when().post("/warehouse/purchase-invoices/" + id + "/cancel")
+        .then().statusCode(400).body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void cancel_nonexistentId_returns404_WH003() {
+        String token = login("admin", "Admin1234");
+        given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"").contentType(ContentType.JSON)
+            .body("{\"reason\":\"Anular una factura inexistente\"}")
+        .when().post("/warehouse/purchase-invoices/999999/cancel")
+        .then().statusCode(404).body("code", equalTo("WH-003"));
+    }
+
+    @Test
+    void cancel_withoutToken_returns401() {
+        given().contentType(ContentType.JSON).body("{\"reason\":\"Sin token de autorización\"}")
+        .when().post("/warehouse/purchase-invoices/1/cancel")
+        .then().statusCode(401);
+    }
+
+    @Test
+    void cancel_withSalesRole_returns403_COM003() {
+        String token = login("lcampos", "Sales1234");
+        given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"").contentType(ContentType.JSON)
+            .body("{\"reason\":\"Rol no autorizado a anular\"}")
+        .when().post("/warehouse/purchase-invoices/1/cancel")
+        .then().statusCode(403).body("code", equalTo("COM-003"));
+    }
 }
