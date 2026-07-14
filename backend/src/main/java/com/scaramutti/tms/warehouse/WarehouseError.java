@@ -42,7 +42,15 @@ public enum WarehouseError implements ApiError {
     PURCHASE_INVOICE_CANCEL_NEGATIVE_STOCK("WH-007", 409, "Conflict",
         "La anulación dejaría el stock del producto en negativo al descontar esta factura"),
     PURCHASE_INVOICE_ALREADY_CANCELLED("WH-008", 409, "Conflict",
-        "La factura está anulada: no se puede editar ni volver a anular");
+        "La factura está anulada: no se puede editar ni volver a anular"),
+    WITHDRAWAL_INSUFFICIENT_STOCK   ("WH-001", 409, "Conflict",
+        "Stock insuficiente para el retiro"),
+    WITHDRAWAL_MULTIPLE_FLEET_UNITS ("WH-005", 400, "Bad Request",
+        "La unidad destino admite a lo sumo una: tracto, carreta o escolta"),
+    FLEET_UNIT_NOT_FOUND_OR_INACTIVE("WH-004", 400, "Bad Request",
+        "La unidad de flota indicada no existe o está inactiva"),
+    WORKER_NOT_FOUND_OR_INACTIVE    ("WH-004", 400, "Bad Request",
+        "El trabajador indicado no existe o está inactivo");
 
     private final String code;
     private final int status;
