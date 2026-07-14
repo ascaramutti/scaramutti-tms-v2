@@ -139,6 +139,12 @@ class WarehouseWithdrawalListResourceTest {
             .setParameter(1, plate).setParameter(2, resourceStatusId()).getSingleResult()).intValue());
     }
 
+    private int seedTrailer(String plate) {
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
+            "INSERT INTO public.trailers (plate, type, status_id, is_active) VALUES (?1, 'ZTEST', ?2, true) RETURNING id")
+            .setParameter(1, plate).setParameter(2, resourceStatusId()).getSingleResult()).intValue());
+    }
+
     /** Retiro sembrado por SQL con withdrawn_at y status explícitos (el POST siempre usa now()/ACTIVE). */
     private void seedWithdrawal(int productId, String quantity, int workerId, String withdrawnAtIso, boolean cancelled) {
         QuarkusTransaction.requiringNew().run(() -> {
@@ -228,6 +234,40 @@ class WarehouseWithdrawalListResourceTest {
         .then().statusCode(200).body("totalElements", equalTo(1))
             .body("content[0].fleetUnit.kind", equalTo("TRACTOR"))
             .body("content[0].fleetUnit.plate", equalTo("ZT9001"));
+    }
+
+    @Test
+    void list_filterByTrailer_embedsFleetUnit() {
+        int productId = seedProduct("ZTEST_WDL Trailer");
+        int workerId = seedWorker("ZTESTW408");
+        int trailerId = seedTrailer("ZT9003");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body("{\"productId\":" + productId + ",\"quantity\":1,\"receivedByWorkerId\":" + workerId + ",\"trailerId\":" + trailerId + "}")
+        .when().post("/warehouse/withdrawals").then().statusCode(201);
+
+        given().header("Authorization", "Bearer " + token)
+        .when().get("/warehouse/withdrawals?trailerId=" + trailerId)
+        .then().statusCode(200).body("totalElements", equalTo(1))
+            .body("content[0].fleetUnit.kind", equalTo("TRAILER"))
+            .body("content[0].fleetUnit.plate", equalTo("ZT9003"));
+    }
+
+    @Test
+    void list_filterByReceivedByWorkerId_returnsOnlyThatWorker() {
+        int productId = seedProduct("ZTEST_WDL Worker");
+        int workerA = seedWorker("ZTESTW409");
+        int workerB = seedWorker("ZTESTW410");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        createWithdrawal(productId, "1", workerA, null, token);
+        createWithdrawal(productId, "1", workerB, null, token);
+
+        given().header("Authorization", "Bearer " + token)
+        .when().get("/warehouse/withdrawals?receivedByWorkerId=" + workerA)
+        .then().statusCode(200).body("totalElements", equalTo(1))
+            .body("content[0].receivedBy.id", equalTo(workerA));
     }
 
     @Test

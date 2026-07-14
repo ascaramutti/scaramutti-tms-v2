@@ -278,6 +278,24 @@ class WarehouseWithdrawalResourceTest {
     }
 
     @Test
+    void create_withTrailer_returns201WithTrailerKind() {
+        int productId = seedProduct("ZTEST_WD Trailer");
+        int workerId = seedWorker("ZTESTW315");
+        int trailerId = seedTrailer("ZT0009", true);
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body("{\"productId\":" + productId + ",\"quantity\":2,\"receivedByWorkerId\":" + workerId
+                + ",\"trailerId\":" + trailerId + "}")
+        .when().post("/warehouse/withdrawals")
+        .then().statusCode(201)
+            .body("fleetUnit.kind", equalTo("TRAILER"))
+            .body("fleetUnit.id", equalTo(trailerId))
+            .body("fleetUnit.plate", equalTo("ZT0009"));
+    }
+
+    @Test
     void create_quantityExactlyEqualsStock_returns201StockToZero() {
         int productId = seedProduct("ZTEST_WD Exact");
         int workerId = seedWorker("ZTESTW303");
@@ -447,6 +465,18 @@ class WarehouseWithdrawalResourceTest {
         seedOpeningBalance(productId, "10", token);
         given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
             .body("{\"productId\":" + productId + ",\"quantity\":1,\"receivedByWorkerId\":" + workerId + ",\"tractorId\":" + tractorId + "}")
+        .when().post("/warehouse/withdrawals").then().statusCode(400).body("code", equalTo("WH-004"));
+    }
+
+    @Test
+    void create_inactiveTrailer_returns400_WH004() {
+        int productId = seedProduct("ZTEST_WD TrailerInactivo");
+        int workerId = seedWorker("ZTESTW316");
+        int trailerId = seedTrailer("ZT0010", false);
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body("{\"productId\":" + productId + ",\"quantity\":1,\"receivedByWorkerId\":" + workerId + ",\"trailerId\":" + trailerId + "}")
         .when().post("/warehouse/withdrawals").then().statusCode(400).body("code", equalTo("WH-004"));
     }
 
