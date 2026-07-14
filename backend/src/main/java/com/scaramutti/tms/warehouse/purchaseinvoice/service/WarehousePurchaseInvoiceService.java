@@ -82,11 +82,11 @@ public class WarehousePurchaseInvoiceService {
         Map<Integer, Product> productsById = requireActiveProducts(command.items());
         rejectDuplicateActive(command.supplierId(), command.invoiceNumber());
 
-        PurchaseInvoice invoice = warehousePurchaseInvoiceServiceMapper.toEntity(command, userId);
+        PurchaseInvoice invoice = warehousePurchaseInvoiceServiceMapper.toPurchaseInvoiceEntity(command, userId);
         persistInvoiceOrTranslateDuplicate(invoice);
 
         List<PurchaseInvoiceItem> items = command.items().stream()
-            .map(item -> warehousePurchaseInvoiceServiceMapper.toItemEntity(item, invoice.id))
+            .map(item -> warehousePurchaseInvoiceServiceMapper.toPurchaseInvoiceItemEntity(item, invoice.id))
             .toList();
         items.forEach(purchaseInvoiceItemRepository::persist);
 

@@ -154,8 +154,8 @@ class WarehousePurchaseInvoiceServiceTest {
         when(currencyRepository.findById(CURRENCY_ID)).thenReturn(activeCurrency());
         when(productRepository.list("id in ?1", Set.of(PRODUCT_ID))).thenReturn(List.of(activeProduct()));
         when(purchaseInvoiceRepository.existsActiveBySupplierAndNumber(SUPPLIER_ID, "F001-00123")).thenReturn(false);
-        when(warehousePurchaseInvoiceServiceMapper.toEntity(cmd, USER_ID)).thenReturn(invoice);
-        when(warehousePurchaseInvoiceServiceMapper.toItemEntity(cmd.items().get(0), INVOICE_ID)).thenReturn(item);
+        when(warehousePurchaseInvoiceServiceMapper.toPurchaseInvoiceEntity(cmd, USER_ID)).thenReturn(invoice);
+        when(warehousePurchaseInvoiceServiceMapper.toPurchaseInvoiceItemEntity(cmd.items().get(0), INVOICE_ID)).thenReturn(item);
         when(unitOfMeasureRepository.list("id in ?1", Set.of(UNIT_ID))).thenReturn(List.of(unitOfMeasure()));
         when(userLookup.require(USER_ID)).thenReturn(userResponse());
     }
@@ -286,7 +286,7 @@ class WarehousePurchaseInvoiceServiceTest {
         when(currencyRepository.findById(CURRENCY_ID)).thenReturn(activeCurrency());
         when(productRepository.list("id in ?1", Set.of(PRODUCT_ID))).thenReturn(List.of(activeProduct()));
         when(purchaseInvoiceRepository.existsActiveBySupplierAndNumber(SUPPLIER_ID, "F001-00123")).thenReturn(false);
-        when(warehousePurchaseInvoiceServiceMapper.toEntity(cmd, USER_ID)).thenReturn(invoice);
+        when(warehousePurchaseInvoiceServiceMapper.toPurchaseInvoiceEntity(cmd, USER_ID)).thenReturn(invoice);
         doThrow(wrapConstraint("uq_purchase_invoices_active")).when(purchaseInvoiceRepository).flush();
 
         ApiException ex = assertThrows(ApiException.class,
