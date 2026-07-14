@@ -18,7 +18,10 @@ import com.scaramutti.tms.shared.repository.PurchaseInvoiceItemRepository;
 import com.scaramutti.tms.shared.repository.PurchaseInvoiceRepository;
 import com.scaramutti.tms.shared.repository.SupplierRepository;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
+import com.scaramutti.tms.shared.util.Etag;
 import com.scaramutti.tms.warehouse.WarehouseError;
+import com.scaramutti.tms.warehouse.model.AuditChangeType;
 import com.scaramutti.tms.warehouse.model.AuditEntityType;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductSummary;
@@ -33,6 +36,7 @@ import com.scaramutti.tms.warehouse.purchaseinvoice.mapper.WarehousePurchaseInvo
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.CreateWarehouseInvoiceItemCommand;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.CreateWarehousePurchaseInvoiceCommand;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.ListWarehousePurchaseInvoicesQuery;
+import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.UpdateWarehousePurchaseInvoiceCommand;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -42,8 +46,12 @@ import org.hibernate.exception.ConstraintViolationException;
 import org.jboss.logging.Logger;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -191,8 +199,16 @@ public class WarehousePurchaseInvoiceService {
      * segundo INSERT ACTIVO. El {@code flush} fuerza el INSERT dentro de este try.
      */
     private void persistInvoiceOrTranslateDuplicate(PurchaseInvoice invoice) {
+        purchaseInvoiceRepository.persist(invoice);
+        flushInvoiceOrTranslateDuplicate(invoice);
+    }
+
+    /**
+     * Fuerza el INSERT/UPDATE dentro del try y traduce la violación del UNIQUE parcial a
+     * WH-002 (lo usa el alta tras el persist y la edición al renombrar el número).
+     */
+    private void flushInvoiceOrTranslateDuplicate(PurchaseInvoice invoice) {
         try {
-            purchaseInvoiceRepository.persist(invoice);
             purchaseInvoiceRepository.flush();
         } catch (PersistenceException ex) {
             ConstraintViolationException cve = extractConstraintViolation(ex);
@@ -291,16 +307,151 @@ public class WarehousePurchaseInvoiceService {
         );
     }
 
-    // ========== A9: detalle ===================================================
+    // ========== A9: detalle, edición y anulación ==============================
 
     /** Detalle de una entrada (GET /{id}). Read-only. 404 WH-003 si no existe. */
     public WarehousePurchaseInvoiceResponse getPurchaseInvoice(Integer id) {
         return assembleResponse(loadInvoiceOrThrow(id));
     }
 
+    /**
+     * Edición de una entrada (PUT /{id}). Orden de validación (calca A5 + A8):
+     * 404 WH-003 → WH-008 (anulada) → 412 If-Match → 400 WH-004 (moneda/productos) →
+     * 409 WH-002 (nº duplicado activo, excluyéndose) → 409 WH-006 (guarda de stock) →
+     * reemplazo de ítems + mutación de cabecera + FIELD_EDIT por campo cambiado.
+     */
+    @Transactional
+    public WarehousePurchaseInvoiceResponse updatePurchaseInvoice(UpdateWarehousePurchaseInvoiceCommand command) {
+        Integer userId = currentUser.requireId();
+        PurchaseInvoice invoice = loadInvoiceOrThrow(command.invoiceId());
+        rejectIfCancelled(invoice);
+        Etag.verify(command.ifMatch(), invoice.updatedAt);
+
+        Currency newCurrency = requireActiveCurrency(command.currencyId());
+        requireActiveProducts(command.items());
+        if (purchaseInvoiceRepository.existsActiveBySupplierAndNumberExcludingId(
+                invoice.supplierId, command.invoiceNumber(), invoice.id)) {
+            throw WarehouseError.PURCHASE_INVOICE_DUPLICATED_ACTIVE.toException();
+        }
+        guardEditKeepsStockNonNegative(invoice, command.items());
+
+        // Snapshot viejo para el diff de auditoría (ANTES de mutar / borrar ítems).
+        String oldNumber = invoice.invoiceNumber;
+        LocalDate oldDate = invoice.invoiceDate;
+        String oldGuide = invoice.guideNumber;
+        String oldObs = invoice.observations;
+        String oldCurrencyCode = currencyRepository.findById(invoice.currencyId).code;
+        String oldItemsCanonical = canonicalItemsFromEntities(
+            purchaseInvoiceItemRepository.list("invoiceId = ?1", invoice.id));
+
+        // Reemplazo de ítems (delete + insert en la misma tx). El flush del delete corre
+        // antes de los inserts nuevos.
+        purchaseInvoiceItemRepository.deleteByInvoiceId(invoice.id);
+        purchaseInvoiceItemRepository.flush();
+        command.items().forEach(item -> purchaseInvoiceItemRepository.persist(
+            warehousePurchaseInvoiceServiceMapper.toPurchaseInvoiceItemEntity(item, invoice.id)));
+
+        // Mutación de cabecera. Se bumpea updatedAt explícitamente: cada PUT reemplaza los
+        // ítems (un cambio de estado de la factura), pero si SOLO cambiaron los ítems la
+        // fila de cabecera no queda "dirty" y el @PreUpdate no correría → el ETag no
+        // reflejaría la edición y dos ediciones de ítems concurrentes compartirían versión.
+        invoice.invoiceNumber = command.invoiceNumber();
+        invoice.invoiceDate = command.invoiceDate();
+        invoice.guideNumber = command.guideNumber();
+        invoice.currencyId = command.currencyId();
+        invoice.observations = command.observations();
+        invoice.updatedAt = DateUtils.nowUtcMicros();
+        flushInvoiceOrTranslateDuplicate(invoice);
+
+        String reason = command.reason();
+        logFieldEdit(invoice.id, "invoiceNumber", "Número de factura", oldNumber, command.invoiceNumber(), reason, userId);
+        logFieldEdit(invoice.id, "invoiceDate", "Fecha de factura", str(oldDate), str(command.invoiceDate()), reason, userId);
+        logFieldEdit(invoice.id, "guideNumber", "Número de guía", oldGuide, command.guideNumber(), reason, userId);
+        logFieldEdit(invoice.id, "currency", "Moneda", oldCurrencyCode, newCurrency.code, reason, userId);
+        logFieldEdit(invoice.id, "observations", "Observaciones", oldObs, command.observations(), reason, userId);
+        logFieldEdit(invoice.id, "items", "Ítems", oldItemsCanonical, canonicalItemsFromCommands(command.items()), reason, userId);
+
+        return assembleResponse(invoice);
+    }
+
+    // ---------- Carga / precondiciones ----------------------------------------
+
     private PurchaseInvoice loadInvoiceOrThrow(Integer id) {
         return purchaseInvoiceRepository.findByIdOptional(id)
             .orElseThrow(WarehouseError.PURCHASE_INVOICE_NOT_FOUND::toException);
+    }
+
+    private void rejectIfCancelled(PurchaseInvoice invoice) {
+        if (WarehouseRecordStatus.CANCELLED.name().equals(invoice.status)) {
+            throw WarehouseError.PURCHASE_INVOICE_ALREADY_CANCELLED.toException();
+        }
+    }
+
+    // ---------- Guardas de stock (WH-006 / WH-007) ----------------------------
+
+    /**
+     * WH-006: tras reemplazar los ítems, ningún producto afectado (unión de viejos y
+     * nuevos) puede quedar con stock negativo. La VIEW {@code product_stock} ya incluye la
+     * apertura y los movimientos ACTIVE (incluida esta factura), así que
+     * {@code stock_después = stock_actual − contribución_vieja + contribución_nueva}
+     * (la apertura cuenta como stock disponible, ratificado por el dueño 2026-07-14).
+     */
+    private void guardEditKeepsStockNonNegative(PurchaseInvoice invoice, List<CreateWarehouseInvoiceItemCommand> newItems) {
+        Map<Integer, BigDecimal> oldContrib = purchaseInvoiceItemRepository.sumQuantityByProductForInvoice(invoice.id);
+        Map<Integer, BigDecimal> newContrib = contributionByProduct(newItems);
+        Set<Integer> affected = new HashSet<>(oldContrib.keySet());
+        affected.addAll(newContrib.keySet());
+
+        Map<Integer, ProductRepository.ProductStockView> stockById = productRepository.findStockByProductIds(affected);
+        for (Integer productId : affected) {
+            BigDecimal after = currentStockOrZero(stockById, productId)
+                .subtract(oldContrib.getOrDefault(productId, BigDecimal.ZERO))
+                .add(newContrib.getOrDefault(productId, BigDecimal.ZERO));
+            if (after.signum() < 0) {
+                throw stockGuardException(WarehouseError.PURCHASE_INVOICE_EDIT_NEGATIVE_STOCK, productId, after);
+            }
+        }
+    }
+
+    private Map<Integer, BigDecimal> contributionByProduct(List<CreateWarehouseInvoiceItemCommand> items) {
+        Map<Integer, BigDecimal> byProduct = new LinkedHashMap<>();
+        for (CreateWarehouseInvoiceItemCommand item : items) {
+            byProduct.merge(item.productId(), item.quantity(), BigDecimal::add);
+        }
+        return byProduct;
+    }
+
+    private BigDecimal currentStockOrZero(Map<Integer, ProductRepository.ProductStockView> stockById, Integer productId) {
+        ProductRepository.ProductStockView view = stockById.get(productId);
+        return view != null ? view.stock() : BigDecimal.ZERO;
+    }
+
+    /** Arma la excepción de la guarda nombrando el producto y el stock resultante. */
+    private RuntimeException stockGuardException(WarehouseError error, Integer productId, BigDecimal resultingStock) {
+        Product product = productRepository.findById(productId);
+        String name = product != null ? product.name : ("#" + productId);
+        return error.toException(
+            "El stock de '" + name + "' quedaría en " + resultingStock.toPlainString() + ".");
+    }
+
+    // ---------- Auditoría (audit_logs) ----------------------------------------
+
+    private void logFieldEdit(Integer invoiceId, String fieldName, String fieldLabel,
+                              String oldValue, String newValue, String reason, Integer userId) {
+        if (Objects.equals(oldValue, newValue)) {
+            return;
+        }
+        AuditLog log = new AuditLog();
+        log.entityType = AuditEntityType.PURCHASE_INVOICE.name();
+        log.entityId = invoiceId;
+        log.changeType = AuditChangeType.FIELD_EDIT.name();
+        log.fieldName = fieldName;
+        log.fieldLabel = fieldLabel;
+        log.oldValue = oldValue;
+        log.newValue = newValue;
+        log.reason = reason;
+        log.changedBy = userId;
+        auditLogRepository.persist(log);
     }
 
     private WarehouseEditTrace loadLastEdit(Integer invoiceId) {
@@ -308,6 +459,30 @@ public class WarehousePurchaseInvoiceService {
             .map(log -> new WarehouseEditTrace(userLookup.require(log.changedBy), log.loggedAt, log.reason))
             .orElse(null);
     }
+
+    private String str(LocalDate date) {
+        return date != null ? date.toString() : null;
+    }
+
+    /** Representación canónica y comparable de los ítems (ordenada), para el diff de auditoría. */
+    private String canonicalItemsFromEntities(List<PurchaseInvoiceItem> items) {
+        return items.stream()
+            .map(item -> canonicalItem(item.productId, item.quantity, item.unitPrice))
+            .sorted().collect(Collectors.joining(","));
+    }
+
+    private String canonicalItemsFromCommands(List<CreateWarehouseInvoiceItemCommand> items) {
+        return items.stream()
+            .map(item -> canonicalItem(item.productId(), item.quantity(), item.unitPrice()))
+            .sorted().collect(Collectors.joining(","));
+    }
+
+    private String canonicalItem(Integer productId, BigDecimal quantity, BigDecimal unitPrice) {
+        return productId + ":" + quantity.stripTrailingZeros().toPlainString()
+            + "@" + unitPrice.stripTrailingZeros().toPlainString();
+    }
+
+    // ---------- Ensamblado del detalle (GET/PUT/cancel) -----------------------
 
     /** Carga los ítems de la factura y arma el response completo (incluye lastEdit + anulación). */
     private WarehousePurchaseInvoiceResponse assembleResponse(PurchaseInvoice invoice) {

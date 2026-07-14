@@ -1276,6 +1276,64 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Warehouse]
+      operationId: updateWarehousePurchaseInvoice
+      summary: Editar entrada (justificacion obligatoria)
+      description: |
+        RN-WH4: `reason` >= 10 → `almacen.audit_logs` con el diff por campo. Reemplazo
+        completo: los `items` del body sustituyen a los existentes. `supplierId` INMUTABLE
+        (no viaja en el body). Guarda de stock (misma tx): el stock del producto no puede
+        quedar negativo tras la edicion, por producto afectado apertura + entradas_tras_edicion
+        - salidas_activas >= 0; si no → 409 WH-006. Anulada → 409 WH-008; numero duplicado entre
+        ACTIVAS → 409 WH-002. If-Match obligatorio → 412 COM-004.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceUpdateRequest' }
+      responses:
+        '200':
+          description: Actualizada
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-006 (dejaria stock negativo) / WH-008 (anulada) / WH-002 (duplicado)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                editWouldLeaveNegativeStock:
+                  summary: Ya se retiro mas de lo que quedaria tras la edicion
+                  value:
+                    type: 'urn:tms:error:wh-006'
+                    title: 'Conflict'
+                    status: 409
+                    detail: "De 'Filtro de aceite XYZ' ya se retiraron 9 UND y con este cambio las entradas quedarian en 8. Corrige primero los retiros."
+                    instance: '/api/v1/warehouse/purchase-invoices/12'
+                    code: 'WH-006'
+                    traceId: '5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b'
+                recordCancelled:
+                  summary: La factura esta anulada (inmutable)
+                  value:
+                    type: 'urn:tms:error:wh-008'
+                    title: 'Conflict'
+                    status: 409
+                    detail: 'Una factura anulada no se puede editar'
+                    instance: '/api/v1/warehouse/purchase-invoices/12'
+                    code: 'WH-008'
+                    traceId: '6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
 
 # =============================================================================
 components:
@@ -2468,6 +2526,25 @@ components:
           minItems: 1
           maxItems: 200
           items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
+
+    WarehousePurchaseInvoiceUpdateRequest:
+      type: object
+      description: |
+        Body del PUT. SIN `supplierId` (el proveedor es INMUTABLE: RN-WH4, proveedor
+        equivocado = anular y re-registrar). Los `items` REEMPLAZAN a los existentes.
+      required: [invoiceNumber, invoiceDate, currencyId, items, reason]
+      properties:
+        invoiceNumber: { type: string, minLength: 1, maxLength: 50 }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'], maxLength: 50 }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'] }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
+        reason: { type: string, minLength: 10, maxLength: 500, description: 'Justificacion de la edicion (RN-WH4). Va a almacen.audit_logs con el diff por campo.' }
 
     WarehouseInvoiceItemResponse:
       type: object

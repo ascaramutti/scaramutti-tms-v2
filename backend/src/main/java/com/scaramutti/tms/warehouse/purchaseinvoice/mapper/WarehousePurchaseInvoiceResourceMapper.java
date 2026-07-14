@@ -3,8 +3,10 @@ package com.scaramutti.tms.warehouse.purchaseinvoice.mapper;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceRequest;
+import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceUpdateRequest;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.CreateWarehousePurchaseInvoiceCommand;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.ListWarehousePurchaseInvoicesQuery;
+import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.UpdateWarehousePurchaseInvoiceCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingConstants;
@@ -45,5 +47,19 @@ public interface WarehousePurchaseInvoiceResourceMapper {
     ListWarehousePurchaseInvoicesQuery toListWarehousePurchaseInvoicesQuery(
         String q, Integer supplierId, WarehouseRecordStatus status,
         LocalDate dateFrom, LocalDate dateTo, int page, int size
+    );
+
+    // invoiceNumber trimeado (campo de unicidad, mismo criterio que el alta); guideNumber/
+    // observations trim → null. supplierId NO está (inmutable). El id y el ifMatch vienen
+    // del path/header. Los items reusan el mapeo por forma (misma shape que el alta).
+    @Mapping(target = "invoiceNumber", source = "request.invoiceNumber", qualifiedByName = "trimToNull")
+    @Mapping(target = "guideNumber",   source = "request.guideNumber",   qualifiedByName = "trimToNull")
+    @Mapping(target = "observations",  source = "request.observations",  qualifiedByName = "trimToNull")
+    @Mapping(target = "invoiceDate",   source = "request.invoiceDate")
+    @Mapping(target = "currencyId",    source = "request.currencyId")
+    @Mapping(target = "items",         source = "request.items")
+    @Mapping(target = "reason",        source = "request.reason")
+    UpdateWarehousePurchaseInvoiceCommand toUpdateWarehousePurchaseInvoiceCommand(
+        Integer invoiceId, String ifMatch, WarehousePurchaseInvoiceUpdateRequest request
     );
 }
