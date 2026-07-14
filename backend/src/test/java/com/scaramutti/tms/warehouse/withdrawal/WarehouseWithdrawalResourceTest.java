@@ -63,10 +63,18 @@ class WarehouseWithdrawalResourceTest {
                 .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM almacen.products WHERE name LIKE ?1")
                 .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.tractors WHERE plate LIKE 'ZT%'").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.trailers WHERE plate LIKE 'ZT%'").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.escort_vehicles WHERE plate LIKE 'ZT%'").executeUpdate();
+            // Flota de test: borrado quirúrgico por su estado propio (ZTEST_STATUS), NO por prefijo
+            // de placa — tractors/trailers/escort viven en public COMPARTIDO con v1 y un prefijo de
+            // 2 chars podría matchear una placa real (y reventar el cleanup por FKs de v1).
+            String byTestStatus = "WHERE status_id = (SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS')";
+            entityManager.createNativeQuery("DELETE FROM public.tractors " + byTestStatus).executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM public.trailers " + byTestStatus).executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM public.escort_vehicles " + byTestStatus).executeUpdate();
             entityManager.createNativeQuery("DELETE FROM public.workers WHERE document_number LIKE 'ZTEST%'")
+                .executeUpdate();
+            // El estado de test se borra al final (su flota, la única FK, ya se fue): no queda
+            // residual en la dev-DB compartida con v1 (que lo mostraría en sus dropdowns de estados).
+            entityManager.createNativeQuery("DELETE FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'")
                 .executeUpdate();
         });
     }

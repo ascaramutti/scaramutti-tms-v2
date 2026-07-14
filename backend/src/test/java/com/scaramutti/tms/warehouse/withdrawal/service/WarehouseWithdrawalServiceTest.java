@@ -30,6 +30,7 @@ import java.time.OffsetDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -146,6 +147,9 @@ class WarehouseWithdrawalServiceTest {
 
         assertEquals("WH-001", ex.code());
         assertEquals(409, ex.status());
+        // El detail lleva el disponible + la unidad (lo que promete el nombre del test).
+        assertTrue(ex.getMessage().contains("3"), "el detail debe indicar el stock disponible");
+        assertTrue(ex.getMessage().contains("UND"), "el detail debe indicar la unidad de medida");
         verify(productRepository).lockProductRow(PRODUCT_ID);   // el lock se toma antes de rechazar
         verify(withdrawalRepository, never()).persist(any(Withdrawal.class));
     }
