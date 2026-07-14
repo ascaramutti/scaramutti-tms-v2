@@ -20,6 +20,12 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
@@ -290,6 +296,44 @@ class WarehouseWithdrawalResourceTest {
             .body("{\"productId\":" + productId + ",\"quantity\":5,\"receivedByWorkerId\":" + workerId + "}")
         .when().post("/warehouse/withdrawals")
         .then().statusCode(409).body("code", equalTo("WH-001")).body("detail", containsString("4"));
+    }
+
+    @Test
+    void create_twoConcurrentWithdrawals_lockSerializesOneSucceedsOneRejected() throws Exception {
+        // La razón de ser del endpoint (RN-WH2): dos retiros SIMULTÁNEOS del mismo producto no
+        // pueden pasar ambos el chequeo de stock. Con el lock de fila correcto el resultado es
+        // determinista (un 201 + un 409); sin el lock, las dos lecturas de stock verían el mismo
+        // valor y ambos retiros descontarían → stock negativo. Se repite el par para que un lock
+        // roto caiga en la race con alta probabilidad.
+        String token = login("admin", "Admin1234");
+        for (int i = 0; i < 5; i++) {
+            int productId = seedProduct("ZTEST_WD Concurrente " + i);
+            int workerId = seedWorker("ZTESTWC" + i);
+            seedOpeningBalance(productId, "5", token);   // alcanza para UN retiro de 3, no dos
+
+            CyclicBarrier barrier = new CyclicBarrier(2);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                Callable<Integer> attempt = () -> {
+                    barrier.await();   // ambos hilos disparan el POST a la vez
+                    return given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+                        .body("{\"productId\":" + productId + ",\"quantity\":3,\"receivedByWorkerId\":" + workerId + "}")
+                    .when().post("/warehouse/withdrawals").then().extract().statusCode();
+                };
+                Future<Integer> f1 = pool.submit(attempt);
+                Future<Integer> f2 = pool.submit(attempt);
+                int s1 = f1.get(20, TimeUnit.SECONDS);
+                int s2 = f2.get(20, TimeUnit.SECONDS);
+
+                boolean exactlyOneEach = (s1 == 201 && s2 == 409) || (s1 == 409 && s2 == 201);
+                if (!exactlyOneEach) {
+                    throw new AssertionError("Iteración " + i + ": esperaba un 201 y un 409, fueron " + s1 + " y " + s2);
+                }
+                assertStock(productId, "2", token);   // 5 - 3: el retiro perdedor no descontó
+            } finally {
+                pool.shutdownNow();
+            }
+        }
     }
 
     @Test
