@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 
 /**
  * Utilidades de fecha/hora compartidas por todo el backend.
@@ -39,5 +40,17 @@ public final class DateUtils {
         if (value instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(ZoneOffset.UTC);
         throw new IllegalStateException("Unexpected temporal type: "
             + (value == null ? "null" : value.getClass().getName()));
+    }
+
+    /**
+     * Ahora en UTC truncado a MICROSEGUNDOS. Postgres ({@code timestamptz}) guarda esa
+     * precision, asi que los timestamps que sirven de version del ETag deben truncarse
+     * a micros: sin esto, el valor devuelto por un POST/PUT no coincide con el releido
+     * por un GET en JVMs con reloj de nanosegundos (Linux), rompiendo el If-Match (bug
+     * D-12). Fuente unica del truncado para el codigo nuevo (los {@code @PrePersist}
+     * viejos aun lo hacen inline: migrarlos es una deuda de refactor dedicado).
+     */
+    public static OffsetDateTime nowUtcMicros() {
+        return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
     }
 }

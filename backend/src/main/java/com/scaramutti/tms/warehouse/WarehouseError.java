@@ -34,7 +34,9 @@ public enum WarehouseError implements ApiError {
     CURRENCY_NOT_FOUND_OR_INACTIVE  ("WH-004", 400, "Bad Request",
         "La moneda indicada no existe o está inactiva"),
     PURCHASE_INVOICE_DUPLICATED_ACTIVE("WH-002", 409, "Conflict",
-        "Ya existe una factura activa con ese número para el proveedor indicado");
+        "Ya existe una factura activa con ese número para el proveedor indicado"),
+    PURCHASE_INVOICE_NOT_FOUND      ("WH-003", 404, "Not Found",
+        "La factura indicada no existe");
 
     private final String code;
     private final int status;

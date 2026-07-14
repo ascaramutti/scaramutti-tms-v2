@@ -20,6 +20,7 @@ import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
@@ -65,5 +66,13 @@ public class WarehousePurchaseInvoiceResource {
             .header("ETag", Etag.of(response.updatedAt()))
             .entity(response)
             .build();
+    }
+
+    @GET
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response getPurchaseInvoice(@PathParam("id") Integer id) {
+        WarehousePurchaseInvoiceResponse response = warehousePurchaseInvoiceService.getPurchaseInvoice(id);
+        return Response.ok(response).header("ETag", Etag.of(response.updatedAt())).build();
     }
 }

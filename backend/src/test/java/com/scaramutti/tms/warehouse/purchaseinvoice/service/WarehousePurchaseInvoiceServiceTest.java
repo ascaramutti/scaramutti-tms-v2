@@ -15,8 +15,11 @@ import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
 import com.scaramutti.tms.shared.repository.PurchaseInvoiceItemRepository;
 import com.scaramutti.tms.shared.repository.PurchaseInvoiceRepository;
+import com.scaramutti.tms.shared.repository.AuditLogRepository;
 import com.scaramutti.tms.shared.repository.SupplierRepository;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
+
+import java.util.Optional;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceResponse;
 import com.scaramutti.tms.warehouse.purchaseinvoice.mapper.WarehousePurchaseInvoiceServiceMapper;
@@ -61,6 +64,7 @@ class WarehousePurchaseInvoiceServiceTest {
     @Mock CurrencyRepository currencyRepository;
     @Mock ProductRepository productRepository;
     @Mock UnitOfMeasureRepository unitOfMeasureRepository;
+    @Mock AuditLogRepository auditLogRepository;
     @Mock UserLookup userLookup;
     @Mock CurrentUser currentUser;
     @Mock WarehousePurchaseInvoiceServiceMapper warehousePurchaseInvoiceServiceMapper;
@@ -339,5 +343,18 @@ class WarehousePurchaseInvoiceServiceTest {
         assertTrue(response.content().isEmpty());
         assertEquals(0L, response.totalElements());
         verify(supplierRepository, never()).list(any(String.class), any(java.util.Collection.class));
+    }
+
+    // ---------- GET detalle ----------
+
+    @Test
+    void get_nonexistentId_throwsWH003() {
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.empty());
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> warehousePurchaseInvoiceService.getPurchaseInvoice(INVOICE_ID));
+
+        assertEquals("WH-003", ex.code());
+        assertEquals(404, ex.status());
     }
 }

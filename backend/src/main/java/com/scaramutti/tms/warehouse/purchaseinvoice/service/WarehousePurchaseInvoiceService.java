@@ -4,12 +4,14 @@ import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.UserLookup;
 import com.scaramutti.tms.shared.dto.PageResponse;
+import com.scaramutti.tms.shared.entity.AuditLog;
 import com.scaramutti.tms.shared.entity.Currency;
 import com.scaramutti.tms.shared.entity.Product;
 import com.scaramutti.tms.shared.entity.PurchaseInvoice;
 import com.scaramutti.tms.shared.entity.PurchaseInvoiceItem;
 import com.scaramutti.tms.shared.entity.Supplier;
 import com.scaramutti.tms.shared.entity.UnitOfMeasure;
+import com.scaramutti.tms.shared.repository.AuditLogRepository;
 import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
 import com.scaramutti.tms.shared.repository.PurchaseInvoiceItemRepository;
@@ -17,8 +19,10 @@ import com.scaramutti.tms.shared.repository.PurchaseInvoiceRepository;
 import com.scaramutti.tms.shared.repository.SupplierRepository;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
 import com.scaramutti.tms.warehouse.WarehouseError;
+import com.scaramutti.tms.warehouse.model.AuditEntityType;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductSummary;
+import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseEditTrace;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseInvoiceCurrencyRef;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseInvoiceItemResponse;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseInvoiceSupplierRef;
@@ -29,6 +33,7 @@ import com.scaramutti.tms.warehouse.purchaseinvoice.mapper.WarehousePurchaseInvo
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.CreateWarehouseInvoiceItemCommand;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.CreateWarehousePurchaseInvoiceCommand;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.ListWarehousePurchaseInvoicesQuery;
+import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
@@ -69,6 +74,7 @@ public class WarehousePurchaseInvoiceService {
     @Inject CurrencyRepository currencyRepository;
     @Inject ProductRepository productRepository;
     @Inject UnitOfMeasureRepository unitOfMeasureRepository;
+    @Inject AuditLogRepository auditLogRepository;
     @Inject UserLookup userLookup;
     @Inject CurrentUser currentUser;
     @Inject WarehousePurchaseInvoiceServiceMapper warehousePurchaseInvoiceServiceMapper;
@@ -91,7 +97,9 @@ public class WarehousePurchaseInvoiceService {
         items.forEach(purchaseInvoiceItemRepository::persist);
 
         Map<Integer, UnitOfMeasure> unitsById = loadUnitsFor(productsById.values());
-        return toResponse(invoice, supplier, currency, items, productsById, unitsById, userLookup.require(userId));
+        // Factura recién creada: nunca editada (lastEdit null) ni anulada (cancelledBy null).
+        return toResponse(invoice, supplier, currency, items, productsById, unitsById,
+            userLookup.require(userId), null, null);
     }
 
     /**
@@ -220,7 +228,8 @@ public class WarehousePurchaseInvoiceService {
 
     private WarehousePurchaseInvoiceResponse toResponse(
         PurchaseInvoice invoice, Supplier supplier, Currency currency, List<PurchaseInvoiceItem> items,
-        Map<Integer, Product> productsById, Map<Integer, UnitOfMeasure> unitsById, UserResponse registeredBy
+        Map<Integer, Product> productsById, Map<Integer, UnitOfMeasure> unitsById, UserResponse registeredBy,
+        WarehouseEditTrace lastEdit, UserResponse cancelledBy
     ) {
         List<WarehouseInvoiceItemResponse> itemResponses = items.stream()
             .map(item -> {
@@ -251,9 +260,9 @@ public class WarehousePurchaseInvoiceService {
             total,
             WarehouseRecordStatus.valueOf(invoice.status),
             invoice.cancelReason,
-            null,
+            cancelledBy,
             invoice.cancelledAt,
-            null,
+            lastEdit,
             registeredBy,
             invoice.createdAt,
             invoice.updatedAt
@@ -280,5 +289,40 @@ public class WarehousePurchaseInvoiceService {
             registeredBy,
             invoice.createdAt
         );
+    }
+
+    // ========== A9: detalle ===================================================
+
+    /** Detalle de una entrada (GET /{id}). Read-only. 404 WH-003 si no existe. */
+    public WarehousePurchaseInvoiceResponse getPurchaseInvoice(Integer id) {
+        return assembleResponse(loadInvoiceOrThrow(id));
+    }
+
+    private PurchaseInvoice loadInvoiceOrThrow(Integer id) {
+        return purchaseInvoiceRepository.findByIdOptional(id)
+            .orElseThrow(WarehouseError.PURCHASE_INVOICE_NOT_FOUND::toException);
+    }
+
+    private WarehouseEditTrace loadLastEdit(Integer invoiceId) {
+        return auditLogRepository.findLastFieldEdit(AuditEntityType.PURCHASE_INVOICE, invoiceId)
+            .map(log -> new WarehouseEditTrace(userLookup.require(log.changedBy), log.loggedAt, log.reason))
+            .orElse(null);
+    }
+
+    /** Carga los ítems de la factura y arma el response completo (incluye lastEdit + anulación). */
+    private WarehousePurchaseInvoiceResponse assembleResponse(PurchaseInvoice invoice) {
+        List<PurchaseInvoiceItem> items = purchaseInvoiceItemRepository.list(
+            "invoiceId = ?1", Sort.by("id"), invoice.id);
+        Supplier supplier = supplierRepository.findById(invoice.supplierId);
+        Currency currency = currencyRepository.findById(invoice.currencyId);
+        Map<Integer, Product> productsById = productRepository
+            .list("id in ?1", items.stream().map(item -> item.productId).collect(Collectors.toSet()))
+            .stream().collect(Collectors.toMap(product -> product.id, product -> product));
+        Map<Integer, UnitOfMeasure> unitsById = loadUnitsFor(productsById.values());
+        UserResponse registeredBy = userLookup.require(invoice.registeredBy);
+        WarehouseEditTrace lastEdit = loadLastEdit(invoice.id);
+        UserResponse cancelledBy = invoice.cancelledBy != null ? userLookup.require(invoice.cancelledBy) : null;
+
+        return toResponse(invoice, supplier, currency, items, productsById, unitsById, registeredBy, lastEdit, cancelledBy);
     }
 }
