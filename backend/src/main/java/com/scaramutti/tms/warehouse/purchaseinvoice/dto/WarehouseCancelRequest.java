@@ -7,7 +7,7 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
 /**
  * Body del POST /warehouse/purchase-invoices/{id}/cancel. {@code reason} (>= 10) es el
  * motivo de anulacion (RN-WH3): va a {@code cancel_reason} y a {@code almacen.audit_logs}
- * (fila CANCELLED). Reusable por la anulacion de retiros (A11).
+ * (fila CANCELLED). Reusable por la anulacion de retiros.
  */
 public record WarehouseCancelRequest(
     @Schema(example = "Factura registrada por error: correspondía a otro proveedor")

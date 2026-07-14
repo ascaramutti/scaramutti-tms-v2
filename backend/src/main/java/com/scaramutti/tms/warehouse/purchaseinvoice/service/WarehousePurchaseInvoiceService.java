@@ -307,7 +307,7 @@ public class WarehousePurchaseInvoiceService {
         );
     }
 
-    // ========== A9: detalle, edición y anulación ==============================
+    // ========== Detalle, edición y anulación ==================================
 
     /** Detalle de una entrada (GET /{id}). Read-only. 404 WH-003 si no existe. */
     public WarehousePurchaseInvoiceResponse getPurchaseInvoice(Integer id) {
@@ -315,7 +315,8 @@ public class WarehousePurchaseInvoiceService {
     }
 
     /**
-     * Edición de una entrada (PUT /{id}). Orden de validación (calca A5 + A8):
+     * Edición de una entrada (PUT /{id}). Orden de validación (mismo criterio que el
+     * detalle/edición de producto y el alta de la entrada):
      * 404 WH-003 → WH-008 (anulada) → 412 If-Match → 400 WH-004 (moneda/productos) →
      * 409 WH-002 (nº duplicado activo, excluyéndose) → 409 WH-006 (guarda de stock) →
      * reemplazo de ítems + mutación de cabecera + FIELD_EDIT por campo cambiado.

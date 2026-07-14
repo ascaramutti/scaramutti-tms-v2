@@ -348,7 +348,7 @@ class WarehousePurchaseInvoiceServiceTest {
         verify(supplierRepository, never()).list(any(String.class), any(java.util.Collection.class));
     }
 
-    // ========== A9: get / update / cancel =====================================
+    // ========== Detalle / edición / anulación =================================
 
     private PurchaseInvoice cancelledInvoice() {
         PurchaseInvoice invoice = invoiceEntity();

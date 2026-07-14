@@ -14,9 +14,8 @@ import java.time.OffsetDateTime;
 /**
  * Registro de auditoria del modulo Almacen ({@code almacen.audit_logs}): una fila por
  * cambio (edicion de un campo o anulacion) de una entrada o retiro. Vive en
- * {@code shared/entity/} por convencion. Se escribe desde A9 (primer writer); la
- * lectura hoy solo alimenta el {@code lastEdit} del detalle (el ultimo FIELD_EDIT), el
- * historial completo queda consultable en la tabla.
+ * {@code shared/entity/} por convencion. La lectura alimenta el {@code lastEdit} del
+ * detalle (el ultimo FIELD_EDIT); el historial completo queda consultable en la tabla.
  *
  * <p>{@code entityType}/{@code changeType} se guardan como String (respaldados por los
  * CHECK de V002); las capas de servicio usan los enums {@code AuditEntityType}/

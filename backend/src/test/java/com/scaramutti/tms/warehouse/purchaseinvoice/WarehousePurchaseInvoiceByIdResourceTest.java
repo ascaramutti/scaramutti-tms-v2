@@ -30,10 +30,10 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
 /**
- * Integration tests de GET/PUT/cancel /warehouse/purchase-invoices/{id} (A9). Hermético
+ * Integration tests de GET/PUT/cancel /warehouse/purchase-invoices/{id}. Hermético
  * (prefijo ZTEST_, cleanup en orden FK). Los retiros que disparan WH-006/WH-007 se
- * siembran por SQL nativo (el endpoint de retiros es A10). Las facturas base se crean vía
- * el POST de A8.
+ * siembran por SQL nativo (el endpoint de retiros aún no existe). Las facturas base se
+ * crean vía el POST de alta de entradas.
  */
 @QuarkusTest
 class WarehousePurchaseInvoiceByIdResourceTest {
@@ -147,7 +147,7 @@ class WarehousePurchaseInvoiceByIdResourceTest {
         });
     }
 
-    /** Retiro ACTIVO (o CANCELLED) sembrado por SQL nativo (el endpoint de retiros es A10). */
+    /** Retiro ACTIVO (o CANCELLED) sembrado por SQL nativo (el endpoint de retiros aún no existe). */
     private void seedWithdrawal(int productId, String quantity, int receivedBy, boolean cancelled) {
         QuarkusTransaction.requiringNew().run(() -> {
             if (!cancelled) {
@@ -257,7 +257,7 @@ class WarehousePurchaseInvoiceByIdResourceTest {
         }
     }
 
-    /** Registra el corte inicial del producto vía el endpoint de A7 (debe ir ANTES de cualquier movimiento). */
+    /** Registra el corte inicial del producto vía su endpoint (debe ir ANTES de cualquier movimiento). */
     private void seedOpeningBalance(int productId, int quantity, String token) {
         given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
             .body("{\"productId\":" + productId + ",\"quantity\":" + quantity + "}")
