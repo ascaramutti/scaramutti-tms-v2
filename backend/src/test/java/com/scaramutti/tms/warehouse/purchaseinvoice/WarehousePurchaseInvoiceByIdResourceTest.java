@@ -65,6 +65,10 @@ class WarehousePurchaseInvoiceByIdResourceTest {
                 .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM almacen.purchase_invoices WHERE invoice_number LIKE 'ZTEST%'")
                 .executeUpdate();
+            entityManager.createNativeQuery(
+                "DELETE FROM almacen.opening_balances WHERE product_id IN "
+                    + "(SELECT id FROM almacen.products WHERE name LIKE ?1)")
+                .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM almacen.products WHERE name LIKE ?1")
                 .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
             entityManager.createNativeQuery("DELETE FROM almacen.suppliers WHERE name LIKE ?1")
@@ -251,6 +255,14 @@ class WarehousePurchaseInvoiceByIdResourceTest {
         if (actual.compareTo(new BigDecimal(expected)) != 0) {
             throw new AssertionError("Stock de " + productId + " esperado " + expected + " pero fue " + actual);
         }
+    }
+
+    /** Registra el corte inicial del producto vía el endpoint de A7 (debe ir ANTES de cualquier movimiento). */
+    private void seedOpeningBalance(int productId, int quantity, String token) {
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body("{\"productId\":" + productId + ",\"quantity\":" + quantity + "}")
+        .when().post("/warehouse/opening-balances")
+        .then().statusCode(201);
     }
 
     // ---------- GET /{id} ---------------------------------------------------------
@@ -596,6 +608,52 @@ class WarehousePurchaseInvoiceByIdResourceTest {
             .body(updateBody("ZTEST-006-003", currencyId("USD"), itemJson(productId, "1", "1.00"), "Bajar con retiro anulado"))
         .when().put("/warehouse/purchase-invoices/" + id)
         .then().statusCode(200);
+    }
+
+    /**
+     * ANCLA DE LA FÓRMULA RATIFICADA (WH-006 con apertura, ruling del dueño 2026-07-14): la
+     * apertura cuenta como stock disponible. Contraejemplo exacto: apertura 10 + factura 5 +
+     * retiro 12 → editar la factura de 5 a 2 → stock real 10+2-12 = 0 ≥ 0 → 200. Con la fórmula
+     * VIEJA (sin apertura) daría 2-12 = -10 → WH-006, así que este test distingue las dos
+     * fórmulas (con apertura 0 serían idénticas y no anclarían nada).
+     */
+    @Test
+    void update_withOpeningBalanceCoveringTheGap_returns200() {
+        int supplierId = seedSupplier("ZTEST_Prov WH006Apertura");
+        int productId = seedProduct("ZTEST_PI WH006Apertura");
+        int workerId = seedWorker("ZTESTW206");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, 10, token);                                   // apertura ANTES de todo
+        int id = createInvoice(supplierId, "ZTEST-006-AP1", itemJson(productId, "5", "1.00"), token);
+        seedWithdrawal(productId, "12", workerId, false);                           // stock actual = 10+5-12 = 3
+        String etag = etagOf(id, token);
+
+        // editar 5 → 2: stock real 10+2-12 = 0 (permite SOLO con apertura incluida)
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag).contentType(ContentType.JSON)
+            .body(updateBody("ZTEST-006-AP1", currencyId("USD"), itemJson(productId, "2", "1.00"), "Ajuste al conteo con apertura"))
+        .when().put("/warehouse/purchase-invoices/" + id)
+        .then().statusCode(200);
+
+        assertStock(productId, "0", token);
+    }
+
+    /** Gemelo negativo del ancla: con apertura la guarda igual dispara cuando el stock real cae bajo 0. */
+    @Test
+    void update_withOpeningBalanceButStillNegative_returns409_WH006() {
+        int supplierId = seedSupplier("ZTEST_Prov WH006AperturaNeg");
+        int productId = seedProduct("ZTEST_PI WH006AperturaNeg");
+        int workerId = seedWorker("ZTESTW207");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, 10, token);
+        int id = createInvoice(supplierId, "ZTEST-006-AP2", itemJson(productId, "5", "1.00"), token);
+        seedWithdrawal(productId, "12", workerId, false);
+        String etag = etagOf(id, token);
+
+        // editar 5 → 1: stock real 10+1-12 = -1 < 0 → WH-006 (incluso contando la apertura)
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag).contentType(ContentType.JSON)
+            .body(updateBody("ZTEST-006-AP2", currencyId("USD"), itemJson(productId, "1", "1.00"), "Baja que deja negativo"))
+        .when().put("/warehouse/purchase-invoices/" + id)
+        .then().statusCode(409).body("code", equalTo("WH-006"));
     }
 
     @Test
