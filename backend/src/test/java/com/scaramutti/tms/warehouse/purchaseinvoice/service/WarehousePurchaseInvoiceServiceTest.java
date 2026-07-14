@@ -15,8 +15,13 @@ import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
 import com.scaramutti.tms.shared.repository.PurchaseInvoiceItemRepository;
 import com.scaramutti.tms.shared.repository.PurchaseInvoiceRepository;
+import com.scaramutti.tms.shared.repository.AuditLogRepository;
 import com.scaramutti.tms.shared.repository.SupplierRepository;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
+import com.scaramutti.tms.shared.util.Etag;
+import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.UpdateWarehousePurchaseInvoiceCommand;
+
+import java.util.Optional;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceResponse;
 import com.scaramutti.tms.warehouse.purchaseinvoice.mapper.WarehousePurchaseInvoiceServiceMapper;
@@ -40,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -61,6 +67,7 @@ class WarehousePurchaseInvoiceServiceTest {
     @Mock CurrencyRepository currencyRepository;
     @Mock ProductRepository productRepository;
     @Mock UnitOfMeasureRepository unitOfMeasureRepository;
+    @Mock AuditLogRepository auditLogRepository;
     @Mock UserLookup userLookup;
     @Mock CurrentUser currentUser;
     @Mock WarehousePurchaseInvoiceServiceMapper warehousePurchaseInvoiceServiceMapper;
@@ -339,5 +346,199 @@ class WarehousePurchaseInvoiceServiceTest {
         assertTrue(response.content().isEmpty());
         assertEquals(0L, response.totalElements());
         verify(supplierRepository, never()).list(any(String.class), any(java.util.Collection.class));
+    }
+
+    // ========== Detalle / edición / anulación =================================
+
+    private PurchaseInvoice cancelledInvoice() {
+        PurchaseInvoice invoice = invoiceEntity();
+        invoice.status = "CANCELLED";
+        return invoice;
+    }
+
+    private UpdateWarehousePurchaseInvoiceCommand updateCommand(String ifMatch, BigDecimal quantity) {
+        return new UpdateWarehousePurchaseInvoiceCommand(
+            INVOICE_ID, ifMatch, "F001-00123", LocalDate.parse("2026-07-05"), null, CURRENCY_ID, null,
+            List.of(new CreateWarehouseInvoiceItemCommand(PRODUCT_ID, quantity, new BigDecimal("1.00"))),
+            "Motivo de edición suficientemente largo");
+    }
+
+    private com.scaramutti.tms.shared.exception.ApiException assertApi(Runnable action) {
+        return assertThrows(com.scaramutti.tms.shared.exception.ApiException.class, action::run);
+    }
+
+    // ---------- GET ----------
+
+    @Test
+    void get_nonexistentId_throwsWH003() {
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.empty());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.getPurchaseInvoice(INVOICE_ID));
+
+        assertEquals("WH-003", ex.code());
+        assertEquals(404, ex.status());
+    }
+
+    // ---------- UPDATE ----------
+
+    @Test
+    void update_nonexistentId_throwsWH003() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.empty());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.updatePurchaseInvoice(
+            updateCommand("\"x\"", new BigDecimal("1"))));
+
+        assertEquals("WH-003", ex.code());
+        verify(purchaseInvoiceItemRepository, never()).deleteByInvoiceId(any());
+    }
+
+    @Test
+    void update_cancelledInvoice_throwsWH008_beforeIfMatch() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(cancelledInvoice()));
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.updatePurchaseInvoice(
+            updateCommand("\"stale\"", new BigDecimal("1"))));
+
+        assertEquals("WH-008", ex.code());
+        assertEquals(409, ex.status());
+    }
+
+    @Test
+    void update_staleIfMatch_throwsCOM004() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoiceEntity()));
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.updatePurchaseInvoice(
+            updateCommand("\"not-the-current-version\"", new BigDecimal("1"))));
+
+        assertEquals("COM-004", ex.code());
+        assertEquals(412, ex.status());
+        verify(purchaseInvoiceItemRepository, never()).deleteByInvoiceId(any());
+    }
+
+    @Test
+    void update_currencyNotFound_throwsWH004() {
+        PurchaseInvoice invoice = invoiceEntity();
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(currencyRepository.findById(CURRENCY_ID)).thenReturn(null);
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.updatePurchaseInvoice(
+            updateCommand(Etag.of(invoice.updatedAt), new BigDecimal("1"))));
+
+        assertEquals("WH-004", ex.code());
+    }
+
+    @Test
+    void update_productNotFound_throwsWH004() {
+        PurchaseInvoice invoice = invoiceEntity();
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(currencyRepository.findById(CURRENCY_ID)).thenReturn(activeCurrency());
+        when(productRepository.list("id in ?1", Set.of(PRODUCT_ID))).thenReturn(List.of());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.updatePurchaseInvoice(
+            updateCommand(Etag.of(invoice.updatedAt), new BigDecimal("1"))));
+
+        assertEquals("WH-004", ex.code());
+        verify(purchaseInvoiceItemRepository, never()).deleteByInvoiceId(any());
+    }
+
+    @Test
+    void update_duplicateNumberExcludingSelf_throwsWH002() {
+        PurchaseInvoice invoice = invoiceEntity();
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(currencyRepository.findById(CURRENCY_ID)).thenReturn(activeCurrency());
+        when(productRepository.list("id in ?1", Set.of(PRODUCT_ID))).thenReturn(List.of(activeProduct()));
+        when(purchaseInvoiceRepository.existsActiveBySupplierAndNumberExcludingId(SUPPLIER_ID, "F001-00123", INVOICE_ID))
+            .thenReturn(true);
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.updatePurchaseInvoice(
+            updateCommand(Etag.of(invoice.updatedAt), new BigDecimal("1"))));
+
+        assertEquals("WH-002", ex.code());
+        verify(purchaseInvoiceItemRepository, never()).deleteByInvoiceId(any());
+    }
+
+    @Test
+    void update_stockGuardNegative_throwsWH006_doesNotMutate() {
+        PurchaseInvoice invoice = invoiceEntity();
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        when(currencyRepository.findById(CURRENCY_ID)).thenReturn(activeCurrency());
+        when(productRepository.list("id in ?1", Set.of(PRODUCT_ID))).thenReturn(List.of(activeProduct()));
+        when(purchaseInvoiceRepository.existsActiveBySupplierAndNumberExcludingId(SUPPLIER_ID, "F001-00123", INVOICE_ID))
+            .thenReturn(false);
+        // Contribución vieja 10, stock actual 1; bajar a 8 → 1 - 10 + 8 = -1 < 0
+        when(purchaseInvoiceItemRepository.sumQuantityByProductForInvoice(INVOICE_ID))
+            .thenReturn(Map.of(PRODUCT_ID, new BigDecimal("10")));
+        when(productRepository.findStockByProductIds(anyCollection()))
+            .thenReturn(Map.of(PRODUCT_ID, new ProductRepository.ProductStockView(new BigDecimal("1"), false)));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(activeProduct());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.updatePurchaseInvoice(
+            updateCommand(Etag.of(invoice.updatedAt), new BigDecimal("8"))));
+
+        assertEquals("WH-006", ex.code());
+        assertEquals(409, ex.status());
+        verify(purchaseInvoiceItemRepository, never()).deleteByInvoiceId(any());
+        verify(auditLogRepository, never()).persist(any(com.scaramutti.tms.shared.entity.AuditLog.class));
+    }
+
+    // ---------- CANCEL ----------
+
+    @Test
+    void cancel_nonexistentId_throwsWH003() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.empty());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(INVOICE_ID, "\"x\"", "Motivo suficientemente largo"));
+
+        assertEquals("WH-003", ex.code());
+    }
+
+    @Test
+    void cancel_alreadyCancelled_throwsWH008() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(cancelledInvoice()));
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(INVOICE_ID, "\"x\"", "Motivo suficientemente largo"));
+
+        assertEquals("WH-008", ex.code());
+    }
+
+    @Test
+    void cancel_staleIfMatch_throwsCOM004() {
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoiceEntity()));
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(INVOICE_ID, "\"stale\"", "Motivo suficientemente largo"));
+
+        assertEquals("COM-004", ex.code());
+        assertEquals(412, ex.status());
+    }
+
+    @Test
+    void cancel_stockGuardNegative_throwsWH007_doesNotMutate() {
+        PurchaseInvoice invoice = invoiceEntity();
+        when(currentUser.requireId()).thenReturn(USER_ID);
+        when(purchaseInvoiceRepository.findByIdOptional(INVOICE_ID)).thenReturn(Optional.of(invoice));
+        // Contribución 10, stock actual 1 → 1 - 10 = -9 < 0
+        when(purchaseInvoiceItemRepository.sumQuantityByProductForInvoice(INVOICE_ID))
+            .thenReturn(Map.of(PRODUCT_ID, new BigDecimal("10")));
+        when(productRepository.findStockByProductIds(anyCollection()))
+            .thenReturn(Map.of(PRODUCT_ID, new ProductRepository.ProductStockView(new BigDecimal("1"), false)));
+        when(productRepository.findById(PRODUCT_ID)).thenReturn(activeProduct());
+
+        var ex = assertApi(() -> warehousePurchaseInvoiceService.cancelPurchaseInvoice(
+            INVOICE_ID, Etag.of(invoice.updatedAt), "Motivo suficientemente largo"));
+
+        assertEquals("WH-007", ex.code());
+        assertEquals(409, ex.status());
+        assertEquals("ACTIVE", invoice.status);
+        verify(auditLogRepository, never()).persist(any(com.scaramutti.tms.shared.entity.AuditLog.class));
     }
 }

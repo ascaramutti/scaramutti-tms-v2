@@ -39,6 +39,16 @@ public class PurchaseInvoiceRepository implements PanacheRepositoryBase<Purchase
             supplierId, invoiceNumber, "ACTIVE") > 0;
     }
 
+    /**
+     * Igual que {@link #existsActiveBySupplierAndNumber} pero EXCLUYENDO una factura
+     * (la que se está editando): así renombrar una factura a su MISMO número no choca
+     * consigo misma (WH-002 solo aplica contra OTRAS activas del mismo proveedor).
+     */
+    public boolean existsActiveBySupplierAndNumberExcludingId(Integer supplierId, String invoiceNumber, Integer excludeId) {
+        return count("supplierId = ?1 and invoiceNumber = ?2 and status = ?3 and id <> ?4",
+            supplierId, invoiceNumber, "ACTIVE", excludeId) > 0;
+    }
+
     // ---------- Listado paginado (GET /warehouse/purchase-invoices) -------------
 
     /**

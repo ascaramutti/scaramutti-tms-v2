@@ -1691,10 +1691,12 @@ paths:
 
         - **`supplierId` INMUTABLE** — no viaja en el body (proveedor equivocado
           = anular y re-registrar).
-        - **Guarda de stock** (misma transacción, RN-WH4): por producto afectado,
-          `entradas_tras_edición − salidas_activas ≥ 0`; si quedaría negativo →
-          **409 `WH-006`** (el `detail` nombra el producto — ej.: la factura
-          decía 10, ya se retiraron 9 → no puede bajar a 8).
+        - **Guarda de stock** (misma transacción, RN-WH4): el stock del producto
+          no puede quedar negativo tras la edición — por producto afectado,
+          `apertura + entradas_tras_edición − salidas_activas ≥ 0` (la apertura
+          cuenta como stock disponible, igual que en la cancelación); si quedaría
+          negativo → **409 `WH-006`** (el `detail` nombra el producto — ej.: sin
+          apertura, la factura decía 10, ya se retiraron 9 → no puede bajar a 8).
         - Anulada → **409 `WH-008`** · nº duplicado entre ACTIVAS → **409 `WH-002`**.
         - `If-Match` obligatorio; versión vieja → **412 `COM-004`**.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
@@ -3424,6 +3426,7 @@ components:
         items:
           type: array
           minItems: 1
+          maxItems: 200
           items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
         reason: { type: string, minLength: 10, maxLength: 500, description: 'Justificación de la edición (RN-WH4). Va a `almacen.audit_logs` con el diff por campo.' }
 

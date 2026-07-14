@@ -56,4 +56,30 @@ public class PurchaseInvoiceItemRepository implements PanacheRepositoryBase<Purc
 
     /** Proyección del agregado por factura: cantidad de ítems + total derivado. */
     public record InvoiceAggregate(int itemsCount, BigDecimal total) {}
+
+    /**
+     * Suma de {@code quantity} por producto de UNA factura (sus ítems actuales en BD).
+     * Es la contribución de la factura al stock por producto, que las guardas WH-006/
+     * WH-007 restan del stock actual de la VIEW. 1 query, indexada por {@code invoice_id}.
+     */
+    public Map<Integer, BigDecimal> sumQuantityByProductForInvoice(Integer invoiceId) {
+        Query nativeQuery = entityManager.createNativeQuery(
+            "SELECT product_id, SUM(quantity) AS qty FROM almacen.purchase_invoice_items "
+                + "WHERE invoice_id = :invoiceId GROUP BY product_id",
+            Tuple.class
+        ).setParameter("invoiceId", invoiceId);
+
+        @SuppressWarnings("unchecked")
+        List<Tuple> rows = nativeQuery.getResultList();
+        Map<Integer, BigDecimal> byProduct = new LinkedHashMap<>();
+        for (Tuple row : rows) {
+            byProduct.put(((Number) row.get("product_id")).intValue(), (BigDecimal) row.get("qty"));
+        }
+        return byProduct;
+    }
+
+    /** Borra los ítems de una factura (el PUT reemplaza: delete + insert en la misma tx). */
+    public long deleteByInvoiceId(Integer invoiceId) {
+        return delete("invoiceId", invoiceId);
+    }
 }

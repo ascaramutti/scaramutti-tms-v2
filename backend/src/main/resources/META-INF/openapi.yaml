@@ -1253,6 +1253,136 @@ paths:
                 code: 'WH-002'
                 traceId: '4d5e6f7a-8b9c-0d1e-2f3a-4b5c6d7e8f9a'
 
+  /warehouse/purchase-invoices/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Warehouse]
+      operationId: getWarehousePurchaseInvoice
+      summary: Detalle de una entrada (cabecera + items)
+      description: |
+        Incluye `lastEdit` (rastro del ultimo FIELD_EDIT en `almacen.audit_logs`; null si
+        nunca se edito) y los campos de anulacion si status=CANCELLED. El header ETag
+        (version opaca del updatedAt) es el que exigen PUT y cancel via If-Match.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      responses:
+        '200':
+          description: Detalle completo
+          headers:
+            ETag: { schema: { type: string }, description: Version opaca para If-Match }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Warehouse]
+      operationId: updateWarehousePurchaseInvoice
+      summary: Editar entrada (justificacion obligatoria)
+      description: |
+        RN-WH4: `reason` >= 10 → `almacen.audit_logs` con el diff por campo. Reemplazo
+        completo: los `items` del body sustituyen a los existentes. `supplierId` INMUTABLE
+        (no viaja en el body). Guarda de stock (misma tx): el stock del producto no puede
+        quedar negativo tras la edicion, por producto afectado apertura + entradas_tras_edicion
+        - salidas_activas >= 0; si no → 409 WH-006. Anulada → 409 WH-008; numero duplicado entre
+        ACTIVAS → 409 WH-002. If-Match obligatorio → 412 COM-004.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceUpdateRequest' }
+      responses:
+        '200':
+          description: Actualizada
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-006 (dejaria stock negativo) / WH-008 (anulada) / WH-002 (duplicado)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                editWouldLeaveNegativeStock:
+                  summary: Ya se retiro mas de lo que quedaria tras la edicion
+                  value:
+                    type: 'urn:tms:error:wh-006'
+                    title: 'Conflict'
+                    status: 409
+                    detail: "De 'Filtro de aceite XYZ' ya se retiraron 9 UND y con este cambio las entradas quedarian en 8. Corrige primero los retiros."
+                    instance: '/api/v1/warehouse/purchase-invoices/12'
+                    code: 'WH-006'
+                    traceId: '5e6f7a8b-9c0d-1e2f-3a4b-5c6d7e8f9a0b'
+                recordCancelled:
+                  summary: La factura esta anulada (inmutable)
+                  value:
+                    type: 'urn:tms:error:wh-008'
+                    title: 'Conflict'
+                    status: 409
+                    detail: 'Una factura anulada no se puede editar'
+                    instance: '/api/v1/warehouse/purchase-invoices/12'
+                    code: 'WH-008'
+                    traceId: '6f7a8b9c-0d1e-2f3a-4b5c-6d7e8f9a0b1c'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /warehouse/purchase-invoices/{id}/cancel:
+    post:
+      tags: [Warehouse]
+      operationId: cancelWarehousePurchaseInvoice
+      summary: Anular entrada (con motivo, "eliminar" no existe)
+      description: |
+        RN-WH3: nada se borra, status→CANCELLED + motivo + quien + cuando. Deja de mover
+        stock/kardex/reportes; queda visible. Guarda: el stock del producto no puede caer en
+        negativo al descontar esta factura (apertura + entradas_sin_esta_factura -
+        salidas_activas >= 0); si no → 409 WH-007. Ya anulada → 409 WH-008. If-Match
+        obligatorio → 412 COM-004.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseCancelRequest' }
+            example: { reason: 'Factura registrada por error: correspondia al proveedor LUBRICANTES DEL PERU' }
+      responses:
+        '200':
+          description: Anulada
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehousePurchaseInvoiceResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-007 (el stock quedaria negativo al descontarla) / WH-008 (ya anulada)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-007'
+                title: 'Conflict'
+                status: 409
+                detail: "No se puede anular: el stock de 'Filtro de aceite XYZ' quedaria en -3 al descontar esta factura. Anula retiros o registra otra entrada primero."
+                instance: '/api/v1/warehouse/purchase-invoices/12/cancel'
+                code: 'WH-007'
+                traceId: '7a8b9c0d-1e2f-3a4b-5c6d-7e8f9a0b1c2d'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -2444,6 +2574,31 @@ components:
           minItems: 1
           maxItems: 200
           items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
+
+    WarehousePurchaseInvoiceUpdateRequest:
+      type: object
+      description: |
+        Body del PUT. SIN `supplierId` (el proveedor es INMUTABLE: RN-WH4, proveedor
+        equivocado = anular y re-registrar). Los `items` REEMPLAZAN a los existentes.
+      required: [invoiceNumber, invoiceDate, currencyId, items, reason]
+      properties:
+        invoiceNumber: { type: string, minLength: 1, maxLength: 50 }
+        invoiceDate:   { type: string, format: date }
+        guideNumber:   { type: [string, 'null'], maxLength: 50 }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'] }
+        items:
+          type: array
+          minItems: 1
+          maxItems: 200
+          items: { $ref: '#/components/schemas/WarehouseInvoiceItemRequest' }
+        reason: { type: string, minLength: 10, maxLength: 500, description: 'Justificacion de la edicion (RN-WH4). Va a almacen.audit_logs con el diff por campo.' }
+
+    WarehouseCancelRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 10, maxLength: 500, description: 'Motivo de anulacion (RN-WH3). Va a cancel_reason y a almacen.audit_logs (CANCELLED).' }
 
     WarehouseInvoiceItemResponse:
       type: object
