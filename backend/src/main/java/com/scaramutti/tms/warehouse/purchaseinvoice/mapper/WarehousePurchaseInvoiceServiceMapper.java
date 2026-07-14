@@ -26,10 +26,10 @@ public interface WarehousePurchaseInvoiceServiceMapper {
     @Mapping(target = "cancelledBy",     ignore = true)
     @Mapping(target = "cancelledAt",     ignore = true)
     @Mapping(target = "registeredBy",    source = "userId")
-    PurchaseInvoice toEntity(CreateWarehousePurchaseInvoiceCommand command, Integer userId);
+    PurchaseInvoice toPurchaseInvoiceEntity(CreateWarehousePurchaseInvoiceCommand command, Integer userId);
 
     @Mapping(target = "id",        ignore = true)
     @Mapping(target = "createdAt", ignore = true)
     @Mapping(target = "invoiceId", source = "invoiceId")
-    PurchaseInvoiceItem toItemEntity(CreateWarehouseInvoiceItemCommand command, Integer invoiceId);
+    PurchaseInvoiceItem toPurchaseInvoiceItemEntity(CreateWarehouseInvoiceItemCommand command, Integer invoiceId);
 }

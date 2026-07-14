@@ -17,5 +17,5 @@ public interface WarehouseOpeningBalanceServiceMapper {
     @Mapping(target = "id",           ignore = true)
     @Mapping(target = "registeredAt", ignore = true)
     @Mapping(target = "registeredBy", source = "userId")
-    OpeningBalance toEntity(CreateWarehouseOpeningBalanceCommand createWarehouseOpeningBalanceCommand, Integer userId);
+    OpeningBalance toOpeningBalanceEntity(CreateWarehouseOpeningBalanceCommand createWarehouseOpeningBalanceCommand, Integer userId);
 }

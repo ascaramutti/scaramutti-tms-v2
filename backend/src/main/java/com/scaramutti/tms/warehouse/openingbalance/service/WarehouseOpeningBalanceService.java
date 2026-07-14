@@ -61,7 +61,7 @@ public class WarehouseOpeningBalanceService {
         rejectExistingOpeningBalance(command.productId());
         rejectExistingMovements(command.productId());
 
-        OpeningBalance openingBalance = warehouseOpeningBalanceServiceMapper.toEntity(command, userId);
+        OpeningBalance openingBalance = warehouseOpeningBalanceServiceMapper.toOpeningBalanceEntity(command, userId);
         persistOrTranslateDuplicate(openingBalance);
 
         UnitOfMeasure unitOfMeasure = unitOfMeasureRepository.findById(product.unitOfMeasureId);

@@ -98,7 +98,7 @@ class WarehouseOpeningBalanceServiceTest {
         when(productRepository.findById(PRODUCT_ID)).thenReturn(activeProduct());
         when(openingBalanceRepository.existsByProductId(PRODUCT_ID)).thenReturn(false);
         when(openingBalanceRepository.existsActiveMovementsForProduct(PRODUCT_ID)).thenReturn(false);
-        when(warehouseOpeningBalanceServiceMapper.toEntity(command(quantity), USER_ID)).thenReturn(entity);
+        when(warehouseOpeningBalanceServiceMapper.toOpeningBalanceEntity(command(quantity), USER_ID)).thenReturn(entity);
         when(unitOfMeasureRepository.findById(1)).thenReturn(unitOfMeasure());
         when(userLookup.require(USER_ID)).thenReturn(userResponse());
     }
@@ -205,7 +205,7 @@ class WarehouseOpeningBalanceServiceTest {
         when(productRepository.findById(PRODUCT_ID)).thenReturn(activeProduct());
         when(openingBalanceRepository.existsByProductId(PRODUCT_ID)).thenReturn(false);
         when(openingBalanceRepository.existsActiveMovementsForProduct(PRODUCT_ID)).thenReturn(false);
-        when(warehouseOpeningBalanceServiceMapper.toEntity(command(new BigDecimal("10")), USER_ID)).thenReturn(entity);
+        when(warehouseOpeningBalanceServiceMapper.toOpeningBalanceEntity(command(new BigDecimal("10")), USER_ID)).thenReturn(entity);
         doThrow(wrapConstraint("opening_balances_product_id_key")).when(openingBalanceRepository).flush();
 
         ApiException ex = assertThrows(ApiException.class,
