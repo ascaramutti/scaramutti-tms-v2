@@ -1569,6 +1569,52 @@ paths:
                     traceId: '2f3a4b5c-6d7e-8f9a-0b1c-2d3e4f5a6b7c'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
 
+  /warehouse/withdrawals/{id}/cancel:
+    post:
+      tags: [Warehouse]
+      operationId: cancelWarehouseWithdrawal
+      summary: Anular retiro (con motivo, el stock vuelve solo)
+      description: |
+        RN-WH3: status→CANCELLED + motivo + quien + cuando. SIEMPRE segura: devuelve stock
+        (las VIEWs excluyen anulados), no lleva guarda de stock. Ya anulado → 409 WH-008.
+        If-Match obligatorio → 412 COM-004.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer } }
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseCancelRequest' }
+            example: { reason: 'El tracto no necesitaba el repuesto; era un problema electrico' }
+      responses:
+        '200':
+          description: Anulado
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Ya anulado -> WH-008
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:wh-008'
+                title: 'Conflict'
+                status: 409
+                detail: 'El retiro esta anulado: no se puede editar ni volver a anular'
+                instance: '/api/v1/warehouse/withdrawals/31/cancel'
+                code: 'WH-008'
+                traceId: '3a4b5c6d-7e8f-9a0b-1c2d-3e4f5a6b7c8d'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
 # =============================================================================
 components:
 # =============================================================================

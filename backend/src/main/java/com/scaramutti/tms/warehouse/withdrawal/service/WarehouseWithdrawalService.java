@@ -41,6 +41,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -375,6 +376,44 @@ public class WarehouseWithdrawalService {
         if (WarehouseRecordStatus.CANCELLED.name().equals(withdrawal.status)) {
             throw WarehouseError.WITHDRAWAL_ALREADY_CANCELLED.toException();
         }
+    }
+
+    // ========== Anulación (POST /{id}/cancel) =================================
+
+    /**
+     * Anulación de un retiro (POST /{id}/cancel). SIEMPRE segura: el stock vuelve solo porque
+     * las VIEWs excluyen los anulados, asi que no lleva guarda de stock (a diferencia de la
+     * anulación de entradas). Orden: 404 WH-003 (no existe) -> 409 WH-008 (ya anulado) -> 412
+     * If-Match -> status CANCELLED + motivo/quién/cuándo + bump de updatedAt + fila CANCELLED en
+     * audit_logs. Nada se borra (RN-WH3).
+     */
+    @Transactional
+    public WarehouseWithdrawalResponse cancelWithdrawal(Integer id, String ifMatch, String reason) {
+        Integer userId = currentUser.requireId();
+        Withdrawal withdrawal = loadWithdrawalOrThrow(id);
+        rejectIfCancelled(withdrawal);
+        Etag.verify(ifMatch, withdrawal.updatedAt);
+
+        OffsetDateTime now = DateUtils.nowUtcMicros();
+        withdrawal.status = WarehouseRecordStatus.CANCELLED.name();
+        withdrawal.cancelReason = reason;
+        withdrawal.cancelledBy = userId;
+        withdrawal.cancelledAt = now;
+        withdrawal.updatedAt = now;
+        withdrawalRepository.flush();
+
+        writeCancelLog(withdrawal.id, reason, userId);
+        return assembleResponse(withdrawal);
+    }
+
+    private void writeCancelLog(Integer withdrawalId, String reason, Integer userId) {
+        AuditLog log = new AuditLog();
+        log.entityType = AuditEntityType.WITHDRAWAL.name();
+        log.entityId = withdrawalId;
+        log.changeType = AuditChangeType.CANCELLED.name();
+        log.reason = reason;
+        log.changedBy = userId;
+        auditLogRepository.persist(log);
     }
 
     /**

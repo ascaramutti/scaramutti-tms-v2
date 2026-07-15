@@ -745,4 +745,143 @@ class WarehouseWithdrawalByIdResourceTest {
             .body("{\"quantity\":2,\"receivedByWorkerId\":1,\"reason\":\"Rol sin permiso de almacen\"}")
         .when().put("/warehouse/withdrawals/1").then().statusCode(403).body("code", equalTo("COM-003"));
     }
+
+    // ---------- POST /{id}/cancel -------------------------------------------------
+
+    private String cancelBody(String reason) {
+        return "{\"reason\":\"" + reason + "\"}";
+    }
+
+    @Test
+    void cancel_activeWithdrawal_returns200_stockReturns_auditRow() {
+        int productId = seedProduct("ZTEST_WD Cancel");
+        int workerId = seedWorker("ZTESTW440");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "4", workerId, token);   // stock 6
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(cancelBody("El tracto no necesitaba el repuesto, era otra falla"))
+        .when().post("/warehouse/withdrawals/" + id + "/cancel")
+        .then().statusCode(200)
+            .header("ETag", notNullValue())
+            .body("status", equalTo("CANCELLED"))
+            .body("cancelReason", equalTo("El tracto no necesitaba el repuesto, era otra falla"))
+            .body("cancelledBy.username", equalTo("admin"))
+            .body("cancelledAt", notNullValue());
+
+        assertStock(productId, "10", token);   // el retiro anulado devuelve el stock
+        if (countChanges(id, "CANCELLED") != 1) {
+            throw new AssertionError("Esperaba 1 fila CANCELLED en audit_logs");
+        }
+    }
+
+    @Test
+    void cancel_alreadyCancelled_returns409_WH008() {
+        int productId = seedProduct("ZTEST_WD CancelTwice");
+        int workerId = seedWorker("ZTESTW441");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(cancelBody("Primera anulacion valida del retiro"))
+        .when().post("/warehouse/withdrawals/" + id + "/cancel").then().statusCode(200);
+
+        String newEtag = etagOf(id, token);
+        given().header("Authorization", "Bearer " + token).header("If-Match", newEtag)
+            .contentType(ContentType.JSON).body(cancelBody("Segundo intento sobre un retiro ya anulado"))
+        .when().post("/warehouse/withdrawals/" + id + "/cancel")
+        .then().statusCode(409).body("code", equalTo("WH-008"));
+    }
+
+    @Test
+    void cancel_missingIfMatch_returns412_COM004() {
+        int productId = seedProduct("ZTEST_WD CancelNoIfMatch");
+        int workerId = seedWorker("ZTESTW442");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body(cancelBody("Anular sin If-Match, debe fallar"))
+        .when().post("/warehouse/withdrawals/" + id + "/cancel")
+        .then().statusCode(412).body("code", equalTo("COM-004"));
+    }
+
+    @Test
+    void cancel_staleIfMatch_returns412_COM004() {
+        int productId = seedProduct("ZTEST_WD CancelStale");
+        int workerId = seedWorker("ZTESTW443");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String staleEtag = etagOf(id, token);
+
+        // Una edicion mueve la version.
+        given().header("Authorization", "Bearer " + token).header("If-Match", staleEtag)
+            .contentType(ContentType.JSON).body(updateBody("4", workerId, "Edicion que mueve la version"))
+        .when().put("/warehouse/withdrawals/" + id).then().statusCode(200);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", staleEtag)
+            .contentType(ContentType.JSON).body(cancelBody("Anular con un ETag viejo"))
+        .when().post("/warehouse/withdrawals/" + id + "/cancel")
+        .then().statusCode(412).body("code", equalTo("COM-004"));
+    }
+
+    @Test
+    void cancel_nonexistent_returns404_WH003() {
+        String token = login("admin", "Admin1234");
+        given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"")
+            .contentType(ContentType.JSON).body(cancelBody("Anular un retiro inexistente"))
+        .when().post("/warehouse/withdrawals/999999/cancel")
+        .then().statusCode(404).body("code", equalTo("WH-003"));
+    }
+
+    @Test
+    void cancel_reasonTooShort_returns400_COM001() {
+        int productId = seedProduct("ZTEST_WD CancelReasonCorto");
+        int workerId = seedWorker("ZTESTW444");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(cancelBody("corto"))
+        .when().post("/warehouse/withdrawals/" + id + "/cancel")
+        .then().statusCode(400).body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void cancel_missingReason_returns400_COM001() {
+        int productId = seedProduct("ZTEST_WD CancelSinReason");
+        int workerId = seedWorker("ZTESTW445");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body("{}")
+        .when().post("/warehouse/withdrawals/" + id + "/cancel")
+        .then().statusCode(400).body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void cancel_withoutToken_returns401() {
+        given().header("If-Match", "\"x\"").contentType(ContentType.JSON)
+            .body(cancelBody("Anular sin token de acceso"))
+        .when().post("/warehouse/withdrawals/1/cancel").then().statusCode(401);
+    }
+
+    @Test
+    void cancel_withSalesRole_returns403_COM003() {
+        String token = login("lcampos", "Sales1234");
+        given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"")
+            .contentType(ContentType.JSON).body(cancelBody("Rol de ventas sin permiso de almacen"))
+        .when().post("/warehouse/withdrawals/1/cancel").then().statusCode(403).body("code", equalTo("COM-003"));
+    }
 }
