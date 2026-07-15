@@ -5,6 +5,7 @@ import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.UserLookup;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
+import com.scaramutti.tms.shared.entity.AuditLog;
 import com.scaramutti.tms.shared.entity.EscortVehicle;
 import com.scaramutti.tms.shared.entity.Product;
 import com.scaramutti.tms.shared.entity.Tractor;
@@ -20,7 +21,10 @@ import com.scaramutti.tms.shared.repository.TrailerRepository;
 import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
 import com.scaramutti.tms.shared.repository.WithdrawalRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
+import com.scaramutti.tms.shared.util.Etag;
 import com.scaramutti.tms.warehouse.WarehouseError;
+import com.scaramutti.tms.warehouse.model.AuditChangeType;
 import com.scaramutti.tms.warehouse.model.AuditEntityType;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
@@ -31,6 +35,7 @@ import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalResponse;
 import com.scaramutti.tms.warehouse.withdrawal.mapper.WarehouseWithdrawalServiceMapper;
 import com.scaramutti.tms.warehouse.withdrawal.service.cmd.CreateWarehouseWithdrawalCommand;
 import com.scaramutti.tms.warehouse.withdrawal.service.cmd.ListWarehouseWithdrawalsQuery;
+import com.scaramutti.tms.warehouse.withdrawal.service.cmd.UpdateWarehouseWithdrawalCommand;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -73,7 +78,7 @@ public class WarehouseWithdrawalService {
     public WarehouseWithdrawalResponse createWithdrawal(CreateWarehouseWithdrawalCommand command) {
         Integer userId = currentUser.requireId();
 
-        rejectMultipleFleetUnits(command);
+        rejectMultipleFleetUnits(command.tractorId(), command.trailerId(), command.escortVehicleId());
         Product product = requireActiveProduct(command.productId());
         UnitOfMeasure unit = unitOfMeasureRepository.findById(product.unitOfMeasureId);
         Worker worker = requireActiveWorker(command.receivedByWorkerId());
@@ -182,10 +187,10 @@ public class WarehouseWithdrawalService {
 
     // ---------- WH-005 (a lo sumo una unidad de flota) ------------------------
 
-    private void rejectMultipleFleetUnits(CreateWarehouseWithdrawalCommand command) {
-        int units = (command.tractorId() != null ? 1 : 0)
-            + (command.trailerId() != null ? 1 : 0)
-            + (command.escortVehicleId() != null ? 1 : 0);
+    private void rejectMultipleFleetUnits(Integer tractorId, Integer trailerId, Integer escortVehicleId) {
+        int units = (tractorId != null ? 1 : 0)
+            + (trailerId != null ? 1 : 0)
+            + (escortVehicleId != null ? 1 : 0);
         if (units > 1) {
             throw WarehouseError.WITHDRAWAL_MULTIPLE_FLEET_UNITS.toException();
         }
@@ -318,5 +323,116 @@ public class WarehouseWithdrawalService {
         return auditLogRepository.findLastFieldEdit(AuditEntityType.WITHDRAWAL, withdrawalId)
             .map(log -> new WarehouseEditTrace(userLookup.require(log.changedBy), log.loggedAt, log.reason))
             .orElse(null);
+    }
+
+    // ========== Edición (PUT /{id}) ===========================================
+
+    /**
+     * Edición de un retiro (PUT /{id}). El producto es inmutable (no viaja en el body).
+     * Orden de validación: 404 WH-003 (no existe) -> 409 WH-008 (anulado) -> 412 If-Match ->
+     * 400 WH-005 (a lo sumo una unidad) -> 400 WH-004 (trabajador y unidad de flota activos) ->
+     * 409 WH-001 (solo si sube la cantidad, con el lock del producto) -> mutación + bump de
+     * updatedAt + una fila FIELD_EDIT por campo cambiado.
+     */
+    @Transactional
+    public WarehouseWithdrawalResponse updateWithdrawal(UpdateWarehouseWithdrawalCommand command) {
+        Integer userId = currentUser.requireId();
+        Withdrawal withdrawal = loadWithdrawalOrThrow(command.withdrawalId());
+        rejectIfCancelled(withdrawal);
+        Etag.verify(command.ifMatch(), withdrawal.updatedAt);
+
+        rejectMultipleFleetUnits(command.tractorId(), command.trailerId(), command.escortVehicleId());
+        Worker newWorker = requireActiveWorker(command.receivedByWorkerId());
+        FleetUnitRef newFleetUnit = requireActiveFleetUnit(
+            command.tractorId(), command.trailerId(), command.escortVehicleId());
+        guardEditKeepsStockNonNegative(withdrawal, command.quantity());
+
+        // Snapshot de los valores viejos para el diff de auditoría (ANTES de mutar).
+        String oldQuantity = plain(withdrawal.quantity);
+        Worker oldWorker = workerRepository.findById(withdrawal.receivedBy);
+        String oldFleetUnit = fleetUnitLabel(resolveFleetUnit(withdrawal));
+        String oldObservations = withdrawal.observations;
+
+        withdrawal.quantity = command.quantity();
+        withdrawal.receivedBy = command.receivedByWorkerId();
+        withdrawal.tractorId = command.tractorId();
+        withdrawal.trailerId = command.trailerId();
+        withdrawal.escortVehicleId = command.escortVehicleId();
+        withdrawal.observations = command.observations();
+        withdrawal.updatedAt = DateUtils.nowUtcMicros();
+        withdrawalRepository.flush();
+
+        String reason = command.reason();
+        logFieldEdit(withdrawal.id, "quantity", "Cantidad", oldQuantity, plain(command.quantity()), reason, userId);
+        logFieldEdit(withdrawal.id, "receivedBy", "Quién recibe", workerLabel(oldWorker), workerLabel(newWorker), reason, userId);
+        logFieldEdit(withdrawal.id, "fleetUnit", "Unidad de flota", oldFleetUnit, fleetUnitLabel(newFleetUnit), reason, userId);
+        logFieldEdit(withdrawal.id, "observations", "Observaciones", oldObservations, command.observations(), reason, userId);
+
+        return assembleResponse(withdrawal);
+    }
+
+    private void rejectIfCancelled(Withdrawal withdrawal) {
+        if (WarehouseRecordStatus.CANCELLED.name().equals(withdrawal.status)) {
+            throw WarehouseError.WITHDRAWAL_ALREADY_CANCELLED.toException();
+        }
+    }
+
+    /**
+     * WH-001 en la edición: subir la cantidad valida contra el disponible SIN contar este
+     * retiro; bajarla o dejarla igual siempre es segura (devuelve stock) y no toca el lock.
+     * Al subir, se lockea la fila del producto en la transacción y se compara contra
+     * {@code stock_actual + cantidad_vieja} (el disponible si este retiro no existiera), el
+     * mismo lock que serializa el alta (RN-WH2).
+     */
+    private void guardEditKeepsStockNonNegative(Withdrawal withdrawal, BigDecimal newQuantity) {
+        if (newQuantity.compareTo(withdrawal.quantity) <= 0) {
+            return;
+        }
+        productRepository.lockProductRow(withdrawal.productId);
+        BigDecimal availableWithoutThis = currentStock(withdrawal.productId).add(withdrawal.quantity);
+        if (newQuantity.compareTo(availableWithoutThis) > 0) {
+            Product product = productRepository.findById(withdrawal.productId);
+            UnitOfMeasure unit = unitOfMeasureRepository.findById(product.unitOfMeasureId);
+            throw WarehouseError.WITHDRAWAL_INSUFFICIENT_STOCK.toException(
+                "Stock insuficiente: solo hay " + availableWithoutThis.toPlainString() + " " + unit.code
+                    + " disponibles de " + product.name + " (sin contar este retiro)");
+        }
+    }
+
+    /** Una fila FIELD_EDIT por campo efectivamente cambiado (Objects.equals decide el no-op). */
+    private void logFieldEdit(Integer withdrawalId, String fieldName, String fieldLabel,
+                              String oldValue, String newValue, String reason, Integer userId) {
+        if (Objects.equals(oldValue, newValue)) {
+            return;
+        }
+        AuditLog log = new AuditLog();
+        log.entityType = AuditEntityType.WITHDRAWAL.name();
+        log.entityId = withdrawalId;
+        log.changeType = AuditChangeType.FIELD_EDIT.name();
+        log.fieldName = fieldName;
+        log.fieldLabel = fieldLabel;
+        log.oldValue = oldValue;
+        log.newValue = newValue;
+        log.reason = reason;
+        log.changedBy = userId;
+        auditLogRepository.persist(log);
+    }
+
+    private String plain(BigDecimal value) {
+        return value.stripTrailingZeros().toPlainString();
+    }
+
+    /**
+     * Etiqueta del trabajador para el diff de auditoría: nombre + id ("Juan Perez (#8)"). Lleva el
+     * id para que el cambio se detecte aunque dos trabajadores compartan nombre (el nombre solo no
+     * es único).
+     */
+    private String workerLabel(Worker worker) {
+        return worker.fullName() + " (#" + worker.id + ")";
+    }
+
+    /** Etiqueta legible de la unidad de flota para el diff de auditoría ("TRACTOR ABC-123"); null si no tiene. */
+    private String fleetUnitLabel(FleetUnitRef ref) {
+        return ref == null ? null : ref.kind() + " " + ref.plate();
     }
 }

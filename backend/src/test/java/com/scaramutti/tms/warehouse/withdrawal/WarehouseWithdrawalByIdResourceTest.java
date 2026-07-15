@@ -20,8 +20,15 @@ import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -326,5 +333,416 @@ class WarehouseWithdrawalByIdResourceTest {
         given().header("Authorization", "Bearer " + fabricateAccessToken("disp_test", "dispatcher"))
         .when().get("/warehouse/withdrawals/1")
         .then().statusCode(403).body("code", equalTo("COM-003"));
+    }
+
+    // ---------- PUT /{id} helpers -------------------------------------------------
+
+    private String updateBody(String quantity, int workerId, String reason) {
+        return "{\"quantity\":" + quantity + ",\"receivedByWorkerId\":" + workerId + ",\"reason\":\"" + reason + "\"}";
+    }
+
+    private long countChanges(int withdrawalId, String changeType) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT COUNT(*) FROM almacen.audit_logs WHERE entity_type = 'WITHDRAWAL' "
+                + "AND entity_id = ?1 AND change_type = ?2")
+            .setParameter(1, withdrawalId).setParameter(2, changeType).getSingleResult()).longValue();
+    }
+
+    // ---------- PUT /{id} happy ---------------------------------------------------
+
+    @Test
+    void update_lowerQuantity_returns200_lastEdit_stockReturns() {
+        int productId = seedProduct("ZTEST_WD EditLower");
+        int workerId = seedWorker("ZTESTW410");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "7", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body(updateBody("3", workerId, "Se pidieron 7 filtros pero se usaron 3, se devuelven 4"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(200)
+            .header("ETag", notNullValue())
+            .body("quantity", equalTo(3))
+            .body("lastEdit.by.username", equalTo("admin"))
+            .body("lastEdit.reason", equalTo("Se pidieron 7 filtros pero se usaron 3, se devuelven 4"));
+
+        assertStock(productId, "7", token);   // 10 - 3 (antes 10 - 7 = 3)
+    }
+
+    @Test
+    void update_raiseWithinAvailable_returns200_stockDecreases() {
+        int productId = seedProduct("ZTEST_WD EditRaise");
+        int workerId = seedWorker("ZTESTW411");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);   // stock 7
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body(updateBody("6", workerId, "Se necesitaban 6 y no 3 para el mantenimiento"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(200).body("quantity", equalTo(6));
+
+        assertStock(productId, "4", token);   // 10 - 6
+    }
+
+    @Test
+    void update_replaceFleetUnit_tractorToTrailer_returns200() {
+        int productId = seedProduct("ZTEST_WD EditFleet");
+        int workerId = seedWorker("ZTESTW412");
+        int tractorId = seedTractor("ZT0410", true);
+        int trailerId = seedTrailer("ZT0411", true);
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body("{\"productId\":" + productId + ",\"quantity\":2,\"receivedByWorkerId\":" + workerId
+                + ",\"tractorId\":" + tractorId + "}")
+        .when().post("/warehouse/withdrawals").then().statusCode(201).extract().jsonPath().getInt("id");
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body("{\"quantity\":2,\"receivedByWorkerId\":" + workerId + ",\"trailerId\":" + trailerId
+                + ",\"reason\":\"Se cargo a la carreta y no al tracto\"}")
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(200)
+            .body("fleetUnit.kind", equalTo("TRAILER"))
+            .body("fleetUnit.id", equalTo(trailerId));
+    }
+
+    @Test
+    void update_removeFleetUnit_returns200Null() {
+        int productId = seedProduct("ZTEST_WD EditRemoveFleet");
+        int workerId = seedWorker("ZTESTW413");
+        int tractorId = seedTractor("ZT0412", true);
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body("{\"productId\":" + productId + ",\"quantity\":2,\"receivedByWorkerId\":" + workerId
+                + ",\"tractorId\":" + tractorId + "}")
+        .when().post("/warehouse/withdrawals").then().statusCode(201).extract().jsonPath().getInt("id");
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body(updateBody("2", workerId, "El retiro no iba a ninguna unidad en particular"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(200).body("fleetUnit", nullValue());
+    }
+
+    @Test
+    void update_thenNewEtagDiffersFromOld() {
+        int productId = seedProduct("ZTEST_WD EditEtag");
+        int workerId = seedWorker("ZTESTW414");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String oldEtag = etagOf(id, token);
+
+        String newEtag = given().header("Authorization", "Bearer " + token).header("If-Match", oldEtag)
+            .contentType(ContentType.JSON).body(updateBody("4", workerId, "Ajuste de la cantidad retirada"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(200).extract().header("ETag");
+
+        if (newEtag.equals(oldEtag)) {
+            throw new AssertionError("El ETag no cambió tras la edición");
+        }
+    }
+
+    @Test
+    void update_twoFieldsChanged_writesOneFieldEditRowPerField() {
+        int productId = seedProduct("ZTEST_WD EditDiff");
+        int workerId = seedWorker("ZTESTW415");
+        int otherWorkerId = seedWorker("ZTESTW416");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        // Cambian cantidad Y quien recibe (2 campos): 2 filas FIELD_EDIT, ninguna para flota/obs.
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body("{\"quantity\":5,\"receivedByWorkerId\":" + otherWorkerId
+                + ",\"reason\":\"Se corrige cantidad y receptor\"}")
+        .when().put("/warehouse/withdrawals/" + id).then().statusCode(200);
+
+        if (countChanges(id, "FIELD_EDIT") != 2) {
+            throw new AssertionError("Esperaba 2 filas FIELD_EDIT, fueron " + countChanges(id, "FIELD_EDIT"));
+        }
+    }
+
+    @Test
+    void update_noopValues_writesNoFieldEditRows_butBumpsEtag() {
+        int productId = seedProduct("ZTEST_WD EditNoop");
+        int workerId = seedWorker("ZTESTW417");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String oldEtag = etagOf(id, token);
+
+        // Mismos valores actuales: 0 filas de auditoría, pero la versión igual se bumpea.
+        String newEtag = given().header("Authorization", "Bearer " + token).header("If-Match", oldEtag)
+            .contentType(ContentType.JSON).body(updateBody("3", workerId, "Se guarda sin cambios reales"))
+        .when().put("/warehouse/withdrawals/" + id).then().statusCode(200).extract().header("ETag");
+
+        if (countChanges(id, "FIELD_EDIT") != 0) {
+            throw new AssertionError("Un no-op no debería escribir filas FIELD_EDIT");
+        }
+        if (newEtag.equals(oldEtag)) {
+            throw new AssertionError("El ETag debería bumpearse aunque no cambien los campos");
+        }
+    }
+
+    @Test
+    void update_productIdInBodyIsIgnored_productImmutable() {
+        int productId = seedProduct("ZTEST_WD EditImmutable");
+        int otherProductId = seedProduct("ZTEST_WD EditImmutableOther");
+        int workerId = seedWorker("ZTESTW418");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body("{\"productId\":" + otherProductId + ",\"quantity\":3,\"receivedByWorkerId\":" + workerId
+                + ",\"reason\":\"Intento de cambiar el producto (debe ignorarse)\"}")
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(200).body("product.id", equalTo(productId));
+    }
+
+    // ---------- PUT /{id} WH-001 (stock) -----------------------------------------
+
+    @Test
+    void update_raiseExceedsAvailable_returns409_WH001() {
+        int productId = seedProduct("ZTEST_WD EditExceso");
+        int workerId = seedWorker("ZTESTW419");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "6", token);
+        int id = createWithdrawal(productId, "4", workerId, token);   // stock 2; disponible sin este = 6
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(updateBody("8", workerId, "Se intenta subir por encima del stock"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(409).body("code", equalTo("WH-001")).body("detail", containsString("6"));
+    }
+
+    @Test
+    void update_twoConcurrentRaises_lockSerializesOneSucceedsOneRejected() throws Exception {
+        // Dos retiros DISTINTOS del MISMO producto suben cantidad a la vez compitiendo por el
+        // stock restante. Cada uno lleva su propio ETag válido (filas distintas), así que no chocan
+        // en el If-Match: compiten en el lock de fila del producto. Con el lock correcto el
+        // resultado es determinista (un 200 y un 409 WH-001); sin él ambas subas descontarían y el
+        // stock quedaría negativo. Se repite para exponer un lock roto con alta probabilidad.
+        String token = login("admin", "Admin1234");
+        for (int i = 0; i < 5; i++) {
+            int productId = seedProduct("ZTEST_WD EditConc " + i);
+            int workerId = seedWorker("ZTESTWEC" + i);
+            seedOpeningBalance(productId, "6", token);
+            int idA = createWithdrawal(productId, "2", workerId, token);
+            int idB = createWithdrawal(productId, "2", workerId, token);   // stock 2
+            String etagA = etagOf(idA, token);
+            String etagB = etagOf(idB, token);
+
+            CyclicBarrier barrier = new CyclicBarrier(2);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                Callable<Integer> raiseA = raiseAttempt(idA, etagA, productId, workerId, barrier, token);
+                Callable<Integer> raiseB = raiseAttempt(idB, etagB, productId, workerId, barrier, token);
+                Future<Integer> f1 = pool.submit(raiseA);
+                Future<Integer> f2 = pool.submit(raiseB);
+                int s1 = f1.get(20, TimeUnit.SECONDS);
+                int s2 = f2.get(20, TimeUnit.SECONDS);
+
+                boolean exactlyOneEach = (s1 == 200 && s2 == 409) || (s1 == 409 && s2 == 200);
+                if (!exactlyOneEach) {
+                    throw new AssertionError("Iteración " + i + ": esperaba un 200 y un 409, fueron " + s1 + " y " + s2);
+                }
+                assertStock(productId, "0", token);   // 6 - 4 (ganador) - 2 (perdedor sigue en 2)
+            } finally {
+                pool.shutdownNow();
+            }
+        }
+    }
+
+    /** Sube un retiro a cantidad 4 (delta que solo entra si el otro no gano) tras la barrera. */
+    private Callable<Integer> raiseAttempt(int withdrawalId, String etag, int productId, int workerId,
+                                           CyclicBarrier barrier, String token) {
+        return () -> {
+            barrier.await();
+            return given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+                .contentType(ContentType.JSON)
+                .body(updateBody("4", workerId, "Se necesita el doble para el mantenimiento urgente"))
+            .when().put("/warehouse/withdrawals/" + withdrawalId).then().extract().statusCode();
+        };
+    }
+
+    // ---------- PUT /{id} WH-005 / WH-004 ----------------------------------------
+
+    @Test
+    void update_twoFleetUnits_returns400_WH005() {
+        int productId = seedProduct("ZTEST_WD EditDosUnidades");
+        int workerId = seedWorker("ZTESTW420");
+        int tractorId = seedTractor("ZT0420", true);
+        int trailerId = seedTrailer("ZT0421", true);
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "2", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body("{\"quantity\":2,\"receivedByWorkerId\":" + workerId + ",\"tractorId\":" + tractorId
+                + ",\"trailerId\":" + trailerId + ",\"reason\":\"Dos unidades, debe fallar\"}")
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(400).body("code", equalTo("WH-005"));
+    }
+
+    @Test
+    void update_inactiveWorker_returns400_WH004() {
+        int productId = seedProduct("ZTEST_WD EditWorkerInactivo");
+        int workerId = seedWorker("ZTESTW421");
+        int inactiveWorkerId = seedWorker("ZTESTW422", false);
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "2", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body(updateBody("2", inactiveWorkerId, "Se asigna a un trabajador inactivo"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(400).body("code", equalTo("WH-004"));
+    }
+
+    @Test
+    void update_inactiveTractor_returns400_WH004() {
+        int productId = seedProduct("ZTEST_WD EditTractorInactivo");
+        int workerId = seedWorker("ZTESTW423");
+        int inactiveTractorId = seedTractor("ZT0423", false);
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "2", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body("{\"quantity\":2,\"receivedByWorkerId\":" + workerId + ",\"tractorId\":" + inactiveTractorId
+                + ",\"reason\":\"Se asigna a un tracto inactivo\"}")
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(400).body("code", equalTo("WH-004"));
+    }
+
+    // ---------- PUT /{id} WH-008 / If-Match / validación -------------------------
+
+    @Test
+    void update_cancelledWithdrawal_returns409_WH008() {
+        int productId = seedProduct("ZTEST_WD EditCancelled");
+        int workerId = seedWorker("ZTESTW424");
+        String token = login("admin", "Admin1234");
+        int id = seedCancelledWithdrawal(productId, "3", workerId);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(updateBody("2", workerId, "Intento de editar un anulado"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(409).body("code", equalTo("WH-008"));
+    }
+
+    @Test
+    void update_missingIfMatch_returns412_COM004() {
+        int productId = seedProduct("ZTEST_WD EditNoIfMatch");
+        int workerId = seedWorker("ZTESTW425");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+
+        given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
+            .body(updateBody("2", workerId, "Sin If-Match, debe fallar"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(412).body("code", equalTo("COM-004"));
+    }
+
+    @Test
+    void update_staleIfMatch_returns412_COM004() {
+        int productId = seedProduct("ZTEST_WD EditStale");
+        int workerId = seedWorker("ZTESTW426");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String staleEtag = etagOf(id, token);
+
+        // Una primera edición cambia la versión.
+        given().header("Authorization", "Bearer " + token).header("If-Match", staleEtag)
+            .contentType(ContentType.JSON).body(updateBody("4", workerId, "Primera edición que mueve la versión"))
+        .when().put("/warehouse/withdrawals/" + id).then().statusCode(200);
+
+        // Reintentar con el ETag viejo.
+        given().header("Authorization", "Bearer " + token).header("If-Match", staleEtag)
+            .contentType(ContentType.JSON).body(updateBody("2", workerId, "Reintento con ETag viejo"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(412).body("code", equalTo("COM-004"));
+    }
+
+    @Test
+    void update_reasonTooShort_returns400_COM001() {
+        int productId = seedProduct("ZTEST_WD EditReasonCorto");
+        int workerId = seedWorker("ZTESTW427");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON).body(updateBody("2", workerId, "corto"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(400).body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void update_missingReason_returns400_COM001() {
+        int productId = seedProduct("ZTEST_WD EditSinReason");
+        int workerId = seedWorker("ZTESTW428");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+            .contentType(ContentType.JSON)
+            .body("{\"quantity\":2,\"receivedByWorkerId\":" + workerId + "}")
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(400).body("code", equalTo("COM-001"));
+    }
+
+    @Test
+    void update_nonexistent_returns404_WH003() {
+        int workerId = seedWorker("ZTESTW429");
+        String token = login("admin", "Admin1234");
+        given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"")
+            .contentType(ContentType.JSON).body(updateBody("2", workerId, "Editar un retiro inexistente"))
+        .when().put("/warehouse/withdrawals/999999")
+        .then().statusCode(404).body("code", equalTo("WH-003"));
+    }
+
+    @Test
+    void update_withoutToken_returns401() {
+        given().header("If-Match", "\"x\"").contentType(ContentType.JSON)
+            .body("{\"quantity\":2,\"receivedByWorkerId\":1,\"reason\":\"Sin token de acceso\"}")
+        .when().put("/warehouse/withdrawals/1").then().statusCode(401);
+    }
+
+    @Test
+    void update_withSalesRole_returns403_COM003() {
+        String token = login("lcampos", "Sales1234");
+        given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"")
+            .contentType(ContentType.JSON)
+            .body("{\"quantity\":2,\"receivedByWorkerId\":1,\"reason\":\"Rol sin permiso de almacen\"}")
+        .when().put("/warehouse/withdrawals/1").then().statusCode(403).body("code", equalTo("COM-003"));
     }
 }

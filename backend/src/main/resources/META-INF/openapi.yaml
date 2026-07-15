@@ -1509,6 +1509,65 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Warehouse]
+      operationId: updateWarehouseWithdrawal
+      summary: Editar retiro (justificacion obligatoria)
+      description: |
+        RN-WH4: `reason` >= 10 → `almacen.audit_logs` con el diff por campo. Editables:
+        cantidad, quien recibe, unidad de flota, observaciones. `productId` INMUTABLE (no
+        viaja en el body). Guarda de stock (misma tx): subir la cantidad valida contra el
+        disponible SIN contar este retiro; si excede → 409 WH-001. Bajarla siempre es segura
+        (devuelve stock). La unidad de flota se REEMPLAZA: a lo sumo una, los tres campos null
+        la quitan, mas de una → 400 WH-005. Anulado → 409 WH-008. If-Match obligatorio → 412
+        COM-004.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WarehouseWithdrawalUpdateRequest' }
+      responses:
+        '200':
+          description: Actualizado
+          headers:
+            ETag: { schema: { type: string } }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: WH-001 (excede stock sin contar este retiro) / WH-008 (anulado)
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                exceedsAvailableStock:
+                  summary: Subir la cantidad excede el disponible sin contar este retiro
+                  value:
+                    type: 'urn:tms:error:wh-001'
+                    title: 'Conflict'
+                    status: 409
+                    detail: 'Stock insuficiente: solo hay 6 UND disponibles de Filtro de aceite XYZ (sin contar este retiro)'
+                    instance: '/api/v1/warehouse/withdrawals/31'
+                    code: 'WH-001'
+                    traceId: '1e2f3a4b-5c6d-7e8f-9a0b-1c2d3e4f5a6b'
+                recordCancelled:
+                  summary: El retiro esta anulado (inmutable)
+                  value:
+                    type: 'urn:tms:error:wh-008'
+                    title: 'Conflict'
+                    status: 409
+                    detail: 'El retiro esta anulado: no se puede editar ni volver a anular'
+                    instance: '/api/v1/warehouse/withdrawals/31'
+                    code: 'WH-008'
+                    traceId: '2f3a4b5c-6d7e-8f9a-0b1c-2d3e4f5a6b7c'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
 
 # =============================================================================
 components:
@@ -2846,6 +2905,22 @@ components:
         trailerId:          { type: [integer, 'null'] }
         escortVehicleId:    { type: [integer, 'null'] }
         observations:       { type: [string, 'null'] }
+
+    WarehouseWithdrawalUpdateRequest:
+      type: object
+      description: |
+        Body del PUT. SIN `productId`: el producto es INMUTABLE (RN-WH4, producto equivocado
+        = anular y crear otro). La unidad de flota se REEMPLAZA (los tres campos null la
+        quitan; a lo sumo una).
+      required: [quantity, receivedByWorkerId, reason]
+      properties:
+        quantity:           { type: number, exclusiveMinimum: 0, description: 'Subirla valida contra el disponible SIN contar este retiro (409 WH-001); bajarla siempre es segura' }
+        receivedByWorkerId: { type: integer }
+        tractorId:          { type: [integer, 'null'] }
+        trailerId:          { type: [integer, 'null'] }
+        escortVehicleId:    { type: [integer, 'null'] }
+        observations:       { type: [string, 'null'] }
+        reason:             { type: string, minLength: 10, maxLength: 500, description: 'Justificacion de la edicion (RN-WH4). Va a `almacen.audit_logs`.' }
 
     WarehouseWithdrawalResponse:
       type: object
