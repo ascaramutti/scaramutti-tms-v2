@@ -203,6 +203,13 @@ class WarehouseWithdrawalByIdResourceTest {
             .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
     }
 
+    /** Token con un userId real como subject (el service resuelve registeredBy/changedBy contra él). */
+    private String fabricateTokenForUser(int userId, String username, String role) {
+        Instant now = Instant.now();
+        return Jwt.subject(String.valueOf(userId)).upn(username).groups(Set.of(role)).claim("typ", "access")
+            .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
+    }
+
     private void seedOpeningBalance(int productId, String quantity, String token) {
         given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
             .body("{\"productId\":" + productId + ",\"quantity\":" + quantity + "}")
@@ -746,6 +753,36 @@ class WarehouseWithdrawalByIdResourceTest {
         .when().put("/warehouse/withdrawals/1").then().statusCode(403).body("code", equalTo("COM-003"));
     }
 
+    @Test
+    void update_withWarehouseKeeperRole_returns200() {
+        int productId = seedProduct("ZTEST_WD EditRoleWK");
+        int workerId = seedWorker("ZTESTW430");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + fabricateTokenForUser(adminId(), "wk_test", "warehouse_keeper"))
+            .header("If-Match", etag).contentType(ContentType.JSON)
+            .body(updateBody("2", workerId, "Ajuste registrado por el almacenero"))
+        .when().put("/warehouse/withdrawals/" + id).then().statusCode(200);
+    }
+
+    @Test
+    void update_cancelledWithStaleIfMatch_returns409_WH008_beforeIfMatch() {
+        int productId = seedProduct("ZTEST_WD EditCancelledStale");
+        int workerId = seedWorker("ZTESTW431");
+        String token = login("admin", "Admin1234");
+        int id = seedCancelledWithdrawal(productId, "3", workerId);
+
+        // Un retiro anulado + If-Match invalido: el 409 WH-008 gana antes que la verificacion de
+        // If-Match (412). Pinnea el orden anulado-antes-de-precondicion.
+        given().header("Authorization", "Bearer " + token).header("If-Match", "\"garbage\"")
+            .contentType(ContentType.JSON).body(updateBody("2", workerId, "Editar un anulado con ETag invalido"))
+        .when().put("/warehouse/withdrawals/" + id)
+        .then().statusCode(409).body("code", equalTo("WH-008"));
+    }
+
     // ---------- POST /{id}/cancel -------------------------------------------------
 
     private String cancelBody(String reason) {
@@ -883,5 +920,20 @@ class WarehouseWithdrawalByIdResourceTest {
         given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"")
             .contentType(ContentType.JSON).body(cancelBody("Rol de ventas sin permiso de almacen"))
         .when().post("/warehouse/withdrawals/1/cancel").then().statusCode(403).body("code", equalTo("COM-003"));
+    }
+
+    @Test
+    void cancel_withWarehouseKeeperRole_returns200() {
+        int productId = seedProduct("ZTEST_WD CancelRoleWK");
+        int workerId = seedWorker("ZTESTW446");
+        String token = login("admin", "Admin1234");
+        seedOpeningBalance(productId, "10", token);
+        int id = createWithdrawal(productId, "3", workerId, token);
+        String etag = etagOf(id, token);
+
+        given().header("Authorization", "Bearer " + fabricateTokenForUser(adminId(), "wk_test", "warehouse_keeper"))
+            .header("If-Match", etag).contentType(ContentType.JSON)
+            .body(cancelBody("Anulacion registrada por el almacenero"))
+        .when().post("/warehouse/withdrawals/" + id + "/cancel").then().statusCode(200);
     }
 }
