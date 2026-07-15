@@ -1486,6 +1486,30 @@ paths:
                 code: 'WH-001'
                 traceId: '0d1e2f3a-4b5c-6d7e-8f9a-0b1c2d3e4f5a'
 
+  /warehouse/withdrawals/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseWithdrawal
+      summary: Detalle de un retiro
+      description: |
+        Incluye `lastEdit` (rastro del ultimo FIELD_EDIT en `almacen.audit_logs`; null si
+        nunca se edito) y los campos de anulacion si status=CANCELLED. El header ETag
+        (version opaca del updatedAt) es el que exigen PUT y cancel via If-Match.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      responses:
+        '200':
+          description: Detalle
+          headers:
+            ETag: { schema: { type: string }, description: Version opaca para If-Match }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 # =============================================================================
 components:
 # =============================================================================

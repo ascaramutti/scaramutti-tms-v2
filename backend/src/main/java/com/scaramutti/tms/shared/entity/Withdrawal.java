@@ -18,9 +18,9 @@ import java.time.OffsetDateTime;
  * plana al producto, al trabajador que recibe ({@code public.workers}) y, a lo sumo, a UNA
  * unidad de flota disyunta (tractor | carreta | escolta, CHECK en BD).
  *
- * <p>La tabla no tiene columna {@code updated_at}: el retiro recién creado no se editó, así
- * que su versión (el ETag) es {@code withdrawn_at}. La edición/anulación (que necesita
- * bumpear la versión para el If-Match) llega con su propia migración.
+ * <p>La versión que respalda el ETag es {@code updated_at}: en el alta se inicializa igual
+ * a {@code withdrawn_at} (el retiro recién creado no se editó) y la edición/anulación la
+ * bumpean para el If-Match optimista, igual que en productos y facturas.
  */
 @Entity
 @Table(name = "withdrawals", schema = "almacen")
@@ -69,13 +69,20 @@ public class Withdrawal {
     @Column(name = "cancelled_at")
     public OffsetDateTime cancelledAt;
 
-    // withdrawnAt sirve de versión del ETag: se trunca a MICROS (Postgres timestamptz), igual
+    @Column(name = "updated_at", nullable = false)
+    public OffsetDateTime updatedAt;
+
+    // updatedAt sirve de versión del ETag: se trunca a MICROS (Postgres timestamptz), igual
     // que el resto del módulo, para que el valor devuelto por el POST coincida con el releído
-    // por un GET en JVMs con reloj de nanosegundos (bug D-12).
+    // por un GET en JVMs con reloj de nanosegundos (bug D-12). En el alta arranca igual a
+    // withdrawnAt (el retiro recién creado no se editó); la edición/anulación lo bumpean.
     @PrePersist
     public void onCreate() {
         if (withdrawnAt == null) {
             withdrawnAt = DateUtils.nowUtcMicros();
+        }
+        if (updatedAt == null) {
+            updatedAt = withdrawnAt;
         }
         if (status == null) {
             status = "ACTIVE";

@@ -12,6 +12,7 @@ import com.scaramutti.tms.shared.entity.Trailer;
 import com.scaramutti.tms.shared.entity.UnitOfMeasure;
 import com.scaramutti.tms.shared.entity.Withdrawal;
 import com.scaramutti.tms.shared.entity.Worker;
+import com.scaramutti.tms.shared.repository.AuditLogRepository;
 import com.scaramutti.tms.shared.repository.EscortVehicleRepository;
 import com.scaramutti.tms.shared.repository.ProductRepository;
 import com.scaramutti.tms.shared.repository.TractorRepository;
@@ -20,9 +21,11 @@ import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
 import com.scaramutti.tms.shared.repository.WithdrawalRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
 import com.scaramutti.tms.warehouse.WarehouseError;
+import com.scaramutti.tms.warehouse.model.AuditEntityType;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductSummary;
+import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseEditTrace;
 import com.scaramutti.tms.warehouse.withdrawal.dto.FleetUnitRef;
 import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalResponse;
 import com.scaramutti.tms.warehouse.withdrawal.mapper.WarehouseWithdrawalServiceMapper;
@@ -61,6 +64,7 @@ public class WarehouseWithdrawalService {
     @Inject TrailerRepository trailerRepository;
     @Inject EscortVehicleRepository escortVehicleRepository;
     @Inject UnitOfMeasureRepository unitOfMeasureRepository;
+    @Inject AuditLogRepository auditLogRepository;
     @Inject UserLookup userLookup;
     @Inject CurrentUser currentUser;
     @Inject WarehouseWithdrawalServiceMapper warehouseWithdrawalServiceMapper;
@@ -88,14 +92,15 @@ public class WarehouseWithdrawalService {
         Withdrawal withdrawal = warehouseWithdrawalServiceMapper.toWithdrawalEntity(command, userId);
         withdrawalRepository.persist(withdrawal);
 
-        // Retiro recién creado: ACTIVE, sin anular (cancelledBy null).
-        return toResponse(withdrawal, product, unit, worker, fleetUnit, userLookup.require(userId), null);
+        // Retiro recién creado: ACTIVE, sin anular (cancelledBy null) ni editar (lastEdit null).
+        return toResponse(withdrawal, product, unit, worker, fleetUnit, userLookup.require(userId), null, null);
     }
 
     /**
      * Listado paginado (GET /warehouse/withdrawals). Read-only, sin {@code @Transactional}.
      * Queries fijas (page + count + productos/unidades + trabajadores + usuarios + las 3
-     * flotas), ninguna N+1 por page size. {@code lastEdit} viaja null (aún no hay edición).
+     * flotas), ninguna N+1 por page size. {@code lastEdit} viaja null en el listado (el rastro
+     * de edición se resuelve en el detalle, sin una query de auditoría por fila).
      */
     public PageResponse<WarehouseWithdrawalResponse> listWithdrawals(ListWarehouseWithdrawalsQuery query) {
         List<Withdrawal> withdrawals = withdrawalRepository.searchPaged(query);
@@ -143,7 +148,10 @@ public class WarehouseWithdrawalService {
                     workersById.get(withdrawal.receivedBy),
                     resolveFleetUnit(withdrawal, tractorsById, trailersById, escortsById),
                     usersById.get(withdrawal.registeredBy),
-                    withdrawal.cancelledBy != null ? usersById.get(withdrawal.cancelledBy) : null);
+                    withdrawal.cancelledBy != null ? usersById.get(withdrawal.cancelledBy) : null,
+                    // lastEdit no viaja en el listado (evita una query de auditoría por fila); el
+                    // rastro de edición se ve en el detalle (GET /{id}).
+                    null);
             })
             .toList();
 
@@ -237,7 +245,8 @@ public class WarehouseWithdrawalService {
 
     private WarehouseWithdrawalResponse toResponse(
         Withdrawal withdrawal, Product product, UnitOfMeasure unit, Worker worker,
-        FleetUnitRef fleetUnit, UserResponse registeredBy, UserResponse cancelledBy
+        FleetUnitRef fleetUnit, UserResponse registeredBy, UserResponse cancelledBy,
+        WarehouseEditTrace lastEdit
     ) {
         return new WarehouseWithdrawalResponse(
             withdrawal.id,
@@ -251,11 +260,63 @@ public class WarehouseWithdrawalService {
             withdrawal.cancelReason,
             cancelledBy,
             withdrawal.cancelledAt,
-            // lastEdit null: aún no hay edición de retiros. La versión (ETag) es withdrawnAt
-            // (la tabla no tiene updated_at; el retiro recién creado no se editó).
-            null,
+            lastEdit,
             registeredBy,
-            withdrawal.withdrawnAt
+            withdrawal.updatedAt
         );
+    }
+
+    // ========== Detalle (GET /{id}) ===========================================
+
+    /** Detalle de un retiro (GET /{id}). Read-only. 404 WH-003 si no existe. */
+    public WarehouseWithdrawalResponse getWithdrawal(Integer id) {
+        return assembleResponse(loadWithdrawalOrThrow(id));
+    }
+
+    private Withdrawal loadWithdrawalOrThrow(Integer id) {
+        return withdrawalRepository.findByIdOptional(id)
+            .orElseThrow(WarehouseError.WITHDRAWAL_NOT_FOUND::toException);
+    }
+
+    /**
+     * Arma el detalle completo de un retiro (lo comparten GET/PUT/cancel). El producto, la
+     * unidad y el trabajador se leen sin chequear activo: el detalle refleja el retiro tal
+     * como quedó registrado, aunque alguna FK se haya inactivado después. {@code lastEdit}
+     * sale del último FIELD_EDIT en {@code almacen.audit_logs}; los campos de anulación se
+     * pueblan si el retiro está anulado.
+     */
+    private WarehouseWithdrawalResponse assembleResponse(Withdrawal withdrawal) {
+        Product product = productRepository.findById(withdrawal.productId);
+        UnitOfMeasure unit = unitOfMeasureRepository.findById(product.unitOfMeasureId);
+        Worker worker = workerRepository.findById(withdrawal.receivedBy);
+        FleetUnitRef fleetUnit = resolveFleetUnit(withdrawal);
+        UserResponse registeredBy = userLookup.require(withdrawal.registeredBy);
+        UserResponse cancelledBy = withdrawal.cancelledBy != null ? userLookup.require(withdrawal.cancelledBy) : null;
+        WarehouseEditTrace lastEdit = loadLastEdit(withdrawal.id);
+        return toResponse(withdrawal, product, unit, worker, fleetUnit, registeredBy, cancelledBy, lastEdit);
+    }
+
+    /** Resuelve la unidad de flota de UN retiro (subtipo presente), sin chequear activo. null si no tiene. */
+    private FleetUnitRef resolveFleetUnit(Withdrawal withdrawal) {
+        if (withdrawal.tractorId != null) {
+            Tractor t = tractorRepository.findById(withdrawal.tractorId);
+            return t != null ? new FleetUnitRef(FleetUnitKind.TRACTOR, t.id, t.plate) : null;
+        }
+        if (withdrawal.trailerId != null) {
+            Trailer t = trailerRepository.findById(withdrawal.trailerId);
+            return t != null ? new FleetUnitRef(FleetUnitKind.TRAILER, t.id, t.plate) : null;
+        }
+        if (withdrawal.escortVehicleId != null) {
+            EscortVehicle e = escortVehicleRepository.findById(withdrawal.escortVehicleId);
+            return e != null ? new FleetUnitRef(FleetUnitKind.ESCORT, e.id, e.plate) : null;
+        }
+        return null;
+    }
+
+    /** Último FIELD_EDIT del retiro para el {@code lastEdit} del detalle. null si nunca se editó. */
+    private WarehouseEditTrace loadLastEdit(Integer withdrawalId) {
+        return auditLogRepository.findLastFieldEdit(AuditEntityType.WITHDRAWAL, withdrawalId)
+            .map(log -> new WarehouseEditTrace(userLookup.require(log.changedBy), log.loggedAt, log.reason))
+            .orElse(null);
     }
 }
