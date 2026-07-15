@@ -3,8 +3,10 @@ package com.scaramutti.tms.warehouse.withdrawal.api;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.util.Etag;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
+import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseCancelRequest;
 import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalRequest;
 import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalResponse;
+import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalUpdateRequest;
 import com.scaramutti.tms.warehouse.withdrawal.mapper.WarehouseWithdrawalResourceMapper;
 import com.scaramutti.tms.warehouse.withdrawal.service.WarehouseWithdrawalService;
 import jakarta.annotation.security.RolesAllowed;
@@ -16,8 +18,11 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
@@ -65,5 +70,41 @@ public class WarehouseWithdrawalResource {
             .header("ETag", Etag.of(response.updatedAt()))
             .entity(response)
             .build();
+    }
+
+    @GET
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response getWithdrawal(@PathParam("id") Integer id) {
+        WarehouseWithdrawalResponse response = warehouseWithdrawalService.getWithdrawal(id);
+        return Response.ok(response).header("ETag", Etag.of(response.updatedAt())).build();
+    }
+
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response updateWithdrawal(
+        @PathParam("id") Integer id,
+        @HeaderParam("If-Match") String ifMatch,
+        @Valid @NotNull WarehouseWithdrawalUpdateRequest request
+    ) {
+        WarehouseWithdrawalResponse response = warehouseWithdrawalService.updateWithdrawal(
+            warehouseWithdrawalResourceMapper.toUpdateWarehouseWithdrawalCommand(id, ifMatch, request)
+        );
+        return Response.ok(response).header("ETag", Etag.of(response.updatedAt())).build();
+    }
+
+    @POST
+    @Path("/{id}/cancel")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    public Response cancelWithdrawal(
+        @PathParam("id") Integer id,
+        @HeaderParam("If-Match") String ifMatch,
+        @Valid @NotNull WarehouseCancelRequest request
+    ) {
+        WarehouseWithdrawalResponse response = warehouseWithdrawalService.cancelWithdrawal(
+            id, ifMatch, request.reason()
+        );
+        return Response.ok(response).header("ETag", Etag.of(response.updatedAt())).build();
     }
 }
