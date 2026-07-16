@@ -71,6 +71,8 @@ class WarehouseReportResourceTest {
                 .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
             String byTestStatus = "WHERE status_id = (SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS')";
             entityManager.createNativeQuery("DELETE FROM public.tractors " + byTestStatus).executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM public.trailers " + byTestStatus).executeUpdate();
+            entityManager.createNativeQuery("DELETE FROM public.escort_vehicles " + byTestStatus).executeUpdate();
             entityManager.createNativeQuery("DELETE FROM public.workers WHERE document_number LIKE 'ZTEST%'")
                 .executeUpdate();
             entityManager.createNativeQuery("DELETE FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'")
@@ -158,6 +160,38 @@ class WarehouseReportResourceTest {
         return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
             "INSERT INTO public.tractors (plate, status_id, is_active) VALUES (?1, ?2, true) RETURNING id")
             .setParameter(1, plate).setParameter(2, resourceStatusId()).getSingleResult()).intValue());
+    }
+
+    private int seedTrailer(String plate) {
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
+            "INSERT INTO public.trailers (plate, type, status_id, is_active) VALUES (?1, 'ZTEST', ?2, true) RETURNING id")
+            .setParameter(1, plate).setParameter(2, resourceStatusId()).getSingleResult()).intValue());
+    }
+
+    private int seedEscortVehicle(String plate) {
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
+            "INSERT INTO public.escort_vehicles (plate, status_id, is_active) VALUES (?1, ?2, true) RETURNING id")
+            .setParameter(1, plate).setParameter(2, resourceStatusId()).getSingleResult()).intValue());
+    }
+
+    /**
+     * Retiro ACTIVE por SQL nativo con la unidad de flota en la columna indicada
+     * ({@code trailer_id}/{@code escort_vehicle_id}). {@code unitColumn} es una
+     * constante controlada del test (no entrada de usuario).
+     */
+    private void seedWithdrawalWithUnit(int productId, String quantity, int workerId,
+                                        String unitColumn, int unitId, OffsetDateTime withdrawnAt) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "INSERT INTO almacen.withdrawals "
+                + "(product_id, quantity, withdrawn_at, received_by, " + unitColumn + ", registered_by, updated_at, status) "
+                + "VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?3, 'ACTIVE')")
+            .setParameter(1, productId)
+            .setParameter(2, new BigDecimal(quantity))
+            .setParameter(3, withdrawnAt)
+            .setParameter(4, workerId)
+            .setParameter(5, unitId)
+            .setParameter(6, adminId())
+            .executeUpdate());
     }
 
     /** Factura ACTIVE/CANCELLED con UN item, por SQL nativo: fija invoice_date, moneda y precio. */
@@ -319,6 +353,22 @@ class WarehouseReportResourceTest {
             .body("rows.find { it.label == 'Tracto ZR0001' }.count", equalTo(2))
             .body("rows.find { it.label == 'Tracto ZR0001' }.amountPEN", equalTo(125.00f))
             .body("rows.find { it.label == 'Tracto ZR0001' }.amountUSD", equalTo(0));
+    }
+
+    @Test
+    void getReport_byUnit_trailerAndEscortLabelledByKind() {
+        String token = login("admin", "Admin1234");
+        int productId = seedProduct("ZTEST_RP UnitKinds");
+        int workerId = seedWorker("ZTESTRP13");
+        int trailerId = seedTrailer("ZR0010");
+        int escortId = seedEscortVehicle("ZR0011");
+        seedWithdrawalWithUnit(productId, "1", workerId, "trailer_id", trailerId, limaNoon(LocalDate.of(2026, 6, 10)));
+        seedWithdrawalWithUnit(productId, "1", workerId, "escort_vehicle_id", escortId, limaNoon(LocalDate.of(2026, 6, 11)));
+
+        report(token, "BY_UNIT", "2026-06-01", "2026-06-30")
+            .statusCode(200)
+            .body("rows.find { it.label == 'Carreta ZR0010' }.count", equalTo(1))
+            .body("rows.find { it.label == 'Escolta ZR0011' }.count", equalTo(1));
     }
 
     @Test
