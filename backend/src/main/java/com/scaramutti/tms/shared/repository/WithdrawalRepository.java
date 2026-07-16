@@ -79,12 +79,12 @@ public class WithdrawalRepository implements PanacheRepositoryBase<Withdrawal, I
         }
         if (query.dateFrom() != null) {
             conditions.add("withdrawn_at >= :dateFrom");
-            params.put("dateFrom", query.dateFrom().atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
+            params.put("dateFrom", DateUtils.limaDayStart(query.dateFrom()));
         }
         if (query.dateTo() != null) {
-            // dateTo inclusivo del dia completo -> < inicio del dia siguiente (Lima).
+            // dateTo inclusivo del dia completo: < inicio del dia siguiente (Lima).
             conditions.add("withdrawn_at < :dateToExclusive");
-            params.put("dateToExclusive", query.dateTo().plusDays(1).atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
+            params.put("dateToExclusive", DateUtils.limaNextDayStart(query.dateTo()));
         }
         return conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);
     }

@@ -43,6 +43,26 @@ public final class DateUtils {
     }
 
     /**
+     * Inicio del dia (00:00) de una fecha en zona Lima, como {@link OffsetDateTime} para
+     * comparar contra columnas {@code timestamptz}. Es el borde INCLUSIVO inferior de un
+     * filtro por dia/rango en hora de negocio. Fuente unica del patron: los filtros de
+     * fecha (retiros, kardex, cotizaciones, stats, reportes) lo comparten en vez de
+     * repetir {@code d.atStartOfDay(LIMA).toOffsetDateTime()}.
+     */
+    public static OffsetDateTime limaDayStart(java.time.LocalDate date) {
+        return date.atStartOfDay(LIMA).toOffsetDateTime();
+    }
+
+    /**
+     * Inicio del dia SIGUIENTE (00:00) en zona Lima. Es el borde EXCLUSIVO superior de un
+     * rango cuyo {@code dateTo} es inclusivo del dia completo ({@code < limaNextDayStart}
+     * cubre hasta las 23:59:59.999 de {@code date}). Complementa a {@link #limaDayStart}.
+     */
+    public static OffsetDateTime limaNextDayStart(java.time.LocalDate date) {
+        return date.plusDays(1).atStartOfDay(LIMA).toOffsetDateTime();
+    }
+
+    /**
      * Ahora en UTC truncado a MICROSEGUNDOS. Postgres ({@code timestamptz}) guarda esa
      * precision, asi que los timestamps que sirven de version del ETag deben truncarse
      * a micros: sin esto, el valor devuelto por un POST/PUT no coincide con el releido

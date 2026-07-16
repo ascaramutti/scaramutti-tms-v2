@@ -119,12 +119,12 @@ public class WarehouseKardexRepository {
         List<String> conditions = new ArrayList<>();
         if (query.dateFrom() != null) {
             conditions.add("moved_at >= :dateFrom");
-            params.put("dateFrom", query.dateFrom().atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
+            params.put("dateFrom", DateUtils.limaDayStart(query.dateFrom()));
         }
         if (query.dateTo() != null) {
-            // dateTo inclusivo del dia completo -> < inicio del dia siguiente (Lima).
+            // dateTo inclusivo del dia completo: < inicio del dia siguiente (Lima).
             conditions.add("moved_at < :dateToExclusive");
-            params.put("dateToExclusive", query.dateTo().plusDays(1).atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
+            params.put("dateToExclusive", DateUtils.limaNextDayStart(query.dateTo()));
         }
         if (conditions.isEmpty()) {
             return "";
