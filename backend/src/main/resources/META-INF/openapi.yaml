@@ -1615,6 +1615,27 @@ paths:
                 traceId: '3a4b5c6d-7e8f-9a0b-1c2d-3e4f5a6b7c8d'
         '412': { $ref: '#/components/responses/PreconditionFailed' }
 
+  /warehouse/stats:
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseStats
+      summary: KPIs del strip de Existencias
+      description: |
+        Contadores del mes calendario en curso (America/Lima). Solo registros
+        ACTIVOS. `lowStockCount` = productos activos con `stock < minStock`
+        (RN-WH11, la VIEW `almacen.product_stock` lo expone). `entriesThisMonth`
+        y `withdrawalsThisMonth` = facturas/retiros ACTIVOS registrados este mes
+        (por `createdAt`/`withdrawnAt`).
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      responses:
+        '200':
+          description: Contadores del strip
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseStatsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -2996,3 +3017,13 @@ components:
             content:
               type: array
               items: { $ref: '#/components/schemas/WarehouseWithdrawalResponse' }
+
+    WarehouseStatsResponse:
+      type: object
+      description: KPIs del strip de Existencias. Mes calendario en curso (America/Lima); solo ACTIVOS.
+      required: [activeProducts, lowStockCount, entriesThisMonth, withdrawalsThisMonth]
+      properties:
+        activeProducts:       { type: integer }
+        lowStockCount:        { type: integer, description: 'Productos activos con stock < minStock (RN-WH11)' }
+        entriesThisMonth:     { type: integer, description: 'Facturas ACTIVAS registradas este mes (createdAt)' }
+        withdrawalsThisMonth: { type: integer, description: 'Retiros ACTIVOS registrados este mes (withdrawnAt)' }
