@@ -23,8 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Integration tests de GET /fleet-units. Hermetico: la flota de test se siembra con un
  * estado de recurso propio ({@code ZTEST_STATUS}) y se limpia por ese status en
  * {@code @AfterEach} (NUNCA por prefijo de placa: {@code public.tractors}/etc son
- * COMPARTIDAS con v1 y un prefijo corto podria matchear una placa real). Placas {@code ZR00xx}
- * (distintas de las {@code ZT00xx}/{@code ZR000x} de otros tests). Aserciones por PRESENCIA.
+ * COMPARTIDAS con v1 y un prefijo corto podria matchear una placa real). Placas en el rango
+ * PROPIO {@code ZF00xx} (los retiros usan {@code ZT00xx} y los reportes {@code ZR00xx}: rangos
+ * disjuntos para no colisionar en la BD compartida). Aserciones por PRESENCIA.
  */
 @QuarkusTest
 class FleetUnitsResourceTest {
@@ -102,18 +103,18 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_mixedKindsWithBrandModelAndTrailerNulls() {
-        int tractor = seedTractor("ZR0001", true, "Volvo", "FH");
-        int trailer = seedTrailer("ZR0002", true);
-        int escort = seedEscortVehicle("ZR0003", true, "Toyota", "Hilux");
+        int tractor = seedTractor("ZF0001", true, "Volvo", "FH");
+        int trailer = seedTrailer("ZF0002", true);
+        int escort = seedEscortVehicle("ZF0003", true, "Toyota", "Hilux");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/fleet-units")
         .then().statusCode(200)
-            .body("find { it.kind == 'TRACTOR' && it.id == " + tractor + " }.plate", equalTo("ZR0001"))
+            .body("find { it.kind == 'TRACTOR' && it.id == " + tractor + " }.plate", equalTo("ZF0001"))
             .body("find { it.kind == 'TRACTOR' && it.id == " + tractor + " }.brand", equalTo("Volvo"))
             .body("find { it.kind == 'TRACTOR' && it.id == " + tractor + " }.model", equalTo("FH"))
             .body("find { it.kind == 'TRACTOR' && it.id == " + tractor + " }.isActive", equalTo(true))
-            .body("find { it.kind == 'TRAILER' && it.id == " + trailer + " }.plate", equalTo("ZR0002"))
+            .body("find { it.kind == 'TRAILER' && it.id == " + trailer + " }.plate", equalTo("ZF0002"))
             .body("find { it.kind == 'TRAILER' && it.id == " + trailer + " }.brand", nullValue())
             .body("find { it.kind == 'TRAILER' && it.id == " + trailer + " }.model", nullValue())
             .body("find { it.kind == 'ESCORT' && it.id == " + escort + " }.brand", equalTo("Toyota"))
@@ -124,9 +125,9 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindTractorReturnsOnlyTractors() {
-        int tractor = seedTractor("ZR0004", true, "Scania", "R450");
-        int trailer = seedTrailer("ZR0005", true);
-        int escort = seedEscortVehicle("ZR0006", true, "Nissan", "Frontier");
+        int tractor = seedTractor("ZF0004", true, "Scania", "R450");
+        int trailer = seedTrailer("ZF0005", true);
+        int escort = seedEscortVehicle("ZF0006", true, "Nissan", "Frontier");
         String token = adminToken();
 
         var kinds = given().header("Authorization", "Bearer " + token).queryParam("kind", "TRACTOR")
@@ -141,7 +142,7 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindTrailerHasNullBrandModel() {
-        int trailer = seedTrailer("ZR0007", true);
+        int trailer = seedTrailer("ZF0007", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("kind", "TRAILER")
@@ -154,36 +155,36 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindEscortReturnsEscortWithBrandModel() {
-        int escort = seedEscortVehicle("ZR0008", true, "Nissan", "X-Trail");
+        int escort = seedEscortVehicle("ZF0008", true, "Nissan", "X-Trail");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("kind", "ESCORT")
         .when().get("/fleet-units")
         .then().statusCode(200)
             .body("find { it.id == " + escort + " }.kind", equalTo("ESCORT"))
-            .body("find { it.id == " + escort + " }.plate", equalTo("ZR0008"))
+            .body("find { it.id == " + escort + " }.plate", equalTo("ZF0008"))
             .body("find { it.id == " + escort + " }.brand", equalTo("Nissan"));
     }
 
     @Test
     void listFleetUnits_withoutKindReturnsAllThreeSubtypes() {
-        int tractor = seedTractor("ZR0009", true, "Volvo", "FM");
-        int trailer = seedTrailer("ZR0010", true);
-        int escort = seedEscortVehicle("ZR0011", true, "Toyota", "Land Cruiser");
+        int tractor = seedTractor("ZF0009", true, "Volvo", "FM");
+        int trailer = seedTrailer("ZF0010", true);
+        int escort = seedEscortVehicle("ZF0011", true, "Toyota", "Land Cruiser");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/fleet-units")
         .then().statusCode(200)
-            .body("find { it.kind == 'TRACTOR' && it.id == " + tractor + " }.plate", equalTo("ZR0009"))
-            .body("find { it.kind == 'TRAILER' && it.id == " + trailer + " }.plate", equalTo("ZR0010"))
-            .body("find { it.kind == 'ESCORT' && it.id == " + escort + " }.plate", equalTo("ZR0011"));
+            .body("find { it.kind == 'TRACTOR' && it.id == " + tractor + " }.plate", equalTo("ZF0009"))
+            .body("find { it.kind == 'TRAILER' && it.id == " + trailer + " }.plate", equalTo("ZF0010"))
+            .body("find { it.kind == 'ESCORT' && it.id == " + escort + " }.plate", equalTo("ZF0011"));
     }
 
     // ---------- isActive filter --------------------------------------------------
 
     @Test
     void listFleetUnits_isActiveFalseIncludesInactive() {
-        int tractor = seedTractor("ZR0012", false, "Volvo", "FH");
+        int tractor = seedTractor("ZF0012", false, "Volvo", "FH");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", false)
@@ -194,7 +195,7 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_isActiveTrueExcludesInactive() {
-        int trailer = seedTrailer("ZR0013", false);
+        int trailer = seedTrailer("ZF0013", false);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", true)
@@ -204,8 +205,8 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindAndIsActiveCombined() {
-        int active = seedTractor("ZR0014", true, "Volvo", "FH");
-        int inactive = seedTractor("ZR0015", false, "Volvo", "FH");
+        int active = seedTractor("ZF0014", true, "Volvo", "FH");
+        int inactive = seedTractor("ZF0015", false, "Volvo", "FH");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token)
@@ -218,8 +219,8 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_orderedByPlateAscWithinKind() {
-        int high = seedTractor("ZR0020", true, "Volvo", "FH");
-        int low = seedTractor("ZR0016", true, "Volvo", "FH");
+        int high = seedTractor("ZF0020", true, "Volvo", "FH");
+        int low = seedTractor("ZF0016", true, "Volvo", "FH");
         String token = adminToken();
 
         List<Integer> ids = given().header("Authorization", "Bearer " + token).queryParam("kind", "TRACTOR")
@@ -227,7 +228,7 @@ class FleetUnitsResourceTest {
         .then().statusCode(200).extract().jsonPath().getList("id", Integer.class);
 
         assertTrue(ids.indexOf(low) < ids.indexOf(high),
-            "ZR0016 debe venir antes que ZR0020 (plate ASC); ids=" + ids);
+            "ZF0016 debe venir antes que ZF0020 (plate ASC); ids=" + ids);
     }
 
     // ---------- kind invalido ----------------------------------------------------

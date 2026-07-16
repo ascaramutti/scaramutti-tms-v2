@@ -170,6 +170,21 @@ class WorkersResourceTest {
     }
 
     @Test
+    void listWorkers_qAndIsActiveCombined() {
+        int active = seedWorker("ZTESTW920", "Aaa", "Ztcombo", "Chofer", true);
+        int inactive = seedWorker("ZTESTW921", "Bbb", "Ztcombo", "Chofer", false);
+        String token = adminToken();
+
+        // q acota por apellido comun; isActive=true debe excluir al inactivo (AND de las 2 condiciones)
+        given().header("Authorization", "Bearer " + token)
+            .queryParam("q", "ztcombo").queryParam("isActive", true)
+        .when().get("/workers")
+        .then().statusCode(200)
+            .body("id", hasItem(active))
+            .body("id", not(hasItem(inactive)));
+    }
+
+    @Test
     void listWorkers_noFiltersIncludesSeeded() {
         int id = seedWorker("ZTESTW906", "Luis", "Vega", "Mecánico", true);
         String token = adminToken();
