@@ -219,14 +219,14 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
             params.put("serviceTypeId", q.serviceTypeId());
         }
         if (q.dateFrom() != null) {
-            // Inicio del dia en zona Lima → instante UTC para comparar contra created_at (timestamptz).
+            // Inicio del dia en zona Lima como instante UTC para comparar contra created_at (timestamptz).
             conditions.add("qt.created_at >= :dateFrom");
-            params.put("dateFrom", q.dateFrom().atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
+            params.put("dateFrom", DateUtils.limaDayStart(q.dateFrom()));
         }
         if (q.dateTo() != null) {
-            // dateTo inclusivo del dia completo → < inicio del dia siguiente (Lima).
+            // dateTo inclusivo del dia completo: < inicio del dia siguiente (Lima).
             conditions.add("qt.created_at < :dateToExclusive");
-            params.put("dateToExclusive", q.dateTo().plusDays(1).atStartOfDay(DateUtils.LIMA).toOffsetDateTime());
+            params.put("dateToExclusive", DateUtils.limaNextDayStart(q.dateTo()));
         }
 
         return conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);

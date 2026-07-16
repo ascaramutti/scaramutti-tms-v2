@@ -1,5 +1,6 @@
 package com.scaramutti.tms.shared.repository;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -27,7 +28,8 @@ import java.util.List;
  * items de cada factura, en la moneda de la factura.
  *
  * <p>Los bordes del rango (retiros: {@code fromInclusive}/{@code toExclusive}
- * semiabierto en America/Lima) los calcula el service, igual que el kardex.
+ * semiabierto en America/Lima) los calcula el service con DateUtils.limaDayStart/
+ * limaNextDayStart y los pasa ya resueltos; este repositorio solo los bindea.
  */
 @ApplicationScoped
 public class WarehouseReportRepository {
@@ -96,7 +98,7 @@ public class WarehouseReportRepository {
             + "to_char(week_start, 'YYYY-MM-DD') AS detail, COUNT(*) AS cnt, "
             + "COALESCE(SUM(amount_pen), 0) AS amount_pen, COALESCE(SUM(amount_usd), 0) AS amount_usd "
             + "FROM ( "
-            + "  SELECT date_trunc('week', w.withdrawn_at AT TIME ZONE 'America/Lima')::date AS week_start, "
+            + "  SELECT date_trunc('week', w.withdrawn_at AT TIME ZONE '" + DateUtils.LIMA_ZONE_ID + "')::date AS week_start, "
             + "  CASE WHEN lp.currency_code = 'PEN' THEN w.quantity * lp.unit_price ELSE 0 END AS amount_pen, "
             + "  CASE WHEN lp.currency_code = 'USD' THEN w.quantity * lp.unit_price ELSE 0 END AS amount_usd "
             + "  FROM almacen.withdrawals w "

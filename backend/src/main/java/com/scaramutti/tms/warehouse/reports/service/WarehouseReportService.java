@@ -50,12 +50,12 @@ public class WarehouseReportService {
 
     /** Inicio del rango (inclusive) en America/Lima, sobre withdrawn_at (timestamptz). */
     private OffsetDateTime fromInclusive(GetWarehouseReportQuery query) {
-        return query.dateFrom().atStartOfDay(DateUtils.LIMA).toOffsetDateTime();
+        return DateUtils.limaDayStart(query.dateFrom());
     }
 
     /** Fin del rango como inicio del dia siguiente (semiabierto): dateTo inclusive del dia completo. */
     private OffsetDateTime toExclusive(GetWarehouseReportQuery query) {
-        return query.dateTo().plusDays(1).atStartOfDay(DateUtils.LIMA).toOffsetDateTime();
+        return DateUtils.limaNextDayStart(query.dateTo());
     }
 
     private WarehouseReportRowResponse toRowResponse(ReportRowView view) {

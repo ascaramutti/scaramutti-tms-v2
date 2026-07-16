@@ -23,8 +23,8 @@ public class WarehouseStatsService {
 
     public WarehouseStatsResponse getStats() {
         LocalDate firstOfMonth = LocalDate.now(DateUtils.LIMA).withDayOfMonth(1);
-        OffsetDateTime monthStart = firstOfMonth.atStartOfDay(DateUtils.LIMA).toOffsetDateTime();
-        OffsetDateTime monthEndExclusive = firstOfMonth.plusMonths(1).atStartOfDay(DateUtils.LIMA).toOffsetDateTime();
+        OffsetDateTime monthStart = DateUtils.limaDayStart(firstOfMonth);
+        OffsetDateTime monthEndExclusive = DateUtils.limaDayStart(firstOfMonth.plusMonths(1));
 
         WarehouseStatsRow row = warehouseStatsRepository.getStats(monthStart, monthEndExclusive);
         return new WarehouseStatsResponse(
