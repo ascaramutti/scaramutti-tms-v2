@@ -1636,6 +1636,38 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /warehouse/reports:
+    get:
+      tags: [Warehouse]
+      operationId: getWarehouseReport
+      summary: Reporte agregado por corte (unidad / periodo / producto / proveedor)
+      description: |
+        Los 4 cortes de la pantalla Reportes. Solo registros ACTIVOS. RN-WH7
+        bi-moneda SIN conversion: los montos se agregan POR MONEDA tal como se
+        registro cada factura; almacen entrega cantidades, contabilidad valoriza.
+        - `BY_UNIT` / `BY_PRODUCT` / `BY_PERIOD`: consumos (retiros activos con
+          `withdrawnAt` en el rango); el valor de cada salida usa el ultimo precio
+          de compra activo del producto (con su moneda) como referencia.
+          `BY_PERIOD` agrupa por semana (lunes como clave, en `detail`).
+        - `BY_SUPPLIER`: compras (facturas activas por `invoiceDate` en el rango),
+          valorizadas con sus propios items.
+        - Rango America/Lima, ambos extremos inclusivos; `dateFrom > dateTo` ->
+          400 COM-001.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: cut, in: query, required: true, schema: { $ref: '#/components/schemas/WarehouseReportCut' } }
+        - { name: dateFrom, in: query, required: true, schema: { type: string, format: date } }
+        - { name: dateTo, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Filas + totales por moneda
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WarehouseReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -3027,3 +3059,41 @@ components:
         lowStockCount:        { type: integer, description: 'Productos activos con stock < minStock (RN-WH11)' }
         entriesThisMonth:     { type: integer, description: 'Facturas ACTIVAS registradas este mes (createdAt)' }
         withdrawalsThisMonth: { type: integer, description: 'Retiros ACTIVOS registrados este mes (withdrawnAt)' }
+
+    WarehouseReportCut:
+      type: string
+      enum: [BY_UNIT, BY_PERIOD, BY_PRODUCT, BY_SUPPLIER]
+      description: |
+        Corte del reporte (los 4 de la pantalla Reportes):
+        - `BY_UNIT`: consumo por unidad de flota (retiros sin unidad -> "Sin unidad asignada")
+        - `BY_PERIOD`: consumo por semana (lunes como clave, en `detail`)
+        - `BY_PRODUCT`: consumo por producto (`count` = unidades retiradas)
+        - `BY_SUPPLIER`: compras por proveedor (facturas activas por `invoiceDate`)
+
+    WarehouseReportRowResponse:
+      type: object
+      description: |
+        Fila agregada. RN-WH7 bi-moneda SIN conversion: `amountPEN` y `amountUSD`
+        acumulan por separado segun la moneda registrada (catalogo activo = PEN + USD).
+      required: [label, count, amountPEN, amountUSD]
+      properties:
+        label:     { type: string, description: 'Etiqueta del grupo (ej: "Tracto ABC123", "Semana del 22/06", producto, proveedor)' }
+        detail:    { type: [string, 'null'], description: 'Dato secundario (unidad de medida en BY_PRODUCT, fecha ISO del lunes en BY_PERIOD)' }
+        count:     { type: number, description: 'Nro de movimientos (o unidades retiradas en BY_PRODUCT)' }
+        amountPEN: { type: number, description: 'Valorizacion de referencia en PEN (salidas: ultimo precio de compra del producto)' }
+        amountUSD: { type: number, description: 'Valorizacion de referencia en USD' }
+
+    WarehouseReportResponse:
+      type: object
+      required: [cut, dateFrom, dateTo, rows, totalPEN, totalUSD, totalCount]
+      properties:
+        cut:      { $ref: '#/components/schemas/WarehouseReportCut' }
+        dateFrom: { type: string, format: date }
+        dateTo:   { type: string, format: date }
+        rows:
+          type: array
+          description: 'Orden: BY_PERIOD cronologico ASC; el resto por monto total DESC. Lista vacia si no hubo movimientos (nunca null).'
+          items: { $ref: '#/components/schemas/WarehouseReportRowResponse' }
+        totalPEN:   { type: number }
+        totalUSD:   { type: number }
+        totalCount: { type: number }
