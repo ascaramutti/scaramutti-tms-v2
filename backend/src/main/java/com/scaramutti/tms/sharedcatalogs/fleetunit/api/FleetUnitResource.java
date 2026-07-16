@@ -17,7 +17,8 @@ import java.util.List;
 /**
  * Listado unificado de unidades de flota (GET /fleet-units): tractos + carretas + escoltas.
  * Path PLANO (no bajo /warehouse/*): es de {@code public} y lo reutilizara Operaciones. Sin
- * creacion al vuelo (RN-WH9). Sin paginar (flota chica). {@code kind} malformado (no matchea
+ * creacion al vuelo (RN-WH9: los trabajadores y las unidades de flota nunca se crean desde
+ * almacen, solo se buscan). Sin paginar (flota chica). {@code kind} malformado (no matchea
  * el enum) devuelve 404 (RESTEasy, query param tipado que no parsea).
  */
 @Path("/fleet-units")

@@ -17,7 +17,8 @@ import java.util.List;
 /**
  * Listado de trabajadores (GET /workers), catalogo compartido {@code public.workers}
  * (read-only desde v2). Path PLANO (no bajo /warehouse/*): es de {@code public} y lo
- * reutilizara Operaciones. Sin creacion al vuelo (RN-WH9). Sin paginar (plantilla chica).
+ * reutilizara Operaciones. Sin creacion al vuelo (RN-WH9: los trabajadores y las unidades
+ * de flota nunca se crean desde almacen, solo se buscan). Sin paginar (plantilla chica).
  */
 @Path("/workers")
 @Produces(MediaType.APPLICATION_JSON)
