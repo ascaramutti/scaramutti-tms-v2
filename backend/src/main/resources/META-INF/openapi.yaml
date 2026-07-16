@@ -1700,6 +1700,35 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /fleet-units:
+    get:
+      tags: [SharedCatalogs]
+      operationId: listFleetUnits
+      summary: Listar unidades de flota unificadas (tractos + carretas + escoltas)
+      description: |
+        Vista unificada de los tres subtipos DISYUNTOS de la flota
+        (`public.tractors`, `public.trailers`, `public.escort_vehicles`). El
+        supertipo fisico `fleet_units` llega en la fase flota/RRHH; mientras tanto
+        la union se hace en codigo. Solo busqueda/seleccion, SIN creacion al vuelo
+        (RN-WH9). Sin paginar (flota chica). `id` es el id de la tabla del SUBTIPO:
+        la direccion de una unidad es el par `(kind, id)`. `kind` omitido = los
+        tres subtipos.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+      parameters:
+        - { name: kind, in: query, schema: { $ref: '#/components/schemas/FleetUnitKind' } }
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Unidades de flota
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/FleetUnitResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -3020,6 +3049,19 @@ components:
         kind:  { $ref: '#/components/schemas/FleetUnitKind' }
         id:    { type: integer }
         plate: { type: string, minLength: 6, maxLength: 6, example: 'ABC123' }
+
+    FleetUnitResponse:
+      description: |
+        Unidad de flota unificada (GET /fleet-units). Extiende FleetUnitRef con los
+        datos del subtipo. `brand`/`model` pueden ser null (las carretas no los tienen).
+      allOf:
+        - $ref: '#/components/schemas/FleetUnitRef'
+        - type: object
+          required: [isActive]
+          properties:
+            brand:    { type: [string, 'null'], maxLength: 50 }
+            model:    { type: [string, 'null'], maxLength: 50 }
+            isActive: { type: boolean }
 
     WarehouseWithdrawalRequest:
       type: object
