@@ -1,21 +1,17 @@
 package com.scaramutti.tms.sharedcatalogs.worker;
 
-import com.scaramutti.tms.shared.entity.Worker;
-import com.scaramutti.tms.shared.repository.WorkerRepository;
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.http.ContentType;
-import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
-import java.time.OffsetDateTime;
 import java.util.List;
-import java.util.Set;
 
+import static com.scaramutti.tms.support.TestAuth.adminToken;
+import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
+import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
@@ -32,67 +28,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @QuarkusTest
 class WorkersResourceTest {
 
-    @Inject WorkerRepository workerRepository;
-    @Inject EntityManager entityManager;
+    @Inject WarehouseTestData fixtures;
 
     @AfterEach
     void cleanupFixtures() {
-        QuarkusTransaction.requiringNew().run(() ->
-            entityManager.createNativeQuery("DELETE FROM public.workers WHERE document_number LIKE 'ZTEST%'")
-                .executeUpdate());
-    }
-
-    // ---------- fixtures --------------------------------------------------------
-
-    private int seedWorker(String documentNumber, String firstName, String lastName, String position, boolean isActive) {
-        return QuarkusTransaction.requiringNew().call(() -> {
-            Worker worker = new Worker();
-            worker.firstName = firstName;
-            worker.lastName = lastName;
-            worker.documentTypeId = dniDocumentTypeId();
-            worker.documentNumber = documentNumber;
-            worker.position = position;
-            worker.isActive = isActive;
-            worker.createdAt = OffsetDateTime.now();
-            workerRepository.persist(worker);
-            return worker.id;
-        });
-    }
-
-    private int dniDocumentTypeId() {
-        var rows = entityManager.createNativeQuery("SELECT id FROM public.document_types WHERE code = 'DNI'")
-            .getResultList();
-        if (!rows.isEmpty()) {
-            return ((Number) rows.get(0)).intValue();
-        }
-        entityManager.createNativeQuery(
-            "INSERT INTO public.document_types (code, name, max_length, is_active) VALUES ('DNI', 'DNI', 8, true)")
-            .executeUpdate();
-        return ((Number) entityManager.createNativeQuery("SELECT id FROM public.document_types WHERE code = 'DNI'")
-            .getSingleResult()).intValue();
-    }
-
-    private String login(String username, String password) {
-        return given().contentType(ContentType.JSON)
-            .body("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-        .when().post("/auth/login").then().statusCode(200).extract().jsonPath().getString("token");
-    }
-
-    private String fabricateAccessToken(String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject("999").upn(username).groups(Set.of(role)).claim("typ", "access")
-            .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
-    }
-
-    private String adminToken() {
-        return login("admin", "Admin1234");
+        QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestWorkers());
     }
 
     // ---------- happy path -------------------------------------------------------
 
     @Test
     void listWorkers_returnsSeededWorkerWithComposedFullName() {
-        int id = seedWorker("ZTESTW900", "Juan", "Perez", "Mecánico", true);
+        int id = fixtures.seedWorker("ZTESTW900", "Juan", "Perez", "Mecánico", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/workers")
@@ -106,7 +53,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qMatchesPartialNameCaseInsensitive() {
-        int id = seedWorker("ZTESTW902", "Carlos", "Ramirez", "Chofer", true);
+        int id = fixtures.seedWorker("ZTESTW902", "Carlos", "Ramirez", "Chofer", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("q", "carlos")
@@ -118,7 +65,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qMultiWordMatchesFirstAndLastName() {
-        int id = seedWorker("ZTESTW903", "Juan", "Perez", "Mecánico", true);
+        int id = fixtures.seedWorker("ZTESTW903", "Juan", "Perez", "Mecánico", true);
         String token = adminToken();
 
         // "juan perez": cada palabra matchea first_name O last_name (MultiWordSearch, AND de ORs)
@@ -129,7 +76,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qNoMatchReturnsEmptyArray() {
-        seedWorker("ZTESTW910", "Ana", "Silva", "Ayudante", true);
+        fixtures.seedWorker("ZTESTW910", "Ana", "Silva", "Ayudante", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("q", "zzzznomatch999")
@@ -149,7 +96,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_isActiveFalseIncludesInactive() {
-        int id = seedWorker("ZTESTW904", "Ines", "Torres", "Ayudante", false);
+        int id = fixtures.seedWorker("ZTESTW904", "Ines", "Torres", "Ayudante", false);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", false)
@@ -161,7 +108,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_isActiveTrueExcludesInactive() {
-        int id = seedWorker("ZTESTW905", "Pedro", "Diaz", "Chofer", false);
+        int id = fixtures.seedWorker("ZTESTW905", "Pedro", "Diaz", "Chofer", false);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", true)
@@ -171,8 +118,8 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qAndIsActiveCombined() {
-        int active = seedWorker("ZTESTW920", "Aaa", "Ztcombo", "Chofer", true);
-        int inactive = seedWorker("ZTESTW921", "Bbb", "Ztcombo", "Chofer", false);
+        int active = fixtures.seedWorker("ZTESTW920", "Aaa", "Ztcombo", "Chofer", true);
+        int inactive = fixtures.seedWorker("ZTESTW921", "Bbb", "Ztcombo", "Chofer", false);
         String token = adminToken();
 
         // q acota por apellido comun; isActive=true debe excluir al inactivo (AND de las 2 condiciones)
@@ -186,7 +133,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_noFiltersIncludesSeeded() {
-        int id = seedWorker("ZTESTW906", "Luis", "Vega", "Mecánico", true);
+        int id = fixtures.seedWorker("ZTESTW906", "Luis", "Vega", "Mecánico", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/workers")
@@ -195,8 +142,8 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_orderedByFirstNameAsc() {
-        int zeta = seedWorker("ZTESTW907", "Zzz", "Ztestord", "Chofer", true);
-        int alfa = seedWorker("ZTESTW908", "Aaa", "Ztestord", "Chofer", true);
+        int zeta = fixtures.seedWorker("ZTESTW907", "Zzz", "Ztestord", "Chofer", true);
+        int alfa = fixtures.seedWorker("ZTESTW908", "Aaa", "Ztestord", "Chofer", true);
         String token = adminToken();
 
         // q acota el universo a los 2 sembrados (last_name comun); orden por first_name: Aaa antes que Zzz
