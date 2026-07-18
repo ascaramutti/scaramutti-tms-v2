@@ -244,6 +244,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UserResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ----- Quotations ----------------------------------------------------------
 
@@ -342,6 +343,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/QuotationResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
 
   /quotations/config:
@@ -482,6 +485,8 @@ paths:
                     instance: '/api/v1/quotations/142'
                     code: 'QUO-004'
                     traceId: '9f5a3b1c-2d4e-6f8a-0b1c-3d5e7f9a1b2c'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '412': { $ref: '#/components/responses/PreconditionFailed' }
@@ -494,6 +499,7 @@ paths:
       responses:
         '204':
           description: Eliminada
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
@@ -607,6 +613,8 @@ paths:
             Cache-Control:
               description: '`private, no-cache` (RFC 9110: el 304 repite los headers de cache del 200)'
               schema: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ----- Catalogs: Clients ---------------------------------------------------
@@ -658,6 +666,8 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/ClientResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
 
   /clients/{id}:
@@ -673,6 +683,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ClientResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Clients]
@@ -690,6 +701,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ClientResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [Clients]
@@ -699,6 +711,7 @@ paths:
       responses:
         '204':
           description: Desactivado
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ----- Catalogs: Currencies ------------------------------------------------
@@ -720,6 +733,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/CurrencyResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Catalogs]
       operationId: createCurrency
@@ -736,6 +750,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CurrencyResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /currencies/{id}:
     parameters:
@@ -756,6 +771,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CurrencyResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ----- Catalogs: Cargo Types -----------------------------------------------
@@ -828,6 +844,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CargoTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [CargoTypes]
@@ -845,6 +862,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/CargoTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
     delete:
       tags: [CargoTypes]
@@ -854,6 +872,7 @@ paths:
       responses:
         '204':
           description: Desactivado
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ----- Catalogs: Quotation Service Types -----------------------------------
@@ -880,6 +899,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Catalogs]
       operationId: createQuotationServiceType
@@ -896,6 +916,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /quotation-service-types/{id}:
     parameters:
@@ -916,6 +937,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ----- Catalogs: Quotation Conditions --------------------------------------
@@ -975,6 +997,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/PaymentTermResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
     post:
       tags: [Catalogs]
       operationId: createPaymentTerm
@@ -991,6 +1014,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PaymentTermResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /payment-terms/{id}:
     parameters:
@@ -1011,6 +1035,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PaymentTermResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ----- Settings ------------------------------------------------------------
@@ -1029,6 +1054,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/SystemSettingResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /system-settings/{key}:
     parameters:
@@ -1048,6 +1074,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SystemSettingResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Settings]
@@ -1069,6 +1096,7 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SystemSettingResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
 
   # ----- Health --------------------------------------------------------------
@@ -1101,9 +1129,10 @@ paths:
         Catálogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
         en v1). **Solo búsqueda rápida — SIN creación al vuelo** (regla del dueño
         2026-07-04: trabajadores y unidades de flota nunca se crean desde
-        almacén; RN-WH9). Sin paginar — plantilla chica. `q` filtra por substring
-        case-insensitive en el nombre (≥ 3 caracteres; para no filtrar, OMITIR el
-        parámetro). Cuando Operaciones lo consuma, sus roles se suman acá.
+        almacén; RN-WH9). Sin paginar — plantilla chica. `q` es multi-palabra
+        case-insensitive (≥ 3 caracteres): cada palabra debe matchear en el
+        nombre O el apellido (RN-WH14); para no filtrar, OMITIR el parámetro.
+        Cuando Operaciones lo consuma, sus roles se suman acá.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
         - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }

@@ -331,6 +331,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/CurrencyResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /payment-terms:
     get:
@@ -349,6 +350,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/PaymentTermResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /quotation-conditions:
     get:
@@ -367,6 +369,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/ConditionResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /quotation-service-types:
     get:
@@ -385,6 +388,7 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/QuotationServiceTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   # ----- Clients ------------------------------------------------------------
 
@@ -862,6 +866,8 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/WarehouseUnitOfMeasureResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /warehouse/suppliers:
     get:
       tags: [Warehouse]
