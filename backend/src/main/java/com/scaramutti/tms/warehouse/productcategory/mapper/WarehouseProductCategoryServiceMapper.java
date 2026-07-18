@@ -1,11 +1,11 @@
 package com.scaramutti.tms.warehouse.productcategory.mapper;
 
 import com.scaramutti.tms.shared.entity.ProductCategory;
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.warehouse.productcategory.dto.WarehouseProductCategoryResponse;
 import com.scaramutti.tms.warehouse.productcategory.service.cmd.CreateWarehouseProductCategoryCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 
 import java.util.List;
 
@@ -14,7 +14,7 @@ import java.util.List;
  * toProductCategoryEntity setea isActive=true explicitamente y NO setea id
  * (lo asigna la BD).
  */
-@Mapper(componentModel = MappingConstants.ComponentModel.CDI)
+@Mapper(config = SharedMapperConfig.class)
 public interface WarehouseProductCategoryServiceMapper {
 
     @Mapping(target = "id",       ignore = true)

@@ -67,13 +67,18 @@ public class WarehouseKardexService {
             rows.stream().map(KardexMovementRow::registeredBy).collect(Collectors.toSet()));
 
         List<WarehouseKardexMovementResponse> content = rows.stream()
-            .map(row -> toResponse(row, entradaReferences, salidaReferences, usersById))
+            .map(row -> toWarehouseKardexMovementResponse(row, entradaReferences, salidaReferences, usersById))
             .toList();
 
         return PageResponse.of(content, query.page(), query.size(), totalElements);
     }
 
-    private WarehouseKardexMovementResponse toResponse(
+    /**
+     * Se queda en el service (excepción anotada al patrón "responses via mapper"):
+     * {@code reference} compone la etiqueta de negocio es-PE con lookups por tipo
+     * de movimiento, eso es lógica y no shaping campo a campo.
+     */
+    private WarehouseKardexMovementResponse toWarehouseKardexMovementResponse(
         KardexMovementRow row,
         Map<Integer, EntradaReferenceView> entradaReferences,
         Map<Integer, SalidaReferenceView> salidaReferences,

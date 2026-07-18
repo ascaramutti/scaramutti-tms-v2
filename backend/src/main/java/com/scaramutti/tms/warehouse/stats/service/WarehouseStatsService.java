@@ -4,6 +4,7 @@ import com.scaramutti.tms.shared.repository.WarehouseStatsRepository;
 import com.scaramutti.tms.shared.repository.WarehouseStatsRepository.WarehouseStatsRow;
 import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.warehouse.stats.dto.WarehouseStatsResponse;
+import com.scaramutti.tms.warehouse.stats.mapper.WarehouseStatsServiceMapper;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -20,6 +21,7 @@ import java.time.OffsetDateTime;
 public class WarehouseStatsService {
 
     @Inject WarehouseStatsRepository warehouseStatsRepository;
+    @Inject WarehouseStatsServiceMapper warehouseStatsServiceMapper;
 
     public WarehouseStatsResponse getStats() {
         LocalDate firstOfMonth = LocalDate.now(DateUtils.LIMA).withDayOfMonth(1);
@@ -27,11 +29,6 @@ public class WarehouseStatsService {
         OffsetDateTime monthEndExclusive = DateUtils.limaDayStart(firstOfMonth.plusMonths(1));
 
         WarehouseStatsRow row = warehouseStatsRepository.getStats(monthStart, monthEndExclusive);
-        return new WarehouseStatsResponse(
-            row.activeProducts(),
-            row.lowStockCount(),
-            row.entriesThisMonth(),
-            row.withdrawalsThisMonth()
-        );
+        return warehouseStatsServiceMapper.toWarehouseStatsResponse(row);
     }
 }

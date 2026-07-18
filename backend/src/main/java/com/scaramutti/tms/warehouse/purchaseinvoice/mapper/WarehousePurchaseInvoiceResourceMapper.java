@@ -1,5 +1,6 @@
 package com.scaramutti.tms.warehouse.purchaseinvoice.mapper;
 
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehousePurchaseInvoiceRequest;
@@ -9,7 +10,6 @@ import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.ListWarehousePur
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.UpdateWarehousePurchaseInvoiceCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 import org.mapstruct.NullValueMappingStrategy;
 
 import java.time.LocalDate;
@@ -25,7 +25,7 @@ import java.time.LocalDate;
  * WarehouseOpeningBalanceResourceMapper/WarehouseProductResourceMapper.
  */
 @Mapper(
-    componentModel = MappingConstants.ComponentModel.CDI,
+    config = SharedMapperConfig.class,
     uses = StringUtils.class,
     nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT
 )

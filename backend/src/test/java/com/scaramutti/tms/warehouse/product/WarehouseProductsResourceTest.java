@@ -1,25 +1,24 @@
 package com.scaramutti.tms.warehouse.product;
 
 import com.scaramutti.tms.shared.entity.Product;
-import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.repository.ProductRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
-import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Set;
 
+import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
+import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
+import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInRelativeOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -47,25 +46,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WarehouseProductsResourceTest {
 
     @Inject ProductRepository productRepository;
-    @Inject UserRepository userRepository;
     @Inject EntityManager entityManager;
+    @Inject WarehouseTestData fixtures;
 
-    private static final String TEST_NAME_PREFIX = "ZTEST_";
     private static final int CATEGORY_FILTROS = 4;
     private static final int CATEGORY_OTHER = 5;
     private static final int UNIT_UND = 1;
 
     @AfterEach
     void cleanupFixtures() {
-        QuarkusTransaction.requiringNew().run(() -> {
-            // Los opening_balances referencian products (FK) — se borran primero.
-            entityManager.createNativeQuery(
-                "DELETE FROM almacen.opening_balances WHERE product_id IN "
-                    + "(SELECT id FROM almacen.products WHERE name LIKE ?1)")
-                .setParameter(1, TEST_NAME_PREFIX + "%")
-                .executeUpdate();
-            productRepository.delete("name like ?1", TEST_NAME_PREFIX + "%");
-        });
+        QuarkusTransaction.requiringNew().run(() -> fixtures.deleteWarehouseTestData());
     }
 
     /**
@@ -87,7 +77,7 @@ class WarehouseProductsResourceTest {
             product.attributes = new HashMap<>();
             product.minStock = new BigDecimal(minStock);
             product.isActive = isActive;
-            product.createdBy = adminId();
+            product.createdBy = fixtures.adminId();
             productRepository.persist(product);
             return product.id;
         });
@@ -99,9 +89,10 @@ class WarehouseProductsResourceTest {
     }
 
     /**
-     * Registra un corte inicial (opening_balance) para darle stock a un producto:
-     * es el unico movimiento sembrable hoy (entradas/retiros aun no tienen endpoint),
-     * y la VIEW product_stock lo suma igual que cualquier ENTRADA.
+     * Registra un corte inicial (opening_balance) por SQL nativo para darle stock a
+     * un producto. Se queda local a proposito: la variante de support pasa por el
+     * endpoint (que exige producto activo) y estos tests tambien dan stock a
+     * productos que luego se inactivan.
      */
     private void seedOpeningBalance(int productId, String quantity) {
         QuarkusTransaction.requiringNew().run(() ->
@@ -110,53 +101,9 @@ class WarehouseProductsResourceTest {
                     + "VALUES (?1, CAST(?2 AS NUMERIC), ?3)")
                 .setParameter(1, productId)
                 .setParameter(2, quantity)
-                .setParameter(3, adminId())
+                .setParameter(3, fixtures.adminId())
                 .executeUpdate()
         );
-    }
-
-    private String login(String username, String password) {
-        return given()
-            .contentType(ContentType.JSON)
-            .body("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-        .when()
-            .post("/auth/login")
-        .then()
-            .statusCode(200)
-            .extract().jsonPath().getString("token");
-    }
-
-    /** Token con subject ficticio (999): sirve para los 403 (el gate de rol dispara antes del persist). */
-    private String fabricateAccessToken(String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject("999")
-            .upn(username)
-            .groups(Set.of(role))
-            .claim("typ", "access")
-            .issuedAt(now)
-            .expiresAt(now.plusSeconds(3600))
-            .sign();
-    }
-
-    /**
-     * Token con el id de un usuario REAL: obligatorio en los 201 porque
-     * products.created_by es FK NOT NULL (un subject inexistente reventaria el
-     * INSERT con FK violation, no daria 201).
-     */
-    private String fabricateTokenForUser(int userId, String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject(String.valueOf(userId))
-            .upn(username)
-            .groups(Set.of(role))
-            .claim("typ", "access")
-            .issuedAt(now)
-            .expiresAt(now.plusSeconds(3600))
-            .sign();
-    }
-
-    private int adminId() {
-        User admin = userRepository.findByUsername("admin").orElseThrow();
-        return admin.id;
     }
 
     private String productJson(
@@ -956,7 +903,7 @@ class WarehouseProductsResourceTest {
     @Test
     void create_withWarehouseKeeperRole_returns201() {
         // created_by es FK real → token con el id de un usuario existente (admin).
-        String token = fabricateTokenForUser(adminId(), "wk_test", "warehouse_keeper");
+        String token = fabricateTokenForUser(fixtures.adminId(), "wk_test", "warehouse_keeper");
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -966,6 +913,6 @@ class WarehouseProductsResourceTest {
             .post("/warehouse/products")
         .then()
             .statusCode(201)
-            .body("createdBy.id", equalTo(adminId()));
+            .body("createdBy.id", equalTo(fixtures.adminId()));
     }
 }

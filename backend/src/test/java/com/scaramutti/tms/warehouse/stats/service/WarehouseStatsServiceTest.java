@@ -1,15 +1,18 @@
 package com.scaramutti.tms.warehouse.stats.service;
 
+import com.scaramutti.tms.warehouse.stats.mapper.WarehouseStatsServiceMapper;
 import com.scaramutti.tms.shared.repository.WarehouseStatsRepository;
 import com.scaramutti.tms.shared.repository.WarehouseStatsRepository.WarehouseStatsRow;
 import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.warehouse.stats.dto.WarehouseStatsResponse;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -30,6 +33,13 @@ class WarehouseStatsServiceTest {
 
     @Mock WarehouseStatsRepository warehouseStatsRepository;
     @InjectMocks WarehouseStatsService warehouseStatsService;
+
+    // El mapper es un colaborador REAL (impl generada por MapStruct), no un mock:
+    // estos tests cubren justamente el shaping fila a response.
+    @BeforeEach
+    void wireRealMapper() {
+        warehouseStatsService.warehouseStatsServiceMapper = Mappers.getMapper(WarehouseStatsServiceMapper.class);
+    }
 
     @Test
     void getStats_mapsRepositoryRowToResponseFields() {

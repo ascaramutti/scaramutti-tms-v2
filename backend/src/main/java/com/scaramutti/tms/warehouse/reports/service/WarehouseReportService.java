@@ -6,6 +6,7 @@ import com.scaramutti.tms.shared.repository.WarehouseReportRepository.ReportRowV
 import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.warehouse.reports.dto.WarehouseReportResponse;
 import com.scaramutti.tms.warehouse.reports.dto.WarehouseReportRowResponse;
+import com.scaramutti.tms.warehouse.reports.mapper.WarehouseReportServiceMapper;
 import com.scaramutti.tms.warehouse.reports.service.cmd.GetWarehouseReportQuery;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -26,6 +27,7 @@ import java.util.function.Function;
 public class WarehouseReportService {
 
     @Inject WarehouseReportRepository warehouseReportRepository;
+    @Inject WarehouseReportServiceMapper warehouseReportServiceMapper;
 
     public WarehouseReportResponse getReport(GetWarehouseReportQuery query) {
         if (query.dateFrom().isAfter(query.dateTo())) {
@@ -39,9 +41,10 @@ public class WarehouseReportService {
             case BY_SUPPLIER -> warehouseReportRepository.findBySupplier(query.dateFrom(), query.dateTo());
         };
 
-        List<WarehouseReportRowResponse> rows = views.stream().map(this::toRowResponse).toList();
-        return new WarehouseReportResponse(
-            query.cut(), query.dateFrom(), query.dateTo(), rows,
+        List<WarehouseReportRowResponse> rows =
+            warehouseReportServiceMapper.toWarehouseReportRowResponseList(views);
+        return warehouseReportServiceMapper.toWarehouseReportResponse(
+            query, rows,
             sum(rows, WarehouseReportRowResponse::amountPEN),
             sum(rows, WarehouseReportRowResponse::amountUSD),
             sum(rows, WarehouseReportRowResponse::count)
@@ -56,11 +59,6 @@ public class WarehouseReportService {
     /** Fin del rango como inicio del dia siguiente (semiabierto): dateTo inclusive del dia completo. */
     private OffsetDateTime toExclusive(GetWarehouseReportQuery query) {
         return DateUtils.limaNextDayStart(query.dateTo());
-    }
-
-    private WarehouseReportRowResponse toRowResponse(ReportRowView view) {
-        return new WarehouseReportRowResponse(
-            view.label(), view.detail(), view.count(), view.amountPEN(), view.amountUSD());
     }
 
     private BigDecimal sum(List<WarehouseReportRowResponse> rows,

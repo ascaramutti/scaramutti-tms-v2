@@ -2,17 +2,16 @@ package com.scaramutti.tms.warehouse.productcategory;
 
 import com.scaramutti.tms.shared.entity.ProductCategory;
 import com.scaramutti.tms.shared.repository.ProductCategoryRepository;
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
-import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
-import java.util.Set;
-
+import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
+import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInRelativeOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -25,23 +24,25 @@ import static org.hamcrest.Matchers.nullValue;
 
 /**
  * Integration tests de GET/POST /warehouse/product-categories. Calco
- * estructural de CargoTypesResourceTest. Los seeds de A1 (7 categorias
- * activas) ya estan en la BD de test — no se re-siembran acá.
+ * estructural de CargoTypesResourceTest. Las 7 categorias base las siembra
+ * la migracion V002: ya estan en la BD de test y no se re-siembran aca.
  */
 @QuarkusTest
 class WarehouseProductCategoriesResourceTest {
 
     @Inject ProductCategoryRepository productCategoryRepository;
 
-    private static final String TEST_NAME_PREFIX = "ZTEST_";
-
+    // Limpieza local: almacen.product_categories no la cubre ningún fragmento de
+    // WarehouseTestData (las categorías base de V002 viven fuera del circuito de
+    // facturas/retiros que esos fragmentos limpian).
     @AfterEach
     void cleanupFixtures() {
         QuarkusTransaction.requiringNew().run(() ->
-            productCategoryRepository.delete("name like ?1", TEST_NAME_PREFIX + "%")
+            productCategoryRepository.delete("name like ?1", WarehouseTestData.PREFIX + "%")
         );
     }
 
+    /** Siembra propia: WarehouseTestData no trae seed de categorías (las base las crea V002 y solo se leen). */
     private void seedProductCategory(String name, boolean isActive) {
         QuarkusTransaction.requiringNew().run(() -> {
             ProductCategory productCategory = new ProductCategory();
@@ -49,29 +50,6 @@ class WarehouseProductCategoriesResourceTest {
             productCategory.isActive = isActive;
             productCategoryRepository.persist(productCategory);
         });
-    }
-
-    private String login(String username, String password) {
-        return given()
-            .contentType(ContentType.JSON)
-            .body("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-        .when()
-            .post("/auth/login")
-        .then()
-            .statusCode(200)
-            .extract().jsonPath().getString("token");
-    }
-
-    /** Genera un JWT valido para un rol sin usuario seedeado. */
-    private String fabricateAccessToken(String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject("999")
-            .upn(username)
-            .groups(Set.of(role))
-            .claim("typ", "access")
-            .issuedAt(now)
-            .expiresAt(now.plusSeconds(3600))
-            .sign();
     }
 
     private String body(String name, String description) {
@@ -317,9 +295,9 @@ class WarehouseProductCategoriesResourceTest {
 
     @Test
     void create_preservesSubmittedCasing_returns201WithExactName() {
-        // Sin uppercase (a diferencia de cargo-types): los seeds de A1 son
-        // Title Case y el contrato solo exige unicidad case-insensitive, no
-        // normalizar casing.
+        // Sin uppercase (a diferencia de cargo-types): las categorías base de
+        // V002 son Title Case y el contrato solo exige unicidad case-insensitive,
+        // no normalizar casing.
         String name = "ZTEST_Mixed Case Name";
         String token = login("admin", "Admin1234");
 

@@ -1,14 +1,17 @@
 package com.scaramutti.tms.sharedcatalogs.worker.service;
 
+import com.scaramutti.tms.sharedcatalogs.worker.mapper.WorkerServiceMapper;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
 import com.scaramutti.tms.sharedcatalogs.worker.service.cmd.ListWorkersQuery;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.util.List;
 
@@ -26,6 +29,13 @@ class WorkerServiceTest {
 
     @Mock WorkerRepository workerRepository;
     @InjectMocks WorkerService workerService;
+
+    // El mapper es un colaborador REAL (impl generada por MapStruct), no un mock:
+    // estos tests cubren justamente el shaping entidad a response.
+    @BeforeEach
+    void wireRealMapper() {
+        workerService.workerServiceMapper = Mappers.getMapper(WorkerServiceMapper.class);
+    }
 
     private Worker worker(int id, String first, String last, String position, boolean isActive) {
         Worker w = new Worker();

@@ -1,12 +1,12 @@
 package com.scaramutti.tms.warehouse.supplier.mapper;
 
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.warehouse.supplier.dto.WarehouseSupplierRequest;
 import com.scaramutti.tms.warehouse.supplier.service.cmd.CreateWarehouseSupplierCommand;
 import com.scaramutti.tms.warehouse.supplier.service.cmd.ListWarehouseSuppliersQuery;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 import org.mapstruct.NullValueMappingStrategy;
 
 /**
@@ -20,7 +20,7 @@ import org.mapstruct.NullValueMappingStrategy;
  *    el formato exacto.
  */
 @Mapper(
-    componentModel = MappingConstants.ComponentModel.CDI,
+    config = SharedMapperConfig.class,
     uses = StringUtils.class,
     nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT
 )

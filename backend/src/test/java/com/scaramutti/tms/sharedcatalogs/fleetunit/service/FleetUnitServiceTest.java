@@ -1,15 +1,18 @@
 package com.scaramutti.tms.sharedcatalogs.fleetunit.service;
 
+import com.scaramutti.tms.sharedcatalogs.fleetunit.mapper.FleetUnitServiceMapper;
 import com.scaramutti.tms.shared.repository.FleetUnitRepository;
 import com.scaramutti.tms.shared.repository.FleetUnitRepository.FleetUnitRow;
 import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitResponse;
 import com.scaramutti.tms.sharedcatalogs.fleetunit.service.cmd.ListFleetUnitsQuery;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.util.List;
 
@@ -28,6 +31,13 @@ class FleetUnitServiceTest {
 
     @Mock FleetUnitRepository fleetUnitRepository;
     @InjectMocks FleetUnitService fleetUnitService;
+
+    // El mapper es un colaborador REAL (impl generada por MapStruct), no un mock:
+    // estos tests cubren justamente el shaping fila a response (incluido el kind).
+    @BeforeEach
+    void wireRealMapper() {
+        fleetUnitService.fleetUnitServiceMapper = Mappers.getMapper(FleetUnitServiceMapper.class);
+    }
 
     @Test
     void listFleetUnits_delegatesFilterAndMapsKindToEnum() {

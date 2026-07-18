@@ -1,5 +1,6 @@
 package com.scaramutti.tms.warehouse.product.mapper;
 
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductUpdateRequest;
@@ -8,7 +9,6 @@ import com.scaramutti.tms.warehouse.product.service.cmd.ListWarehouseProductsQue
 import com.scaramutti.tms.warehouse.product.service.cmd.UpdateWarehouseProductCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 import org.mapstruct.NullValueMappingStrategy;
 
 import java.math.BigDecimal;
@@ -26,7 +26,7 @@ import java.util.Map;
  *  - minStock: null → 0 (default del contrato).
  */
 @Mapper(
-    componentModel = MappingConstants.ComponentModel.CDI,
+    config = SharedMapperConfig.class,
     uses = StringUtils.class,
     nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT
 )

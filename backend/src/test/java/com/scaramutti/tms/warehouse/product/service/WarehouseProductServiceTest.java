@@ -21,10 +21,13 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -56,7 +59,9 @@ class WarehouseProductServiceTest {
     @Mock UserLookup userLookup;
     @Mock CurrentUser currentUser;
     @Mock WarehouseProductCodeGeneratorService warehouseProductCodeGeneratorService;
-    @Mock WarehouseProductServiceMapper warehouseProductServiceMapper;
+    // Spy sobre la impl REAL generada por MapStruct: el shaping del response se
+    // ejercita de verdad; to*Entity se sigue stubeando con when() sobre el spy.
+    @Spy WarehouseProductServiceMapper warehouseProductServiceMapper = Mappers.getMapper(WarehouseProductServiceMapper.class);
     @InjectMocks WarehouseProductService warehouseProductService;
 
     private static final int USER_ID = 7;
@@ -91,7 +96,7 @@ class WarehouseProductServiceTest {
         product.name = "ZTEST_Filtro";
         product.categoryId = 4;
         product.unitOfMeasureId = 1;
-        product.attributes = Map.of();
+        product.attributes = new HashMap<>();
         product.minStock = minStock;
         product.isActive = true;
         product.createdBy = USER_ID;
@@ -310,7 +315,7 @@ class WarehouseProductServiceTest {
         product.unitOfMeasureId = 1;
         product.brand = "Bosch";
         product.partNumber = "P1";
-        product.attributes = Map.of();
+        product.attributes = new HashMap<>();
         product.minStock = new BigDecimal("4");
         product.isActive = true;
         product.createdBy = USER_ID;

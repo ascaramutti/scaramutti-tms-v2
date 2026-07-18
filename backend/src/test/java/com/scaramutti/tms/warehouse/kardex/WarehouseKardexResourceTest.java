@@ -1,29 +1,18 @@
 package com.scaramutti.tms.warehouse.kardex;
 
-import com.scaramutti.tms.shared.entity.Product;
-import com.scaramutti.tms.shared.entity.Supplier;
-import com.scaramutti.tms.shared.entity.User;
-import com.scaramutti.tms.shared.entity.Worker;
-import com.scaramutti.tms.shared.repository.ProductRepository;
-import com.scaramutti.tms.shared.repository.SupplierRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
-import com.scaramutti.tms.shared.repository.WorkerRepository;
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.http.ContentType;
-import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.Set;
 
+import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
+import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.nullValue;
@@ -43,64 +32,22 @@ import static org.hamcrest.Matchers.nullValue;
 class WarehouseKardexResourceTest {
 
     private static final ZoneOffset LIMA_OFFSET = ZoneOffset.of("-05:00");
-    private static final String TEST_NAME_PREFIX = "ZTEST_";
-    private static final int CATEGORY_FILTROS = 4;
-    private static final int UNIT_UND = 1;
 
-    @Inject ProductRepository productRepository;
-    @Inject SupplierRepository supplierRepository;
-    @Inject WorkerRepository workerRepository;
-    @Inject UserRepository userRepository;
     @Inject EntityManager entityManager;
+    @Inject WarehouseTestData fixtures;
 
     @AfterEach
     void cleanupFixtures() {
         QuarkusTransaction.requiringNew().run(() -> {
-            entityManager.createNativeQuery(
-                "DELETE FROM almacen.withdrawals WHERE product_id IN "
-                    + "(SELECT id FROM almacen.products WHERE name LIKE ?1)")
-                .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM almacen.purchase_invoices WHERE invoice_number LIKE 'ZTEST%'")
-                .executeUpdate();
-            entityManager.createNativeQuery(
-                "DELETE FROM almacen.opening_balances WHERE product_id IN "
-                    + "(SELECT id FROM almacen.products WHERE name LIKE ?1)")
-                .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM almacen.products WHERE name LIKE ?1")
-                .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM almacen.suppliers WHERE name LIKE ?1")
-                .setParameter(1, TEST_NAME_PREFIX + "%").executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.workers WHERE document_number LIKE 'ZTEST%'")
-                .executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.tractors WHERE plate LIKE 'Z9%'")
-                .executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'")
-                .executeUpdate();
+            fixtures.deleteWarehouseTestData();
+            fixtures.deleteTestFleet();
+            fixtures.deleteTestWorkers();
         });
     }
 
     // ---------- fixtures --------------------------------------------------------
 
-    private int adminId() {
-        User admin = userRepository.findByUsername("admin").orElseThrow();
-        return admin.id;
-    }
-
-    private int seedProduct(String name) {
-        return QuarkusTransaction.requiringNew().call(() -> {
-            Product product = new Product();
-            product.name = name;
-            product.categoryId = CATEGORY_FILTROS;
-            product.unitOfMeasureId = UNIT_UND;
-            product.attributes = new HashMap<>();
-            product.minStock = BigDecimal.ZERO;
-            product.isActive = true;
-            product.createdBy = adminId();
-            productRepository.persist(product);
-            return product.id;
-        });
-    }
-
+    /** Se queda local: fija registered_at explicito (la variante de support usa el del servidor). */
     private void seedOpeningBalance(int productId, String quantity, OffsetDateTime registeredAt) {
         QuarkusTransaction.requiringNew().run(() ->
             entityManager.createNativeQuery(
@@ -108,19 +55,9 @@ class WarehouseKardexResourceTest {
                     + "VALUES (?1, CAST(?2 AS NUMERIC), ?3, ?4)")
                 .setParameter(1, productId)
                 .setParameter(2, quantity)
-                .setParameter(3, adminId())
+                .setParameter(3, fixtures.adminId())
                 .setParameter(4, registeredAt)
                 .executeUpdate());
-    }
-
-    private int seedSupplier(String name) {
-        return QuarkusTransaction.requiringNew().call(() -> {
-            Supplier supplier = new Supplier();
-            supplier.name = name;
-            supplier.isActive = true;
-            supplierRepository.persist(supplier);
-            return supplier.id;
-        });
     }
 
     /** Factura ACTIVA (o CANCELLED con motivo) con created_at explicito, usado como movedAt de sus items. */
@@ -135,7 +72,7 @@ class WarehouseKardexResourceTest {
                     .setParameter(1, supplierId)
                     .setParameter(2, invoiceNumber)
                     .setParameter(3, createdAt.toLocalDate())
-                    .setParameter(4, adminId())
+                    .setParameter(4, fixtures.adminId())
                     .setParameter(5, createdAt)
                     .getSingleResult();
                 return ((Number) id).intValue();
@@ -149,7 +86,7 @@ class WarehouseKardexResourceTest {
                 .setParameter(1, supplierId)
                 .setParameter(2, invoiceNumber)
                 .setParameter(3, createdAt.toLocalDate())
-                .setParameter(4, adminId())
+                .setParameter(4, fixtures.adminId())
                 .setParameter(5, createdAt)
                 .getSingleResult();
             return ((Number) id).intValue();
@@ -167,56 +104,6 @@ class WarehouseKardexResourceTest {
                 .executeUpdate());
     }
 
-    /** DNI ya deberia existir (DevDataSeeder lo garantiza al arrancar); se resuelve/crea defensivamente. */
-    private int dniDocumentTypeId() {
-        var rows = entityManager.createNativeQuery("SELECT id FROM public.document_types WHERE code = 'DNI'")
-            .getResultList();
-        if (!rows.isEmpty()) {
-            return ((Number) rows.get(0)).intValue();
-        }
-        entityManager.createNativeQuery(
-            "INSERT INTO public.document_types (code, name, max_length, is_active) VALUES ('DNI', 'DNI', 8, true)")
-            .executeUpdate();
-        return ((Number) entityManager.createNativeQuery("SELECT id FROM public.document_types WHERE code = 'DNI'")
-            .getSingleResult()).intValue();
-    }
-
-    private int seedWorker(String documentNumber, String firstName, String lastName) {
-        return QuarkusTransaction.requiringNew().call(() -> {
-            Worker worker = new Worker();
-            worker.firstName = firstName;
-            worker.lastName = lastName;
-            worker.documentTypeId = dniDocumentTypeId();
-            worker.documentNumber = documentNumber;
-            worker.position = "ZTEST Operario";
-            worker.isActive = true;
-            worker.createdAt = OffsetDateTime.now();
-            workerRepository.persist(worker);
-            return worker.id;
-        });
-    }
-
-    /** Tractor sintetico (plate acotado a 6 chars). Reusa/crea un resource_status generico. */
-    private int seedTractor(String plate) {
-        return QuarkusTransaction.requiringNew().call(() -> {
-            var statusRows = entityManager.createNativeQuery(
-                "SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'").getResultList();
-            int statusId;
-            if (statusRows.isEmpty()) {
-                statusId = ((Number) entityManager.createNativeQuery(
-                    "INSERT INTO public.resource_statuses (name, is_active) VALUES ('ZTEST_STATUS', true) RETURNING id")
-                    .getSingleResult()).intValue();
-            } else {
-                statusId = ((Number) statusRows.get(0)).intValue();
-            }
-            return ((Number) entityManager.createNativeQuery(
-                "INSERT INTO public.tractors (plate, status_id, is_active) VALUES (?1, ?2, true) RETURNING id")
-                .setParameter(1, plate)
-                .setParameter(2, statusId)
-                .getSingleResult()).intValue();
-        });
-    }
-
     private int seedWithdrawal(
         int productId, String quantity, OffsetDateTime withdrawnAt, int receivedBy, Integer tractorId, boolean cancelled
     ) {
@@ -231,7 +118,7 @@ class WarehouseKardexResourceTest {
                     .setParameter(3, withdrawnAt)
                     .setParameter(4, receivedBy)
                     .setParameter(5, tractorId)
-                    .setParameter(6, adminId())
+                    .setParameter(6, fixtures.adminId())
                     .getSingleResult()).intValue();
             }
             return ((Number) entityManager.createNativeQuery(
@@ -244,7 +131,7 @@ class WarehouseKardexResourceTest {
                 .setParameter(3, withdrawnAt)
                 .setParameter(4, receivedBy)
                 .setParameter(5, tractorId)
-                .setParameter(6, adminId())
+                .setParameter(6, fixtures.adminId())
                 .getSingleResult()).intValue();
         });
     }
@@ -253,33 +140,11 @@ class WarehouseKardexResourceTest {
         return OffsetDateTime.of(year, month, day, hour, minute, 0, 0, LIMA_OFFSET);
     }
 
-    private String login(String username, String password) {
-        return given()
-            .contentType(ContentType.JSON)
-            .body("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-        .when()
-            .post("/auth/login")
-        .then()
-            .statusCode(200)
-            .extract().jsonPath().getString("token");
-    }
-
-    private String fabricateAccessToken(String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject("999")
-            .upn(username)
-            .groups(Set.of(role))
-            .claim("typ", "access")
-            .issuedAt(now)
-            .expiresAt(now.plusSeconds(3600))
-            .sign();
-    }
-
     // ---------- shape / referencia por tipo --------------------------------------
 
     @Test
     void kardex_apertura_shapeAndReference() {
-        int productId = seedProduct("ZTEST_Kardex Apertura");
+        int productId = fixtures.seedProduct("ZTEST_Kardex Apertura");
         seedOpeningBalance(productId, "100", lima(2026, 1, 1, 8, 0));
         String token = login("admin", "Admin1234");
 
@@ -299,8 +164,8 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_entrada_referenceComposesInvoiceAndSupplier() {
-        int productId = seedProduct("ZTEST_Kardex Entrada");
-        int supplierId = seedSupplier("ZTEST_Proveedor Norte");
+        int productId = fixtures.seedProduct("ZTEST_Kardex Entrada");
+        int supplierId = fixtures.seedSupplier("ZTEST_Proveedor Norte");
         int invoiceId = seedPurchaseInvoice(supplierId, "ZTEST-INV-001", lima(2026, 1, 2, 9, 0), false);
         seedPurchaseInvoiceItem(invoiceId, productId, "50");
         String token = login("admin", "Admin1234");
@@ -320,10 +185,10 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_salida_withUnit_referenceIncludesPlate() {
-        int productId = seedProduct("ZTEST_Kardex SalidaConUnidad");
+        int productId = fixtures.seedProduct("ZTEST_Kardex SalidaConUnidad");
         seedOpeningBalance(productId, "50", lima(2026, 1, 1, 8, 0));
-        int workerId = seedWorker("ZTESTW001", "Carlos", "Quispe");
-        int tractorId = seedTractor("Z90001");
+        int workerId = fixtures.seedWorker("ZTESTW001", "Carlos", "Quispe", "ZTEST Operario", true);
+        int tractorId = fixtures.seedTractor("Z90001");
         int withdrawalId = seedWithdrawal(productId, "10", lima(2026, 1, 2, 10, 0), workerId, tractorId, false);
         String token = login("admin", "Admin1234");
 
@@ -342,9 +207,9 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_salida_withoutUnit_referenceOmitsPlateGracefully() {
-        int productId = seedProduct("ZTEST_Kardex SalidaSinUnidad");
+        int productId = fixtures.seedProduct("ZTEST_Kardex SalidaSinUnidad");
         seedOpeningBalance(productId, "50", lima(2026, 1, 1, 8, 0));
-        int workerId = seedWorker("ZTESTW002", "Rosa", "Diaz");
+        int workerId = fixtures.seedWorker("ZTESTW002", "Rosa", "Diaz", "ZTEST Operario", true);
         seedWithdrawal(productId, "5", lima(2026, 1, 2, 10, 0), workerId, null, false);
         String token = login("admin", "Admin1234");
 
@@ -368,12 +233,12 @@ class WarehouseKardexResourceTest {
      */
     @Test
     void kardex_pagination_balanceIsGlobal_notResetPerPage() {
-        int productId = seedProduct("ZTEST_Kardex Paginacion");
-        int supplierId = seedSupplier("ZTEST_Proveedor Paginacion");
+        int productId = fixtures.seedProduct("ZTEST_Kardex Paginacion");
+        int supplierId = fixtures.seedSupplier("ZTEST_Proveedor Paginacion");
         seedOpeningBalance(productId, "100", lima(2026, 2, 1, 8, 0));
         int invoice1 = seedPurchaseInvoice(supplierId, "ZTEST-INV-PAG1", lima(2026, 2, 2, 8, 0), false);
         seedPurchaseInvoiceItem(invoice1, productId, "50");
-        int workerId = seedWorker("ZTESTW010", "Luis", "Mamani");
+        int workerId = fixtures.seedWorker("ZTESTW010", "Luis", "Mamani", "ZTEST Operario", true);
         seedWithdrawal(productId, "30", lima(2026, 2, 3, 8, 0), workerId, null, false);
         int invoice2 = seedPurchaseInvoice(supplierId, "ZTEST-INV-PAG2", lima(2026, 2, 4, 8, 0), false);
         seedPurchaseInvoiceItem(invoice2, productId, "20");
@@ -406,8 +271,8 @@ class WarehouseKardexResourceTest {
      */
     @Test
     void kardex_dateFilter_balanceStillReflectsFullHistory() {
-        int productId = seedProduct("ZTEST_Kardex FiltroFecha");
-        int supplierId = seedSupplier("ZTEST_Proveedor FiltroFecha");
+        int productId = fixtures.seedProduct("ZTEST_Kardex FiltroFecha");
+        int supplierId = fixtures.seedSupplier("ZTEST_Proveedor FiltroFecha");
         seedOpeningBalance(productId, "100", lima(2026, 3, 1, 8, 0));
         int invoice = seedPurchaseInvoice(supplierId, "ZTEST-INV-FEC1", lima(2026, 3, 5, 8, 0), false);
         seedPurchaseInvoiceItem(invoice, productId, "50");
@@ -428,8 +293,8 @@ class WarehouseKardexResourceTest {
     /** Borde de medianoche Lima: 23:50 del dia D-1 vs 00:05 del dia D. */
     @Test
     void kardex_dateFilter_respectsLimaMidnightBoundary() {
-        int productId = seedProduct("ZTEST_Kardex Medianoche");
-        int supplierId = seedSupplier("ZTEST_Proveedor Medianoche");
+        int productId = fixtures.seedProduct("ZTEST_Kardex Medianoche");
+        int supplierId = fixtures.seedSupplier("ZTEST_Proveedor Medianoche");
         int invoiceLate = seedPurchaseInvoice(supplierId, "ZTEST-INV-MED1", lima(2026, 4, 9, 23, 50), false);
         seedPurchaseInvoiceItem(invoiceLate, productId, "10");
         int invoiceEarly = seedPurchaseInvoice(supplierId, "ZTEST-INV-MED2", lima(2026, 4, 10, 0, 5), false);
@@ -460,7 +325,7 @@ class WarehouseKardexResourceTest {
     /** dateFrom > dateTo NO es 400: pagina vacia (mismo criterio que cotizaciones). */
     @Test
     void kardex_dateFromAfterDateTo_returns200EmptyContent() {
-        int productId = seedProduct("ZTEST_Kardex FechasInvertidas");
+        int productId = fixtures.seedProduct("ZTEST_Kardex FechasInvertidas");
         seedOpeningBalance(productId, "10", lima(2026, 1, 1, 8, 0));
         String token = login("admin", "Admin1234");
 
@@ -478,12 +343,12 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_cancelledInvoiceAndWithdrawal_excludedAndDoNotAffectBalance() {
-        int productId = seedProduct("ZTEST_Kardex Anulados");
-        int supplierId = seedSupplier("ZTEST_Proveedor Anulados");
+        int productId = fixtures.seedProduct("ZTEST_Kardex Anulados");
+        int supplierId = fixtures.seedSupplier("ZTEST_Proveedor Anulados");
         seedOpeningBalance(productId, "100", lima(2026, 6, 1, 8, 0));
         int cancelledInvoice = seedPurchaseInvoice(supplierId, "ZTEST-INV-CAN1", lima(2026, 6, 2, 8, 0), true);
         seedPurchaseInvoiceItem(cancelledInvoice, productId, "999");
-        int workerId = seedWorker("ZTESTW020", "Ana", "Vega");
+        int workerId = fixtures.seedWorker("ZTESTW020", "Ana", "Vega", "ZTEST Operario", true);
         seedWithdrawal(productId, "999", lima(2026, 6, 3, 8, 0), workerId, null, true);
         int activeInvoice = seedPurchaseInvoice(supplierId, "ZTEST-INV-CAN2", lima(2026, 6, 4, 8, 0), false);
         seedPurchaseInvoiceItem(activeInvoice, productId, "30");
@@ -505,8 +370,8 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_sameMovedAt_tiebreaksDeterministicallyByMovementSeq() {
-        int productId = seedProduct("ZTEST_Kardex Empate");
-        int supplierId = seedSupplier("ZTEST_Proveedor Empate");
+        int productId = fixtures.seedProduct("ZTEST_Kardex Empate");
+        int supplierId = fixtures.seedSupplier("ZTEST_Proveedor Empate");
         OffsetDateTime sameInstant = lima(2026, 7, 1, 12, 0);
         int invoiceId = seedPurchaseInvoice(supplierId, "ZTEST-INV-TIE1", sameInstant, false);
         seedPurchaseInvoiceItem(invoiceId, productId, "10");  // menor movement_seq (item insertado primero)
@@ -532,7 +397,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_productWithoutMovements_returnsEmptyPage() {
-        int productId = seedProduct("ZTEST_Kardex SinMovimientos");
+        int productId = fixtures.seedProduct("ZTEST_Kardex SinMovimientos");
         String token = login("admin", "Admin1234");
 
         given()
@@ -569,7 +434,7 @@ class WarehouseKardexResourceTest {
      */
     @Test
     void kardex_malformedDate_returns404() {
-        int productId = seedProduct("ZTEST_Kardex FechaInvalida");
+        int productId = fixtures.seedProduct("ZTEST_Kardex FechaInvalida");
         String token = login("admin", "Admin1234");
 
         given()
@@ -582,7 +447,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_sizeAboveMax_returns400_COM001() {
-        int productId = seedProduct("ZTEST_Kardex SizeMax");
+        int productId = fixtures.seedProduct("ZTEST_Kardex SizeMax");
         String token = login("admin", "Admin1234");
 
         given()
@@ -598,7 +463,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withoutToken_returns401() {
-        int productId = seedProduct("ZTEST_Kardex NoToken");
+        int productId = fixtures.seedProduct("ZTEST_Kardex NoToken");
 
         given()
         .when()
@@ -609,7 +474,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withAdminRole_returns200() {
-        int productId = seedProduct("ZTEST_Kardex RoleAdmin");
+        int productId = fixtures.seedProduct("ZTEST_Kardex RoleAdmin");
         String token = login("admin", "Admin1234");
 
         given()
@@ -622,7 +487,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withOperationsManagerRole_returns200() {
-        int productId = seedProduct("ZTEST_Kardex RoleOM");
+        int productId = fixtures.seedProduct("ZTEST_Kardex RoleOM");
 
         given()
             .header("Authorization", "Bearer " + fabricateAccessToken("om_test", "operations_manager"))
@@ -634,7 +499,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withFinanceManagerRole_returns200() {
-        int productId = seedProduct("ZTEST_Kardex RoleFM");
+        int productId = fixtures.seedProduct("ZTEST_Kardex RoleFM");
 
         given()
             .header("Authorization", "Bearer " + fabricateAccessToken("fm_test", "finance_manager"))
@@ -646,7 +511,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withWarehouseKeeperRole_returns200() {
-        int productId = seedProduct("ZTEST_Kardex RoleWK");
+        int productId = fixtures.seedProduct("ZTEST_Kardex RoleWK");
 
         given()
             .header("Authorization", "Bearer " + fabricateAccessToken("wk_test", "warehouse_keeper"))
@@ -658,7 +523,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withGeneralManagerRole_returns200() {
-        int productId = seedProduct("ZTEST_Kardex RoleGM");
+        int productId = fixtures.seedProduct("ZTEST_Kardex RoleGM");
 
         given()
             .header("Authorization", "Bearer " + fabricateAccessToken("gm_test", "general_manager"))
@@ -670,7 +535,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withSalesRole_returns403_COM003() {
-        int productId = seedProduct("ZTEST_Kardex RoleSales");
+        int productId = fixtures.seedProduct("ZTEST_Kardex RoleSales");
         String token = login("lcampos", "Sales1234");
 
         given()
@@ -684,7 +549,7 @@ class WarehouseKardexResourceTest {
 
     @Test
     void kardex_withDispatcherRole_returns403_COM003() {
-        int productId = seedProduct("ZTEST_Kardex RoleDispatcher");
+        int productId = fixtures.seedProduct("ZTEST_Kardex RoleDispatcher");
 
         given()
             .header("Authorization", "Bearer " + fabricateAccessToken("disp_test", "dispatcher"))

@@ -5,13 +5,11 @@ import com.scaramutti.tms.shared.repository.UnitOfMeasureRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
-import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
-import java.util.Set;
-
+import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
+import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.equalTo;
@@ -52,28 +50,6 @@ class WarehouseUnitsOfMeasureResourceTest {
         QuarkusTransaction.requiringNew().run(() ->
             unitOfMeasureRepository.delete("code", INACTIVE_TEST_CODE)
         );
-    }
-
-    private String login(String username, String password) {
-        return given()
-            .contentType(ContentType.JSON)
-            .body("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-        .when()
-            .post("/auth/login")
-        .then()
-            .statusCode(200)
-            .extract().jsonPath().getString("token");
-    }
-
-    private String fabricateAccessToken(String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject("999")
-            .upn(username)
-            .groups(Set.of(role))
-            .claim("typ", "access")
-            .issuedAt(now)
-            .expiresAt(now.plusSeconds(3600))
-            .sign();
     }
 
     // ---------- Happy path / contrato -------------------------------------------

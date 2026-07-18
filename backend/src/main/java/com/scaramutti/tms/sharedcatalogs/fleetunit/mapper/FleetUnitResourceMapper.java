@@ -1,9 +1,9 @@
 package com.scaramutti.tms.sharedcatalogs.fleetunit.mapper;
 
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.sharedcatalogs.fleetunit.service.cmd.ListFleetUnitsQuery;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import org.mapstruct.Mapper;
-import org.mapstruct.MappingConstants;
 import org.mapstruct.NullValueMappingStrategy;
 
 /**
@@ -13,7 +13,7 @@ import org.mapstruct.NullValueMappingStrategy;
  * service reventaria (gotcha conocido del proyecto con params opcionales).
  */
 @Mapper(
-    componentModel = MappingConstants.ComponentModel.CDI,
+    config = SharedMapperConfig.class,
     nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT
 )
 public interface FleetUnitResourceMapper {
