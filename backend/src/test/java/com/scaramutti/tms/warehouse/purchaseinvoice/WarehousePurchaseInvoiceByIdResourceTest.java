@@ -9,6 +9,13 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.concurrent.Callable;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
 import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
@@ -511,6 +518,68 @@ class WarehousePurchaseInvoiceByIdResourceTest {
             .body(updateBody("ZTEST-006-AP2", fixtures.currencyId("USD"), itemJson(productId, "1", "1.00"), "Baja que deja negativo"))
         .when().put("/warehouse/purchase-invoices/" + id)
         .then().statusCode(409).body("code", equalTo("WH-006"));
+    }
+
+    @Test
+    void update_twoConcurrentReductions_lockSerializesOneSucceedsOneRejected() throws Exception {
+        // Dos facturas DISTINTAS del MISMO producto bajan su cantidad a la vez compitiendo por el
+        // stock restante. Cada PUT lleva su propio ETag válido (cabeceras distintas), así que no
+        // chocan en el If-Match: compiten en el lock de fila del producto (el mismo de retiros).
+        // Con el lock la guarda WH-006 es determinista (un 200 y un 409); sin él ambas bajas
+        // decidirían sobre el stock viejo y el producto quedaría negativo. Se repite para exponer
+        // un lock roto con alta probabilidad.
+        String token = login("admin", "Admin1234");
+        for (int i = 0; i < 5; i++) {
+            int productId = fixtures.seedProduct("ZTEST_PI EditConc " + i);
+            int workerId = fixtures.seedWorker("ZTESTIEC" + i);
+            int supplierId = fixtures.seedSupplier("ZTEST_Proveedor Conc " + i);
+            int idA = createInvoice(supplierId, "ZTEST-CONC-A" + i, itemJson(productId, "10", "1.00"), token);
+            int idB = createInvoice(supplierId, "ZTEST-CONC-B" + i, itemJson(productId, "10", "1.00"), token);
+            seedWithdrawal(productId, "12", workerId, false);   // stock 10 + 10 - 12 = 8
+            String etagA = etagOf(idA, token);
+            String etagB = etagOf(idB, token);
+
+            // Cada baja 10 → 4 (descuenta 6): sola deja 2; las dos juntas dejarían -4 → WH-006.
+            CyclicBarrier barrier = new CyclicBarrier(2);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                Callable<Integer> reduceA = reductionAttempt(idA, etagA,
+                    reductionBody("ZTEST-CONC-A" + i, productId), barrier, token);
+                Callable<Integer> reduceB = reductionAttempt(idB, etagB,
+                    reductionBody("ZTEST-CONC-B" + i, productId), barrier, token);
+                Future<Integer> f1 = pool.submit(reduceA);
+                Future<Integer> f2 = pool.submit(reduceB);
+                int s1 = f1.get(20, TimeUnit.SECONDS);
+                int s2 = f2.get(20, TimeUnit.SECONDS);
+
+                boolean exactlyOneEach = (s1 == 200 && s2 == 409) || (s1 == 409 && s2 == 200);
+                if (!exactlyOneEach) {
+                    throw new AssertionError("Iteración " + i + ": esperaba un 200 y un 409, fueron " + s1 + " y " + s2);
+                }
+                fixtures.assertStock(productId, "2", token);   // 8 - 6 (ganador); el perdedor sigue en 10
+            } finally {
+                pool.shutdownNow();
+            }
+        }
+    }
+
+    /** Body del PUT que baja la cantidad del ítem 10 → 4. Se arma en el hilo del test: los
+     * lookups de fixtures usan el EntityManager y no pueden correr en los hilos del pool. */
+    private String reductionBody(String invoiceNumber, int productId) {
+        return updateBody(invoiceNumber, fixtures.currencyId("USD"),
+            itemJson(productId, "4", "1.00"), "Ajuste concurrente al conteo real");
+    }
+
+    /** Un PUT con el body ya armado, sincronizado en la barrier; devuelve el status. */
+    private Callable<Integer> reductionAttempt(int invoiceId, String etag, String body,
+                                               CyclicBarrier barrier, String token) {
+        return () -> {
+            barrier.await(10, TimeUnit.SECONDS);
+            return given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+                .contentType(ContentType.JSON).body(body)
+            .when().put("/warehouse/purchase-invoices/" + invoiceId)
+            .then().extract().statusCode();
+        };
     }
 
     @Test
