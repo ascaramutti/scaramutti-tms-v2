@@ -2,8 +2,11 @@
 
 Esta carpeta es la **única fuente de verdad del schema**. Flyway la aplica al arrancar el
 backend (`quarkus.flyway.migrate-at-start=true`). `V001__baseline.sql` es la foto schema-only
-de producción al 2026-07-06; en DBs que ya tenían el schema, `baseline-on-migrate` la marca
-como aplicada sin ejecutarla — solo una DB vacía (tests/CI) la ejecuta completa.
+de producción al 2026-07-06. Las DBs que ya tenían ese schema fueron baselineadas en su
+momento (la V001 quedó marcada como aplicada sin ejecutarse) y después se retiró
+`baseline-on-migrate` a propósito: una DB no vacía sin `flyway_schema_history` falla
+ruidosamente en vez de adoptarse en silencio. Solo una DB vacía (dev local, tests, CI)
+ejecuta la V001 completa.
 
 ## Reglas (contrato entre los dos proyectos paralelos — Almacén y Operaciones)
 

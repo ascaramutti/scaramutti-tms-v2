@@ -10,11 +10,11 @@ import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
- * Detalle de una entrada (respuesta del POST y, a futuro, del GET/{id}).
+ * Detalle de una entrada (respuesta del POST, del GET/{id} y del PUT).
  * {@code total} = Σ items.subtotal, derivado en código (nunca persistido, patrón v2).
  * Los campos de anulación ({@code cancelReason}/{@code cancelledBy}/{@code cancelledAt})
- * y {@code lastEdit} viajan null mientras la factura esté ACTIVE y sin ediciones (A8);
- * los pueblan la anulación y la edición (A9).
+ * y {@code lastEdit} viajan null mientras la factura esté ACTIVE y sin ediciones;
+ * los pueblan la anulación y la edición.
  */
 public record WarehousePurchaseInvoiceResponse(
     Integer id,

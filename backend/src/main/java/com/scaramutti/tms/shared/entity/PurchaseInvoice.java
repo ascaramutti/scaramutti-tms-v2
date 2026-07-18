@@ -28,8 +28,8 @@ import java.time.OffsetDateTime;
  * <p>El {@code status} se guarda como String (no un enum) para no invertir la
  * dependencia {@code shared → warehouse}: el enum de dominio
  * {@code WarehouseRecordStatus} vive en {@code warehouse/model/} y lo usan las capas
- * REST/service; la BD ya restringe el valor con un CHECK (V002). A8 solo escribe
- * ACTIVE; la anulación (CANCELLED) llega en A9.
+ * REST/service; la BD ya restringe el valor con un CHECK (V002). El alta escribe
+ * ACTIVE; la anulación lo pasa a CANCELLED.
  */
 @Entity
 @Table(name = "purchase_invoices", schema = "almacen")
@@ -85,7 +85,7 @@ public class PurchaseInvoice {
     // porque Postgres (timestamptz) guarda esa precisión (mismo fix que Product,
     // bug D-12). Sin truncar, el valor devuelto por el POST no coincidiría con el
     // releído por un GET en JVMs con reloj de nanosegundos (Linux), desalineando el
-    // If-Match del PUT/cancel (A9).
+    // If-Match del PUT/cancel.
     @PrePersist
     public void onCreate() {
         OffsetDateTime now = DateUtils.nowUtcMicros();
