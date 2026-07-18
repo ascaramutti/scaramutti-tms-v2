@@ -1,5 +1,6 @@
 package com.scaramutti.tms.warehouse.withdrawal.mapper;
 
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalRequest;
@@ -9,7 +10,6 @@ import com.scaramutti.tms.warehouse.withdrawal.service.cmd.ListWarehouseWithdraw
 import com.scaramutti.tms.warehouse.withdrawal.service.cmd.UpdateWarehouseWithdrawalCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 import org.mapstruct.NullValueMappingStrategy;
 
 import java.time.LocalDate;
@@ -19,7 +19,7 @@ import java.time.LocalDate;
  * listado se agrega con el endpoint de listado.
  */
 @Mapper(
-    componentModel = MappingConstants.ComponentModel.CDI,
+    config = SharedMapperConfig.class,
     uses = StringUtils.class,
     nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT
 )

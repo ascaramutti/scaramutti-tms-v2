@@ -1,11 +1,11 @@
 package com.scaramutti.tms.warehouse.product.mapper;
 
 import com.scaramutti.tms.shared.entity.Product;
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
 import com.scaramutti.tms.warehouse.product.service.cmd.UpdateWarehouseProductCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 import org.mapstruct.MappingTarget;
 
 /**
@@ -16,7 +16,7 @@ import org.mapstruct.MappingTarget;
  * La construcción del Response se hace en el service (necesita lookups de
  * categoría/unidad/usuario y los derivados stock/lowStock).
  */
-@Mapper(componentModel = MappingConstants.ComponentModel.CDI)
+@Mapper(config = SharedMapperConfig.class)
 public interface WarehouseProductServiceMapper {
 
     @Mapping(target = "id",        ignore = true)

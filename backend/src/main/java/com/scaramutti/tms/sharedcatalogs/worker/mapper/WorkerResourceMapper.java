@@ -1,10 +1,10 @@
 package com.scaramutti.tms.sharedcatalogs.worker.mapper;
 
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.sharedcatalogs.worker.service.cmd.ListWorkersQuery;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 import org.mapstruct.NullValueMappingStrategy;
 
 /**
@@ -17,7 +17,7 @@ import org.mapstruct.NullValueMappingStrategy;
  * Query null y el service reventaria (gotcha conocido del proyecto con params opcionales).
  */
 @Mapper(
-    componentModel = MappingConstants.ComponentModel.CDI,
+    config = SharedMapperConfig.class,
     uses = StringUtils.class,
     nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT
 )

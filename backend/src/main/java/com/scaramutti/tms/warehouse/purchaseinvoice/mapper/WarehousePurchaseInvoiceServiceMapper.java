@@ -2,11 +2,11 @@ package com.scaramutti.tms.warehouse.purchaseinvoice.mapper;
 
 import com.scaramutti.tms.shared.entity.PurchaseInvoice;
 import com.scaramutti.tms.shared.entity.PurchaseInvoiceItem;
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.CreateWarehouseInvoiceItemCommand;
 import com.scaramutti.tms.warehouse.purchaseinvoice.service.cmd.CreateWarehousePurchaseInvoiceCommand;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.MappingConstants;
 
 /**
  * Mapper de la capa Service: arma las entities a partir del command + el id del
@@ -14,7 +14,7 @@ import org.mapstruct.MappingConstants;
  * maneja la BD / el {@code @PrePersist} de la entity). El {@code invoiceId} de cada
  * ítem lo setea el service tras persistir la cabecera (FK plana, no cascade).
  */
-@Mapper(componentModel = MappingConstants.ComponentModel.CDI)
+@Mapper(config = SharedMapperConfig.class)
 public interface WarehousePurchaseInvoiceServiceMapper {
 
     @Mapping(target = "id",              ignore = true)

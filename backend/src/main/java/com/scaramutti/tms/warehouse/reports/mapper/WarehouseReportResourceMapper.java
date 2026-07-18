@@ -1,9 +1,9 @@
 package com.scaramutti.tms.warehouse.reports.mapper;
 
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.warehouse.reports.model.WarehouseReportCut;
 import com.scaramutti.tms.warehouse.reports.service.cmd.GetWarehouseReportQuery;
 import org.mapstruct.Mapper;
-import org.mapstruct.MappingConstants;
 
 import java.time.LocalDate;
 
@@ -12,7 +12,7 @@ import java.time.LocalDate;
  * llegan tipados/validados por JAX-RS): solo agrupa la firma en el Query (mismo
  * criterio que {@code WarehouseKardexResourceMapper}).
  */
-@Mapper(componentModel = MappingConstants.ComponentModel.CDI)
+@Mapper(config = SharedMapperConfig.class)
 public interface WarehouseReportResourceMapper {
 
     GetWarehouseReportQuery toGetWarehouseReportQuery(
