@@ -67,8 +67,8 @@ public final class DateUtils {
      * precision, asi que los timestamps que sirven de version del ETag deben truncarse
      * a micros: sin esto, el valor devuelto por un POST/PUT no coincide con el releido
      * por un GET en JVMs con reloj de nanosegundos (Linux), rompiendo el If-Match (bug
-     * D-12). Fuente unica del truncado para el codigo nuevo (los {@code @PrePersist}
-     * viejos aun lo hacen inline: migrarlos es una deuda de refactor dedicado).
+     * D-12). Fuente unica del truncado: todos los {@code @PrePersist}/{@code @PreUpdate}
+     * de las entities y los services lo usan.
      */
     public static OffsetDateTime nowUtcMicros() {
         return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);

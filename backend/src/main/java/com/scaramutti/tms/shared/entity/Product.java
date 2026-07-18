@@ -1,5 +1,6 @@
 package com.scaramutti.tms.shared.entity;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -13,8 +14,6 @@ import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.Map;
 
 /**
@@ -90,7 +89,7 @@ public class Product {
     // idéntico al persistido en todas las plataformas.
     @PrePersist
     public void onCreate() {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
+        OffsetDateTime now = DateUtils.nowUtcMicros();
         if (createdAt == null) {
             createdAt = now;
         }
@@ -101,6 +100,6 @@ public class Product {
 
     @PreUpdate
     public void onUpdate() {
-        updatedAt = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
+        updatedAt = DateUtils.nowUtcMicros();
     }
 }

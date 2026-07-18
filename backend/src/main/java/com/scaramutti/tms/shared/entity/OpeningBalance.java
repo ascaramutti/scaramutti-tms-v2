@@ -1,5 +1,6 @@
 package com.scaramutti.tms.shared.entity;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,8 +11,6 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 
 /**
  * Corte inicial de inventario de un producto ("con cuánto arranca"). Vive en
@@ -51,7 +50,7 @@ public class OpeningBalance {
     @PrePersist
     public void onCreate() {
         if (registeredAt == null) {
-            registeredAt = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
+            registeredAt = DateUtils.nowUtcMicros();
         }
     }
 }

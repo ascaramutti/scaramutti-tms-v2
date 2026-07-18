@@ -1,5 +1,6 @@
 package com.scaramutti.tms.shared.entity;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,8 +11,6 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 
 /**
  * Ítem de una entrada ({@link PurchaseInvoice}). FK plana a la factura
@@ -45,7 +44,7 @@ public class PurchaseInvoiceItem {
     @PrePersist
     public void onCreate() {
         if (createdAt == null) {
-            createdAt = OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
+            createdAt = DateUtils.nowUtcMicros();
         }
     }
 }
