@@ -15,7 +15,6 @@ import com.scaramutti.tms.warehouse.openingbalance.dto.WarehouseOpeningBalanceRe
 import com.scaramutti.tms.warehouse.openingbalance.mapper.WarehouseOpeningBalanceServiceMapper;
 import com.scaramutti.tms.warehouse.openingbalance.service.cmd.CreateWarehouseOpeningBalanceCommand;
 import com.scaramutti.tms.warehouse.openingbalance.service.cmd.ListWarehouseOpeningBalancesQuery;
-import com.scaramutti.tms.warehouse.product.dto.WarehouseProductSummary;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.PersistenceException;
@@ -65,7 +64,8 @@ public class WarehouseOpeningBalanceService {
         persistOrTranslateDuplicate(openingBalance);
 
         UnitOfMeasure unitOfMeasure = unitOfMeasureRepository.findById(product.unitOfMeasureId);
-        return toResponse(openingBalance, product, unitOfMeasure, userLookup.require(userId));
+        return warehouseOpeningBalanceServiceMapper.toWarehouseOpeningBalanceResponse(
+            openingBalance, product, unitOfMeasure, userLookup.require(userId));
     }
 
     /**
@@ -93,7 +93,7 @@ public class WarehouseOpeningBalanceService {
         List<WarehouseOpeningBalanceResponse> content = openingBalances.stream()
             .map(openingBalance -> {
                 Product product = productsById.get(openingBalance.productId);
-                return toResponse(
+                return warehouseOpeningBalanceServiceMapper.toWarehouseOpeningBalanceResponse(
                     openingBalance, product, unitsById.get(product.unitOfMeasureId),
                     usersById.get(openingBalance.registeredBy)
                 );
@@ -159,20 +159,5 @@ public class WarehouseOpeningBalanceService {
         }
         Throwable cause = ex.getCause();
         return (cause instanceof ConstraintViolationException cve) ? cve : null;
-    }
-
-    // ---------- Ensamblado del response ----------------------------------------
-
-    private WarehouseOpeningBalanceResponse toResponse(
-        OpeningBalance openingBalance, Product product, UnitOfMeasure unitOfMeasure, UserResponse registeredBy
-    ) {
-        return new WarehouseOpeningBalanceResponse(
-            openingBalance.id,
-            new WarehouseProductSummary(product.id, product.code, product.name, unitOfMeasure.code),
-            openingBalance.quantity,
-            openingBalance.observations,
-            registeredBy,
-            openingBalance.registeredAt
-        );
     }
 }

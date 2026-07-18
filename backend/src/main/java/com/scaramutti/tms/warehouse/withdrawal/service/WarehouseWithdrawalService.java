@@ -4,7 +4,6 @@ import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.UserLookup;
 import com.scaramutti.tms.shared.dto.PageResponse;
-import com.scaramutti.tms.shared.dto.WorkerResponse;
 import com.scaramutti.tms.shared.entity.AuditLog;
 import com.scaramutti.tms.shared.entity.EscortVehicle;
 import com.scaramutti.tms.shared.entity.Product;
@@ -28,7 +27,6 @@ import com.scaramutti.tms.warehouse.model.AuditChangeType;
 import com.scaramutti.tms.warehouse.model.AuditEntityType;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
-import com.scaramutti.tms.warehouse.product.dto.WarehouseProductSummary;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseEditTrace;
 import com.scaramutti.tms.warehouse.withdrawal.dto.FleetUnitRef;
 import com.scaramutti.tms.warehouse.withdrawal.dto.WarehouseWithdrawalResponse;
@@ -99,7 +97,8 @@ public class WarehouseWithdrawalService {
         withdrawalRepository.persist(withdrawal);
 
         // Retiro recién creado: ACTIVE, sin anular (cancelledBy null) ni editar (lastEdit null).
-        return toResponse(withdrawal, product, unit, worker, fleetUnit, userLookup.require(userId), null, null);
+        return warehouseWithdrawalServiceMapper.toWarehouseWithdrawalResponse(
+            withdrawal, product, unit, worker, fleetUnit, userLookup.require(userId), null, null);
     }
 
     /**
@@ -149,7 +148,7 @@ public class WarehouseWithdrawalService {
         List<WarehouseWithdrawalResponse> content = withdrawals.stream()
             .map(withdrawal -> {
                 Product product = productsById.get(withdrawal.productId);
-                return toResponse(
+                return warehouseWithdrawalServiceMapper.toWarehouseWithdrawalResponse(
                     withdrawal, product, unitsById.get(product.unitOfMeasureId),
                     workersById.get(withdrawal.receivedBy),
                     resolveFleetUnit(withdrawal, tractorsById, trailersById, escortsById),
@@ -247,36 +246,11 @@ public class WarehouseWithdrawalService {
         return view != null ? view.stock() : BigDecimal.ZERO;
     }
 
-    // ---------- Ensamblado del response ----------------------------------------
-
-    private WarehouseWithdrawalResponse toResponse(
-        Withdrawal withdrawal, Product product, UnitOfMeasure unit, Worker worker,
-        FleetUnitRef fleetUnit, UserResponse registeredBy, UserResponse cancelledBy,
-        WarehouseEditTrace lastEdit
-    ) {
-        return new WarehouseWithdrawalResponse(
-            withdrawal.id,
-            new WarehouseProductSummary(product.id, product.code, product.name, unit.code),
-            withdrawal.quantity,
-            withdrawal.withdrawnAt,
-            new WorkerResponse(worker.id, worker.fullName(), worker.position, worker.isActive),
-            fleetUnit,
-            withdrawal.observations,
-            WarehouseRecordStatus.valueOf(withdrawal.status),
-            withdrawal.cancelReason,
-            cancelledBy,
-            withdrawal.cancelledAt,
-            lastEdit,
-            registeredBy,
-            withdrawal.updatedAt
-        );
-    }
-
     // ========== Detalle (GET /{id}) ===========================================
 
     /** Detalle de un retiro (GET /{id}). Read-only. 404 WH-003 si no existe. */
     public WarehouseWithdrawalResponse getWithdrawal(Integer id) {
-        return assembleResponse(loadWithdrawalOrThrow(id));
+        return assembleWarehouseWithdrawalResponse(loadWithdrawalOrThrow(id));
     }
 
     private Withdrawal loadWithdrawalOrThrow(Integer id) {
@@ -291,7 +265,7 @@ public class WarehouseWithdrawalService {
      * sale del último FIELD_EDIT en {@code almacen.audit_logs}; los campos de anulación se
      * pueblan si el retiro está anulado.
      */
-    private WarehouseWithdrawalResponse assembleResponse(Withdrawal withdrawal) {
+    private WarehouseWithdrawalResponse assembleWarehouseWithdrawalResponse(Withdrawal withdrawal) {
         Product product = productRepository.findById(withdrawal.productId);
         UnitOfMeasure unit = unitOfMeasureRepository.findById(product.unitOfMeasureId);
         Worker worker = workerRepository.findById(withdrawal.receivedBy);
@@ -299,7 +273,8 @@ public class WarehouseWithdrawalService {
         UserResponse registeredBy = userLookup.require(withdrawal.registeredBy);
         UserResponse cancelledBy = withdrawal.cancelledBy != null ? userLookup.require(withdrawal.cancelledBy) : null;
         WarehouseEditTrace lastEdit = loadLastEdit(withdrawal.id);
-        return toResponse(withdrawal, product, unit, worker, fleetUnit, registeredBy, cancelledBy, lastEdit);
+        return warehouseWithdrawalServiceMapper.toWarehouseWithdrawalResponse(
+            withdrawal, product, unit, worker, fleetUnit, registeredBy, cancelledBy, lastEdit);
     }
 
     /** Resuelve la unidad de flota de UN retiro (subtipo presente), sin chequear activo. null si no tiene. */
@@ -349,7 +324,7 @@ public class WarehouseWithdrawalService {
         guardEditKeepsStockNonNegative(withdrawal, command.quantity());
 
         // Snapshot de los valores viejos para el diff de auditoría (ANTES de mutar).
-        String oldQuantity = plain(withdrawal.quantity);
+        String oldQuantity = quantityLabel(withdrawal.quantity);
         Worker oldWorker = workerRepository.findById(withdrawal.receivedBy);
         String oldFleetUnit = fleetUnitLabel(resolveFleetUnit(withdrawal));
         String oldObservations = withdrawal.observations;
@@ -364,12 +339,12 @@ public class WarehouseWithdrawalService {
         withdrawalRepository.flush();
 
         String reason = command.reason();
-        logFieldEdit(withdrawal.id, "quantity", "Cantidad", oldQuantity, plain(command.quantity()), reason, userId);
+        logFieldEdit(withdrawal.id, "quantity", "Cantidad", oldQuantity, quantityLabel(command.quantity()), reason, userId);
         logFieldEdit(withdrawal.id, "receivedBy", "Quién recibe", workerLabel(oldWorker), workerLabel(newWorker), reason, userId);
         logFieldEdit(withdrawal.id, "fleetUnit", "Unidad de flota", oldFleetUnit, fleetUnitLabel(newFleetUnit), reason, userId);
         logFieldEdit(withdrawal.id, "observations", "Observaciones", oldObservations, command.observations(), reason, userId);
 
-        return assembleResponse(withdrawal);
+        return assembleWarehouseWithdrawalResponse(withdrawal);
     }
 
     private void rejectIfCancelled(Withdrawal withdrawal) {
@@ -403,7 +378,7 @@ public class WarehouseWithdrawalService {
         withdrawalRepository.flush();
 
         writeCancelLog(withdrawal.id, reason, userId);
-        return assembleResponse(withdrawal);
+        return assembleWarehouseWithdrawalResponse(withdrawal);
     }
 
     private void writeCancelLog(Integer withdrawalId, String reason, Integer userId) {
@@ -457,8 +432,9 @@ public class WarehouseWithdrawalService {
         auditLogRepository.persist(log);
     }
 
-    private String plain(BigDecimal value) {
-        return value.stripTrailingZeros().toPlainString();
+    /** Etiqueta de la cantidad para el diff de auditoría: sin ceros de cola ni notación científica. */
+    private String quantityLabel(BigDecimal quantity) {
+        return quantity.stripTrailingZeros().toPlainString();
     }
 
     /**

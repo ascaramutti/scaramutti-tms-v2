@@ -106,7 +106,7 @@ public class WarehousePurchaseInvoiceService {
 
         Map<Integer, UnitOfMeasure> unitsById = loadUnitsFor(productsById.values());
         // Factura recién creada: nunca editada (lastEdit null) ni anulada (cancelledBy null).
-        return toResponse(invoice, supplier, currency, items, productsById, unitsById,
+        return toWarehousePurchaseInvoiceResponse(invoice, supplier, currency, items, productsById, unitsById,
             userLookup.require(userId), null, null);
     }
 
@@ -136,7 +136,7 @@ public class WarehousePurchaseInvoiceService {
             purchaseInvoiceItemRepository.aggregateByInvoiceIds(invoices.stream().map(pi -> pi.id).collect(Collectors.toSet()));
 
         List<WarehousePurchaseInvoiceSummary> content = invoices.stream()
-            .map(invoice -> toSummary(
+            .map(invoice -> toWarehousePurchaseInvoiceSummary(
                 invoice, suppliersById.get(invoice.supplierId), currenciesById.get(invoice.currencyId),
                 usersById.get(invoice.registeredBy), aggregatesByInvoiceId.get(invoice.id)))
             .toList();
@@ -242,7 +242,13 @@ public class WarehousePurchaseInvoiceService {
             .stream().collect(Collectors.toMap(unit -> unit.id, unit -> unit));
     }
 
-    private WarehousePurchaseInvoiceResponse toResponse(
+    /**
+     * Se queda en el service (excepción anotada al patrón "responses via mapper"):
+     * calcula el subtotal por ítem (quantity x unitPrice) y el total de la factura
+     * (los agregados NO se persisten, RN del módulo), eso es lógica de negocio y
+     * no shaping campo a campo.
+     */
+    private WarehousePurchaseInvoiceResponse toWarehousePurchaseInvoiceResponse(
         PurchaseInvoice invoice, Supplier supplier, Currency currency, List<PurchaseInvoiceItem> items,
         Map<Integer, Product> productsById, Map<Integer, UnitOfMeasure> unitsById, UserResponse registeredBy,
         WarehouseEditTrace lastEdit, UserResponse cancelledBy
@@ -285,7 +291,7 @@ public class WarehousePurchaseInvoiceService {
         );
     }
 
-    private WarehousePurchaseInvoiceSummary toSummary(
+    private WarehousePurchaseInvoiceSummary toWarehousePurchaseInvoiceSummary(
         PurchaseInvoice invoice, Supplier supplier, Currency currency, UserResponse registeredBy,
         PurchaseInvoiceItemRepository.InvoiceAggregate aggregate
     ) {
@@ -311,7 +317,7 @@ public class WarehousePurchaseInvoiceService {
 
     /** Detalle de una entrada (GET /{id}). Read-only. 404 WH-003 si no existe. */
     public WarehousePurchaseInvoiceResponse getPurchaseInvoice(Integer id) {
-        return assembleResponse(loadInvoiceOrThrow(id));
+        return assembleWarehousePurchaseInvoiceResponse(loadInvoiceOrThrow(id));
     }
 
     /**
@@ -366,13 +372,13 @@ public class WarehousePurchaseInvoiceService {
 
         String reason = command.reason();
         logFieldEdit(invoice.id, "invoiceNumber", "Número de factura", oldNumber, command.invoiceNumber(), reason, userId);
-        logFieldEdit(invoice.id, "invoiceDate", "Fecha de factura", str(oldDate), str(command.invoiceDate()), reason, userId);
+        logFieldEdit(invoice.id, "invoiceDate", "Fecha de factura", invoiceDateLabel(oldDate), invoiceDateLabel(command.invoiceDate()), reason, userId);
         logFieldEdit(invoice.id, "guideNumber", "Número de guía", oldGuide, command.guideNumber(), reason, userId);
         logFieldEdit(invoice.id, "currency", "Moneda", oldCurrencyCode, newCurrency.code, reason, userId);
         logFieldEdit(invoice.id, "observations", "Observaciones", oldObs, command.observations(), reason, userId);
         logFieldEdit(invoice.id, "items", "Ítems", oldItemsCanonical, canonicalItemsFromCommands(command.items()), reason, userId);
 
-        return assembleResponse(invoice);
+        return assembleWarehousePurchaseInvoiceResponse(invoice);
     }
 
     /**
@@ -396,7 +402,7 @@ public class WarehousePurchaseInvoiceService {
         purchaseInvoiceRepository.flush();
 
         writeCancelLog(invoice.id, reason, userId);
-        return assembleResponse(invoice);
+        return assembleWarehousePurchaseInvoiceResponse(invoice);
     }
 
     // ---------- Carga / precondiciones ----------------------------------------
@@ -513,7 +519,8 @@ public class WarehousePurchaseInvoiceService {
             .orElse(null);
     }
 
-    private String str(LocalDate date) {
+    /** Etiqueta de la fecha de factura para el diff de auditoría (ISO yyyy-MM-dd); null se conserva. */
+    private String invoiceDateLabel(LocalDate date) {
         return date != null ? date.toString() : null;
     }
 
@@ -538,7 +545,7 @@ public class WarehousePurchaseInvoiceService {
     // ---------- Ensamblado del detalle (GET/PUT/cancel) -----------------------
 
     /** Carga los ítems de la factura y arma el response completo (incluye lastEdit + anulación). */
-    private WarehousePurchaseInvoiceResponse assembleResponse(PurchaseInvoice invoice) {
+    private WarehousePurchaseInvoiceResponse assembleWarehousePurchaseInvoiceResponse(PurchaseInvoice invoice) {
         List<PurchaseInvoiceItem> items = purchaseInvoiceItemRepository.list(
             "invoiceId = ?1", Sort.by("id"), invoice.id);
         Supplier supplier = supplierRepository.findById(invoice.supplierId);
@@ -551,6 +558,6 @@ public class WarehousePurchaseInvoiceService {
         WarehouseEditTrace lastEdit = loadLastEdit(invoice.id);
         UserResponse cancelledBy = invoice.cancelledBy != null ? userLookup.require(invoice.cancelledBy) : null;
 
-        return toResponse(invoice, supplier, currency, items, productsById, unitsById, registeredBy, lastEdit, cancelledBy);
+        return toWarehousePurchaseInvoiceResponse(invoice, supplier, currency, items, productsById, unitsById, registeredBy, lastEdit, cancelledBy);
     }
 }

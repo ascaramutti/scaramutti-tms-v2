@@ -23,7 +23,9 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
@@ -53,7 +55,9 @@ class WarehouseWithdrawalServiceTest {
     @Mock UnitOfMeasureRepository unitOfMeasureRepository;
     @Mock UserLookup userLookup;
     @Mock CurrentUser currentUser;
-    @Mock WarehouseWithdrawalServiceMapper warehouseWithdrawalServiceMapper;
+    // Spy sobre la impl REAL generada por MapStruct: el shaping del response se
+    // ejercita de verdad; to*Entity se sigue stubeando con when() sobre el spy.
+    @Spy WarehouseWithdrawalServiceMapper warehouseWithdrawalServiceMapper = Mappers.getMapper(WarehouseWithdrawalServiceMapper.class);
     @InjectMocks WarehouseWithdrawalService warehouseWithdrawalService;
 
     private static final int USER_ID = 7;

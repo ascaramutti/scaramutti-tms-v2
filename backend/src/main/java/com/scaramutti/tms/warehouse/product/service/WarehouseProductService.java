@@ -14,8 +14,6 @@ import com.scaramutti.tms.auth.service.UserLookup;
 import com.scaramutti.tms.warehouse.WarehouseError;
 import com.scaramutti.tms.warehouse.product.WarehouseProductEtag;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse;
-import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.CategoryRef;
-import com.scaramutti.tms.warehouse.product.dto.WarehouseProductResponse.UnitOfMeasureRef;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductStockResponse;
 import com.scaramutti.tms.warehouse.product.mapper.WarehouseProductServiceMapper;
 import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
@@ -91,7 +89,7 @@ public class WarehouseProductService {
             products.stream().map(p -> p.createdBy).collect(Collectors.toSet()));
 
         List<WarehouseProductResponse> content = products.stream()
-            .map(product -> toResponse(
+            .map(product -> warehouseProductServiceMapper.toWarehouseProductResponse(
                 product,
                 categoriesById.get(product.categoryId),
                 unitsById.get(product.unitOfMeasureId),
@@ -128,7 +126,8 @@ public class WarehouseProductService {
         UnitOfMeasure unitOfMeasure = unitOfMeasureRepository.findById(product.unitOfMeasureId);
         ProductStockView stock = currentStockOf(product);
 
-        return toResponse(product, category, unitOfMeasure, stock, userLookup.require(product.createdBy));
+        return warehouseProductServiceMapper.toWarehouseProductResponse(
+            product, category, unitOfMeasure, stock, userLookup.require(product.createdBy));
     }
 
     /**
@@ -161,7 +160,8 @@ public class WarehouseProductService {
         // (RN-WH11) vive en la VIEW product_stock, que consume el listado.
         ProductStockView initialStock = new ProductStockView(
             INITIAL_STOCK, INITIAL_STOCK.compareTo(product.minStock) < 0);
-        return toResponse(product, category, unitOfMeasure, initialStock, userLookup.require(userId));
+        return warehouseProductServiceMapper.toWarehouseProductResponse(
+            product, category, unitOfMeasure, initialStock, userLookup.require(userId));
     }
 
     /**
@@ -188,7 +188,8 @@ public class WarehouseProductService {
         // el producto la fijó al crear: se busca SIN el filtro isActive del alta.
         UnitOfMeasure unitOfMeasure = unitOfMeasureRepository.findById(product.unitOfMeasureId);
         ProductStockView stock = currentStockOf(product);
-        return toResponse(product, category, unitOfMeasure, stock, userLookup.require(product.createdBy));
+        return warehouseProductServiceMapper.toWarehouseProductResponse(
+            product, category, unitOfMeasure, stock, userLookup.require(product.createdBy));
     }
 
     /**
@@ -201,7 +202,7 @@ public class WarehouseProductService {
         Product product = productRepository.findByIdOptional(id)
             .orElseThrow(WarehouseError.PRODUCT_NOT_FOUND::toException);
         ProductStockView stock = currentStockOf(product);
-        return new WarehouseProductStockResponse(product.id, stock.stock(), product.minStock, stock.lowStock());
+        return warehouseProductServiceMapper.toWarehouseProductStockResponse(product, stock);
     }
 
     // ---------- Validación de FKs (WH-004) -----------------------------------
@@ -300,36 +301,5 @@ public class WarehouseProductService {
         }
         Throwable cause = ex.getCause();
         return (cause instanceof ConstraintViolationException cve) ? cve : null;
-    }
-
-    // ---------- Ensamblado del response --------------------------------------
-
-    /**
-     * Arma el response combinando la entity con sus refs (categoría, unidad),
-     * el stock/lowStock de la VIEW y el createdBy. Compartido por el alta (stock
-     * inicial 0) y el listado (stock real de la VIEW) — una sola forma del DTO.
-     */
-    private WarehouseProductResponse toResponse(
-        Product product, ProductCategory category, UnitOfMeasure unitOfMeasure,
-        ProductStockView stock, UserResponse createdBy
-    ) {
-        return new WarehouseProductResponse(
-            product.id,
-            product.code,
-            product.name,
-            new CategoryRef(category.id, category.name),
-            new UnitOfMeasureRef(unitOfMeasure.id, unitOfMeasure.code, unitOfMeasure.name),
-            product.brand,
-            product.partNumber,
-            product.attributes,
-            product.minStock,
-            product.observations,
-            product.isActive,
-            stock.stock(),
-            stock.lowStock(),
-            createdBy,
-            product.createdAt,
-            product.updatedAt
-        );
     }
 }

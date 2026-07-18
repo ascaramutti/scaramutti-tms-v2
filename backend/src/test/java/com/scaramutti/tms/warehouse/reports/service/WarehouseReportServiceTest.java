@@ -1,16 +1,19 @@
 package com.scaramutti.tms.warehouse.reports.service;
 
+import com.scaramutti.tms.warehouse.reports.mapper.WarehouseReportServiceMapper;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.repository.WarehouseReportRepository;
 import com.scaramutti.tms.shared.repository.WarehouseReportRepository.ReportRowView;
 import com.scaramutti.tms.warehouse.reports.dto.WarehouseReportResponse;
 import com.scaramutti.tms.warehouse.reports.model.WarehouseReportCut;
 import com.scaramutti.tms.warehouse.reports.service.cmd.GetWarehouseReportQuery;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mapstruct.factory.Mappers;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,6 +40,13 @@ class WarehouseReportServiceTest {
 
     @Mock WarehouseReportRepository warehouseReportRepository;
     @InjectMocks WarehouseReportService warehouseReportService;
+
+    // El mapper es un colaborador REAL (impl generada por MapStruct), no un mock:
+    // estos tests cubren el despacho por corte Y el shaping de filas/header.
+    @BeforeEach
+    void wireRealMapper() {
+        warehouseReportService.warehouseReportServiceMapper = Mappers.getMapper(WarehouseReportServiceMapper.class);
+    }
 
     private static final LocalDate FROM = LocalDate.of(2026, 6, 1);
     private static final LocalDate TO = LocalDate.of(2026, 6, 30);
