@@ -2,17 +2,16 @@ package com.scaramutti.tms.warehouse.productcategory;
 
 import com.scaramutti.tms.shared.entity.ProductCategory;
 import com.scaramutti.tms.shared.repository.ProductCategoryRepository;
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
-import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
-import java.util.Set;
-
+import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
+import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInRelativeOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -33,15 +32,16 @@ class WarehouseProductCategoriesResourceTest {
 
     @Inject ProductCategoryRepository productCategoryRepository;
 
-    private static final String TEST_NAME_PREFIX = "ZTEST_";
-
+    // Limpieza local: almacen.product_categories no la cubre ningún fragmento de
+    // WarehouseTestData (el seed de A1 vive fuera del circuito de facturas/retiros).
     @AfterEach
     void cleanupFixtures() {
         QuarkusTransaction.requiringNew().run(() ->
-            productCategoryRepository.delete("name like ?1", TEST_NAME_PREFIX + "%")
+            productCategoryRepository.delete("name like ?1", WarehouseTestData.PREFIX + "%")
         );
     }
 
+    /** Siembra propia: no existe seed de categorías en support (solo se leen las de A1). */
     private void seedProductCategory(String name, boolean isActive) {
         QuarkusTransaction.requiringNew().run(() -> {
             ProductCategory productCategory = new ProductCategory();
@@ -49,29 +49,6 @@ class WarehouseProductCategoriesResourceTest {
             productCategory.isActive = isActive;
             productCategoryRepository.persist(productCategory);
         });
-    }
-
-    private String login(String username, String password) {
-        return given()
-            .contentType(ContentType.JSON)
-            .body("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-        .when()
-            .post("/auth/login")
-        .then()
-            .statusCode(200)
-            .extract().jsonPath().getString("token");
-    }
-
-    /** Genera un JWT valido para un rol sin usuario seedeado. */
-    private String fabricateAccessToken(String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject("999")
-            .upn(username)
-            .groups(Set.of(role))
-            .claim("typ", "access")
-            .issuedAt(now)
-            .expiresAt(now.plusSeconds(3600))
-            .sign();
     }
 
     private String body(String name, String description) {
