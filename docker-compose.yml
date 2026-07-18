@@ -11,7 +11,6 @@ services:
       - "5432:5432"
     volumes:
       - tms_dev_data:/var/lib/postgresql/data
-      - ./db/baseline.sql:/docker-entrypoint-initdb.d/01-baseline.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U scaramutti_user -d scaramutti_tms_dev"]
       interval: 10s
