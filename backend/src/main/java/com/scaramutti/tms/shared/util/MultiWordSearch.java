@@ -11,7 +11,7 @@ import java.util.Map;
  * campo y "diesel" en otro, sin exigir que ambas estén en el mismo campo.
  *
  * Extraído de {@code SupplierRepository} al aparecer el 2° caller
- * ({@code ProductRepository}, nota del plan en A4). El repo llamante arma su
+ * ({@code ProductRepository}). El repo llamante arma su
  * SELECT/ORDER/LIMIT; este helper solo produce las condiciones tokenizadas del
  * WHERE y rellena los named params (mismo criterio side-effect que el
  * {@code buildWhere} de cada repo).
