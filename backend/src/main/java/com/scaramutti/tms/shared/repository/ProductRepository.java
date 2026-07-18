@@ -90,8 +90,8 @@ public class ProductRepository implements PanacheRepositoryBase<Product, Integer
      * lock al inicio de la tx, dos transacciones sobre el MISMO producto se serializan (la 2da
      * bloquea hasta el COMMIT de la 1ra), así que al releer el stock ya ve el movimiento
      * committeado: el retiro no puede pasar el chequeo de stock por una race (RN-WH2, no
-     * best-effort). Productos distintos no se estorban. Lo reusa la guarda de la edición de
-     * entradas además del alta de retiros.
+     * best-effort). Productos distintos no se estorban. Además del alta de retiros, lo reusan
+     * las guardas de stock de la edición y la anulación de entradas.
      *
      * <p>Correcto bajo READ COMMITTED (el default de Postgres/Quarkus): el INSERT del movimiento
      * no modifica la fila lockeada, pero al liberarse el lock la 2da tx re-snapshotea en su

@@ -457,12 +457,20 @@ public class WarehousePurchaseInvoiceService {
     /**
      * WH-007: descontar esta factura (sus ítems ACTIVE) no puede dejar ningún producto en
      * negativo. {@code stock_después = stock_actual − contribución_de_esta_factura}.
+     *
+     * <p>La validación corre BAJO el lock de fila de cada producto de la factura
+     * ({@code SELECT ... FOR UPDATE}, el mismo que serializa los retiros y la guarda de
+     * edición): dos anulaciones que compiten por el mismo stock se serializan y la segunda
+     * relee el stock ya committeado, en vez de decidir sobre una lectura vieja
+     * (check-then-act). Los locks se toman en orden ASCENDENTE de productId, el mismo
+     * criterio anti-deadlock de la guarda de edición.
      */
     private void guardCancelKeepsStockNonNegative(PurchaseInvoice invoice) {
         Map<Integer, BigDecimal> contrib = purchaseInvoiceItemRepository.sumQuantityByProductForInvoice(invoice.id);
         if (contrib.isEmpty()) {
             return;
         }
+        contrib.keySet().stream().sorted().forEach(productRepository::lockProductRow);
         Map<Integer, ProductRepository.ProductStockView> stockById = productRepository.findStockByProductIds(contrib.keySet());
         for (Map.Entry<Integer, BigDecimal> entry : contrib.entrySet()) {
             BigDecimal after = currentStockOrZero(stockById, entry.getKey()).subtract(entry.getValue());

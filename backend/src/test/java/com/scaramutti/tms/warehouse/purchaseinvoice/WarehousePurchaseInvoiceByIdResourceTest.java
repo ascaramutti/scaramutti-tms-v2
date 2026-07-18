@@ -676,6 +676,57 @@ class WarehousePurchaseInvoiceByIdResourceTest {
     }
 
     @Test
+    void cancel_twoConcurrentCancels_lockSerializesOneSucceedsOneRejected() throws Exception {
+        // Dos facturas DISTINTAS del MISMO producto se anulan a la vez compitiendo por el stock
+        // restante. Cada POST lleva su propio ETag válido (cabeceras distintas), así que no chocan
+        // en el If-Match: compiten en el lock de fila del producto (el mismo de retiros y de la
+        // edición). Con el lock la guarda WH-007 es determinista (un 200 y un 409); sin él ambas
+        // anulaciones decidirían sobre el stock viejo y el producto quedaría negativo. Se repite
+        // para exponer un lock roto con alta probabilidad.
+        String token = login("admin", "Admin1234");
+        for (int i = 0; i < 5; i++) {
+            int productId = fixtures.seedProduct("ZTEST_PI CancelConc " + i);
+            int workerId = fixtures.seedWorker("ZTESTICC" + i);
+            int supplierId = fixtures.seedSupplier("ZTEST_Proveedor CConc " + i);
+            int idA = createInvoice(supplierId, "ZTEST-CCONC-A" + i, itemJson(productId, "10", "1.00"), token);
+            int idB = createInvoice(supplierId, "ZTEST-CCONC-B" + i, itemJson(productId, "10", "1.00"), token);
+            seedWithdrawal(productId, "5", workerId, false);   // stock 10 + 10 - 5 = 15
+            String etagA = etagOf(idA, token);
+            String etagB = etagOf(idB, token);
+
+            // Cada anulación descuenta 10: sola deja 5; las dos juntas dejarían -5 → WH-007.
+            CyclicBarrier barrier = new CyclicBarrier(2);
+            ExecutorService pool = Executors.newFixedThreadPool(2);
+            try {
+                Future<Integer> f1 = pool.submit(cancelAttempt(idA, etagA, barrier, token));
+                Future<Integer> f2 = pool.submit(cancelAttempt(idB, etagB, barrier, token));
+                int s1 = f1.get(20, TimeUnit.SECONDS);
+                int s2 = f2.get(20, TimeUnit.SECONDS);
+
+                boolean exactlyOneEach = (s1 == 200 && s2 == 409) || (s1 == 409 && s2 == 200);
+                if (!exactlyOneEach) {
+                    throw new AssertionError("Iteración " + i + ": esperaba un 200 y un 409, fueron " + s1 + " y " + s2);
+                }
+                fixtures.assertStock(productId, "5", token);   // queda la factura del perdedor (10) - retiro (5)
+            } finally {
+                pool.shutdownNow();
+            }
+        }
+    }
+
+    /** Un cancel sincronizado en la barrier; devuelve el status. El body es JSON fijo (sin
+     * lookups de fixtures), así que puede armarse en el hilo del pool sin tocar el EntityManager. */
+    private Callable<Integer> cancelAttempt(int invoiceId, String etag, CyclicBarrier barrier, String token) {
+        return () -> {
+            barrier.await(10, TimeUnit.SECONDS);
+            return given().header("Authorization", "Bearer " + token).header("If-Match", etag)
+                .contentType(ContentType.JSON).body("{\"reason\":\"Anulación concurrente del duplicado\"}")
+            .when().post("/warehouse/purchase-invoices/" + invoiceId + "/cancel")
+            .then().extract().statusCode();
+        };
+    }
+
+    @Test
     void cancel_alreadyCancelled_returns409_WH008() {
         int supplierId = fixtures.seedSupplier("ZTEST_Prov ReCancel");
         int productId = fixtures.seedProduct("ZTEST_PI ReCancel");
