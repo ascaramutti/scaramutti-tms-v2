@@ -1,17 +1,17 @@
 package com.scaramutti.tms.sharedcatalogs.fleetunit;
 
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
-import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
-import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.time.Instant;
 import java.util.List;
-import java.util.Set;
 
+import static com.scaramutti.tms.support.TestAuth.adminToken;
+import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
+import static com.scaramutti.tms.support.TestAuth.login;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
@@ -30,82 +30,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @QuarkusTest
 class FleetUnitsResourceTest {
 
-    @Inject EntityManager entityManager;
+    @Inject WarehouseTestData fixtures;
 
     @AfterEach
     void cleanupFixtures() {
-        QuarkusTransaction.requiringNew().run(() -> {
-            String byTestStatus = "WHERE status_id = (SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS')";
-            entityManager.createNativeQuery("DELETE FROM public.tractors " + byTestStatus).executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.trailers " + byTestStatus).executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.escort_vehicles " + byTestStatus).executeUpdate();
-            entityManager.createNativeQuery("DELETE FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'")
-                .executeUpdate();
-        });
-    }
-
-    // ---------- fixtures --------------------------------------------------------
-
-    private int resourceStatusId() {
-        var rows = entityManager.createNativeQuery(
-            "SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'").getResultList();
-        if (!rows.isEmpty()) {
-            return ((Number) rows.get(0)).intValue();
-        }
-        entityManager.createNativeQuery(
-            "INSERT INTO public.resource_statuses (name, is_active) VALUES ('ZTEST_STATUS', true)")
-            .executeUpdate();
-        return ((Number) entityManager.createNativeQuery(
-            "SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'")
-            .getSingleResult()).intValue();
-    }
-
-    private int seedTractor(String plate, boolean isActive, String brand, String model) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.tractors (plate, brand, model, status_id, is_active) "
-                + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
-            .setParameter(1, plate).setParameter(2, brand).setParameter(3, model)
-            .setParameter(4, resourceStatusId()).setParameter(5, isActive).getSingleResult()).intValue());
-    }
-
-    private int seedTrailer(String plate, boolean isActive) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.trailers (plate, type, status_id, is_active) VALUES (?1, 'ZTEST', ?2, ?3) RETURNING id")
-            .setParameter(1, plate).setParameter(2, resourceStatusId()).setParameter(3, isActive)
-            .getSingleResult()).intValue());
-    }
-
-    private int seedEscortVehicle(String plate, boolean isActive, String brand, String model) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.escort_vehicles (plate, brand, model, status_id, is_active) "
-                + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
-            .setParameter(1, plate).setParameter(2, brand).setParameter(3, model)
-            .setParameter(4, resourceStatusId()).setParameter(5, isActive).getSingleResult()).intValue());
-    }
-
-    private String login(String username, String password) {
-        return given().contentType("application/json")
-            .body("{\"username\":\"" + username + "\",\"password\":\"" + password + "\"}")
-        .when().post("/auth/login").then().statusCode(200).extract().jsonPath().getString("token");
-    }
-
-    private String fabricateAccessToken(String username, String role) {
-        Instant now = Instant.now();
-        return Jwt.subject("999").upn(username).groups(Set.of(role)).claim("typ", "access")
-            .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
-    }
-
-    private String adminToken() {
-        return login("admin", "Admin1234");
+        QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestFleet());
     }
 
     // ---------- happy path -------------------------------------------------------
 
     @Test
     void listFleetUnits_mixedKindsWithBrandModelAndTrailerNulls() {
-        int tractor = seedTractor("ZF0001", true, "Volvo", "FH");
-        int trailer = seedTrailer("ZF0002", true);
-        int escort = seedEscortVehicle("ZF0003", true, "Toyota", "Hilux");
+        int tractor = fixtures.seedTractor("ZF0001", true, "Volvo", "FH");
+        int trailer = fixtures.seedTrailer("ZF0002", true);
+        int escort = fixtures.seedEscortVehicle("ZF0003", true, "Toyota", "Hilux");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/fleet-units")
@@ -125,9 +63,9 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindTractorReturnsOnlyTractors() {
-        int tractor = seedTractor("ZF0004", true, "Scania", "R450");
-        int trailer = seedTrailer("ZF0005", true);
-        int escort = seedEscortVehicle("ZF0006", true, "Nissan", "Frontier");
+        int tractor = fixtures.seedTractor("ZF0004", true, "Scania", "R450");
+        int trailer = fixtures.seedTrailer("ZF0005", true);
+        int escort = fixtures.seedEscortVehicle("ZF0006", true, "Nissan", "Frontier");
         String token = adminToken();
 
         var kinds = given().header("Authorization", "Bearer " + token).queryParam("kind", "TRACTOR")
@@ -142,7 +80,7 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindTrailerHasNullBrandModel() {
-        int trailer = seedTrailer("ZF0007", true);
+        int trailer = fixtures.seedTrailer("ZF0007", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("kind", "TRAILER")
@@ -155,7 +93,7 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindEscortReturnsEscortWithBrandModel() {
-        int escort = seedEscortVehicle("ZF0008", true, "Nissan", "X-Trail");
+        int escort = fixtures.seedEscortVehicle("ZF0008", true, "Nissan", "X-Trail");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("kind", "ESCORT")
@@ -168,9 +106,9 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_withoutKindReturnsAllThreeSubtypes() {
-        int tractor = seedTractor("ZF0009", true, "Volvo", "FM");
-        int trailer = seedTrailer("ZF0010", true);
-        int escort = seedEscortVehicle("ZF0011", true, "Toyota", "Land Cruiser");
+        int tractor = fixtures.seedTractor("ZF0009", true, "Volvo", "FM");
+        int trailer = fixtures.seedTrailer("ZF0010", true);
+        int escort = fixtures.seedEscortVehicle("ZF0011", true, "Toyota", "Land Cruiser");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/fleet-units")
@@ -184,7 +122,7 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_isActiveFalseIncludesInactive() {
-        int tractor = seedTractor("ZF0012", false, "Volvo", "FH");
+        int tractor = fixtures.seedTractor("ZF0012", false, "Volvo", "FH");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", false)
@@ -195,7 +133,7 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_isActiveTrueExcludesInactive() {
-        int trailer = seedTrailer("ZF0013", false);
+        int trailer = fixtures.seedTrailer("ZF0013", false);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", true)
@@ -205,8 +143,8 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_kindAndIsActiveCombined() {
-        int active = seedTractor("ZF0014", true, "Volvo", "FH");
-        int inactive = seedTractor("ZF0015", false, "Volvo", "FH");
+        int active = fixtures.seedTractor("ZF0014", true, "Volvo", "FH");
+        int inactive = fixtures.seedTractor("ZF0015", false, "Volvo", "FH");
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token)
@@ -219,8 +157,8 @@ class FleetUnitsResourceTest {
 
     @Test
     void listFleetUnits_orderedByPlateAscWithinKind() {
-        int high = seedTractor("ZF0020", true, "Volvo", "FH");
-        int low = seedTractor("ZF0016", true, "Volvo", "FH");
+        int high = fixtures.seedTractor("ZF0020", true, "Volvo", "FH");
+        int low = fixtures.seedTractor("ZF0016", true, "Volvo", "FH");
         String token = adminToken();
 
         List<Integer> ids = given().header("Authorization", "Bearer " + token).queryParam("kind", "TRACTOR")
