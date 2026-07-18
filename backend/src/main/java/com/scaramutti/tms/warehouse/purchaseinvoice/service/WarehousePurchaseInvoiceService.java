@@ -324,8 +324,9 @@ public class WarehousePurchaseInvoiceService {
      * Edición de una entrada (PUT /{id}). Orden de validación (mismo criterio que el
      * detalle/edición de producto y el alta de la entrada):
      * 404 WH-003 → WH-008 (anulada) → 412 If-Match → 400 WH-004 (moneda/productos) →
-     * 409 WH-002 (nº duplicado activo, excluyéndose) → 409 WH-006 (guarda de stock) →
-     * reemplazo de ítems + mutación de cabecera + FIELD_EDIT por campo cambiado.
+     * 409 WH-002 (nº duplicado activo, excluyéndose) → 409 WH-006 (guarda de stock, bajo
+     * lock de fila de los productos afectados) → reemplazo de ítems + mutación de
+     * cabecera + FIELD_EDIT por campo cambiado.
      */
     @Transactional
     public WarehousePurchaseInvoiceResponse updatePurchaseInvoice(UpdateWarehousePurchaseInvoiceCommand command) {
@@ -426,6 +427,14 @@ public class WarehousePurchaseInvoiceService {
      * apertura y los movimientos ACTIVE (incluida esta factura), así que
      * {@code stock_después = stock_actual − contribución_vieja + contribución_nueva}
      * (la apertura cuenta como stock disponible, ratificado por el dueño 2026-07-14).
+     *
+     * <p>La validación corre BAJO el lock de fila de cada producto afectado
+     * ({@code SELECT ... FOR UPDATE}, el mismo que serializa los retiros): dos ediciones
+     * concurrentes que compiten por el mismo stock se serializan y la segunda relee el
+     * stock ya committeado, en vez de decidir sobre una lectura vieja (check-then-act).
+     * Los locks se toman en orden ASCENDENTE de productId: dos transacciones que lockeen
+     * varios productos siempre los piden en el mismo orden y no pueden abrazarse en
+     * deadlock.
      */
     private void guardEditKeepsStockNonNegative(PurchaseInvoice invoice, List<CreateWarehouseInvoiceItemCommand> newItems) {
         Map<Integer, BigDecimal> oldContrib = purchaseInvoiceItemRepository.sumQuantityByProductForInvoice(invoice.id);
@@ -433,6 +442,7 @@ public class WarehousePurchaseInvoiceService {
         Set<Integer> affected = new HashSet<>(oldContrib.keySet());
         affected.addAll(newContrib.keySet());
 
+        affected.stream().sorted().forEach(productRepository::lockProductRow);
         Map<Integer, ProductRepository.ProductStockView> stockById = productRepository.findStockByProductIds(affected);
         for (Integer productId : affected) {
             BigDecimal after = currentStockOrZero(stockById, productId)
