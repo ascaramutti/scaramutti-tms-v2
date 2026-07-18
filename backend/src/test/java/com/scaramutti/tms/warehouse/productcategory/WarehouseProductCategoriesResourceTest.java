@@ -24,8 +24,8 @@ import static org.hamcrest.Matchers.nullValue;
 
 /**
  * Integration tests de GET/POST /warehouse/product-categories. Calco
- * estructural de CargoTypesResourceTest. Los seeds de A1 (7 categorias
- * activas) ya estan en la BD de test — no se re-siembran acá.
+ * estructural de CargoTypesResourceTest. Las 7 categorias base las siembra
+ * la migracion V002: ya estan en la BD de test y no se re-siembran aca.
  */
 @QuarkusTest
 class WarehouseProductCategoriesResourceTest {
@@ -33,7 +33,8 @@ class WarehouseProductCategoriesResourceTest {
     @Inject ProductCategoryRepository productCategoryRepository;
 
     // Limpieza local: almacen.product_categories no la cubre ningún fragmento de
-    // WarehouseTestData (el seed de A1 vive fuera del circuito de facturas/retiros).
+    // WarehouseTestData (las categorías base de V002 viven fuera del circuito de
+    // facturas/retiros que esos fragmentos limpian).
     @AfterEach
     void cleanupFixtures() {
         QuarkusTransaction.requiringNew().run(() ->
@@ -41,7 +42,7 @@ class WarehouseProductCategoriesResourceTest {
         );
     }
 
-    /** Siembra propia: no existe seed de categorías en support (solo se leen las de A1). */
+    /** Siembra propia: WarehouseTestData no trae seed de categorías (las base las crea V002 y solo se leen). */
     private void seedProductCategory(String name, boolean isActive) {
         QuarkusTransaction.requiringNew().run(() -> {
             ProductCategory productCategory = new ProductCategory();
@@ -294,9 +295,9 @@ class WarehouseProductCategoriesResourceTest {
 
     @Test
     void create_preservesSubmittedCasing_returns201WithExactName() {
-        // Sin uppercase (a diferencia de cargo-types): los seeds de A1 son
-        // Title Case y el contrato solo exige unicidad case-insensitive, no
-        // normalizar casing.
+        // Sin uppercase (a diferencia de cargo-types): las categorías base de
+        // V002 son Title Case y el contrato solo exige unicidad case-insensitive,
+        // no normalizar casing.
         String name = "ZTEST_Mixed Case Name";
         String token = login("admin", "Admin1234");
 
