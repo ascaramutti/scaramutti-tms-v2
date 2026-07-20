@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesResponses, ListPaymentTermsData, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesResponses, ListQuotationsResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses } from './types.gen';
+import type { CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -107,7 +107,7 @@ export const createCargoType = <ThrowOnError extends boolean = false>(options: O
 /**
  * Listar monedas (sin paginar — pocos registros)
  */
-export const listCurrencies = <ThrowOnError extends boolean = false>(options?: Options<ListCurrenciesData, ThrowOnError>) => (options?.client ?? client).get<ListCurrenciesResponses, unknown, ThrowOnError>({
+export const listCurrencies = <ThrowOnError extends boolean = false>(options?: Options<ListCurrenciesData, ThrowOnError>) => (options?.client ?? client).get<ListCurrenciesResponses, ListCurrenciesErrors, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/currencies',
@@ -117,7 +117,7 @@ export const listCurrencies = <ThrowOnError extends boolean = false>(options?: O
 /**
  * Listar términos de pago
  */
-export const listPaymentTerms = <ThrowOnError extends boolean = false>(options?: Options<ListPaymentTermsData, ThrowOnError>) => (options?.client ?? client).get<ListPaymentTermsResponses, unknown, ThrowOnError>({
+export const listPaymentTerms = <ThrowOnError extends boolean = false>(options?: Options<ListPaymentTermsData, ThrowOnError>) => (options?.client ?? client).get<ListPaymentTermsResponses, ListPaymentTermsErrors, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/payment-terms',
@@ -127,7 +127,7 @@ export const listPaymentTerms = <ThrowOnError extends boolean = false>(options?:
 /**
  * Listar condiciones generales del catálogo (filtrable por isActive)
  */
-export const listQuotationConditions = <ThrowOnError extends boolean = false>(options?: Options<ListQuotationConditionsData, ThrowOnError>) => (options?.client ?? client).get<ListQuotationConditionsResponses, unknown, ThrowOnError>({
+export const listQuotationConditions = <ThrowOnError extends boolean = false>(options?: Options<ListQuotationConditionsData, ThrowOnError>) => (options?.client ?? client).get<ListQuotationConditionsResponses, ListQuotationConditionsErrors, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/quotation-conditions',
@@ -137,7 +137,7 @@ export const listQuotationConditions = <ThrowOnError extends boolean = false>(op
 /**
  * Listar tipos de servicio cotizables
  */
-export const listQuotationServiceTypes = <ThrowOnError extends boolean = false>(options?: Options<ListQuotationServiceTypesData, ThrowOnError>) => (options?.client ?? client).get<ListQuotationServiceTypesResponses, unknown, ThrowOnError>({
+export const listQuotationServiceTypes = <ThrowOnError extends boolean = false>(options?: Options<ListQuotationServiceTypesData, ThrowOnError>) => (options?.client ?? client).get<ListQuotationServiceTypesResponses, ListQuotationServiceTypesErrors, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/quotation-service-types',
@@ -326,5 +326,507 @@ export const downloadQuotationPdf = <ThrowOnError extends boolean = false>(optio
     responseType: 'blob',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/quotations/{id}/pdf',
+    ...options
+});
+
+/**
+ * Listar categorías de producto
+ *
+ * Catálogo chico — sin paginar. Orden natural `name` ASC.
+ */
+export const listWarehouseProductCategories = <ThrowOnError extends boolean = false>(options?: Options<ListWarehouseProductCategoriesData, ThrowOnError>) => (options?.client ?? client).get<ListWarehouseProductCategoriesResponses, ListWarehouseProductCategoriesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/product-categories',
+    ...options
+});
+
+/**
+ * Crear categoría de producto (al vuelo desde el form)
+ *
+ * Nombre único (case-insensitive efectivo) → `409 WH-010` (RN-WH10).
+ */
+export const createWarehouseProductCategory = <ThrowOnError extends boolean = false>(options: Options<CreateWarehouseProductCategoryData, ThrowOnError>) => (options.client ?? client).post<CreateWarehouseProductCategoryResponses, CreateWarehouseProductCategoryErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/product-categories',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Listar unidades de medida (lista CERRADA)
+ *
+ * Catálogo chico (seed UND, LT, GAL, KG, MT, CJA, JGO) — sin paginar.
+ * Orden `code` ASC. **Lista CERRADA — SIN POST** (regla del dueño
+ * 2026-07-04): no se crea al vuelo; agregar una unidad nueva = seed/
+ * migración coordinada. El select del form es de solo selección.
+ *
+ */
+export const listWarehouseUnitsOfMeasure = <ThrowOnError extends boolean = false>(options?: Options<ListWarehouseUnitsOfMeasureData, ThrowOnError>) => (options?.client ?? client).get<ListWarehouseUnitsOfMeasureResponses, ListWarehouseUnitsOfMeasureErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/units-of-measure',
+    ...options
+});
+
+/**
+ * Buscar proveedores (paginado)
+ *
+ * Con `q` filtra por substring case-insensitive en `name` y `ruc` (ILIKE
+ * acelerado por GIN trgm `idx_suppliers_name_trgm`), ranking `similarity`
+ * DESC, tiebreak `name` ASC. Multi-palabra: `q` se tokeniza por espacios y
+ * cada palabra debe matchear en ALGÚN campo (AND de ORs) — RN-WH14.
+ * Sin `q`: `name` ASC. Para no filtrar, OMITIR el parámetro (no enviarlo
+ * vacío).
+ *
+ */
+export const listWarehouseSuppliers = <ThrowOnError extends boolean = false>(options?: Options<ListWarehouseSuppliersData, ThrowOnError>) => (options?.client ?? client).get<ListWarehouseSuppliersResponses, ListWarehouseSuppliersErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/suppliers',
+    ...options
+});
+
+/**
+ * Crear proveedor (al vuelo desde el form de factura)
+ *
+ * `name` y `ruc` únicos → `409 WH-010` (el `detail` dice cuál chocó).
+ */
+export const createWarehouseSupplier = <ThrowOnError extends boolean = false>(options: Options<CreateWarehouseSupplierData, ThrowOnError>) => (options.client ?? client).post<CreateWarehouseSupplierResponses, CreateWarehouseSupplierErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/suppliers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Listar productos CON su stock actual (Existencias y comboboxes)
+ *
+ * Un solo listado sirve a la pantalla Existencias y a los comboboxes de
+ * producto: cada fila trae `stock` y `lowStock` LEÍDOS de la VIEW
+ * `almacen.product_stock` (RN-WH1, nunca persistidos). `lowStock = stock <
+ * minStock` (estricto) se define UNA vez en la VIEW (RN-WH11).
+ * `q` (≥ 3) filtra por substring case-insensitive en `name`, `code`,
+ * `brand` y `partNumber`; multi-palabra: cada palabra debe matchear en
+ * ALGÚN campo (AND de ORs, RN-WH14), ranking `similarity` DESC, tiebreak
+ * `name` ASC. Sin `q`: `name` ASC. `lowOnly=true` restringe a los productos
+ * bajo umbral. Para no filtrar, OMITIR el parámetro.
+ *
+ */
+export const listWarehouseProducts = <ThrowOnError extends boolean = false>(options?: Options<ListWarehouseProductsData, ThrowOnError>) => (options?.client ?? client).get<ListWarehouseProductsResponses, ListWarehouseProductsErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/products',
+    ...options
+});
+
+/**
+ * Crear producto (al vuelo desde la factura o desde Existencias)
+ *
+ * Identidad ÚNICA compuesta `(name, brand, partNumber)` → `409 WH-010`
+ * (Δ-2, RN-WH10): mismo nombre y marca pueden coexistir con distinto n° de
+ * parte (variantes/modelos); comparación case-insensitive y los opcionales
+ * vacíos cuentan como "sin valor" (el backend normaliza trim + vacío→null;
+ * índice con COALESCE — dos genéricos idénticos sin marca/parte también
+ * chocan). El `code` (SKU) lo asigna siempre el backend (`PRO-NNNN`,
+ * correlativo); no se acepta en el request.
+ * `attributes` = objeto JSON libre clave-valor (JSONB).
+ * Un producto nuevo **nace con stock 0** — su primera factura es su primer
+ * movimiento; el corte inicial es SOLO para inventario pre-existente (RN-WH6).
+ * Duplicados: el guardián es el índice único de identidad compuesta → `409
+ * WH-010`; no hay cabecera de idempotencia (redundante frente al índice,
+ * consistente con el resto del módulo).
+ *
+ */
+export const createWarehouseProduct = <ThrowOnError extends boolean = false>(options: Options<CreateWarehouseProductData, ThrowOnError>) => (options.client ?? client).post<CreateWarehouseProductResponses, CreateWarehouseProductErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/products',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Obtener producto por ID (con stock actual)
+ *
+ * El header `ETag` (versión opaca del `updatedAt`) es el que exige el PUT
+ * vía `If-Match`. Usar el HEADER, no el `updatedAt` del body.
+ *
+ */
+export const getWarehouseProduct = <ThrowOnError extends boolean = false>(options: Options<GetWarehouseProductData, ThrowOnError>) => (options.client ?? client).get<GetWarehouseProductResponses, GetWarehouseProductErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/products/{id}',
+    ...options
+});
+
+/**
+ * Actualizar producto (catálogo — sin justificación)
+ *
+ * Edición de catálogo: nombre, categoría, marca, nº de parte, atributos,
+ * `minStock`, observaciones, `isActive` (soft delete). La **unidad de
+ * medida NO viaja** — se fija al crear y es inmutable (P-1). NO exige
+ * justificación — la regla editar-con-justificación (RN-WH4) aplica a
+ * movimientos de stock, no al catálogo (RN-WH15). Identidad compuesta
+ * `(name, brand, partNumber)` única (Δ-2) y `code` único → `409 WH-010`.
+ * No afecta el kardex (los movimientos referencian por id).
+ * `If-Match` obligatorio (optimistic locking): versión vieja → `412
+ * COM-004`. El ETag a enviar es el HEADER del GET o del PUT anterior.
+ *
+ */
+export const updateWarehouseProduct = <ThrowOnError extends boolean = false>(options: Options<UpdateWarehouseProductData, ThrowOnError>) => (options.client ?? client).put<UpdateWarehouseProductResponses, UpdateWarehouseProductErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/products/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Stock disponible en vivo (form de retiro)
+ *
+ * Lectura puntual de la VIEW `almacen.product_stock` — el form de retiro
+ * muestra el disponible al elegir producto y bloquea el submit si excede
+ * (espejo UX). La validación AUTORITATIVA sigue siendo la del POST/PUT del
+ * retiro en transacción (`409 WH-001`, RN-WH2).
+ *
+ */
+export const getWarehouseProductStock = <ThrowOnError extends boolean = false>(options: Options<GetWarehouseProductStockData, ThrowOnError>) => (options.client ?? client).get<GetWarehouseProductStockResponses, GetWarehouseProductStockErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/products/{id}/stock',
+    ...options
+});
+
+/**
+ * Kardex del producto (movimientos con saldo corrido)
+ *
+ * Lee la VIEW `almacen.stock_movements`: APERTURA ∪ ENTRADAS activas ∪
+ * SALIDAS activas (los ANULADOS no aparecen). Orden `movedAt` DESC.
+ * `balance` = saldo DESPUÉS del movimiento, calculado por el backend sobre
+ * la historia completa: correcto aunque se pagine o filtre por fechas
+ * (RN-WH13). `quantity` siempre positiva (el signo lo da `movementType`).
+ *
+ */
+export const getWarehouseProductKardex = <ThrowOnError extends boolean = false>(options: Options<GetWarehouseProductKardexData, ThrowOnError>) => (options.client ?? client).get<GetWarehouseProductKardexResponses, GetWarehouseProductKardexErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/products/{id}/kardex',
+    ...options
+});
+
+/**
+ * Listar cortes iniciales registrados
+ */
+export const listWarehouseOpeningBalances = <ThrowOnError extends boolean = false>(options?: Options<ListWarehouseOpeningBalancesData, ThrowOnError>) => (options?.client ?? client).get<ListWarehouseOpeningBalancesResponses, ListWarehouseOpeningBalancesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/opening-balances',
+    ...options
+});
+
+/**
+ * Registrar corte inicial de un producto ("con cuánto arranca")
+ *
+ * UNA apertura por producto e INMUTABLE (sin PUT/DELETE). Es el primer
+ * movimiento del kardex (`APERTURA`), solo para inventario existente al
+ * arranque.
+ * - Producto con apertura ya registrada → `409 WH-009` (UNIQUE en BD).
+ * - Producto que ya tiene movimientos → `409 WH-011` (una apertura posterior
+ * falsearía el saldo corrido).
+ * - Producto inexistente o inactivo → `400 WH-004`.
+ *
+ */
+export const createWarehouseOpeningBalance = <ThrowOnError extends boolean = false>(options: Options<CreateWarehouseOpeningBalanceData, ThrowOnError>) => (options.client ?? client).post<CreateWarehouseOpeningBalanceResponses, CreateWarehouseOpeningBalanceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/opening-balances',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Listar entradas (facturas de compra) con filtros
+ *
+ * Orden `createdAt` DESC. Incluye las ANULADAS (badge + motivo en la UI),
+ * filtrable por `status`. `q` (>= 3) busca substring case-insensitive en
+ * `invoiceNumber`, `guideNumber` y nombre del proveedor; multi-palabra:
+ * cada palabra debe matchear en algun campo (AND de ORs, RN-WH14). `total`
+ * e `itemsCount` se calculan de los items (los totales NO se persisten).
+ *
+ */
+export const listWarehousePurchaseInvoices = <ThrowOnError extends boolean = false>(options?: Options<ListWarehousePurchaseInvoicesData, ThrowOnError>) => (options?.client ?? client).get<ListWarehousePurchaseInvoicesResponses, ListWarehousePurchaseInvoicesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/purchase-invoices',
+    ...options
+});
+
+/**
+ * Registrar entrada, factura con N items (transaccional)
+ *
+ * Crea factura + items en UNA transaccion; cada item suma stock (via VIEW).
+ * Los productos se referencian por `productId` (crear-al-vuelo llama antes a
+ * `POST /warehouse/products` desde el modal, decision D-3).
+ * - Unicidad proveedor+numero solo entre ACTIVAS (UNIQUE parcial): duplicado
+ * -> 409 `WH-002` (RN-WH5). Una anulada libera su numero.
+ * - Proveedor/moneda/producto inexistente o inactivo -> 400 `WH-004`.
+ * - `currencyId` fija la moneda de la factura (RN-WH7, sin conversion).
+ *
+ */
+export const createWarehousePurchaseInvoice = <ThrowOnError extends boolean = false>(options: Options<CreateWarehousePurchaseInvoiceData, ThrowOnError>) => (options.client ?? client).post<CreateWarehousePurchaseInvoiceResponses, CreateWarehousePurchaseInvoiceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/purchase-invoices',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Detalle de una entrada (cabecera + items)
+ *
+ * Incluye `lastEdit` (rastro del ultimo FIELD_EDIT en `almacen.audit_logs`; null si
+ * nunca se edito) y los campos de anulacion si status=CANCELLED. El header ETag
+ * (version opaca del updatedAt) es el que exigen PUT y cancel via If-Match.
+ *
+ */
+export const getWarehousePurchaseInvoice = <ThrowOnError extends boolean = false>(options: Options<GetWarehousePurchaseInvoiceData, ThrowOnError>) => (options.client ?? client).get<GetWarehousePurchaseInvoiceResponses, GetWarehousePurchaseInvoiceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/purchase-invoices/{id}',
+    ...options
+});
+
+/**
+ * Editar entrada (justificacion obligatoria)
+ *
+ * RN-WH4: `reason` >= 10 → `almacen.audit_logs` con el diff por campo. Reemplazo
+ * completo: los `items` del body sustituyen a los existentes. `supplierId` INMUTABLE
+ * (no viaja en el body). Guarda de stock (misma tx): el stock del producto no puede
+ * quedar negativo tras la edicion, por producto afectado apertura + entradas_tras_edicion
+ * - salidas_activas >= 0; si no → 409 WH-006. Anulada → 409 WH-008; numero duplicado entre
+ * ACTIVAS → 409 WH-002. If-Match obligatorio → 412 COM-004.
+ *
+ */
+export const updateWarehousePurchaseInvoice = <ThrowOnError extends boolean = false>(options: Options<UpdateWarehousePurchaseInvoiceData, ThrowOnError>) => (options.client ?? client).put<UpdateWarehousePurchaseInvoiceResponses, UpdateWarehousePurchaseInvoiceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/purchase-invoices/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Anular entrada (con motivo, "eliminar" no existe)
+ *
+ * RN-WH3: nada se borra, status→CANCELLED + motivo + quien + cuando. Deja de mover
+ * stock/kardex/reportes; queda visible. Guarda: el stock del producto no puede caer en
+ * negativo al descontar esta factura (apertura + entradas_sin_esta_factura -
+ * salidas_activas >= 0); si no → 409 WH-007. Ya anulada → 409 WH-008. If-Match
+ * obligatorio → 412 COM-004.
+ *
+ */
+export const cancelWarehousePurchaseInvoice = <ThrowOnError extends boolean = false>(options: Options<CancelWarehousePurchaseInvoiceData, ThrowOnError>) => (options.client ?? client).post<CancelWarehousePurchaseInvoiceResponses, CancelWarehousePurchaseInvoiceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/purchase-invoices/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Listar retiros con filtros
+ *
+ * Orden `withdrawnAt` DESC. Incluye los ANULADOS (badge + motivo), filtrable por
+ * `status`. Filtros de unidad excluyentes en la practica (una unidad por retiro).
+ *
+ */
+export const listWarehouseWithdrawals = <ThrowOnError extends boolean = false>(options?: Options<ListWarehouseWithdrawalsData, ThrowOnError>) => (options?.client ?? client).get<ListWarehouseWithdrawalsResponses, ListWarehouseWithdrawalsErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/withdrawals',
+    ...options
+});
+
+/**
+ * Registrar retiro (valida stock en transaccion)
+ *
+ * RN-WH2: `receivedByWorkerId` SIEMPRE obligatorio (FK public.workers). Unidad
+ * destino OPCIONAL y a lo sumo UNA (`tractorId` | `trailerId` | `escortVehicleId`,
+ * subtipos disyuntos); mas de una -> 400 WH-005. `quantity > 0` y <= stock
+ * disponible, validado en la MISMA transaccion con lock del producto
+ * (SELECT ... FOR UPDATE); si excede -> 409 WH-001 con el disponible en el detail.
+ * `withdrawnAt` lo pone el server; `registeredBy` = usuario del token. Producto/
+ * trabajador/unidad inexistente o inactivo -> 400 WH-004.
+ *
+ */
+export const createWarehouseWithdrawal = <ThrowOnError extends boolean = false>(options: Options<CreateWarehouseWithdrawalData, ThrowOnError>) => (options.client ?? client).post<CreateWarehouseWithdrawalResponses, CreateWarehouseWithdrawalErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/withdrawals',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Detalle de un retiro
+ *
+ * Incluye `lastEdit` (rastro del ultimo FIELD_EDIT en `almacen.audit_logs`; null si
+ * nunca se edito) y los campos de anulacion si status=CANCELLED. El header ETag
+ * (version opaca del updatedAt) es el que exigen PUT y cancel via If-Match.
+ *
+ */
+export const getWarehouseWithdrawal = <ThrowOnError extends boolean = false>(options: Options<GetWarehouseWithdrawalData, ThrowOnError>) => (options.client ?? client).get<GetWarehouseWithdrawalResponses, GetWarehouseWithdrawalErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/withdrawals/{id}',
+    ...options
+});
+
+/**
+ * Editar retiro (justificacion obligatoria)
+ *
+ * RN-WH4: `reason` >= 10 → `almacen.audit_logs` con el diff por campo. Editables:
+ * cantidad, quien recibe, unidad de flota, observaciones. `productId` INMUTABLE (no
+ * viaja en el body). Guarda de stock (misma tx): subir la cantidad valida contra el
+ * disponible SIN contar este retiro; si excede → 409 WH-001. Bajarla siempre es segura
+ * (devuelve stock). La unidad de flota se REEMPLAZA: a lo sumo una, los tres campos null
+ * la quitan, mas de una → 400 WH-005. Anulado → 409 WH-008. If-Match obligatorio → 412
+ * COM-004.
+ *
+ */
+export const updateWarehouseWithdrawal = <ThrowOnError extends boolean = false>(options: Options<UpdateWarehouseWithdrawalData, ThrowOnError>) => (options.client ?? client).put<UpdateWarehouseWithdrawalResponses, UpdateWarehouseWithdrawalErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/withdrawals/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Anular retiro (con motivo, el stock vuelve solo)
+ *
+ * RN-WH3: status→CANCELLED + motivo + quien + cuando. SIEMPRE segura: devuelve stock
+ * (las VIEWs excluyen anulados), no lleva guarda de stock. Ya anulado → 409 WH-008.
+ * If-Match obligatorio → 412 COM-004.
+ *
+ */
+export const cancelWarehouseWithdrawal = <ThrowOnError extends boolean = false>(options: Options<CancelWarehouseWithdrawalData, ThrowOnError>) => (options.client ?? client).post<CancelWarehouseWithdrawalResponses, CancelWarehouseWithdrawalErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/withdrawals/{id}/cancel',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * KPIs del strip de Existencias
+ *
+ * Contadores del mes calendario en curso (America/Lima). Solo registros
+ * ACTIVOS. `lowStockCount` = productos activos con `stock < minStock`
+ * (RN-WH11, la VIEW `almacen.product_stock` lo expone). `entriesThisMonth`
+ * y `withdrawalsThisMonth` = facturas/retiros ACTIVOS registrados este mes
+ * (por `createdAt`/`withdrawnAt`).
+ *
+ */
+export const getWarehouseStats = <ThrowOnError extends boolean = false>(options?: Options<GetWarehouseStatsData, ThrowOnError>) => (options?.client ?? client).get<GetWarehouseStatsResponses, GetWarehouseStatsErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/stats',
+    ...options
+});
+
+/**
+ * Reporte agregado por corte (unidad / periodo / producto / proveedor)
+ *
+ * Los 4 cortes de la pantalla Reportes. Solo registros ACTIVOS. RN-WH7
+ * bi-moneda SIN conversion: los montos se agregan POR MONEDA tal como se
+ * registro cada factura; almacen entrega cantidades, contabilidad valoriza.
+ * - `BY_UNIT` / `BY_PRODUCT` / `BY_PERIOD`: consumos (retiros activos con
+ * `withdrawnAt` en el rango); el valor de cada salida usa el ultimo precio
+ * de compra activo del producto (con su moneda) como referencia.
+ * `BY_PERIOD` agrupa por semana (lunes como clave, en `detail`).
+ * - `BY_SUPPLIER`: compras (facturas activas por `invoiceDate` en el rango),
+ * valorizadas con sus propios items.
+ * - Rango America/Lima, ambos extremos inclusivos; `dateFrom > dateTo` ->
+ * 400 COM-001.
+ *
+ */
+export const getWarehouseReport = <ThrowOnError extends boolean = false>(options: Options<GetWarehouseReportData, ThrowOnError>) => (options.client ?? client).get<GetWarehouseReportResponses, GetWarehouseReportErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/warehouse/reports',
+    ...options
+});
+
+/**
+ * Listar trabajadores (combobox "quien recibe" del retiro)
+ *
+ * Catalogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
+ * en v1). Solo busqueda rapida, SIN creacion al vuelo (RN-WH9: trabajadores
+ * y unidades de flota nunca se crean desde almacen). Sin paginar (plantilla
+ * chica). `q` es multi-palabra case-insensitive (>= 3 caracteres): cada
+ * palabra debe matchear en el nombre O el apellido (RN-WH14); para no
+ * filtrar, OMITIR el parametro.
+ *
+ */
+export const listWorkers = <ThrowOnError extends boolean = false>(options?: Options<ListWorkersData, ThrowOnError>) => (options?.client ?? client).get<ListWorkersResponses, ListWorkersErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers',
+    ...options
+});
+
+/**
+ * Listar unidades de flota unificadas (tractos + carretas + escoltas)
+ *
+ * Vista unificada de los tres subtipos DISYUNTOS de la flota
+ * (`public.tractors`, `public.trailers`, `public.escort_vehicles`). El
+ * supertipo fisico `fleet_units` llega en la fase flota/RRHH; mientras tanto
+ * la union se hace en codigo. Solo busqueda/seleccion, SIN creacion al vuelo
+ * (RN-WH9). Sin paginar (flota chica). `id` es el id de la tabla del SUBTIPO:
+ * la direccion de una unidad es el par `(kind, id)`. `kind` omitido = los
+ * tres subtipos.
+ *
+ */
+export const listFleetUnits = <ThrowOnError extends boolean = false>(options?: Options<ListFleetUnitsData, ThrowOnError>) => (options?.client ?? client).get<ListFleetUnitsResponses, ListFleetUnitsErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/fleet-units',
     ...options
 });
