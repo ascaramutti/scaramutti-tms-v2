@@ -1,0 +1,63 @@
+name: Frontend checks
+
+# CI del frontend (lint + tests Vitest + build de producción).
+# Corre en runner GitHub-hosted (ubuntu-latest): gratis en repo público y sin
+# acceso a infra propia, así que pull_request desde forks es seguro acá (la
+# regla "self-hosted nunca en pull_request" aplica solo al runner de staging).
+on:
+  pull_request:
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-checks.yml'
+  push:
+    branches: [develop]
+    paths:
+      - 'frontend/**'
+      - '.github/workflows/frontend-checks.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un commit nuevo en la misma rama cancela el run anterior (ahorra minutos;
+# solo interesa el resultado del último push).
+concurrency:
+  group: frontend-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      # Node 22, la misma major que usa el build de producción (frontend/Dockerfile).
+      - name: Configurar Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci (no install): instala exactamente el lockfile y falla si package.json
+      # y package-lock.json están desincronizados.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test
+
+      # `npm run build` corre `tsc -b` antes de Vite: acá es donde se cazan los
+      # errores de tipos (ni el lint ni Vitest chequean tipos por sí solos).
+      - name: Build de producción
+        run: npm run build
