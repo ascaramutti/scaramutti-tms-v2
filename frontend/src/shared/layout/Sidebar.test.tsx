@@ -183,4 +183,14 @@ describe('Sidebar - módulo Almacén', () => {
     const existencias = await screen.findByRole('link', { name: /existencias/i })
     expect(existencias).toHaveAttribute('aria-current', 'page')
   })
+
+  it('los matchers respetan el borde de segmento en ambos módulos', async () => {
+    // Una ruta que solo comparte texto con el prefijo no es el módulo.
+    renderSidebarAs('admin', '/cotizaciones/almacen/productosX')
+    await screen.findByRole('link', { name: /existencias/i })
+    expect(screen.getByRole('link', { name: /existencias/i })).not.toHaveAttribute('aria-current')
+    expect(screen.getByRole('link', { name: /^cotizaciones$/i })).not.toHaveAttribute(
+      'aria-current',
+    )
+  })
 })

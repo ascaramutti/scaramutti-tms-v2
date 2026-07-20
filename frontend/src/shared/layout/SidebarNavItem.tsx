@@ -1,6 +1,7 @@
 import { Link, useLocation } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../utils/cn'
+import { matchesPathPrefix } from './pathMatching'
 
 interface SidebarNavItemProps {
   icon: LucideIcon
@@ -22,15 +23,6 @@ interface SidebarNavItemProps {
 
 const baseClasses =
   'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors'
-
-/**
- * Prefix-matching por segmento: /clientes/123 marca activo a /clientes, pero
- * /clientesX no. La raíz `/` matchea solo exacta (si no, marcaría todo).
- */
-function matchesPathPrefix(pathname: string, to: string): boolean {
-  if (to === '/') return pathname === '/'
-  return pathname === to || pathname.startsWith(`${to}/`)
-}
 
 export function SidebarNavItem({ icon: Icon, label, to, href, activeWhen }: SidebarNavItemProps) {
   const location = useLocation()

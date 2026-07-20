@@ -11,6 +11,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
+import { matchesPathPrefix } from './pathMatching'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
@@ -68,7 +69,8 @@ const MENU: MenuGroup[] = [
         // activo Existencias. El prefijo pelado no sirve: marcaría activo el
         // item también en entradas, retiros y reportes.
         activeWhen: (pathname) =>
-          pathname === WAREHOUSE_BASE || pathname.startsWith(`${WAREHOUSE_BASE}/productos`),
+          pathname === WAREHOUSE_BASE ||
+          matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/productos`),
       },
       // Sin `to` hasta que exista su pantalla: el item se muestra deshabilitado
       // ("Próximamente"), como ya se hace con Clientes.
@@ -86,8 +88,8 @@ const MENU: MenuGroup[] = [
         to: '/cotizaciones',
         allowedRoles: QUOTATION_ROLES,
         activeWhen: (pathname) =>
-          pathname.startsWith('/cotizaciones') &&
-          !NON_QUOTATION_SUBTREES.some((subtree) => pathname.startsWith(subtree)),
+          matchesPathPrefix(pathname, '/cotizaciones') &&
+          !NON_QUOTATION_SUBTREES.some((subtree) => matchesPathPrefix(pathname, subtree)),
       },
       {
         icon: Users,
