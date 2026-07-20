@@ -15,3 +15,16 @@ export const QUOTATION_ROLES: UserRole[] = [
   'general_manager',
   'operations_manager',
 ]
+
+/**
+ * Almacén: los cinco roles tienen poder total dentro del módulo (ver, registrar,
+ * editar y anular), así que una sola lista alcanza para todas sus pantallas.
+ * `sales` y `dispatcher` quedan afuera.
+ */
+export const WAREHOUSE_ROLES: UserRole[] = [
+  'admin',
+  'general_manager',
+  'operations_manager',
+  'finance_manager',
+  'warehouse_keeper',
+]

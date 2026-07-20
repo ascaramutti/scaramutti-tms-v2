@@ -22,7 +22,7 @@ function buildUser(role: UserRole): UserResponse {
   }
 }
 
-function renderSidebarAs(role: UserRole) {
+function renderSidebarAs(role: UserRole, initialPath = '/cotizaciones') {
   server.use(
     http.get(`${API}/auth/me`, () => HttpResponse.json(buildUser(role))),
   )
@@ -33,7 +33,7 @@ function renderSidebarAs(role: UserRole) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter>
+        <MemoryRouter initialEntries={[initialPath]}>
           <Sidebar />
         </MemoryRouter>
       </AuthProvider>
@@ -111,5 +111,76 @@ describe('Sidebar - filtrado por rol', () => {
     expect(screen.getByText('Cotizaciones')).toBeInTheDocument()
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()
+  })
+})
+
+describe('Sidebar - módulo Almacén', () => {
+  beforeEach(() => {
+    tokenStorage.clear()
+  })
+
+  it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager', 'warehouse_keeper'] as const)(
+    '%s ve la sección Almacén con Existencias navegable',
+    async (role) => {
+      renderSidebarAs(role)
+      await waitFor(() => {
+        expect(screen.getByText(`Usuario ${role}`)).toBeInTheDocument()
+      })
+      expect(screen.getByText(/^almacén$/i)).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: /existencias/i })).toHaveAttribute(
+        'href',
+        '/cotizaciones/almacen',
+      )
+    },
+  )
+
+  it.each(['sales', 'dispatcher'] as const)(
+    '%s no ve la sección Almacén (se oculta entera, sin h2 huérfano)',
+    async (role) => {
+      renderSidebarAs(role)
+      await waitFor(() => {
+        expect(screen.getByText(`Usuario ${role}`)).toBeInTheDocument()
+      })
+      expect(screen.queryByText(/^almacén$/i)).not.toBeInTheDocument()
+      expect(screen.queryByText('Existencias')).not.toBeInTheDocument()
+    },
+  )
+
+  it('los roles de almacén no ven Cotizaciones ni Clientes', async () => {
+    renderSidebarAs('finance_manager')
+    await waitFor(() => {
+      expect(screen.getByText(/usuario finance_manager/i)).toBeInTheDocument()
+    })
+    expect(screen.queryByText('Cotizaciones')).not.toBeInTheDocument()
+    expect(screen.queryByText('Clientes')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^comercial$/i)).not.toBeInTheDocument()
+  })
+
+  it('entradas, retiros y reportes esperan su pantalla (deshabilitados)', async () => {
+    renderSidebarAs('warehouse_keeper')
+    await waitFor(() => {
+      expect(screen.getByText(/usuario warehouse_keeper/i)).toBeInTheDocument()
+    })
+    for (const label of ['Entradas', 'Retiros', 'Reportes']) {
+      expect(screen.queryByRole('link', { name: new RegExp(label, 'i') })).not.toBeInTheDocument()
+      expect(screen.getByText(label).closest('span')).toHaveAttribute('aria-disabled', 'true')
+    }
+  })
+
+  it('en almacén se resalta Existencias y NO Cotizaciones', async () => {
+    // Ambos módulos cuelgan de /cotizaciones (el base de la SPA): sin matcher
+    // por módulo, el prefijo marcaría Cotizaciones estando en Almacén.
+    renderSidebarAs('admin', '/cotizaciones/almacen')
+    const existencias = await screen.findByRole('link', { name: /existencias/i })
+    expect(existencias).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /^cotizaciones$/i })).not.toHaveAttribute(
+      'aria-current',
+    )
+  })
+
+  it('el detalle de un producto sigue resaltando Existencias', async () => {
+    renderSidebarAs('admin', '/cotizaciones/almacen/productos/42')
+    const existencias = await screen.findByRole('link', { name: /existencias/i })
+    expect(existencias).toHaveAttribute('aria-current', 'page')
   })
 })

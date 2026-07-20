@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../utils/cn'
 
@@ -13,15 +13,24 @@ interface SidebarNavItemProps {
    */
   href?: string
   /**
-   * Matcher custom de "activo". Por defecto NavLink usa prefix-matching, que
-   * marca falsos positivos cuando rutas de otra sección anidan bajo el mismo
-   * prefijo (ej. /cotizaciones/cuenta/* no es parte del módulo Cotizaciones).
+   * Matcher custom de "activo". El default es prefix-matching, que marca falsos
+   * positivos cuando rutas de otra sección anidan bajo el mismo prefijo (ej.
+   * /cotizaciones/cuenta/* y /cotizaciones/almacen/* no son Cotizaciones).
    */
   activeWhen?: (pathname: string) => boolean
 }
 
 const baseClasses =
   'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors'
+
+/**
+ * Prefix-matching por segmento: /clientes/123 marca activo a /clientes, pero
+ * /clientesX no. La raíz `/` matchea solo exacta (si no, marcaría todo).
+ */
+function matchesPathPrefix(pathname: string, to: string): boolean {
+  if (to === '/') return pathname === '/'
+  return pathname === to || pathname.startsWith(`${to}/`)
+}
 
 export function SidebarNavItem({ icon: Icon, label, to, href, activeWhen }: SidebarNavItemProps) {
   const location = useLocation()
@@ -56,25 +65,29 @@ export function SidebarNavItem({ icon: Icon, label, to, href, activeWhen }: Side
     )
   }
 
-  // `end` solo en la raíz `/` para que rutas hijas (ej. /clientes/123) no
-  // apaguen el highlight del padre (/clientes).
+  // El estado activo se calcula acá (y no con NavLink) para que el resaltado y
+  // el `aria-current` salgan del MISMO criterio: NavLink impone su prefijo al
+  // `aria-current`, y con un `activeWhen` que lo contradice el lector de
+  // pantalla anunciaría como página actual un módulo en el que no estás.
+  const isActive = activeWhen
+    ? activeWhen(location.pathname)
+    : matchesPathPrefix(location.pathname, to)
+
   return (
     <li className="list-none">
-      <NavLink
+      <Link
         to={to}
-        end={to === '/'}
-        className={({ isActive }) =>
-          cn(
-            baseClasses,
-            (activeWhen ? activeWhen(location.pathname) : isActive)
-              ? 'bg-blue-50 text-blue-700'
-              : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
-          )
-        }
+        aria-current={isActive ? 'page' : undefined}
+        className={cn(
+          baseClasses,
+          isActive
+            ? 'bg-blue-50 text-blue-700'
+            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+        )}
       >
         <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />
         {label}
-      </NavLink>
+      </Link>
     </li>
   )
 }
