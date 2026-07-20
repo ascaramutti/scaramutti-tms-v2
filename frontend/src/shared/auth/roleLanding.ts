@@ -36,6 +36,17 @@ export function landingPathFor(role: UserRole | undefined): string {
   return ROLE_LANDING[role] ?? COTIZACIONES_LANDING
 }
 
+/** Nombre visible de cada landing, para los links que ofrecen "ir a…". */
+const LANDING_LABEL: Record<string, string> = {
+  [V1_LANDING]: 'Servicios',
+  [COTIZACIONES_LANDING]: 'Cotizaciones',
+  [ALMACEN_LANDING]: 'Almacén',
+}
+
+export function landingLabelFor(role: UserRole | undefined): string {
+  return LANDING_LABEL[landingPathFor(role)] ?? 'Servicios'
+}
+
 /**
  * Un landing fuera de /cotizaciones vive en otra SPA (v1): hay que navegar
  * con window.location (full page load), no con el router de React.

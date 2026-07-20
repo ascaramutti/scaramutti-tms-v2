@@ -1,5 +1,6 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
+import { QUOTATION_ROLES } from './shared/auth/moduleRoles'
 import { AppLayout } from './shared/layout/AppLayout'
 import { LoginPage } from './features/auth/components/LoginPage'
 import { ChangePasswordPage } from './features/auth/components/ChangePasswordPage'
@@ -25,7 +26,7 @@ export const router = createBrowserRouter([
       {
         path: '/cotizaciones',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
             <CotizacionesListPage />
           </ProtectedRoute>
         ),
@@ -34,7 +35,7 @@ export const router = createBrowserRouter([
       {
         path: '/cotizaciones/nueva',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
             <CotizacionWizardPage />
           </ProtectedRoute>
         ),
@@ -43,7 +44,7 @@ export const router = createBrowserRouter([
       {
         path: '/cotizaciones/:id/editar',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
             <CotizacionEditPage />
           </ProtectedRoute>
         ),
@@ -51,7 +52,7 @@ export const router = createBrowserRouter([
       {
         path: '/cotizaciones/:id',
         element: (
-          <ProtectedRoute allowedRoles={['admin', 'sales', 'general_manager', 'operations_manager']}>
+          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
             <CotizacionDetailPage />
           </ProtectedRoute>
         ),

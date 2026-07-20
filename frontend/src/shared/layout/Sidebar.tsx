@@ -3,6 +3,7 @@ import { SidebarNavItem } from './SidebarNavItem'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
+import { QUOTATION_ROLES } from '../auth/moduleRoles'
 import type { UserRole } from '../../api'
 
 interface MenuItem {
@@ -42,7 +43,7 @@ const MENU: MenuGroup[] = [
         icon: FileText,
         label: 'Cotizaciones',
         to: '/cotizaciones',
-        allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
+        allowedRoles: QUOTATION_ROLES,
         // Prefix-matching marcaría activo también en /cotizaciones/cuenta/*
         // (cuenta anida bajo el mismo prefijo pero no es parte del módulo).
         activeWhen: (pathname) =>
@@ -51,7 +52,7 @@ const MENU: MenuGroup[] = [
       {
         icon: Users,
         label: 'Clientes',
-        allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
+        allowedRoles: QUOTATION_ROLES,
       },
     ],
   },
