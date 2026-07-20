@@ -42,4 +42,34 @@ describe('SidebarNavItem', () => {
     const link = screen.getByRole('link', { name: /inicio/i })
     expect(link).not.toHaveAttribute('aria-current')
   })
+
+  it('marca activo en las rutas hijas (prefijo por segmento)', () => {
+    renderItem(
+      <SidebarNavItem icon={FileText} label="Clientes" to="/clientes" />,
+      '/clientes/123',
+    )
+    expect(screen.getByRole('link', { name: /clientes/i })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('el prefijo respeta el borde de segmento (/clientesX no es /clientes)', () => {
+    renderItem(<SidebarNavItem icon={FileText} label="Clientes" to="/clientes" />, '/clientesX')
+    expect(screen.getByRole('link', { name: /clientes/i })).not.toHaveAttribute('aria-current')
+  })
+
+  it('con activeWhen, el resaltado y el aria-current salen del mismo criterio', () => {
+    // Un item de otro módulo anidado bajo el mismo prefijo: el matcher custom
+    // lo excluye, así que no debe quedar ni resaltado ni anunciado como actual.
+    renderItem(
+      <SidebarNavItem
+        icon={FileText}
+        label="Cotizaciones"
+        to="/cotizaciones"
+        activeWhen={(pathname) => !pathname.startsWith('/cotizaciones/almacen')}
+      />,
+      '/cotizaciones/almacen',
+    )
+    const link = screen.getByRole('link', { name: /cotizaciones/i })
+    expect(link).not.toHaveAttribute('aria-current')
+    expect(link.className).not.toContain('bg-blue-50')
+  })
 })

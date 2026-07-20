@@ -31,7 +31,7 @@ export type Problem = {
     }>;
 };
 
-export type UserRole = 'admin' | 'sales' | 'dispatcher' | 'general_manager' | 'operations_manager';
+export type UserRole = 'admin' | 'sales' | 'dispatcher' | 'general_manager' | 'operations_manager' | 'finance_manager' | 'warehouse_keeper';
 
 export type LoginRequest = {
     username: string;
@@ -584,6 +584,554 @@ export type QuotationResponse = {
     updatedAt: string;
 };
 
+export type WarehouseProductCategoryResponse = {
+    id: number;
+    name: string;
+    description?: string | null;
+    isActive: boolean;
+};
+
+export type WarehouseProductCategoryRequest = {
+    name: string;
+    description?: string | null;
+};
+
+export type WarehouseUnitOfMeasureResponse = {
+    id: number;
+    code: string;
+    name: string;
+    isActive: boolean;
+};
+
+export type WarehouseSupplierResponse = {
+    id: number;
+    name: string;
+    ruc?: string | null;
+    phone?: string | null;
+    contactName?: string | null;
+    isActive: boolean;
+    createdAt: string;
+};
+
+export type WarehouseSupplierRequest = {
+    name: string;
+    ruc?: string | null;
+    phone?: string | null;
+    contactName?: string | null;
+};
+
+export type PageOfWarehouseSupplier = PageMeta & {
+    content: Array<WarehouseSupplierResponse>;
+};
+
+export type PageOfWarehouseProduct = PageMeta & {
+    content: Array<WarehouseProductResponse>;
+};
+
+export type WarehouseProductRequest = {
+    /**
+     * Único COMPUESTO con brand+partNumber (Δ-2, RN-WH10)
+     */
+    name: string;
+    categoryId: number;
+    unitOfMeasureId: number;
+    brand?: string | null;
+    partNumber?: string | null;
+    /**
+     * Características flexibles clave-valor (JSONB). Objeto libre; la UI lo edita como filas clave-valor.
+     */
+    attributes?: {
+        [key: string]: string;
+    };
+    /**
+     * Umbral de reposición: stock < minStock → badge "Bajo" (RN-WH11)
+     */
+    minStock?: number;
+    observations?: string | null;
+    /**
+     * Soft delete del catálogo. En el POST se ignora (siempre nace activo).
+     */
+    isActive?: boolean;
+};
+
+/**
+ * Como WarehouseProductRequest pero SIN unitOfMeasureId: la unidad de medida se fija al crear y es inmutable (P-1). Su edición se evaluará más adelante.
+ */
+export type WarehouseProductUpdateRequest = {
+    /**
+     * Único COMPUESTO con brand+partNumber (Δ-2, RN-WH10)
+     */
+    name: string;
+    categoryId: number;
+    brand?: string | null;
+    partNumber?: string | null;
+    /**
+     * Características flexibles clave-valor (JSONB). Objeto libre; la UI lo edita como filas clave-valor.
+     */
+    attributes?: {
+        [key: string]: string;
+    };
+    minStock?: number;
+    observations?: string | null;
+    /**
+     * Soft delete del catálogo.
+     */
+    isActive?: boolean;
+};
+
+export type WarehouseProductResponse = {
+    id: number;
+    /**
+     * SKU (autogenerado por el backend)
+     */
+    code: string;
+    name: string;
+    category: {
+        id: number;
+        name: string;
+    };
+    unitOfMeasure: {
+        id: number;
+        code: string;
+        name: string;
+    };
+    brand?: string | null;
+    partNumber?: string | null;
+    /**
+     * Objeto JSON libre clave-valor (JSONB). Nunca `null` (default `{}`).
+     */
+    attributes: {
+        [key: string]: string;
+    };
+    minStock: number;
+    observations?: string | null;
+    isActive: boolean;
+    /**
+     * LEÍDO de la VIEW `almacen.product_stock` (RN-WH1 — nunca persistido, siempre exacto)
+     */
+    stock: number;
+    /**
+     * Derivado en código: `stock < minStock` (estricto). NO es columna.
+     */
+    lowStock: boolean;
+    createdBy: UserResponse;
+    createdAt: string;
+    /**
+     * Versión del recurso (source del optimistic locking). Para el `If-Match` del PUT usar el header `ETag` del GET/PUT, NO este campo del body (difieren por µs entre memoria y BD → 412 espurio).
+     */
+    updatedAt: string;
+};
+
+/**
+ * Lectura puntual del stock disponible (form de retiro, validación en vivo).
+ */
+export type WarehouseProductStockResponse = {
+    productId: number;
+    /**
+     * De la VIEW `almacen.product_stock`
+     */
+    stock: number;
+    minStock: number;
+    /**
+     * Derivado: `stock < minStock`
+     */
+    lowStock: boolean;
+};
+
+/**
+ * Tipo de movimiento de la VIEW `almacen.stock_movements`: `APERTURA`
+ * (corte inicial, +), `ENTRADA` (ítem de factura activa, +), `SALIDA`
+ * (retiro activo, −). Valores en español porque son los literales de la
+ * VIEW del DDL congelado.
+ *
+ */
+export type WarehouseKardexMovementType = 'APERTURA' | 'ENTRADA' | 'SALIDA';
+
+export type WarehouseKardexMovementResponse = {
+    movementType: WarehouseKardexMovementType;
+    /**
+     * SIEMPRE positiva (el signo lo da movementType)
+     */
+    quantity: number;
+    /**
+     * Saldo corrido DESPUÉS del movimiento (RN-WH13 — server-side sobre la historia completa)
+     */
+    balance: number;
+    movedAt: string;
+    /**
+     * Id del origen: factura (ENTRADA) o retiro (SALIDA); null para APERTURA
+     */
+    sourceId?: number | null;
+    /**
+     * Etiqueta legible compuesta por el backend (es-PE)
+     */
+    reference: string;
+    registeredBy: UserResponse;
+};
+
+export type PageOfWarehouseKardexMovement = PageMeta & {
+    content: Array<WarehouseKardexMovementResponse>;
+};
+
+/**
+ * Referencia mínima a un producto para embeber en ítems, retiros y aperturas.
+ */
+export type WarehouseProductSummary = {
+    id: number;
+    code?: string | null;
+    name: string;
+    /**
+     * Código de la unidad de medida (para pintar cantidades)
+     */
+    unitCode: string;
+};
+
+export type WarehouseOpeningBalanceRequest = {
+    productId: number;
+    /**
+     * Puede ser 0 (deja constancia del conteo)
+     */
+    quantity: number;
+    observations?: string | null;
+};
+
+export type WarehouseOpeningBalanceResponse = {
+    id: number;
+    product: WarehouseProductSummary;
+    quantity: number;
+    observations?: string | null;
+    registeredBy: UserResponse;
+    registeredAt: string;
+};
+
+export type PageOfWarehouseOpeningBalance = PageMeta & {
+    content: Array<WarehouseOpeningBalanceResponse>;
+};
+
+/**
+ * Estado de entradas y retiros (columna + CHECK). `CANCELLED` = anulado con
+ * motivo/quien/cuando; no mueve stock/kardex/reportes pero queda visible.
+ *
+ */
+export type WarehouseRecordStatus = 'ACTIVE' | 'CANCELLED';
+
+/**
+ * Rastro del ultimo cambio, derivado del FIELD_EDIT mas reciente en almacen.audit_logs.
+ */
+export type WarehouseEditTrace = {
+    by: UserResponse;
+    at: string;
+    /**
+     * Justificacion dada al editar (>= 10 caracteres)
+     */
+    reason: string;
+};
+
+export type WarehouseInvoiceItemRequest = {
+    productId: number;
+    quantity: number;
+    /**
+     * En la moneda de la factura. Puede ser 0 (bonificacion).
+     */
+    unitPrice: number;
+};
+
+export type WarehousePurchaseInvoiceRequest = {
+    supplierId: number;
+    invoiceNumber: string;
+    invoiceDate: string;
+    /**
+     * Guia de remision (1 factura -> 1 guia; dato de finanzas)
+     */
+    guideNumber?: string | null;
+    /**
+     * Fija la moneda de la factura (RN-WH7)
+     */
+    currencyId: number;
+    observations?: string | null;
+    items: Array<WarehouseInvoiceItemRequest>;
+};
+
+/**
+ * Body del PUT. SIN `supplierId` (el proveedor es INMUTABLE: RN-WH4, proveedor
+ * equivocado = anular y re-registrar). Los `items` REEMPLAZAN a los existentes.
+ *
+ */
+export type WarehousePurchaseInvoiceUpdateRequest = {
+    invoiceNumber: string;
+    invoiceDate: string;
+    guideNumber?: string | null;
+    currencyId: number;
+    observations?: string | null;
+    items: Array<WarehouseInvoiceItemRequest>;
+    /**
+     * Justificacion de la edicion (RN-WH4). Va a almacen.audit_logs con el diff por campo.
+     */
+    reason: string;
+};
+
+export type WarehouseCancelRequest = {
+    /**
+     * Motivo de anulacion (RN-WH3). Va a cancel_reason y a almacen.audit_logs (CANCELLED).
+     */
+    reason: string;
+};
+
+export type WarehouseInvoiceItemResponse = {
+    id: number;
+    product: WarehouseProductSummary;
+    quantity: number;
+    unitPrice: number;
+    /**
+     * `quantity * unitPrice`, derivado en codigo, no persistido
+     */
+    subtotal: number;
+};
+
+export type WarehousePurchaseInvoiceResponse = {
+    id: number;
+    supplier: {
+        id: number;
+        name: string;
+        ruc?: string | null;
+    };
+    invoiceNumber: string;
+    invoiceDate: string;
+    guideNumber?: string | null;
+    currency: {
+        id: number;
+        code: string;
+        symbol: string;
+    };
+    observations?: string | null;
+    items: Array<WarehouseInvoiceItemResponse>;
+    /**
+     * Suma de items.subtotal en la moneda de la factura, derivado en codigo, nunca persistido
+     */
+    total: number;
+    status: WarehouseRecordStatus;
+    /**
+     * Presente solo si status=CANCELLED
+     */
+    cancelReason?: string | null;
+    cancelledBy?: UserResponse;
+    cancelledAt?: string | null;
+    lastEdit?: WarehouseEditTrace;
+    registeredBy: UserResponse;
+    createdAt: string;
+    /**
+     * Source de la version, usar el header ETag opaco en If-Match, NO este valor
+     */
+    updatedAt: string;
+};
+
+/**
+ * Fila del listado de Entradas.
+ */
+export type WarehousePurchaseInvoiceSummary = {
+    id: number;
+    supplier: {
+        id: number;
+        name: string;
+    };
+    invoiceNumber: string;
+    invoiceDate: string;
+    guideNumber?: string | null;
+    currencyCode: string;
+    itemsCount: number;
+    /**
+     * Derivado de los items (no persistido)
+     */
+    total: number;
+    status: WarehouseRecordStatus;
+    cancelReason?: string | null;
+    registeredBy: UserResponse;
+    createdAt: string;
+};
+
+export type PageOfWarehousePurchaseInvoiceSummary = PageMeta & {
+    content: Array<WarehousePurchaseInvoiceSummary>;
+};
+
+/**
+ * Trabajador de public.workers (catalogo compartido con v1, read-only desde v2).
+ */
+export type WorkerResponse = {
+    id: number;
+    fullName: string;
+    position?: string | null;
+    isActive: boolean;
+};
+
+/**
+ * Subtipo de la flota (disyunto y total). ESCORT = vehiculo escolta.
+ */
+export type FleetUnitKind = 'TRACTOR' | 'TRAILER' | 'ESCORT';
+
+/**
+ * Referencia minima a una unidad de flota; la direccion completa es el par (kind, id).
+ */
+export type FleetUnitRef = {
+    kind: FleetUnitKind;
+    id: number;
+    plate: string;
+};
+
+/**
+ * Unidad de flota unificada (GET /fleet-units). Extiende FleetUnitRef con los
+ * datos del subtipo. `brand`/`model` pueden ser null (las carretas no los tienen).
+ *
+ */
+export type FleetUnitResponse = FleetUnitRef & {
+    brand?: string | null;
+    model?: string | null;
+    isActive: boolean;
+};
+
+/**
+ * RN-WH2: `receivedByWorkerId` SIEMPRE obligatorio; unidad destino OPCIONAL y a lo
+ * sumo UNA (tractorId | trailerId | escortVehicleId, subtipos disyuntos; mas de una
+ * -> 400 WH-005). `withdrawnAt` lo asigna el server.
+ *
+ */
+export type WarehouseWithdrawalRequest = {
+    productId: number;
+    /**
+     * > 0 y <= stock disponible (en transaccion -> 409 WH-001)
+     */
+    quantity: number;
+    /**
+     * Quien recibe (FK public.workers). Obligatorio.
+     */
+    receivedByWorkerId: number;
+    tractorId?: number | null;
+    trailerId?: number | null;
+    escortVehicleId?: number | null;
+    observations?: string | null;
+};
+
+/**
+ * Body del PUT. SIN `productId`: el producto es INMUTABLE (RN-WH4, producto equivocado
+ * = anular y crear otro). La unidad de flota se REEMPLAZA (los tres campos null la
+ * quitan; a lo sumo una).
+ *
+ */
+export type WarehouseWithdrawalUpdateRequest = {
+    /**
+     * Subirla valida contra el disponible SIN contar este retiro (409 WH-001); bajarla siempre es segura
+     */
+    quantity: number;
+    receivedByWorkerId: number;
+    tractorId?: number | null;
+    trailerId?: number | null;
+    escortVehicleId?: number | null;
+    observations?: string | null;
+    /**
+     * Justificacion de la edicion (RN-WH4). Va a `almacen.audit_logs`.
+     */
+    reason: string;
+};
+
+export type WarehouseWithdrawalResponse = {
+    id: number;
+    product: WarehouseProductSummary;
+    quantity: number;
+    /**
+     * Lo asigna el server al registrar
+     */
+    withdrawnAt: string;
+    receivedBy: WorkerResponse;
+    fleetUnit?: FleetUnitRef;
+    observations?: string | null;
+    status: WarehouseRecordStatus;
+    /**
+     * Presente solo si status=CANCELLED
+     */
+    cancelReason?: string | null;
+    cancelledBy?: UserResponse;
+    cancelledAt?: string | null;
+    lastEdit?: WarehouseEditTrace;
+    registeredBy: UserResponse;
+    /**
+     * Source de la version, usar el header ETag opaco en If-Match
+     */
+    updatedAt: string;
+};
+
+export type PageOfWarehouseWithdrawal = PageMeta & {
+    content: Array<WarehouseWithdrawalResponse>;
+};
+
+/**
+ * KPIs del strip de Existencias. Mes calendario en curso (America/Lima); solo ACTIVOS.
+ */
+export type WarehouseStatsResponse = {
+    activeProducts: number;
+    /**
+     * Productos activos con stock < minStock (RN-WH11)
+     */
+    lowStockCount: number;
+    /**
+     * Facturas ACTIVAS registradas este mes (createdAt)
+     */
+    entriesThisMonth: number;
+    /**
+     * Retiros ACTIVOS registrados este mes (withdrawnAt)
+     */
+    withdrawalsThisMonth: number;
+};
+
+/**
+ * Corte del reporte (los 4 de la pantalla Reportes):
+ * - `BY_UNIT`: consumo por unidad de flota (retiros sin unidad -> "Sin unidad asignada")
+ * - `BY_PERIOD`: consumo por semana (lunes como clave, en `detail`)
+ * - `BY_PRODUCT`: consumo por producto (`count` = unidades retiradas)
+ * - `BY_SUPPLIER`: compras por proveedor (facturas activas por `invoiceDate`)
+ *
+ */
+export type WarehouseReportCut = 'BY_UNIT' | 'BY_PERIOD' | 'BY_PRODUCT' | 'BY_SUPPLIER';
+
+/**
+ * Fila agregada. RN-WH7 bi-moneda SIN conversion: `amountPEN` y `amountUSD`
+ * acumulan por separado segun la moneda registrada (catalogo activo = PEN + USD).
+ *
+ */
+export type WarehouseReportRowResponse = {
+    /**
+     * Etiqueta del grupo (ej: "Tracto ABC123", "Semana del 22/06", producto, proveedor)
+     */
+    label: string;
+    /**
+     * Dato secundario (unidad de medida en BY_PRODUCT, fecha ISO del lunes en BY_PERIOD)
+     */
+    detail?: string | null;
+    /**
+     * Nro de movimientos (o unidades retiradas en BY_PRODUCT)
+     */
+    count: number;
+    /**
+     * Valorizacion de referencia en PEN (salidas: ultimo precio de compra del producto)
+     */
+    amountPEN: number;
+    /**
+     * Valorizacion de referencia en USD
+     */
+    amountUSD: number;
+};
+
+export type WarehouseReportResponse = {
+    cut: WarehouseReportCut;
+    dateFrom: string;
+    dateTo: string;
+    /**
+     * Orden: BY_PERIOD cronologico ASC; el resto por monto total DESC. Lista vacia si no hubo movimientos (nunca null).
+     */
+    rows: Array<WarehouseReportRowResponse>;
+    totalPEN: number;
+    totalUSD: number;
+    totalCount: number;
+};
+
 /**
  * Página (base 0)
  */
@@ -802,6 +1350,15 @@ export type ListCurrenciesData = {
     url: '/currencies';
 };
 
+export type ListCurrenciesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+};
+
+export type ListCurrenciesError = ListCurrenciesErrors[keyof ListCurrenciesErrors];
+
 export type ListCurrenciesResponses = {
     /**
      * OK
@@ -819,6 +1376,15 @@ export type ListPaymentTermsData = {
     };
     url: '/payment-terms';
 };
+
+export type ListPaymentTermsErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+};
+
+export type ListPaymentTermsError = ListPaymentTermsErrors[keyof ListPaymentTermsErrors];
 
 export type ListPaymentTermsResponses = {
     /**
@@ -838,6 +1404,15 @@ export type ListQuotationConditionsData = {
     url: '/quotation-conditions';
 };
 
+export type ListQuotationConditionsErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+};
+
+export type ListQuotationConditionsError = ListQuotationConditionsErrors[keyof ListQuotationConditionsErrors];
+
 export type ListQuotationConditionsResponses = {
     /**
      * OK
@@ -855,6 +1430,15 @@ export type ListQuotationServiceTypesData = {
     };
     url: '/quotation-service-types';
 };
+
+export type ListQuotationServiceTypesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+};
+
+export type ListQuotationServiceTypesError = ListQuotationServiceTypesErrors[keyof ListQuotationServiceTypesErrors];
 
 export type ListQuotationServiceTypesResponses = {
     /**
@@ -1272,3 +1856,1076 @@ export type DownloadQuotationPdfResponses = {
 };
 
 export type DownloadQuotationPdfResponse = DownloadQuotationPdfResponses[keyof DownloadQuotationPdfResponses];
+
+export type ListWarehouseProductCategoriesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        isActive?: boolean;
+    };
+    url: '/warehouse/product-categories';
+};
+
+export type ListWarehouseProductCategoriesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWarehouseProductCategoriesError = ListWarehouseProductCategoriesErrors[keyof ListWarehouseProductCategoriesErrors];
+
+export type ListWarehouseProductCategoriesResponses = {
+    /**
+     * Categorías
+     */
+    200: Array<WarehouseProductCategoryResponse>;
+};
+
+export type ListWarehouseProductCategoriesResponse = ListWarehouseProductCategoriesResponses[keyof ListWarehouseProductCategoriesResponses];
+
+export type CreateWarehouseProductCategoryData = {
+    body: WarehouseProductCategoryRequest;
+    path?: never;
+    query?: never;
+    url: '/warehouse/product-categories';
+};
+
+export type CreateWarehouseProductCategoryErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Nombre duplicado → WH-010
+     */
+    409: Problem;
+};
+
+export type CreateWarehouseProductCategoryError = CreateWarehouseProductCategoryErrors[keyof CreateWarehouseProductCategoryErrors];
+
+export type CreateWarehouseProductCategoryResponses = {
+    /**
+     * Creada
+     */
+    201: WarehouseProductCategoryResponse;
+};
+
+export type CreateWarehouseProductCategoryResponse = CreateWarehouseProductCategoryResponses[keyof CreateWarehouseProductCategoryResponses];
+
+export type ListWarehouseUnitsOfMeasureData = {
+    body?: never;
+    path?: never;
+    query?: {
+        isActive?: boolean;
+    };
+    url: '/warehouse/units-of-measure';
+};
+
+export type ListWarehouseUnitsOfMeasureErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWarehouseUnitsOfMeasureError = ListWarehouseUnitsOfMeasureErrors[keyof ListWarehouseUnitsOfMeasureErrors];
+
+export type ListWarehouseUnitsOfMeasureResponses = {
+    /**
+     * Unidades de medida
+     */
+    200: Array<WarehouseUnitOfMeasureResponse>;
+};
+
+export type ListWarehouseUnitsOfMeasureResponse = ListWarehouseUnitsOfMeasureResponses[keyof ListWarehouseUnitsOfMeasureResponses];
+
+export type ListWarehouseSuppliersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        q?: string;
+        isActive?: boolean;
+        page?: number;
+        size?: number;
+    };
+    url: '/warehouse/suppliers';
+};
+
+export type ListWarehouseSuppliersErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWarehouseSuppliersError = ListWarehouseSuppliersErrors[keyof ListWarehouseSuppliersErrors];
+
+export type ListWarehouseSuppliersResponses = {
+    /**
+     * Página de proveedores
+     */
+    200: PageOfWarehouseSupplier;
+};
+
+export type ListWarehouseSuppliersResponse = ListWarehouseSuppliersResponses[keyof ListWarehouseSuppliersResponses];
+
+export type CreateWarehouseSupplierData = {
+    body: WarehouseSupplierRequest;
+    path?: never;
+    query?: never;
+    url: '/warehouse/suppliers';
+};
+
+export type CreateWarehouseSupplierErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Duplicado de catálogo del módulo Almacén — nombre/código/RUC ya existe → WH-010
+     */
+    409: Problem;
+};
+
+export type CreateWarehouseSupplierError = CreateWarehouseSupplierErrors[keyof CreateWarehouseSupplierErrors];
+
+export type CreateWarehouseSupplierResponses = {
+    /**
+     * Creado
+     */
+    201: WarehouseSupplierResponse;
+};
+
+export type CreateWarehouseSupplierResponse = CreateWarehouseSupplierResponses[keyof CreateWarehouseSupplierResponses];
+
+export type ListWarehouseProductsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        q?: string;
+        categoryId?: number;
+        isActive?: boolean;
+        /**
+         * Si `true`, solo productos con `stock < minStock` (badge "Bajo").
+         */
+        lowOnly?: boolean;
+        page?: number;
+        size?: number;
+    };
+    url: '/warehouse/products';
+};
+
+export type ListWarehouseProductsErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWarehouseProductsError = ListWarehouseProductsErrors[keyof ListWarehouseProductsErrors];
+
+export type ListWarehouseProductsResponses = {
+    /**
+     * Página de productos con stock
+     */
+    200: PageOfWarehouseProduct;
+};
+
+export type ListWarehouseProductsResponse = ListWarehouseProductsResponses[keyof ListWarehouseProductsResponses];
+
+export type CreateWarehouseProductData = {
+    body: WarehouseProductRequest;
+    path?: never;
+    query?: never;
+    url: '/warehouse/products';
+};
+
+export type CreateWarehouseProductErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Duplicado de catálogo del módulo Almacén — nombre/código/RUC ya existe → WH-010
+     */
+    409: Problem;
+};
+
+export type CreateWarehouseProductError = CreateWarehouseProductErrors[keyof CreateWarehouseProductErrors];
+
+export type CreateWarehouseProductResponses = {
+    /**
+     * Creado
+     */
+    201: WarehouseProductResponse;
+};
+
+export type CreateWarehouseProductResponse = CreateWarehouseProductResponses[keyof CreateWarehouseProductResponses];
+
+export type GetWarehouseProductData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/products/{id}';
+};
+
+export type GetWarehouseProductErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWarehouseProductError = GetWarehouseProductErrors[keyof GetWarehouseProductErrors];
+
+export type GetWarehouseProductResponses = {
+    /**
+     * Producto con stock
+     */
+    200: WarehouseProductResponse;
+};
+
+export type GetWarehouseProductResponse = GetWarehouseProductResponses[keyof GetWarehouseProductResponses];
+
+export type UpdateWarehouseProductData = {
+    body: WarehouseProductUpdateRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/products/{id}';
+};
+
+export type UpdateWarehouseProductErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Duplicado de catálogo del módulo Almacén — nombre/código/RUC ya existe → WH-010
+     */
+    409: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type UpdateWarehouseProductError = UpdateWarehouseProductErrors[keyof UpdateWarehouseProductErrors];
+
+export type UpdateWarehouseProductResponses = {
+    /**
+     * Actualizado
+     */
+    200: WarehouseProductResponse;
+};
+
+export type UpdateWarehouseProductResponse = UpdateWarehouseProductResponses[keyof UpdateWarehouseProductResponses];
+
+export type GetWarehouseProductStockData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/products/{id}/stock';
+};
+
+export type GetWarehouseProductStockErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWarehouseProductStockError = GetWarehouseProductStockErrors[keyof GetWarehouseProductStockErrors];
+
+export type GetWarehouseProductStockResponses = {
+    /**
+     * Stock del producto
+     */
+    200: WarehouseProductStockResponse;
+};
+
+export type GetWarehouseProductStockResponse = GetWarehouseProductStockResponses[keyof GetWarehouseProductStockResponses];
+
+export type GetWarehouseProductKardexData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: {
+        /**
+         * Desde (inclusive, América/Lima)
+         */
+        dateFrom?: string;
+        /**
+         * Hasta (inclusive del día completo, América/Lima)
+         */
+        dateTo?: string;
+        page?: number;
+        size?: number;
+    };
+    url: '/warehouse/products/{id}/kardex';
+};
+
+export type GetWarehouseProductKardexErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWarehouseProductKardexError = GetWarehouseProductKardexErrors[keyof GetWarehouseProductKardexErrors];
+
+export type GetWarehouseProductKardexResponses = {
+    /**
+     * Página de movimientos
+     */
+    200: PageOfWarehouseKardexMovement;
+};
+
+export type GetWarehouseProductKardexResponse = GetWarehouseProductKardexResponses[keyof GetWarehouseProductKardexResponses];
+
+export type ListWarehouseOpeningBalancesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        productId?: number;
+        page?: number;
+        size?: number;
+    };
+    url: '/warehouse/opening-balances';
+};
+
+export type ListWarehouseOpeningBalancesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWarehouseOpeningBalancesError = ListWarehouseOpeningBalancesErrors[keyof ListWarehouseOpeningBalancesErrors];
+
+export type ListWarehouseOpeningBalancesResponses = {
+    /**
+     * Página de aperturas
+     */
+    200: PageOfWarehouseOpeningBalance;
+};
+
+export type ListWarehouseOpeningBalancesResponse = ListWarehouseOpeningBalancesResponses[keyof ListWarehouseOpeningBalancesResponses];
+
+export type CreateWarehouseOpeningBalanceData = {
+    body: WarehouseOpeningBalanceRequest;
+    path?: never;
+    query?: never;
+    url: '/warehouse/opening-balances';
+};
+
+export type CreateWarehouseOpeningBalanceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * WH-009 (apertura duplicada) o WH-011 (producto con movimientos)
+     */
+    409: Problem;
+};
+
+export type CreateWarehouseOpeningBalanceError = CreateWarehouseOpeningBalanceErrors[keyof CreateWarehouseOpeningBalanceErrors];
+
+export type CreateWarehouseOpeningBalanceResponses = {
+    /**
+     * Registrado
+     */
+    201: WarehouseOpeningBalanceResponse;
+};
+
+export type CreateWarehouseOpeningBalanceResponse = CreateWarehouseOpeningBalanceResponses[keyof CreateWarehouseOpeningBalanceResponses];
+
+export type ListWarehousePurchaseInvoicesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        q?: string;
+        supplierId?: number;
+        status?: WarehouseRecordStatus;
+        /**
+         * `invoiceDate` desde (inclusive)
+         */
+        dateFrom?: string;
+        /**
+         * `invoiceDate` hasta (inclusive)
+         */
+        dateTo?: string;
+        page?: number;
+        size?: number;
+    };
+    url: '/warehouse/purchase-invoices';
+};
+
+export type ListWarehousePurchaseInvoicesErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWarehousePurchaseInvoicesError = ListWarehousePurchaseInvoicesErrors[keyof ListWarehousePurchaseInvoicesErrors];
+
+export type ListWarehousePurchaseInvoicesResponses = {
+    /**
+     * Pagina de facturas
+     */
+    200: PageOfWarehousePurchaseInvoiceSummary;
+};
+
+export type ListWarehousePurchaseInvoicesResponse = ListWarehousePurchaseInvoicesResponses[keyof ListWarehousePurchaseInvoicesResponses];
+
+export type CreateWarehousePurchaseInvoiceData = {
+    body: WarehousePurchaseInvoiceRequest;
+    path?: never;
+    query?: never;
+    url: '/warehouse/purchase-invoices';
+};
+
+export type CreateWarehousePurchaseInvoiceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Nº de factura duplicado para ese proveedor (entre ACTIVAS) -> WH-002
+     */
+    409: Problem;
+};
+
+export type CreateWarehousePurchaseInvoiceError = CreateWarehousePurchaseInvoiceErrors[keyof CreateWarehousePurchaseInvoiceErrors];
+
+export type CreateWarehousePurchaseInvoiceResponses = {
+    /**
+     * Creada
+     */
+    201: WarehousePurchaseInvoiceResponse;
+};
+
+export type CreateWarehousePurchaseInvoiceResponse = CreateWarehousePurchaseInvoiceResponses[keyof CreateWarehousePurchaseInvoiceResponses];
+
+export type GetWarehousePurchaseInvoiceData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/purchase-invoices/{id}';
+};
+
+export type GetWarehousePurchaseInvoiceErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWarehousePurchaseInvoiceError = GetWarehousePurchaseInvoiceErrors[keyof GetWarehousePurchaseInvoiceErrors];
+
+export type GetWarehousePurchaseInvoiceResponses = {
+    /**
+     * Detalle completo
+     */
+    200: WarehousePurchaseInvoiceResponse;
+};
+
+export type GetWarehousePurchaseInvoiceResponse = GetWarehousePurchaseInvoiceResponses[keyof GetWarehousePurchaseInvoiceResponses];
+
+export type UpdateWarehousePurchaseInvoiceData = {
+    body: WarehousePurchaseInvoiceUpdateRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/purchase-invoices/{id}';
+};
+
+export type UpdateWarehousePurchaseInvoiceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * WH-006 (dejaria stock negativo) / WH-008 (anulada) / WH-002 (duplicado)
+     */
+    409: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type UpdateWarehousePurchaseInvoiceError = UpdateWarehousePurchaseInvoiceErrors[keyof UpdateWarehousePurchaseInvoiceErrors];
+
+export type UpdateWarehousePurchaseInvoiceResponses = {
+    /**
+     * Actualizada
+     */
+    200: WarehousePurchaseInvoiceResponse;
+};
+
+export type UpdateWarehousePurchaseInvoiceResponse = UpdateWarehousePurchaseInvoiceResponses[keyof UpdateWarehousePurchaseInvoiceResponses];
+
+export type CancelWarehousePurchaseInvoiceData = {
+    body: WarehouseCancelRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/purchase-invoices/{id}/cancel';
+};
+
+export type CancelWarehousePurchaseInvoiceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * WH-007 (el stock quedaria negativo al descontarla) / WH-008 (ya anulada)
+     */
+    409: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type CancelWarehousePurchaseInvoiceError = CancelWarehousePurchaseInvoiceErrors[keyof CancelWarehousePurchaseInvoiceErrors];
+
+export type CancelWarehousePurchaseInvoiceResponses = {
+    /**
+     * Anulada
+     */
+    200: WarehousePurchaseInvoiceResponse;
+};
+
+export type CancelWarehousePurchaseInvoiceResponse = CancelWarehousePurchaseInvoiceResponses[keyof CancelWarehousePurchaseInvoiceResponses];
+
+export type ListWarehouseWithdrawalsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        productId?: number;
+        receivedByWorkerId?: number;
+        tractorId?: number;
+        trailerId?: number;
+        escortVehicleId?: number;
+        status?: WarehouseRecordStatus;
+        /**
+         * `withdrawnAt` desde (inclusive, America/Lima)
+         */
+        dateFrom?: string;
+        /**
+         * `withdrawnAt` hasta (inclusive del dia completo, America/Lima)
+         */
+        dateTo?: string;
+        page?: number;
+        size?: number;
+    };
+    url: '/warehouse/withdrawals';
+};
+
+export type ListWarehouseWithdrawalsErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWarehouseWithdrawalsError = ListWarehouseWithdrawalsErrors[keyof ListWarehouseWithdrawalsErrors];
+
+export type ListWarehouseWithdrawalsResponses = {
+    /**
+     * Pagina de retiros
+     */
+    200: PageOfWarehouseWithdrawal;
+};
+
+export type ListWarehouseWithdrawalsResponse = ListWarehouseWithdrawalsResponses[keyof ListWarehouseWithdrawalsResponses];
+
+export type CreateWarehouseWithdrawalData = {
+    body: WarehouseWithdrawalRequest;
+    path?: never;
+    query?: never;
+    url: '/warehouse/withdrawals';
+};
+
+export type CreateWarehouseWithdrawalErrors = {
+    /**
+     * Validacion, incluye WH-005 (mas de una unidad) y WH-004 (catalogo)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Stock insuficiente -> WH-001
+     */
+    409: Problem;
+};
+
+export type CreateWarehouseWithdrawalError = CreateWarehouseWithdrawalErrors[keyof CreateWarehouseWithdrawalErrors];
+
+export type CreateWarehouseWithdrawalResponses = {
+    /**
+     * Registrado
+     */
+    201: WarehouseWithdrawalResponse;
+};
+
+export type CreateWarehouseWithdrawalResponse = CreateWarehouseWithdrawalResponses[keyof CreateWarehouseWithdrawalResponses];
+
+export type GetWarehouseWithdrawalData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/withdrawals/{id}';
+};
+
+export type GetWarehouseWithdrawalErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWarehouseWithdrawalError = GetWarehouseWithdrawalErrors[keyof GetWarehouseWithdrawalErrors];
+
+export type GetWarehouseWithdrawalResponses = {
+    /**
+     * Detalle
+     */
+    200: WarehouseWithdrawalResponse;
+};
+
+export type GetWarehouseWithdrawalResponse = GetWarehouseWithdrawalResponses[keyof GetWarehouseWithdrawalResponses];
+
+export type UpdateWarehouseWithdrawalData = {
+    body: WarehouseWithdrawalUpdateRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/withdrawals/{id}';
+};
+
+export type UpdateWarehouseWithdrawalErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * WH-001 (excede stock sin contar este retiro) / WH-008 (anulado)
+     */
+    409: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type UpdateWarehouseWithdrawalError = UpdateWarehouseWithdrawalErrors[keyof UpdateWarehouseWithdrawalErrors];
+
+export type UpdateWarehouseWithdrawalResponses = {
+    /**
+     * Actualizado
+     */
+    200: WarehouseWithdrawalResponse;
+};
+
+export type UpdateWarehouseWithdrawalResponse = UpdateWarehouseWithdrawalResponses[keyof UpdateWarehouseWithdrawalResponses];
+
+export type CancelWarehouseWithdrawalData = {
+    body: WarehouseCancelRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/warehouse/withdrawals/{id}/cancel';
+};
+
+export type CancelWarehouseWithdrawalErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Ya anulado -> WH-008
+     */
+    409: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type CancelWarehouseWithdrawalError = CancelWarehouseWithdrawalErrors[keyof CancelWarehouseWithdrawalErrors];
+
+export type CancelWarehouseWithdrawalResponses = {
+    /**
+     * Anulado
+     */
+    200: WarehouseWithdrawalResponse;
+};
+
+export type CancelWarehouseWithdrawalResponse = CancelWarehouseWithdrawalResponses[keyof CancelWarehouseWithdrawalResponses];
+
+export type GetWarehouseStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/warehouse/stats';
+};
+
+export type GetWarehouseStatsErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type GetWarehouseStatsError = GetWarehouseStatsErrors[keyof GetWarehouseStatsErrors];
+
+export type GetWarehouseStatsResponses = {
+    /**
+     * Contadores del strip
+     */
+    200: WarehouseStatsResponse;
+};
+
+export type GetWarehouseStatsResponse = GetWarehouseStatsResponses[keyof GetWarehouseStatsResponses];
+
+export type GetWarehouseReportData = {
+    body?: never;
+    path?: never;
+    query: {
+        cut: WarehouseReportCut;
+        dateFrom: string;
+        dateTo: string;
+    };
+    url: '/warehouse/reports';
+};
+
+export type GetWarehouseReportErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type GetWarehouseReportError = GetWarehouseReportErrors[keyof GetWarehouseReportErrors];
+
+export type GetWarehouseReportResponses = {
+    /**
+     * Filas + totales por moneda
+     */
+    200: WarehouseReportResponse;
+};
+
+export type GetWarehouseReportResponse = GetWarehouseReportResponses[keyof GetWarehouseReportResponses];
+
+export type ListWorkersData = {
+    body?: never;
+    path?: never;
+    query?: {
+        q?: string;
+        isActive?: boolean;
+    };
+    url: '/workers';
+};
+
+export type ListWorkersErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListWorkersError = ListWorkersErrors[keyof ListWorkersErrors];
+
+export type ListWorkersResponses = {
+    /**
+     * Trabajadores
+     */
+    200: Array<WorkerResponse>;
+};
+
+export type ListWorkersResponse = ListWorkersResponses[keyof ListWorkersResponses];
+
+export type ListFleetUnitsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        kind?: FleetUnitKind;
+        isActive?: boolean;
+    };
+    url: '/fleet-units';
+};
+
+export type ListFleetUnitsErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListFleetUnitsError = ListFleetUnitsErrors[keyof ListFleetUnitsErrors];
+
+export type ListFleetUnitsResponses = {
+    /**
+     * Unidades de flota
+     */
+    200: Array<FleetUnitResponse>;
+};
+
+export type ListFleetUnitsResponse = ListFleetUnitsResponses[keyof ListFleetUnitsResponses];

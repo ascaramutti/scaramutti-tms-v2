@@ -1,8 +1,21 @@
-import { FileText, KeyRound, Route, Truck, Users, type LucideIcon } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Boxes,
+  FileBarChart2,
+  FileText,
+  KeyRound,
+  Route,
+  Truck,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
+import { matchesPathPrefix } from './pathMatching'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
+import { QUOTATION_ROLES, WAREHOUSE_ROLES } from '../auth/moduleRoles'
 import type { UserRole } from '../../api'
 
 interface MenuItem {
@@ -24,6 +37,15 @@ interface MenuGroup {
   items: MenuItem[]
 }
 
+/**
+ * Subárboles que cuelgan de /cotizaciones (el `base` de Vite, o sea la SPA
+ * entera) pero NO son el módulo comercial. Sin esta lista el prefijo marcaría
+ * activo el item de Cotizaciones mientras el usuario está en otro módulo.
+ */
+const NON_QUOTATION_SUBTREES = ['/cotizaciones/cuenta', '/cotizaciones/almacen']
+
+const WAREHOUSE_BASE = '/cotizaciones/almacen'
+
 // Matriz de permisos del menú alineada con `x-required-roles` del contrato OpenAPI.
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
 const MENU: MenuGroup[] = [
@@ -36,22 +58,43 @@ const MENU: MenuGroup[] = [
     ],
   },
   {
+    label: 'Almacén',
+    items: [
+      {
+        icon: Boxes,
+        label: 'Existencias',
+        to: WAREHOUSE_BASE,
+        allowedRoles: WAREHOUSE_ROLES,
+        // El detalle de un producto se abre desde acá, así que sigue marcando
+        // activo Existencias. El prefijo pelado no sirve: marcaría activo el
+        // item también en entradas, retiros y reportes.
+        activeWhen: (pathname) =>
+          pathname === WAREHOUSE_BASE ||
+          matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/productos`),
+      },
+      // Sin `to` hasta que exista su pantalla: el item se muestra deshabilitado
+      // ("Próximamente"), como ya se hace con Clientes.
+      { icon: ArrowDownToLine, label: 'Entradas', allowedRoles: WAREHOUSE_ROLES },
+      { icon: ArrowUpFromLine, label: 'Retiros', allowedRoles: WAREHOUSE_ROLES },
+      { icon: FileBarChart2, label: 'Reportes', allowedRoles: WAREHOUSE_ROLES },
+    ],
+  },
+  {
     label: 'Comercial',
     items: [
       {
         icon: FileText,
         label: 'Cotizaciones',
         to: '/cotizaciones',
-        allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
-        // Prefix-matching marcaría activo también en /cotizaciones/cuenta/*
-        // (cuenta anida bajo el mismo prefijo pero no es parte del módulo).
+        allowedRoles: QUOTATION_ROLES,
         activeWhen: (pathname) =>
-          pathname.startsWith('/cotizaciones') && !pathname.startsWith('/cotizaciones/cuenta'),
+          matchesPathPrefix(pathname, '/cotizaciones') &&
+          !NON_QUOTATION_SUBTREES.some((subtree) => matchesPathPrefix(pathname, subtree)),
       },
       {
         icon: Users,
         label: 'Clientes',
-        allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
+        allowedRoles: QUOTATION_ROLES,
       },
     ],
   },
