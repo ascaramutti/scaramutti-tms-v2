@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
@@ -25,6 +26,7 @@ function renderProtected(
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
             <Route path="/cotizaciones/login" element={<div>LOGIN PAGE</div>} />
+            <Route path="/cotizaciones/almacen" element={<div>ALMACEN</div>} />
             <Route
               path="/protegida"
               element={
@@ -114,6 +116,20 @@ describe('ProtectedRoute', () => {
       'href',
       '/cotizaciones/almacen',
     )
+  })
+
+  it('la salida a un modulo de esta SPA navega con el router (sin recargar)', async () => {
+    tokenStorage.setTokens('finanzas-token', 'finanzas-refresh')
+    server.use(
+      http.get(`${API}/auth/me`, () =>
+        HttpResponse.json({ ...fakeUser, role: 'finance_manager' } satisfies UserResponse),
+      ),
+    )
+    const user = userEvent.setup()
+    renderProtected('/protegida', { allowedRoles: ['sales'], moduleName: 'Cotizaciones' })
+
+    await user.click(await screen.findByRole('link', { name: /ir a almacén/i }))
+    expect(await screen.findByText('ALMACEN')).toBeInTheDocument()
   })
 
   it('el dispatcher sigue saliendo a v1 (trabaja fuera de esta SPA)', async () => {

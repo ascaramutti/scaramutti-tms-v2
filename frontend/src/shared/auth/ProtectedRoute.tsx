@@ -1,7 +1,7 @@
-import { Navigate, useLocation } from 'react-router-dom'
+import { Link, Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { useAuth } from './AuthContext'
-import { landingLabelFor, landingPathFor } from './roleLanding'
+import { isExternalLanding, landingLabelFor, landingPathFor } from './roleLanding'
 import type { UserRole } from '../../api'
 
 interface ProtectedRouteProps {
@@ -17,7 +17,13 @@ interface ProtectedRouteProps {
  * El link ofrece ir al módulo donde ese rol SÍ trabaja (su landing), que para
  * dispatcher es v1 (fuera de esta SPA) y para los roles de almacén es almacén.
  */
+const exitLinkClasses =
+  'mt-6 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors'
+
 function AccessDenied({ role, moduleName }: { role: UserRole | undefined; moduleName?: string }) {
+  const landing = landingPathFor(role)
+  const label = `Ir a ${landingLabelFor(role)}`
+
   // <div> (no <main>): este componente se monta DENTRO del <main> de AppLayout
   // cuando la ruta protegida es hija del layout — un <main> anidado sería
   // HTML inválido y duplicaría el landmark para screen readers.
@@ -30,12 +36,17 @@ function AccessDenied({ role, moduleName }: { role: UserRole | undefined; module
         <p className="mt-2 text-sm text-slate-500">
           Tu rol no tiene permisos para este módulo.
         </p>
-        <a
-          href={landingPathFor(role)}
-          className="mt-6 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
-        >
-          Ir a {landingLabelFor(role)}
-        </a>
+        {/* Ancla solo hacia afuera de la SPA (v1): adentro navega el router,
+            que evita recargar la app entera para cambiar de módulo. */}
+        {isExternalLanding(landing) ? (
+          <a href={landing} className={exitLinkClasses}>
+            {label}
+          </a>
+        ) : (
+          <Link to={landing} className={exitLinkClasses}>
+            {label}
+          </Link>
+        )}
       </div>
     </div>
   )
