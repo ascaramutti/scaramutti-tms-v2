@@ -15,7 +15,7 @@ import { matchesPathPrefix } from './pathMatching'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
-import { QUOTATION_ROLES, WAREHOUSE_ROLES } from '../auth/moduleRoles'
+import { OPERATIONS_ROLES, QUOTATION_ROLES, WAREHOUSE_ROLES } from '../auth/moduleRoles'
 import type { UserRole } from '../../api'
 
 interface MenuItem {
@@ -53,8 +53,9 @@ const MENU: MenuGroup[] = [
     label: 'Operaciones',
     items: [
       // Cross-link a v1 (servicios/viajes, otra SPA en la raíz del dominio).
-      // Visible para todos: cualquier rol puede tener trabajo en v1.
-      { icon: Route, label: 'Servicios / Viajes', href: '/' },
+      // Los roles de almacén no tienen cuenta allá: el link los dejaría en un
+      // login ajeno.
+      { icon: Route, label: 'Servicios / Viajes', href: '/', allowedRoles: OPERATIONS_ROLES },
     ],
   },
   {
