@@ -1,7 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { updateQuotation, type QuotationRequest } from '../../../api'
 import { quotationKeys } from '../queryKeys'
-import { readEtag, type QuotationWithEtag } from './useQuotation'
+import { readEtag } from '../../../shared/utils/etag'
+import type { QuotationWithEtag } from './useQuotation'
 
 interface UpdateQuotationVariables {
   id: number

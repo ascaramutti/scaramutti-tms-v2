@@ -15,6 +15,7 @@ interface StockTableProps {
   errorMessage?: string
   onRetry: () => void
   onPageChange: (page: number) => void
+  onRowClick: (product: WarehouseProductResponse) => void
   /** Hay filtros aplicados: cambia el copy del estado vacío. */
   hasActiveFilters: boolean
 }
@@ -25,11 +26,7 @@ function formatIdentificationLabel(product: WarehouseProductResponse): string {
   return parts.length > 0 ? parts.join(' · ') : '—'
 }
 
-/**
- * Tabla de existencias. Sin filas clickeables en esta entrega: el detalle de
- * producto todavía no tiene ruta, y una fila que navega a la nada caería en el
- * catch-all del router.
- */
+/** Tabla de existencias: cada fila lleva al detalle del producto con su kardex. */
 export function StockTable({
   data,
   page,
@@ -42,6 +39,7 @@ export function StockTable({
   errorMessage,
   onRetry,
   onPageChange,
+  onRowClick,
   hasActiveFilters,
 }: StockTableProps) {
   const columns: Column<WarehouseProductResponse>[] = [
@@ -106,6 +104,8 @@ export function StockTable({
       isError={isError}
       errorMessage={errorMessage}
       onRetry={onRetry}
+      onRowClick={onRowClick}
+      rowLabel={(product) => `Ver el producto ${product.code}: ${product.name}`}
       caption="Existencias del almacén"
       emptyTitle={hasActiveFilters ? 'No se encontraron productos' : 'Aún no hay productos'}
       emptyDescription={

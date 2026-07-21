@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { useLastGoodPage } from '../../../shared/hooks/useLastGoodPage'
@@ -23,6 +24,7 @@ const SEARCH_DEBOUNCE_MS = 300
  * del otro para tener sentido.
  */
 export function StockListPage() {
+  const navigate = useNavigate()
   const [filters, setFilters] = useState<StockFilters>(EMPTY_STOCK_FILTERS)
   const [page, setPage] = useState(0)
 
@@ -101,6 +103,7 @@ export function StockListPage() {
         errorMessage={getApiErrorMessage(error, 'No se pudieron cargar las existencias.')}
         onRetry={() => refetch()}
         onPageChange={setPage}
+        onRowClick={(product) => navigate(`/cotizaciones/almacen/productos/${product.id}`)}
         hasActiveFilters={hasActiveFilters}
       />
     </div>

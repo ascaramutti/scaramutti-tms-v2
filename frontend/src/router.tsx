@@ -9,6 +9,7 @@ import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDeta
 import { CotizacionEditPage } from './features/quotations/pages/CotizacionEditPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
+import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
 // con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
@@ -66,6 +67,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <StockListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/cotizaciones/almacen/productos/:id',
+        element: (
+          <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
+            <ProductDetailPage />
           </ProtectedRoute>
         ),
       },

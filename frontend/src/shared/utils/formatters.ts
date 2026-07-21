@@ -57,3 +57,20 @@ export function formatDateOnly(isoDate: string): string {
 export function formatQuantity(value: number): string {
   return new Intl.NumberFormat('es-PE', { maximumFractionDigits: 2 }).format(value)
 }
+
+/**
+ * Formatea una fecha ISO (UTC) a dd/mm/aaaa, hh:mm en zona horaria de Lima. Es
+ * `formatDate` con hora: el kardex necesita distinguir varios movimientos del
+ * mismo día, donde solo la fecha los volvería indistinguibles.
+ */
+export function formatDateTime(isoDate: string): string {
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Lima',
+  }).format(new Date(isoDate))
+}
