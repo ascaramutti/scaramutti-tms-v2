@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { StockListPage } from './StockListPage'
@@ -37,11 +37,20 @@ function renderExistencias() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <MemoryRouter initialEntries={['/cotizaciones/almacen']}>
-          <StockListPage />
+          <Routes>
+            <Route path="/cotizaciones/almacen" element={<StockListPage />} />
+            <Route path="/cotizaciones/almacen/productos/:id" element={<DetalleStub />} />
+          </Routes>
         </MemoryRouter>
       </AuthProvider>
     </QueryClientProvider>,
   )
+}
+
+// Stub del detalle: refleja el :id para verificar la navegación con el valor correcto.
+function DetalleStub() {
+  const { id } = useParams()
+  return <div>DETALLE {id}</div>
 }
 
 /** Sube del nodo de texto a su `<tr>` para acotar asserts a una fila. */
@@ -374,6 +383,14 @@ describe('StockListPage', () => {
     renderExistencias()
     expect(await screen.findByText('PRO-0001')).toBeInTheDocument()
     expect(await screen.findByText('120')).toBeInTheDocument()
+  })
+
+  it('la fila lleva al detalle del producto', async () => {
+    const user = userEvent.setup()
+    server.use(warehouseProductsPage([fakeProduct({ id: 42, code: 'PRO-0042' })]))
+    renderExistencias()
+    await user.click(await screen.findByText('PRO-0042'))
+    expect(await screen.findByText('DETALLE 42')).toBeInTheDocument()
   })
 
   // ----- Accesibilidad -----

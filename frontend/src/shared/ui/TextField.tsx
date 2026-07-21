@@ -15,10 +15,12 @@ interface TextFieldProps {
   /** Mensaje de error inline (suele venir de `formState.errors[field].message`). */
   error?: string
   disabled?: boolean
-  /** Para `type='number'`: límites y paso del input nativo (acotan el spinner + validación HTML). */
+  /** Para `type='number'`: límites y paso del input nativo (acotan el spinner + validación HTML).
+   * `step='any'` acepta decimales sin atarlos a una escala: un `step` numérico chico (0.01) hace
+   * que el browser marque "step mismatch" por redondeo de coma flotante en valores válidos. */
   min?: number
   max?: number
-  step?: number
+  step?: number | 'any'
   /** Clases extra para el `<label>` (ej. reservar altura en grids multi-columna para alinear). */
   labelClassName?: string
   /** Registro de react-hook-form: `register('fieldName')`. */
