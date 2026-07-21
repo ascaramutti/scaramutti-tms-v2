@@ -1,12 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
-import type { PageOfQuotationSummary } from '../../../api'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 import { CotizacionesFilterBar } from '../components/CotizacionesFilterBar'
 import { CotizacionesTable } from '../components/CotizacionesTable'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
+import { useLastGoodPage } from '../../../shared/hooks/useLastGoodPage'
 import { SEARCH_MIN_LENGTH, useQuotationsList } from '../hooks/useQuotationsList'
 import {
   EMPTY_QUOTATION_FILTERS,
@@ -34,17 +34,7 @@ export function CotizacionesListPage() {
     filters: effectiveFilters,
   })
 
-  // react-query descarta `data` al entrar en error (placeholderData solo aplica
-  // en estado pending). Conservamos la última página exitosa para no vaciar la
-  // tabla si un refetch (al paginar/filtrar) falla: se muestra la data previa
-  // con un aviso no destructivo en lugar del error a pantalla completa.
-  // Ajuste de estado durante el render (patrón recomendado por React en vez de
-  // un useEffect): es condicional y converge (en el re-render `data === lastGoodPage`).
-  const [lastGoodPage, setLastGoodPage] = useState<PageOfQuotationSummary | undefined>(undefined)
-  if (data && data !== lastGoodPage) {
-    setLastGoodPage(data)
-  }
-  const shownPage = data ?? lastGoodPage
+  const shownPage = useLastGoodPage(data)
 
   function handleFiltersChange(next: QuotationFilters) {
     setFilters(next)
