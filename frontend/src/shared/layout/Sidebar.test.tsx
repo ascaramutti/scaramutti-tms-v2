@@ -184,6 +184,35 @@ describe('Sidebar - módulo Almacén', () => {
     expect(existencias).toHaveAttribute('aria-current', 'page')
   })
 
+  it.each(['finance_manager', 'warehouse_keeper'] as const)(
+    '%s no ve el cross-link a v1 ni la sección Operaciones',
+    async (role) => {
+      renderSidebarAs(role)
+      await waitFor(() => {
+        expect(screen.getByText(`Usuario ${role}`)).toBeInTheDocument()
+      })
+      // No tienen cuenta en v1: ofrecerles el link los dejaría en un login ajeno.
+      expect(screen.queryByText(/servicios \/ viajes/i)).not.toBeInTheDocument()
+      // Sin items, la sección entera se oculta (no queda el <h2> huérfano).
+      expect(screen.queryByText(/^operaciones$/i)).not.toBeInTheDocument()
+    },
+  )
+
+  it.each([
+    'admin',
+    'sales',
+    'general_manager',
+    'operations_manager',
+    'dispatcher',
+  ] as const)('%s sigue viendo el cross-link a v1', async (role) => {
+    renderSidebarAs(role)
+    await waitFor(() => {
+      expect(screen.getByText(`Usuario ${role}`)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('link', { name: /servicios \/ viajes/i })).toHaveAttribute('href', '/')
+    expect(screen.getByText(/^operaciones$/i)).toBeInTheDocument()
+  })
+
   it('los matchers respetan el borde de segmento en ambos módulos', async () => {
     // Una ruta que solo comparte texto con el prefijo no es el módulo.
     renderSidebarAs('admin', '/cotizaciones/almacen/productosX')

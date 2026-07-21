@@ -17,6 +17,20 @@ export const QUOTATION_ROLES: UserRole[] = [
 ]
 
 /**
+ * Operaciones (servicios y viajes) vive en v1, otra app en la raíz del dominio,
+ * que valida sus propias sesiones: acá la lista solo evita ofrecer un link a
+ * quien no tiene cuenta allá. Los roles de almacén trabajan únicamente en su
+ * módulo y quedan afuera.
+ */
+export const OPERATIONS_ROLES: UserRole[] = [
+  'admin',
+  'sales',
+  'general_manager',
+  'operations_manager',
+  'dispatcher',
+]
+
+/**
  * Almacén: los cinco roles tienen poder total dentro del módulo (ver, registrar,
  * editar y anular), así que una sola lista alcanza para todas sus pantallas.
  * `sales` y `dispatcher` quedan afuera.
