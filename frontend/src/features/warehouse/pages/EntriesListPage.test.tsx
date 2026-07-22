@@ -37,6 +37,10 @@ function renderEntradas() {
               path="/cotizaciones/almacen/entradas/nueva"
               element={<div>NUEVA ENTRADA STUB</div>}
             />
+            <Route
+              path="/cotizaciones/almacen/entradas/:id"
+              element={<div>DETALLE ENTRADA STUB</div>}
+            />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -64,6 +68,14 @@ describe('EntriesListPage', () => {
     expect(await screen.findByText('F001-00123')).toBeInTheDocument()
     expect(screen.getByText('F001-00124')).toBeInTheDocument()
     expect(screen.getByText('F002-00001')).toBeInTheDocument()
+  })
+
+  it('clickear una fila navega al detalle de la entrada', async () => {
+    server.use(warehouseInvoicesPage([fakeInvoiceSummary({ id: 7, invoiceNumber: 'F001-00700' })]))
+    renderEntradas()
+    const user = userEvent.setup()
+    await user.click(rowOf(await screen.findByText('F001-00700')))
+    expect(screen.getByText('DETALLE ENTRADA STUB')).toBeInTheDocument()
   })
 
   it('mapea los campos de la factura en su fila', async () => {

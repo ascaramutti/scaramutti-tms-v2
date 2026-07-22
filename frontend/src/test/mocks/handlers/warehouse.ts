@@ -21,8 +21,14 @@ const API = 'http://localhost:8080/api/v1'
 
 /** ETag del producto por defecto: NO coincide con el `updatedAt` del body. */
 export const DEFAULT_PRODUCT_ETAG = '"2026-05-20T10:00:00.392890Z"'
+/**
+ * ETag por defecto de la entrada. El cero final NO aparece en el `updatedAt` del
+ * body (Jackson lo recorta), así que si el `If-Match` armado desde el header
+ * coincidiera con el body sería por accidente: fija que el cancel usa el header.
+ */
+export const DEFAULT_INVOICE_ETAG = '"2026-07-02T10:00:00.392890Z"'
 
-const AUDIT_USER: UserResponse = {
+export const AUDIT_USER: UserResponse = {
   id: 1,
   username: 'admin',
   fullName: 'Admin TMS',
@@ -643,6 +649,88 @@ export function warehouseInvoicesSlow(
 /** Responde un error en el listado de entradas (Problem RFC 7807). */
 export function warehouseInvoicesError(status: number, problem: Partial<Problem> = {}) {
   return http.get(`${API}/warehouse/purchase-invoices`, () => problemResponse(status, problem))
+}
+
+/** Responde el detalle de una entrada con su ETag en el header. */
+export function warehouseInvoiceDetail(
+  invoice: WarehousePurchaseInvoiceResponse = fakeInvoice(),
+  etag: string = DEFAULT_INVOICE_ETAG,
+) {
+  return http.get(`${API}/warehouse/purchase-invoices/:id`, () =>
+    HttpResponse.json(invoice, { headers: { ETag: etag } }),
+  )
+}
+
+/** Responde el detalle SIN el header ETag (gateway que no lo expone). */
+export function warehouseInvoiceDetailWithoutEtag(
+  invoice: WarehousePurchaseInvoiceResponse = fakeInvoice(),
+) {
+  return http.get(`${API}/warehouse/purchase-invoices/:id`, () => HttpResponse.json(invoice))
+}
+
+/** Responde el detalle con un delay (para observar el estado de carga). */
+export function warehouseInvoiceDetailSlow(
+  invoice: WarehousePurchaseInvoiceResponse = fakeInvoice(),
+  ms = 40,
+) {
+  return http.get(`${API}/warehouse/purchase-invoices/:id`, async () => {
+    await delay(ms)
+    return HttpResponse.json(invoice, { headers: { ETag: DEFAULT_INVOICE_ETAG } })
+  })
+}
+
+/** Responde un error en el detalle (404 entrada inexistente WH-003, 500 fallo). */
+export function warehouseInvoiceDetailError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/purchase-invoices/:id`, () => problemResponse(status, problem))
+}
+
+/** Primera respuesta del detalle y siguientes: para probar la recarga tras un 412. */
+export function warehouseInvoiceDetailSequence(
+  responses: { invoice: WarehousePurchaseInvoiceResponse; etag: string }[],
+) {
+  let call = 0
+  return http.get(`${API}/warehouse/purchase-invoices/:id`, () => {
+    const current = responses[Math.min(call, responses.length - 1)]
+    call += 1
+    return HttpResponse.json(current.invoice, { headers: { ETag: current.etag } })
+  })
+}
+
+/** Captura el body `{ reason }` y el If-Match del POST de anulación. */
+export function cancelInvoiceSuccess(
+  sink: UpdateCaptureSink,
+  response: WarehousePurchaseInvoiceResponse = fakeInvoice({
+    status: 'CANCELLED',
+    cancelReason: 'Factura cargada dos veces por error',
+    cancelledBy: AUDIT_USER,
+    cancelledAt: '2026-07-06T10:00:00Z',
+  }),
+) {
+  return http.post(`${API}/warehouse/purchase-invoices/:id/cancel`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    return HttpResponse.json(response, { headers: { ETag: '"v2"' } })
+  })
+}
+
+/** Responde el POST de anulación con un delay (para observar el estado en vuelo). */
+export function cancelInvoiceSlow(sink: UpdateCaptureSink, ms = 40) {
+  return http.post(`${API}/warehouse/purchase-invoices/:id/cancel`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    await delay(ms)
+    return HttpResponse.json(
+      fakeInvoice({ status: 'CANCELLED', cancelReason: 'x'.repeat(12), cancelledBy: AUDIT_USER }),
+      { headers: { ETag: '"v2"' } },
+    )
+  })
+}
+
+/** Responde un error en la anulación (412 versión vencida, 409 WH-006/WH-008, 400, 500). */
+export function cancelInvoiceError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/warehouse/purchase-invoices/:id/cancel`, () =>
+    problemResponse(status, problem),
+  )
 }
 
 /** Captura los query params de cada request del listado de entradas. */

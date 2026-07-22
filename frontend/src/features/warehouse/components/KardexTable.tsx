@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 import type {
   WarehouseKardexMovementResponse,
   WarehouseKardexMovementType,
@@ -102,7 +103,21 @@ export function KardexTable({
     {
       key: 'reference',
       header: 'Referencia',
-      render: (movement) => movement.reference,
+      // Solo las ENTRADA linkean a su factura: su detalle ya existe (`sourceId` es
+      // el id de la factura). La APERTURA no tiene origen que abrir (`sourceId`
+      // null). La SALIDA linkeará a su retiro cuando esa pantalla de detalle
+      // exista; hasta entonces queda como texto plano.
+      render: (movement) =>
+        movement.movementType === 'ENTRADA' && movement.sourceId != null ? (
+          <Link
+            to={`/cotizaciones/almacen/entradas/${movement.sourceId}`}
+            className="rounded font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          >
+            {movement.reference}
+          </Link>
+        ) : (
+          movement.reference
+        ),
     },
     {
       key: 'registeredBy',

@@ -35,6 +35,8 @@ export const warehouseKeys = {
   purchaseInvoiceLists: () => [...warehouseKeys.purchaseInvoices(), 'list'] as const,
   purchaseInvoiceList: (params: WarehousePurchaseInvoiceListParams) =>
     [...warehouseKeys.purchaseInvoiceLists(), params] as const,
+  purchaseInvoiceDetail: (id: number) =>
+    [...warehouseKeys.purchaseInvoices(), 'detail', id] as const,
   suppliers: () => [...warehouseKeys.all, 'suppliers'] as const,
   supplierSearches: () => [...warehouseKeys.suppliers(), 'search'] as const,
   supplierSearch: (q: string) => [...warehouseKeys.supplierSearches(), q] as const,
