@@ -84,7 +84,12 @@ export function ProductCategoryField({
         options={options}
         selected={selected}
         onQueryChange={setQuery}
-        onSelect={(option) => onChange(option.id)}
+        // Resuelve la categoría de la lista (su id es numérico); el id del combobox
+        // se amplió a string para claves compuestas de otros catálogos.
+        onSelect={(option) => {
+          const category = categories.find((item) => item.id === option.id)
+          if (category) onChange(category.id)
+        }}
         onClear={() => onChange(null)}
         onBlur={onBlur}
         loading={categoriesLoading || createCategory.isPending}
