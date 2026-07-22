@@ -14,6 +14,8 @@ import { EntriesListPage } from './features/warehouse/pages/EntriesListPage'
 import { EntryCreatePage } from './features/warehouse/pages/EntryCreatePage'
 import { EntryDetailPage } from './features/warehouse/pages/EntryDetailPage'
 import { EntryEditPage } from './features/warehouse/pages/EntryEditPage'
+import { WithdrawalsListPage } from './features/warehouse/pages/WithdrawalsListPage'
+import { WithdrawalCreatePage } from './features/warehouse/pages/WithdrawalCreatePage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
 // con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
@@ -105,6 +107,24 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <EntryDetailPage />
+          </ProtectedRoute>
+        ),
+      },
+      // "nuevo" declarado antes del listado; su detalle (con la ruta `:id`) llega
+      // en una pantalla posterior, y ahí "nuevo" deberá quedar antes de `:id`.
+      {
+        path: '/cotizaciones/almacen/retiros/nuevo',
+        element: (
+          <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
+            <WithdrawalCreatePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/cotizaciones/almacen/retiros',
+        element: (
+          <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
+            <WithdrawalsListPage />
           </ProtectedRoute>
         ),
       },

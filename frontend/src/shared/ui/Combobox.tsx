@@ -5,7 +5,13 @@ import { cn } from '../utils/cn'
 import { Spinner } from './Spinner'
 
 export interface ComboboxOption {
-  id: number
+  /**
+   * Identidad de la opción (React key + para que el consumidor resuelva el objeto
+   * elegido). Admite string para entidades cuya identidad NO es un id numérico
+   * suelto: p. ej. una unidad de flota se identifica por el par (kind, id), y un
+   * tracto y una carreta pueden compartir id, así que su clave es `kind:id`.
+   */
+  id: number | string
   label: string
   sublabel?: string
 }

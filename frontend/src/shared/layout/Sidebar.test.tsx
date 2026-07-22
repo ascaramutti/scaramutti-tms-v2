@@ -156,21 +156,25 @@ describe('Sidebar - módulo Almacén', () => {
     expect(screen.queryByText(/^comercial$/i)).not.toBeInTheDocument()
   })
 
-  it('retiros y reportes esperan su pantalla (deshabilitados)', async () => {
+  it('reportes espera su pantalla (deshabilitado)', async () => {
     renderSidebarAs('warehouse_keeper')
     await waitFor(() => {
       expect(screen.getByText(/usuario warehouse_keeper/i)).toBeInTheDocument()
     })
-    for (const label of ['Retiros', 'Reportes']) {
-      expect(screen.queryByRole('link', { name: new RegExp(label, 'i') })).not.toBeInTheDocument()
-      expect(screen.getByText(label).closest('span')).toHaveAttribute('aria-disabled', 'true')
-    }
+    expect(screen.queryByRole('link', { name: /reportes/i })).not.toBeInTheDocument()
+    expect(screen.getByText('Reportes').closest('span')).toHaveAttribute('aria-disabled', 'true')
   })
 
   it('entradas navega a su listado', async () => {
     renderSidebarAs('warehouse_keeper')
     const entradas = await screen.findByRole('link', { name: /entradas/i })
     expect(entradas).toHaveAttribute('href', '/cotizaciones/almacen/entradas')
+  })
+
+  it('retiros navega a su listado', async () => {
+    renderSidebarAs('warehouse_keeper')
+    const retiros = await screen.findByRole('link', { name: /retiros/i })
+    expect(retiros).toHaveAttribute('href', '/cotizaciones/almacen/retiros')
   })
 
   it('en entradas se resalta Entradas y NO Existencias', async () => {

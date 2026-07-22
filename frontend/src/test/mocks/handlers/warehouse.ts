@@ -5,17 +5,21 @@ import type {
   PageOfWarehouseProduct,
   PageOfWarehousePurchaseInvoiceSummary,
   PageOfWarehouseSupplier,
+  PageOfWarehouseWithdrawal,
   Problem,
   UserResponse,
   WarehouseKardexMovementResponse,
   WarehouseProductCategoryResponse,
   WarehouseProductResponse,
+  WarehouseProductStockResponse,
   WarehousePurchaseInvoiceResponse,
   WarehousePurchaseInvoiceSummary,
   WarehouseStatsResponse,
   WarehouseSupplierResponse,
   WarehouseUnitOfMeasureResponse,
+  WarehouseWithdrawalResponse,
 } from '../../../api'
+import { fakeWorker } from './shared-catalogs'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -229,6 +233,48 @@ export function fakeProductCategory(
   return { id: 7, name: 'Filtros', description: null, isActive: true, ...overrides }
 }
 
+/**
+ * ETag por defecto del retiro. El cero final NO aparece en el `updatedAt` del body
+ * (Jackson lo recorta): fija que el If-Match, cuando exista la edición/anulación,
+ * se arma desde el header y no desde el body.
+ */
+export const DEFAULT_WITHDRAWAL_ETAG = '"2026-07-10T09:00:00.392890Z"'
+
+/** Fixture de un retiro (fila del listado y respuesta del POST). */
+export function fakeWithdrawal(
+  overrides: Partial<WarehouseWithdrawalResponse> = {},
+): WarehouseWithdrawalResponse {
+  return {
+    id: 1,
+    product: { id: 1, code: 'PRO-0001', name: 'Filtro de aceite XYZ', unitCode: 'UND' },
+    quantity: 4,
+    withdrawnAt: '2026-07-10T09:00:00Z',
+    receivedBy: fakeWorker(),
+    fleetUnit: { kind: 'TRACTOR', id: 5, plate: 'ABC-123' },
+    observations: null,
+    status: 'ACTIVE',
+    cancelReason: null,
+    registeredBy: AUDIT_USER,
+    updatedAt: '2026-07-10T09:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Envuelve retiros en una página completa (PageMeta + content). */
+export function pageOfWithdrawals(
+  content: WarehouseWithdrawalResponse[],
+  meta: Partial<PageOfWarehouseWithdrawal> = {},
+): PageOfWarehouseWithdrawal {
+  return { ...pageMeta(content.length, meta), content }
+}
+
+/** Fixture del stock disponible en vivo de un producto. */
+export function fakeProductStock(
+  overrides: Partial<WarehouseProductStockResponse> = {},
+): WarehouseProductStockResponse {
+  return { productId: 1, stock: 12, minStock: 4, lowStock: false, ...overrides }
+}
+
 /** Default happy-path: listado de productos + KPIs + catálogo de categorías. */
 export const warehouseHandlers = [
   http.get(`${API}/warehouse/products`, () =>
@@ -335,6 +381,33 @@ export const warehouseHandlers = [
   ),
   http.post(`${API}/warehouse/purchase-invoices`, () =>
     HttpResponse.json(fakeInvoice(), { status: 201 }),
+  ),
+  http.get(`${API}/warehouse/products/:id/stock`, () =>
+    HttpResponse.json(fakeProductStock()),
+  ),
+  http.get(`${API}/warehouse/withdrawals`, () =>
+    HttpResponse.json(
+      pageOfWithdrawals([
+        fakeWithdrawal(),
+        fakeWithdrawal({
+          id: 2,
+          product: { id: 2, code: 'PRO-0002', name: 'Aceite 15W40', unitCode: 'GAL' },
+          quantity: 2,
+          receivedBy: fakeWorker({ id: 9, fullName: 'María López Díaz' }),
+          fleetUnit: { kind: 'TRAILER', id: 9, plate: 'XY-9876' },
+        }),
+        fakeWithdrawal({
+          id: 3,
+          quantity: 1,
+          fleetUnit: undefined,
+          status: 'CANCELLED',
+          cancelReason: 'Retiro duplicado',
+        }),
+      ]),
+    ),
+  ),
+  http.post(`${API}/warehouse/withdrawals`, () =>
+    HttpResponse.json(fakeWithdrawal(), { status: 201, headers: { ETag: DEFAULT_WITHDRAWAL_ETAG } }),
   ),
 ]
 
@@ -904,3 +977,134 @@ export function warehouseUnitsOfMeasure(units: WarehouseUnitOfMeasureResponse[])
 export function warehouseUnitsOfMeasureError(status: number, problem: Partial<Problem> = {}) {
   return http.get(`${API}/warehouse/units-of-measure`, () => problemResponse(status, problem))
 }
+
+// ----- Retiros (withdrawals) y stock en vivo -----
+
+/** Responde una página fija de retiros. */
+export function warehouseWithdrawalsPage(
+  content: WarehouseWithdrawalResponse[],
+  meta?: Partial<PageOfWarehouseWithdrawal>,
+) {
+  return http.get(`${API}/warehouse/withdrawals`, () =>
+    HttpResponse.json(pageOfWithdrawals(content, meta)),
+  )
+}
+
+/** Responde un listado de retiros vacío. */
+export function warehouseWithdrawalsEmpty() {
+  return http.get(`${API}/warehouse/withdrawals`, () =>
+    HttpResponse.json(pageOfWithdrawals([])),
+  )
+}
+
+/** Responde el listado de retiros con un delay (para observar el estado de carga). */
+export function warehouseWithdrawalsSlow(content: WarehouseWithdrawalResponse[] = [], ms = 40) {
+  return http.get(`${API}/warehouse/withdrawals`, async () => {
+    await delay(ms)
+    return HttpResponse.json(pageOfWithdrawals(content))
+  })
+}
+
+/** Responde un error en el listado de retiros (Problem RFC 7807). */
+export function warehouseWithdrawalsError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/withdrawals`, () => problemResponse(status, problem))
+}
+
+/** Captura los query params de cada request del listado de retiros. */
+export function warehouseWithdrawalsCapture(
+  sink: ProductsCaptureSink,
+  content: WarehouseWithdrawalResponse[] = [fakeWithdrawal()],
+  meta?: Partial<PageOfWarehouseWithdrawal>,
+) {
+  sink.calls = []
+  return http.get(`${API}/warehouse/withdrawals`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    sink.params = params
+    sink.calls = [...(sink.calls ?? []), params]
+    return HttpResponse.json(pageOfWithdrawals(content, meta))
+  })
+}
+
+/** Responde según el `page` solicitado (para testear navegación entre páginas). */
+export function warehouseWithdrawalsPagedByParam(totalElements = 25, size = 10) {
+  return http.get(`${API}/warehouse/withdrawals`, ({ request }) => {
+    const page = Number(new URL(request.url).searchParams.get('page') ?? 0)
+    return HttpResponse.json(
+      pageOfWithdrawals(
+        [
+          fakeWithdrawal({
+            id: page * 100 + 1,
+            product: { id: 1, code: `P${page}`, name: `Producto P${page}`, unitCode: 'UND' },
+          }),
+        ],
+        { totalElements, size, page },
+      ),
+    )
+  })
+}
+
+/** OK en la página 0, error en las siguientes (un refetch fallido no borra la tabla). */
+export function warehouseWithdrawalsOkThenErrorOnNextPage(
+  content: WarehouseWithdrawalResponse[],
+  meta: Partial<PageOfWarehouseWithdrawal> = {},
+) {
+  return http.get(`${API}/warehouse/withdrawals`, ({ request }) => {
+    const page = Number(new URL(request.url).searchParams.get('page') ?? 0)
+    if (page === 0) return HttpResponse.json(pageOfWithdrawals(content, meta))
+    return problemResponse(500, { detail: 'Fallo al paginar' })
+  })
+}
+
+/** Captura el body del POST del retiro. */
+export function createWithdrawalCapture(
+  sink: BodyCaptureSink,
+  response: WarehouseWithdrawalResponse = fakeWithdrawal(),
+) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/withdrawals`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.body = body
+    sink.calls = [...(sink.calls ?? []), body]
+    return HttpResponse.json(response, { status: 201, headers: { ETag: DEFAULT_WITHDRAWAL_ETAG } })
+  })
+}
+
+/** Responde el POST del retiro con un delay (para observar el estado en vuelo). */
+export function createWithdrawalSlow(sink: BodyCaptureSink, ms = 40) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/withdrawals`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.calls = [...(sink.calls ?? []), body]
+    await delay(ms)
+    return HttpResponse.json(fakeWithdrawal(), { status: 201 })
+  })
+}
+
+/** Responde un error en el POST del retiro (409 WH-001, 400 WH-004/WH-005, 500). */
+export function createWithdrawalError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/warehouse/withdrawals`, () => problemResponse(status, problem))
+}
+
+/** Responde el stock en vivo de un producto con los valores dados. */
+export function warehouseProductStock(overrides: Partial<WarehouseProductStockResponse> = {}) {
+  return http.get(`${API}/warehouse/products/:id/stock`, () =>
+    HttpResponse.json(fakeProductStock(overrides)),
+  )
+}
+
+/** Responde el stock en vivo con un delay (para observar el estado de carga). */
+export function warehouseProductStockSlow(
+  overrides: Partial<WarehouseProductStockResponse> = {},
+  ms = 40,
+) {
+  return http.get(`${API}/warehouse/products/:id/stock`, async () => {
+    await delay(ms)
+    return HttpResponse.json(fakeProductStock(overrides))
+  })
+}
+
+/** Responde un error en el stock en vivo (Problem RFC 7807). */
+export function warehouseProductStockError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/products/:id/stock`, () => problemResponse(status, problem))
+}
+
