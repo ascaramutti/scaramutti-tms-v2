@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form'
-import type { WarehouseProductResponse } from '../../../api'
+import type { WarehouseProductSummary } from '../../../api'
 import { cn } from '../../../shared/utils/cn'
 import { formatCurrency } from '../../../shared/utils/formatters'
 import {
@@ -14,6 +14,11 @@ import { EntryProductField } from './EntryProductField'
 interface EntryItemsTableProps {
   /** Código de moneda elegido en la cabecera, para formatear los importes. */
   currencyCode?: string
+  /**
+   * Producto ya elegido por fila al montar, alineado con `defaultValues.items`
+   * (la edición siembra el prefill). En modo alta llega `undefined` → todo vacío.
+   */
+  initialSelectedProducts?: Array<WarehouseProductSummary | null>
 }
 
 const inputClasses =
@@ -36,7 +41,7 @@ function lineTotal(quantity: number | undefined, unitPrice: number | undefined):
  * cada input lleva su propio rótulo accesible con el número de fila (mismo
  * patrón que las características del producto).
  */
-export function EntryItemsTable({ currencyCode }: EntryItemsTableProps) {
+export function EntryItemsTable({ currencyCode, initialSelectedProducts }: EntryItemsTableProps) {
   const {
     control,
     register,
@@ -45,10 +50,13 @@ export function EntryItemsTable({ currencyCode }: EntryItemsTableProps) {
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
   // El producto elegido se indexa por el id de fila de react-hook-form, no por
   // posición: quitar una fila del medio correría los índices y la fila siguiente
-  // mostraría el producto de su vecina.
+  // mostraría el producto de su vecina. Se siembra una vez con el prefill: los
+  // `field.id` del primer render reflejan `defaultValues.items` en orden.
   const [selectedByRow, setSelectedByRow] = useState<
-    Record<string, WarehouseProductResponse | null>
-  >({})
+    Record<string, WarehouseProductSummary | null>
+  >(() =>
+    Object.fromEntries(fields.map((field, index) => [field.id, initialSelectedProducts?.[index] ?? null])),
+  )
 
   const items = useWatch({ control, name: 'items' })
   const total = (items ?? []).reduce(
@@ -137,7 +145,7 @@ export function EntryItemsTable({ currencyCode }: EntryItemsTableProps) {
                   {/* La unidad va al costado del número: "1000 GAL" se lee de un vistazo. */}
                   {selected && (
                     <span className="whitespace-nowrap text-xs text-slate-500">
-                      {selected.unitOfMeasure.code}
+                      {selected.unitCode}
                     </span>
                   )}
                 </div>

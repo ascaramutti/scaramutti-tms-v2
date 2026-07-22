@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useFormContext } from 'react-hook-form'
-import type { WarehouseProductResponse } from '../../../api'
+import type { WarehouseProductResponse, WarehouseProductSummary } from '../../../api'
 import { Combobox, type ComboboxOption } from '../../../shared/ui/Combobox'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import {
@@ -19,16 +19,32 @@ const SEARCH_DEBOUNCE_MS = 300
 interface EntryProductFieldProps {
   /** Índice de la fila: cada ítem tiene su propio combobox e id. */
   index: number
-  selected: WarehouseProductResponse | null
-  onSelectedChange: (product: WarehouseProductResponse | null) => void
+  /**
+   * Producto elegido, como `WarehouseProductSummary`: es el shape mínimo que la
+   * fila necesita (código, nombre y unidad) y el mismo que traen los ítems de una
+   * factura existente, así el prefill de la edición se siembra sin adaptación.
+   */
+  selected: WarehouseProductSummary | null
+  onSelectedChange: (product: WarehouseProductSummary | null) => void
   error?: string
 }
 
-function toOption(product: WarehouseProductResponse): ComboboxOption {
+/** Baja el producto completo de la búsqueda/alta al summary que la fila necesita. */
+function productResponseToSummary(product: WarehouseProductResponse): WarehouseProductSummary {
+  return {
+    id: product.id,
+    code: product.code,
+    name: product.name,
+    unitCode: product.unitOfMeasure.code,
+  }
+}
+
+function toOption(product: WarehouseProductSummary): ComboboxOption {
   return {
     id: product.id,
     label: product.name,
-    sublabel: `${product.code} · ${product.unitOfMeasure.code}`,
+    // `code` es opcional en el summary: sin él, la unidad sola hace de sublabel.
+    sublabel: product.code ? `${product.code} · ${product.unitCode}` : product.unitCode,
   }
 }
 
@@ -49,10 +65,12 @@ export function EntryProductField({
   const debouncedQuery = useDebouncedValue(query, SEARCH_DEBOUNCE_MS)
   const { data, isFetching, isError } = useWarehouseProductsSearch(debouncedQuery)
 
-  const options = (data?.content ?? []).map(toOption)
+  const options = (data?.content ?? []).map((product) =>
+    toOption(productResponseToSummary(product)),
+  )
 
   function applyProduct(product: WarehouseProductResponse) {
-    onSelectedChange(product)
+    onSelectedChange(productResponseToSummary(product))
     setValue(`items.${index}.productId`, product.id, {
       shouldValidate: true,
       shouldTouch: true,

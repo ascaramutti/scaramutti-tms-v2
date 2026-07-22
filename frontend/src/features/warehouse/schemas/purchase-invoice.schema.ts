@@ -90,6 +90,32 @@ export type PurchaseInvoiceFormInput = z.infer<typeof purchaseInvoiceFormSchema>
 export type PurchaseInvoiceItemInput = z.infer<typeof invoiceItemSchema>
 
 /**
+ * Espejo de `WarehousePurchaseInvoiceUpdateRequest.reason` en el contrato
+ * (`minLength: 10, maxLength: 500`, requerido). La edición exige una
+ * justificación que va a `almacen.audit_logs` con el diff por campo (RN-WH4).
+ * Constantes propias, no las de la anulación: son dos reglas de dominio distintas
+ * aunque hoy coincidan los números.
+ */
+export const EDIT_REASON_MIN_LENGTH = 10
+export const EDIT_REASON_MAX_LENGTH = 500
+
+/**
+ * Form de EDICIÓN de una entrada. Extiende el de alta con el motivo obligatorio.
+ * El `supplierId` sigue en el schema (prefilled) pero NO viaja al PUT: el
+ * proveedor es inmutable y el contrato no lo acepta, igual que la unidad de medida
+ * en la edición de un producto. Validar un campo que no se envía nunca bloquea.
+ */
+export const purchaseInvoiceEditFormSchema = purchaseInvoiceFormSchema.extend({
+  reason: z
+    .string()
+    .trim()
+    .min(EDIT_REASON_MIN_LENGTH, `El motivo debe tener al menos ${EDIT_REASON_MIN_LENGTH} caracteres`)
+    .max(EDIT_REASON_MAX_LENGTH, `Máximo ${EDIT_REASON_MAX_LENGTH} caracteres`),
+})
+
+export type PurchaseInvoiceEditFormInput = z.infer<typeof purchaseInvoiceEditFormSchema>
+
+/**
  * Fila del form ANTES de validar: los números pueden ser `NaN` (lo que produce un
  * input numérico vacío con `valueAsNumber`). Es un tipo aparte del validado a
  * propósito: `PurchaseInvoiceItemInput` afirma que el ítem pasó el schema.
