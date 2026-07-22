@@ -49,6 +49,19 @@ export function formatDateOnly(isoDate: string): string {
 }
 
 /**
+ * Fecha de hoy como `YYYY-MM-DD` en la zona del navegador, para comparar contra
+ * los date-only del contrato (`invoiceDate`) y para el `max` de los inputs de
+ * fecha. Se arma con los componentes locales a propósito: `toISOString()` pasa
+ * por UTC y en Lima (UTC-5) devolvería el día siguiente después de las 19:00.
+ */
+export function todayIsoDate(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+/**
  * Formatea una cantidad de inventario en formato es-PE (separador de miles).
  * El contrato tipa stock y mínimos como `number`, así que admite decimales
  * (unidades como litros o galones): se muestran hasta 2, sin rellenar con

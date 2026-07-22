@@ -1,13 +1,20 @@
 import { http, HttpResponse, delay } from 'msw'
 import type {
+  PageMeta,
   PageOfWarehouseKardexMovement,
   PageOfWarehouseProduct,
+  PageOfWarehousePurchaseInvoiceSummary,
+  PageOfWarehouseSupplier,
   Problem,
   UserResponse,
   WarehouseKardexMovementResponse,
   WarehouseProductCategoryResponse,
   WarehouseProductResponse,
+  WarehousePurchaseInvoiceResponse,
+  WarehousePurchaseInvoiceSummary,
   WarehouseStatsResponse,
+  WarehouseSupplierResponse,
+  WarehouseUnitOfMeasureResponse,
 } from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
@@ -49,27 +56,35 @@ export function fakeProduct(
   }
 }
 
+/**
+ * Metadatos de una página a partir de la cantidad de filas y los overrides. Lo
+ * comparten todos los `pageOf*`: la aritmética de paginado es la misma para
+ * productos, kardex, proveedores y facturas.
+ */
+function pageMeta(numberOfElements: number, meta: Partial<PageMeta> = {}): PageMeta {
+  const size = meta.size ?? 10
+  const page = meta.page ?? 0
+  const totalElements = meta.totalElements ?? numberOfElements
+  const totalPages = meta.totalPages ?? (totalElements === 0 ? 0 : Math.ceil(totalElements / size))
+  return {
+    page,
+    size,
+    totalElements,
+    totalPages,
+    numberOfElements,
+    first: page === 0,
+    last: totalPages === 0 || page >= totalPages - 1,
+    empty: numberOfElements === 0,
+    ...meta,
+  }
+}
+
 /** Envuelve un array de productos en una página completa (PageMeta + content). */
 export function pageOfProducts(
   content: WarehouseProductResponse[],
   meta: Partial<PageOfWarehouseProduct> = {},
 ): PageOfWarehouseProduct {
-  const size = meta.size ?? 10
-  const page = meta.page ?? 0
-  const totalElements = meta.totalElements ?? content.length
-  const totalPages = meta.totalPages ?? (totalElements === 0 ? 0 : Math.ceil(totalElements / size))
-  return {
-    content,
-    page,
-    size,
-    totalElements,
-    totalPages,
-    numberOfElements: content.length,
-    first: page === 0,
-    last: totalPages === 0 || page >= totalPages - 1,
-    empty: content.length === 0,
-    ...meta,
-  }
+  return { ...pageMeta(content.length, meta), content }
 }
 
 /** Fixture de los KPIs del strip. */
@@ -106,21 +121,98 @@ export function pageOfKardex(
   content: WarehouseKardexMovementResponse[],
   meta: Partial<PageOfWarehouseKardexMovement> = {},
 ): PageOfWarehouseKardexMovement {
-  const size = meta.size ?? 10
-  const page = meta.page ?? 0
-  const totalElements = meta.totalElements ?? content.length
-  const totalPages = meta.totalPages ?? (totalElements === 0 ? 0 : Math.ceil(totalElements / size))
+  return { ...pageMeta(content.length, meta), content }
+}
+
+/** Fixture de proveedor. */
+export function fakeSupplier(
+  overrides: Partial<WarehouseSupplierResponse> = {},
+): WarehouseSupplierResponse {
   return {
-    content,
-    page,
-    size,
-    totalElements,
-    totalPages,
-    numberOfElements: content.length,
-    first: page === 0,
-    last: totalPages === 0 || page >= totalPages - 1,
-    empty: content.length === 0,
-    ...meta,
+    id: 4,
+    name: 'REPUESTOS DIÉSEL S.A.C.',
+    ruc: '20512345678',
+    phone: '987654321',
+    contactName: 'Marta Ríos',
+    isActive: true,
+    createdAt: '2026-04-01T10:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Envuelve proveedores en una página completa. */
+export function pageOfSuppliers(
+  content: WarehouseSupplierResponse[],
+  meta: Partial<PageOfWarehouseSupplier> = {},
+): PageOfWarehouseSupplier {
+  return { ...pageMeta(content.length, meta), content }
+}
+
+/** Catálogo de unidades de medida, ordenado por código como lo devuelve el backend. */
+export const UNITS_OF_MEASURE_SEED: WarehouseUnitOfMeasureResponse[] = [
+  { id: 5, code: 'CJA', name: 'Caja', isActive: true },
+  { id: 2, code: 'GAL', name: 'Galón', isActive: true },
+  { id: 4, code: 'KG', name: 'Kilogramo', isActive: true },
+  { id: 3, code: 'LT', name: 'Litro', isActive: true },
+  { id: 1, code: 'UND', name: 'Unidad', isActive: true },
+]
+
+/** Fixture de fila del listado de entradas. */
+export function fakeInvoiceSummary(
+  overrides: Partial<WarehousePurchaseInvoiceSummary> = {},
+): WarehousePurchaseInvoiceSummary {
+  return {
+    id: 1,
+    supplier: { id: 4, name: 'REPUESTOS DIÉSEL S.A.C.' },
+    invoiceNumber: 'F001-00123',
+    invoiceDate: '2026-07-02',
+    guideNumber: 'T001-0004567',
+    currencyCode: 'PEN',
+    itemsCount: 2,
+    total: 894,
+    status: 'ACTIVE',
+    cancelReason: null,
+    registeredBy: AUDIT_USER,
+    createdAt: '2026-07-02T10:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Envuelve facturas en una página completa. */
+export function pageOfInvoices(
+  content: WarehousePurchaseInvoiceSummary[],
+  meta: Partial<PageOfWarehousePurchaseInvoiceSummary> = {},
+): PageOfWarehousePurchaseInvoiceSummary {
+  return { ...pageMeta(content.length, meta), content }
+}
+
+/** Fixture de la factura completa que devuelve el POST. */
+export function fakeInvoice(
+  overrides: Partial<WarehousePurchaseInvoiceResponse> = {},
+): WarehousePurchaseInvoiceResponse {
+  return {
+    id: 1,
+    supplier: { id: 4, name: 'REPUESTOS DIÉSEL S.A.C.', ruc: '20512345678' },
+    invoiceNumber: 'F001-00123',
+    invoiceDate: '2026-07-02',
+    guideNumber: 'T001-0004567',
+    currency: { id: 2, code: 'PEN', symbol: 'S/' },
+    observations: null,
+    items: [
+      {
+        id: 1,
+        product: { id: 1, code: 'PRO-0001', name: 'Filtro de aceite XYZ', unitCode: 'UND' },
+        quantity: 10,
+        unitPrice: 45,
+        subtotal: 450,
+      },
+    ],
+    total: 450,
+    status: 'ACTIVE',
+    registeredBy: AUDIT_USER,
+    createdAt: '2026-07-02T10:00:00Z',
+    updatedAt: '2026-07-02T10:00:00Z',
+    ...overrides,
   }
 }
 
@@ -198,6 +290,45 @@ export const warehouseHandlers = [
       fakeProductCategory({ id: 7, name: 'Filtros' }),
       fakeProductCategory({ id: 8, name: 'Lubricantes' }),
     ]),
+  ),
+  http.post(`${API}/warehouse/products`, () =>
+    HttpResponse.json(fakeProduct({ id: 42, code: 'PRO-0042' }), { status: 201 }),
+  ),
+  http.get(`${API}/warehouse/units-of-measure`, () => HttpResponse.json(UNITS_OF_MEASURE_SEED)),
+  http.get(`${API}/warehouse/suppliers`, () =>
+    HttpResponse.json(
+      pageOfSuppliers([
+        fakeSupplier(),
+        fakeSupplier({ id: 5, name: 'LUBRICANTES DEL NORTE E.I.R.L.', ruc: '20698765432' }),
+      ]),
+    ),
+  ),
+  http.post(`${API}/warehouse/suppliers`, () =>
+    HttpResponse.json(fakeSupplier({ id: 99, name: 'Proveedor nuevo' }), { status: 201 }),
+  ),
+  http.get(`${API}/warehouse/purchase-invoices`, () =>
+    HttpResponse.json(
+      pageOfInvoices([
+        fakeInvoiceSummary(),
+        fakeInvoiceSummary({
+          id: 2,
+          invoiceNumber: 'F001-00124',
+          supplier: { id: 5, name: 'LUBRICANTES DEL NORTE E.I.R.L.' },
+          guideNumber: null,
+          itemsCount: 1,
+          total: 320.5,
+        }),
+        fakeInvoiceSummary({
+          id: 3,
+          invoiceNumber: 'F002-00001',
+          status: 'CANCELLED',
+          cancelReason: 'Factura cargada dos veces',
+        }),
+      ]),
+    ),
+  ),
+  http.post(`${API}/warehouse/purchase-invoices`, () =>
+    HttpResponse.json(fakeInvoice(), { status: 201 }),
   ),
 ]
 
@@ -471,4 +602,190 @@ export function createWarehouseProductCategoryError(
   problem: Partial<Problem> = {},
 ) {
   return http.post(`${API}/warehouse/product-categories`, () => problemResponse(status, problem))
+}
+
+// ----- Entradas (facturas de compra), proveedores y unidades de medida -----
+
+/** Sink de un POST: body enviado y cantidad de llamadas observadas. */
+export interface BodyCaptureSink {
+  body?: Record<string, unknown>
+  calls?: Record<string, unknown>[]
+}
+
+/** Responde una página fija de entradas. */
+export function warehouseInvoicesPage(
+  content: WarehousePurchaseInvoiceSummary[],
+  meta?: Partial<PageOfWarehousePurchaseInvoiceSummary>,
+) {
+  return http.get(`${API}/warehouse/purchase-invoices`, () =>
+    HttpResponse.json(pageOfInvoices(content, meta)),
+  )
+}
+
+/** Responde un listado de entradas vacío. */
+export function warehouseInvoicesEmpty() {
+  return http.get(`${API}/warehouse/purchase-invoices`, () =>
+    HttpResponse.json(pageOfInvoices([])),
+  )
+}
+
+/** Responde el listado de entradas con un delay (para observar el estado de carga). */
+export function warehouseInvoicesSlow(
+  content: WarehousePurchaseInvoiceSummary[] = [],
+  ms = 40,
+) {
+  return http.get(`${API}/warehouse/purchase-invoices`, async () => {
+    await delay(ms)
+    return HttpResponse.json(pageOfInvoices(content))
+  })
+}
+
+/** Responde un error en el listado de entradas (Problem RFC 7807). */
+export function warehouseInvoicesError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/purchase-invoices`, () => problemResponse(status, problem))
+}
+
+/** Captura los query params de cada request del listado de entradas. */
+export function warehouseInvoicesCapture(
+  sink: ProductsCaptureSink,
+  content: WarehousePurchaseInvoiceSummary[] = [fakeInvoiceSummary()],
+  meta?: Partial<PageOfWarehousePurchaseInvoiceSummary>,
+) {
+  sink.calls = []
+  return http.get(`${API}/warehouse/purchase-invoices`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    sink.params = params
+    sink.calls = [...(sink.calls ?? []), params]
+    return HttpResponse.json(pageOfInvoices(content, meta))
+  })
+}
+
+/** Responde según el `page` solicitado (para testear navegación entre páginas). */
+export function warehouseInvoicesPagedByParam(totalElements = 25, size = 10) {
+  return http.get(`${API}/warehouse/purchase-invoices`, ({ request }) => {
+    const page = Number(new URL(request.url).searchParams.get('page') ?? 0)
+    return HttpResponse.json(
+      pageOfInvoices([fakeInvoiceSummary({ id: page * 100 + 1, invoiceNumber: `F00${page}-1` })], {
+        totalElements,
+        size,
+        page,
+      }),
+    )
+  })
+}
+
+/** OK en la página 0, error en las siguientes (un refetch fallido no borra la tabla). */
+export function warehouseInvoicesOkThenErrorOnNextPage(
+  content: WarehousePurchaseInvoiceSummary[],
+  meta: Partial<PageOfWarehousePurchaseInvoiceSummary> = {},
+) {
+  return http.get(`${API}/warehouse/purchase-invoices`, ({ request }) => {
+    const page = Number(new URL(request.url).searchParams.get('page') ?? 0)
+    if (page === 0) return HttpResponse.json(pageOfInvoices(content, meta))
+    return problemResponse(500, { detail: 'Fallo al paginar' })
+  })
+}
+
+/** Captura el body del POST de la entrada. */
+export function createInvoiceCapture(
+  sink: BodyCaptureSink,
+  response: WarehousePurchaseInvoiceResponse = fakeInvoice(),
+) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/purchase-invoices`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.body = body
+    sink.calls = [...(sink.calls ?? []), body]
+    return HttpResponse.json(response, { status: 201 })
+  })
+}
+
+/** Responde el POST de la entrada con un delay (para observar el estado en vuelo). */
+export function createInvoiceSlow(sink: BodyCaptureSink, ms = 40) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/purchase-invoices`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.calls = [...(sink.calls ?? []), body]
+    await delay(ms)
+    return HttpResponse.json(fakeInvoice(), { status: 201 })
+  })
+}
+
+/** Responde un error en el POST de la entrada (409 WH-002, 400 WH-004, 500). */
+export function createInvoiceError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/warehouse/purchase-invoices`, () => problemResponse(status, problem))
+}
+
+/** Responde la búsqueda de proveedores con la página dada. */
+export function warehouseSuppliersPage(content: WarehouseSupplierResponse[]) {
+  return http.get(`${API}/warehouse/suppliers`, () =>
+    HttpResponse.json(pageOfSuppliers(content)),
+  )
+}
+
+/** Captura los query params de la búsqueda de proveedores. */
+export function warehouseSuppliersCapture(
+  sink: ProductsCaptureSink,
+  content: WarehouseSupplierResponse[] = [fakeSupplier()],
+) {
+  sink.calls = []
+  return http.get(`${API}/warehouse/suppliers`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    sink.params = params
+    sink.calls = [...(sink.calls ?? []), params]
+    return HttpResponse.json(pageOfSuppliers(content))
+  })
+}
+
+/** Responde un error en la búsqueda de proveedores. */
+export function warehouseSuppliersError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/suppliers`, () => problemResponse(status, problem))
+}
+
+/** Captura el body del POST de proveedor (crear al vuelo). */
+export function createSupplierCapture(
+  sink: BodyCaptureSink,
+  response: WarehouseSupplierResponse = fakeSupplier({ id: 99, name: 'Proveedor nuevo' }),
+) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/suppliers`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.body = body
+    sink.calls = [...(sink.calls ?? []), body]
+    return HttpResponse.json(response, { status: 201 })
+  })
+}
+
+/** Responde un error al crear el proveedor (409 WH-010 duplicado). */
+export function createSupplierError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/warehouse/suppliers`, () => problemResponse(status, problem))
+}
+
+/** Captura el body del POST de producto (alta al vuelo). */
+export function createWarehouseProductCapture(
+  sink: BodyCaptureSink,
+  response: WarehouseProductResponse = fakeProduct({ id: 42, code: 'PRO-0042' }),
+) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/products`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.body = body
+    sink.calls = [...(sink.calls ?? []), body]
+    return HttpResponse.json(response, { status: 201 })
+  })
+}
+
+/** Responde un error al crear el producto (409 WH-010 identidad duplicada). */
+export function createWarehouseProductError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/warehouse/products`, () => problemResponse(status, problem))
+}
+
+/** Responde el catálogo de unidades de medida con la lista dada. */
+export function warehouseUnitsOfMeasure(units: WarehouseUnitOfMeasureResponse[]) {
+  return http.get(`${API}/warehouse/units-of-measure`, () => HttpResponse.json(units))
+}
+
+/** Responde un error en el catálogo de unidades de medida. */
+export function warehouseUnitsOfMeasureError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/units-of-measure`, () => problemResponse(status, problem))
 }

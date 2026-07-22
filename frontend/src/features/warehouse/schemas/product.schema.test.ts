@@ -1,10 +1,18 @@
 import { describe, expect, it } from 'vitest'
-import { productFormSchema, type ProductFormInput } from './product.schema'
+import {
+  productBaseSchema,
+  productCreateSchema,
+  type ProductCreateInput,
+  type ProductFormInput,
+} from './product.schema'
+import { toProductUpdateRequest } from '../hooks/useUpdateWarehouseProduct'
 
 /** El form arranca con la categoría en `null` hasta que se elige una, así que el
  * tipo de entrada es más laxo que el de salida del schema. */
 type ProductFormDraft = Omit<Partial<ProductFormInput>, 'categoryId'> & {
   categoryId?: number | null
+  /** Solo la creación acepta la unidad; la edición la ignora (es inmutable). */
+  unitOfMeasureId?: number
 }
 
 function input(overrides: ProductFormDraft = {}) {
@@ -22,16 +30,16 @@ function input(overrides: ProductFormDraft = {}) {
 
 /** Primer mensaje de error de un campo (o `undefined` si el campo validó bien). */
 function errorFor(value: unknown, path: (string | number)[]): string | undefined {
-  const result = productFormSchema.safeParse(value)
+  const result = productBaseSchema.safeParse(value)
   if (result.success) return undefined
   return result.error.issues.find(
     (issue) => issue.path.join('.') === path.join('.'),
   )?.message
 }
 
-describe('productFormSchema', () => {
+describe('productBaseSchema (campos comunes de alta y edición)', () => {
   it('acepta un producto completo', () => {
-    expect(productFormSchema.safeParse(input()).success).toBe(true)
+    expect(productBaseSchema.safeParse(input()).success).toBe(true)
   })
 
   it('exige un nombre de al menos 3 caracteres', () => {
@@ -40,7 +48,7 @@ describe('productFormSchema', () => {
 
   it('acota el nombre a 200 caracteres, como el contrato', () => {
     expect(errorFor(input({ name: 'a'.repeat(201) }), ['name'])).toMatch(/200/)
-    expect(productFormSchema.safeParse(input({ name: 'a'.repeat(200) })).success).toBe(true)
+    expect(productBaseSchema.safeParse(input({ name: 'a'.repeat(200) })).success).toBe(true)
   })
 
   it('acota marca y número de parte a 100 caracteres', () => {
@@ -57,8 +65,8 @@ describe('productFormSchema', () => {
   })
 
   it('acepta un stock mínimo en cero y con decimales', () => {
-    expect(productFormSchema.safeParse(input({ minStock: 0 })).success).toBe(true)
-    expect(productFormSchema.safeParse(input({ minStock: 2.5 })).success).toBe(true)
+    expect(productBaseSchema.safeParse(input({ minStock: 0 })).success).toBe(true)
+    expect(productBaseSchema.safeParse(input({ minStock: 2.5 })).success).toBe(true)
   })
 
   it('exige el stock mínimo cuando el campo queda vacío', () => {
@@ -87,5 +95,30 @@ describe('productFormSchema', () => {
       ['attributes', 1, 'key'],
     )
     expect(error).toMatch(/ya usaste esa característica/i)
+  })
+})
+
+describe('productCreateSchema', () => {
+  it('exige la unidad de medida (el alta sí la acepta)', () => {
+    const result = productCreateSchema.safeParse(input({ unitOfMeasureId: 0 }))
+    expect(result.success).toBe(false)
+    expect(
+      !result.success &&
+        result.error.issues.find((issue) => issue.path[0] === 'unitOfMeasureId')?.message,
+    ).toBe('Selecciona la unidad de medida')
+  })
+
+  it('acepta el alta con unidad elegida', () => {
+    expect(productCreateSchema.safeParse(input({ unitOfMeasureId: 1 })).success).toBe(true)
+  })
+
+  it('el body del PUT no lleva la unidad aunque el form la tenga (es inmutable)', () => {
+    // El modal es uno solo y su form siempre incluye la unidad; lo que la deja
+    // afuera del PUT es el mapper, no el schema.
+    const body = toProductUpdateRequest(
+      { ...input(), unitOfMeasureId: 1 } as ProductCreateInput,
+      true,
+    )
+    expect(body).not.toHaveProperty('unitOfMeasureId')
   })
 })

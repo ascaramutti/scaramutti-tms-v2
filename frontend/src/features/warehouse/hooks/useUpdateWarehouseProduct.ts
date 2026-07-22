@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { updateWarehouseProduct, type WarehouseProductUpdateRequest } from '../../../api'
 import { readEtag } from '../../../shared/utils/etag'
+import { trimToNull } from '../../../shared/utils/trimToNull'
 import { warehouseKeys } from '../queryKeys'
 import type { WarehouseProductWithEtag } from './useWarehouseProduct'
 import type { ProductFormInput } from '../schemas/product.schema'
@@ -10,12 +11,6 @@ interface UpdateWarehouseProductVariables {
   /** ETag OPACO del header del GET (no el `updatedAt` del body), para el header `If-Match`. */
   ifMatch: string
   body: WarehouseProductUpdateRequest
-}
-
-/** Texto opcional del form al valor del contrato: vacío es "sin valor", no cadena vacía. */
-function toNullableText(value: string | undefined): string | null {
-  const trimmed = value?.trim()
-  return trimmed ? trimmed : null
 }
 
 /**
@@ -36,13 +31,13 @@ export function toProductUpdateRequest(
   return {
     name: input.name.trim(),
     categoryId: input.categoryId,
-    brand: toNullableText(input.brand),
-    partNumber: toNullableText(input.partNumber),
+    brand: trimToNull(input.brand),
+    partNumber: trimToNull(input.partNumber),
     attributes: Object.fromEntries(
       input.attributes.map((attribute) => [attribute.key.trim(), attribute.value.trim()]),
     ),
     minStock: input.minStock,
-    observations: toNullableText(input.observations),
+    observations: trimToNull(input.observations),
     isActive: currentIsActive,
   }
 }

@@ -8,6 +8,8 @@ interface DateFieldProps<T extends FieldValues> {
   control: Control<T>
   /** Fecha mínima (`YYYY-MM-DD`), ej. hoy para no permitir fechas pasadas. */
   min?: string
+  /** Fecha máxima (`YYYY-MM-DD`), ej. hoy para no permitir fechas futuras. */
+  max?: string
   error?: string
   disabled?: boolean
   /** Clases extra para el `<label>` (ej. reservar altura en grids multi-columna para alinear). */
@@ -24,6 +26,7 @@ export function DateField<T extends FieldValues>({
   name,
   control,
   min,
+  max,
   error,
   disabled,
   labelClassName,
@@ -41,6 +44,7 @@ export function DateField<T extends FieldValues>({
             id={id}
             type="date"
             min={min}
+            max={max}
             disabled={disabled}
             value={field.value ?? ''}
             onChange={field.onChange}
