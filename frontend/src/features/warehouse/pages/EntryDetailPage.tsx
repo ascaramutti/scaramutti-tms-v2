@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Ban } from 'lucide-react'
+import { Ban, Pencil } from 'lucide-react'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { Badge } from '../../../shared/ui/Badge'
 import { EmptyState } from '../../../shared/ui/EmptyState'
@@ -98,14 +98,23 @@ export function EntryDetailPage() {
         divider
         action={
           isActive ? (
-            <button
-              type="button"
-              onClick={() => setCancelOpen(true)}
-              className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
-            >
-              <Ban className="h-4 w-4" aria-hidden="true" />
-              Anular
-            </button>
+            <div className="flex gap-2">
+              <Link
+                to={`${ENTRIES_PATH}/${data.id}/editar`}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Editar
+              </Link>
+              <button
+                type="button"
+                onClick={() => setCancelOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-200 bg-white px-4 py-2.5 text-sm font-medium text-red-700 shadow-sm hover:bg-red-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              >
+                <Ban className="h-4 w-4" aria-hidden="true" />
+                Anular
+              </button>
+            </div>
           ) : undefined
         }
       />

@@ -24,6 +24,7 @@ export function EntryCreatePage() {
       />
 
       <EntryForm
+        mode="create"
         onCreated={(invoice) => {
           toast.success(
             `Factura ${invoice.invoiceNumber} registrada. El stock ya refleja la entrada.`,

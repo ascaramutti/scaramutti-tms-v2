@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { todayIsoDate } from '../../../shared/utils/formatters'
 import {
+  EDIT_REASON_MAX_LENGTH,
+  EDIT_REASON_MIN_LENGTH,
   INVOICE_MAX_ITEMS,
   INVOICE_NUMBER_MAX_LENGTH,
   INVOICE_OBSERVATIONS_MAX_LENGTH,
+  purchaseInvoiceEditFormSchema,
   purchaseInvoiceFormSchema,
   type PurchaseInvoiceFormInput,
 } from './purchase-invoice.schema'
@@ -175,5 +178,39 @@ describe('purchaseInvoiceFormSchema', () => {
       { productId: 7, quantity: 2, unitPrice: 12 },
     ]
     expect(purchaseInvoiceFormSchema.safeParse({ ...VALID, items }).success).toBe(true)
+  })
+})
+
+describe('purchaseInvoiceEditFormSchema', () => {
+  const VALID_EDIT = { ...VALID, reason: 'Corregí el precio unitario del filtro' }
+
+  function reasonError(reason: unknown): string | undefined {
+    const result = purchaseInvoiceEditFormSchema.safeParse({ ...VALID_EDIT, reason })
+    if (result.success) return undefined
+    return result.error.issues.find((issue) => issue.path[0] === 'reason')?.message
+  }
+
+  it('acepta una edición con un motivo válido', () => {
+    expect(purchaseInvoiceEditFormSchema.safeParse(VALID_EDIT).success).toBe(true)
+  })
+
+  it('exige el motivo (mínimo del contrato)', () => {
+    expect(reasonError('corto')).toBe(
+      `El motivo debe tener al menos ${EDIT_REASON_MIN_LENGTH} caracteres`,
+    )
+    expect(reasonError('   ')).toBe(
+      `El motivo debe tener al menos ${EDIT_REASON_MIN_LENGTH} caracteres`,
+    )
+  })
+
+  it('rechaza un motivo más largo que el máximo del contrato', () => {
+    expect(reasonError('x'.repeat(EDIT_REASON_MAX_LENGTH + 1))).toBe(
+      `Máximo ${EDIT_REASON_MAX_LENGTH} caracteres`,
+    )
+  })
+
+  it('hereda las reglas de la cabecera (número de factura obligatorio)', () => {
+    const result = purchaseInvoiceEditFormSchema.safeParse({ ...VALID_EDIT, invoiceNumber: '' })
+    expect(result.success).toBe(false)
   })
 })

@@ -733,6 +733,33 @@ export function cancelInvoiceError(status: number, problem: Partial<Problem> = {
   )
 }
 
+/** Captura el body y el If-Match del PUT de edición de la entrada. */
+export function updateInvoiceSuccess(
+  sink: UpdateCaptureSink,
+  response: WarehousePurchaseInvoiceResponse = fakeInvoice(),
+) {
+  return http.put(`${API}/warehouse/purchase-invoices/:id`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    return HttpResponse.json(response, { headers: { ETag: '"v2"' } })
+  })
+}
+
+/** Responde el PUT de edición con un delay (para observar el estado "Guardando…"). */
+export function updateInvoiceSlow(sink: UpdateCaptureSink, ms = 40) {
+  return http.put(`${API}/warehouse/purchase-invoices/:id`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    await delay(ms)
+    return HttpResponse.json(fakeInvoice(), { headers: { ETag: '"v2"' } })
+  })
+}
+
+/** Responde un error en la edición (412 COM-004, 409 WH-002/WH-006/WH-008, 400, 500). */
+export function updateInvoiceError(status: number, problem: Partial<Problem> = {}) {
+  return http.put(`${API}/warehouse/purchase-invoices/:id`, () => problemResponse(status, problem))
+}
+
 /** Captura los query params de cada request del listado de entradas. */
 export function warehouseInvoicesCapture(
   sink: ProductsCaptureSink,

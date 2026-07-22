@@ -46,6 +46,10 @@ function renderDetalle(id = '1') {
               path="/cotizaciones/almacen/productos/:id"
               element={<div>FICHA PRODUCTO</div>}
             />
+            <Route
+              path="/cotizaciones/almacen/entradas/:id/editar"
+              element={<div>EDITAR STUB</div>}
+            />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -214,6 +218,21 @@ describe('EntryDetailPage', () => {
     renderDetalle()
     await screen.findByRole('heading', { level: 1 })
     expect(screen.queryByRole('button', { name: /anular/i })).not.toBeInTheDocument()
+  })
+
+  it('el botón Editar (solo si activa) lleva a la pantalla de edición', async () => {
+    server.use(warehouseInvoiceDetail())
+    renderDetalle()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('link', { name: /editar/i }))
+    expect(screen.getByText('EDITAR STUB')).toBeInTheDocument()
+  })
+
+  it('no muestra el botón Editar si la factura ya está anulada', async () => {
+    server.use(warehouseInvoiceDetail(CANCELLED_INVOICE))
+    renderDetalle()
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('link', { name: /editar/i })).not.toBeInTheDocument()
   })
 
   // ----- Anular: flujo -----
