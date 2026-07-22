@@ -6,12 +6,12 @@ import {
   type UseFormRegister,
 } from 'react-hook-form'
 import { cn } from '../../../shared/utils/cn'
-import type { ProductFormInput } from '../schemas/product.schema'
+import type { ProductCreateInput } from '../schemas/product.schema'
 
 interface ProductAttributesFieldProps {
-  control: Control<ProductFormInput>
-  register: UseFormRegister<ProductFormInput>
-  errors: FieldErrors<ProductFormInput>['attributes']
+  control: Control<ProductCreateInput>
+  register: UseFormRegister<ProductCreateInput>
+  errors: FieldErrors<ProductCreateInput>['attributes']
   disabled?: boolean
 }
 

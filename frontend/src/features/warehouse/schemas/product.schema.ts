@@ -25,11 +25,12 @@ const productAttributeSchema = z.object({
 })
 
 /**
- * Form de edición de producto. Espeja `WarehouseProductUpdateRequest`, que NO
- * incluye la unidad de medida: se fija al crear y es inmutable (el modal la
- * muestra como dato, no como campo).
+ * Campos comunes a crear y editar un producto. La unidad de medida NO está acá:
+ * solo el alta la acepta (ver `productCreateSchema`). El modal valida siempre con
+ * `productCreateSchema`, así que este esquema no se usa como resolver: define la
+ * forma compartida y el tipo de entrada del mapper del PUT.
  */
-export const productFormSchema = z.object({
+export const productBaseSchema = z.object({
   name: z
     .string()
     .trim()
@@ -74,4 +75,22 @@ export const productFormSchema = z.object({
   observations: z.string().trim().optional(),
 })
 
-export type ProductFormInput = z.infer<typeof productFormSchema>
+/**
+ * Form de alta de producto (crear al vuelo desde una entrada). Espeja
+ * `WarehouseProductRequest`, que sí exige la unidad de medida. `code` no está:
+ * lo asigna el backend.
+ */
+export const productCreateSchema = productBaseSchema.extend({
+  unitOfMeasureId: z
+    .number({ message: 'Selecciona la unidad de medida' })
+    .int()
+    .positive('Selecciona la unidad de medida'),
+})
+
+/**
+ * Lo que acepta `WarehouseProductUpdateRequest`: todo menos la unidad de medida,
+ * que se fija al crear y es inmutable. Es el tipo de entrada del mapper del PUT;
+ * el form usa `ProductCreateInput` en los dos modos porque el modal es uno solo.
+ */
+export type ProductFormInput = z.infer<typeof productBaseSchema>
+export type ProductCreateInput = z.infer<typeof productCreateSchema>

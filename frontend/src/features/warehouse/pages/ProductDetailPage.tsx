@@ -8,7 +8,7 @@ import { Spinner } from '../../../shared/ui/Spinner'
 import { useLastGoodPage } from '../../../shared/hooks/useLastGoodPage'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { KardexTable } from '../components/KardexTable'
-import { ProductEditModal } from '../components/ProductEditModal'
+import { ProductFormModal } from '../components/ProductFormModal'
 import { ProductInactiveBadge, ProductInfoCards } from '../components/ProductInfoCards'
 import { useWarehouseProduct } from '../hooks/useWarehouseProduct'
 import { useWarehouseProductKardex } from '../hooks/useWarehouseProductKardex'
@@ -151,7 +151,8 @@ export function ProductDetailPage() {
         />
       </section>
 
-      <ProductEditModal
+      <ProductFormModal
+        mode="edit"
         isOpen={isEditOpen}
         onClose={() => setEditOpen(false)}
         product={data}

@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '../utils/cn'
@@ -24,6 +25,14 @@ const FOCUSABLE =
  * Dialog modal reutilizable. A11y: `role="dialog"` + `aria-modal`, etiquetado
  * por el título, foco inicial al primer campo, focus-trap con Tab, cierre por
  * Escape y backdrop, y restauración del foco al elemento que lo abrió.
+ *
+ * Se monta con un portal en `document.body`, no donde se lo invoca: los modales
+ * de creación al vuelo se abren DESDE un formulario, y anidado quedaría un
+ * `<form>` dentro de otro, que es HTML inválido.
+ *
+ * El portal no alcanza para aislarlo: los eventos de React burbujean por el
+ * árbol de componentes, no por el DOM, así que el submit del form de adentro
+ * igual llegaría al de afuera. Por eso el panel también corta la propagación.
  */
 export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
@@ -76,7 +85,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
   if (!isOpen) return null
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="fixed inset-0 bg-slate-900/50" onClick={onClose} aria-hidden="true" />
       <div
@@ -84,6 +93,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
+        onSubmit={(event) => event.stopPropagation()}
         className={cn('relative w-full rounded-xl bg-white shadow-xl', SIZES[size])}
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
@@ -101,6 +111,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         </div>
         <div className="px-6 py-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
