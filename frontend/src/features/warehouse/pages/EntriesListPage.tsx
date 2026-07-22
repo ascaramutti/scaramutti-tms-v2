@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { PRIMARY_BUTTON } from '../../../shared/ui/buttonStyles'
@@ -25,6 +25,7 @@ function hasValidRange(filters: EntryFilters): boolean {
 
 /** Entradas del almacén: las facturas de compra que suman stock. */
 export function EntriesListPage() {
+  const navigate = useNavigate()
   const [filters, setFilters] = useState<EntryFilters>(EMPTY_ENTRY_FILTERS)
   const [page, setPage] = useState(0)
 
@@ -84,6 +85,9 @@ export function EntriesListPage() {
         onRetry={() => refetch()}
         onPageChange={setPage}
         hasActiveFilters={hasActiveFilters}
+        onRowClick={(invoice) =>
+          navigate(`/cotizaciones/almacen/entradas/${invoice.id}`)
+        }
       />
     </div>
   )

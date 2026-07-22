@@ -12,6 +12,7 @@ import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
 import { EntriesListPage } from './features/warehouse/pages/EntriesListPage'
 import { EntryCreatePage } from './features/warehouse/pages/EntryCreatePage'
+import { EntryDetailPage } from './features/warehouse/pages/EntryDetailPage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
 // con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
@@ -72,7 +73,7 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
-      // El detalle de una entrada (/entradas/:id) llega en su propia pantalla.
+      // Declarado ANTES de /entradas/:id para que "nueva" no matchee como id.
       {
         path: '/cotizaciones/almacen/entradas/nueva',
         element: (
@@ -86,6 +87,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <EntriesListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/cotizaciones/almacen/entradas/:id',
+        element: (
+          <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
+            <EntryDetailPage />
           </ProtectedRoute>
         ),
       },

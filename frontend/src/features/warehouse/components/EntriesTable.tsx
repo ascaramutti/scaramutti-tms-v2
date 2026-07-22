@@ -17,11 +17,13 @@ interface EntriesTableProps {
   onPageChange: (page: number) => void
   /** Hay filtros aplicados: cambia el copy del estado vacío. */
   hasActiveFilters: boolean
+  /** Navega al detalle de la entrada al hacer clic en una fila. */
+  onRowClick: (invoice: WarehousePurchaseInvoiceSummary) => void
 }
 
 /**
- * Listado de entradas (facturas de compra). Las filas todavía no navegan: el
- * detalle de la entrada es una pantalla aparte que aún no existe.
+ * Listado de entradas (facturas de compra). Cada fila navega al detalle de la
+ * entrada (`onRowClick`).
  *
  * `itemsCount` y `total` se muestran tal como los devuelve el backend, que los
  * deriva de los ítems: el frontend no los recalcula.
@@ -39,6 +41,7 @@ export function EntriesTable({
   onRetry,
   onPageChange,
   hasActiveFilters,
+  onRowClick,
 }: EntriesTableProps) {
   const columns: Column<WarehousePurchaseInvoiceSummary>[] = [
     {
@@ -111,6 +114,7 @@ export function EntriesTable({
       columns={columns}
       data={data}
       keyExtractor={(invoice) => invoice.id}
+      onRowClick={onRowClick}
       page={page}
       size={size}
       total={total}

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { KardexTable } from './KardexTable'
 import { fakeKardexMovement } from '../../../test/mocks/handlers/warehouse'
 import type { WarehouseKardexMovementResponse } from '../../../api'
@@ -8,21 +9,24 @@ function renderKardex(
   data: WarehouseKardexMovementResponse[],
   props: Partial<Parameters<typeof KardexTable>[0]> = {},
 ) {
+  // Router: la referencia de una ENTRADA es un `Link` a la factura.
   return render(
-    <KardexTable
-      data={data}
-      page={0}
-      size={10}
-      total={data.length}
-      totalPages={1}
-      unitCode="UND"
-      isLoading={false}
-      isFetching={false}
-      isError={false}
-      onRetry={vi.fn()}
-      onPageChange={vi.fn()}
-      {...props}
-    />,
+    <MemoryRouter>
+      <KardexTable
+        data={data}
+        page={0}
+        size={10}
+        total={data.length}
+        totalPages={1}
+        unitCode="UND"
+        isLoading={false}
+        isFetching={false}
+        isError={false}
+        onRetry={vi.fn()}
+        onPageChange={vi.fn()}
+        {...props}
+      />
+    </MemoryRouter>,
   )
 }
 
@@ -132,5 +136,29 @@ describe('KardexTable', () => {
       fakeKardexMovement({ movementType: 'APERTURA', sourceId: null, reference: 'Corte inicial' }),
     ])
     expect(screen.getAllByRole('row')).toHaveLength(2)
+  })
+
+  it('linkea la referencia de una ENTRADA al detalle de su factura', () => {
+    renderKardex([
+      fakeKardexMovement({ movementType: 'ENTRADA', sourceId: 42, reference: 'Factura F001-123' }),
+    ])
+    const link = screen.getByRole('link', { name: 'Factura F001-123' })
+    expect(link).toHaveAttribute('href', '/cotizaciones/almacen/entradas/42')
+  })
+
+  it('no linkea el corte inicial (APERTURA sin origen)', () => {
+    renderKardex([
+      fakeKardexMovement({ movementType: 'APERTURA', sourceId: null, reference: 'Corte inicial' }),
+    ])
+    const row = rowOf(screen.getAllByText('Corte inicial')[0])
+    expect(within(row).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('no linkea la salida hasta que exista el detalle del retiro', () => {
+    renderKardex([
+      fakeKardexMovement({ movementType: 'SALIDA', sourceId: 9, reference: 'Retiro RET-0009' }),
+    ])
+    const row = rowOf(screen.getByText('Retiro RET-0009'))
+    expect(within(row).queryByRole('link')).not.toBeInTheDocument()
   })
 })
