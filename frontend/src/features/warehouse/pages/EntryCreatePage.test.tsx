@@ -53,6 +53,7 @@ function renderRegistro() {
               element={<EntryCreatePage />}
             />
             <Route path="/cotizaciones/almacen/entradas" element={<div>LISTADO STUB</div>} />
+            <Route path="/cotizaciones/almacen/entradas/:id" element={<div>DETALLE STUB</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -523,13 +524,13 @@ describe('EntryCreatePage', () => {
     )
   })
 
-  it('al registrar avisa y vuelve al listado', async () => {
+  it('al registrar avisa y abre el detalle de la entrada creada', async () => {
     const user = userEvent.setup()
     renderRegistro()
     await waitForForm()
     await fillMinimalInvoice(user)
     await user.click(screen.getByRole('button', { name: /registrar entrada/i }))
-    expect(await screen.findByText('LISTADO STUB')).toBeInTheDocument()
+    expect(await screen.findByText('DETALLE STUB')).toBeInTheDocument()
     const { toast } = await import('sonner')
     expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('F001-00123'))
   })
@@ -544,7 +545,7 @@ describe('EntryCreatePage', () => {
     const submit = screen.getByRole('button', { name: /registrar entrada/i })
     await user.click(submit)
     expect(await screen.findByRole('button', { name: /registrando…/i })).toBeDisabled()
-    expect(await screen.findByText('LISTADO STUB')).toBeInTheDocument()
+    expect(await screen.findByText('DETALLE STUB')).toBeInTheDocument()
     expect(sink.calls ?? []).toHaveLength(1)
   })
 
@@ -589,7 +590,7 @@ describe('EntryCreatePage', () => {
     ).toBeInTheDocument()
     // El form no se limpia ni navega: se corrige y se reintenta.
     expect(screen.getByLabelText(/n° de factura/i)).toHaveValue('F001-00123')
-    expect(screen.queryByText('LISTADO STUB')).not.toBeInTheDocument()
+    expect(screen.queryByText('DETALLE STUB')).not.toBeInTheDocument()
   })
 
   it('muestra el detalle del backend cuando un catálogo no es válido', async () => {
