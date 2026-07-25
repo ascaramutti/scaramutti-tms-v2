@@ -45,6 +45,7 @@ function renderRetiros() {
               path="/cotizaciones/almacen/retiros/nuevo"
               element={<div>NUEVO RETIRO STUB</div>}
             />
+            <Route path="/cotizaciones/almacen/retiros/:id" element={<div>DETALLE STUB</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -74,7 +75,7 @@ describe('WithdrawalsListPage', () => {
     expect(screen.getAllByText('Juan Pérez Gómez').length).toBeGreaterThan(0)
   })
 
-  it('las filas todavía no son clickeables (el detalle es una pantalla posterior)', async () => {
+  it('las filas ofrecen la navegación al detalle como control accesible', async () => {
     server.use(
       warehouseWithdrawalsPage([
         fakeWithdrawal({ id: 7, receivedBy: fakeWorker({ fullName: 'Pedro Salas' }) }),
@@ -82,10 +83,9 @@ describe('WithdrawalsListPage', () => {
     )
     renderRetiros()
     const row = rowOf(await screen.findByText('Pedro Salas'))
-    // Sin affordance de navegación: ni rol de botón ni cursor accionable. Se hará
-    // clickeable cuando exista el detalle (igual que se hizo con las entradas).
-    expect(row).not.toHaveAttribute('role', 'button')
-    expect(row).not.toHaveAttribute('tabindex')
+    // La fila entera es el control (rol de botón + foco), no un link en una celda.
+    expect(row).toHaveAttribute('role', 'button')
+    expect(row).toHaveAttribute('tabindex', '0')
   })
 
   it('mapea los campos del retiro en su fila', async () => {
@@ -430,6 +430,26 @@ describe('WithdrawalsListPage', () => {
     expect(screen.getByLabelText(/estado/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/desde/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/hasta/i)).toBeInTheDocument()
+  })
+
+  it('la fila del retiro lleva a su detalle', async () => {
+    renderRetiros()
+    const user = userEvent.setup()
+    await user.click(
+      await screen.findByRole('button', { name: /ver el retiro de aceite 15w40/i }),
+    )
+    expect(screen.getByText('DETALLE STUB')).toBeInTheDocument()
+  })
+
+  it('la fila del retiro se activa con el teclado (Enter)', async () => {
+    renderRetiros()
+    const user = userEvent.setup()
+    const row = await screen.findByRole('button', {
+      name: /ver el retiro de aceite 15w40/i,
+    })
+    row.focus()
+    await user.keyboard('{Enter}')
+    expect(screen.getByText('DETALLE STUB')).toBeInTheDocument()
   })
 
   it('no tiene violaciones de accesibilidad', async () => {

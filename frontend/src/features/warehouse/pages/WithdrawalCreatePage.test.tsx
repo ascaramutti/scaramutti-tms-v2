@@ -48,6 +48,7 @@ function renderRegistro() {
           <Routes>
             <Route path="/cotizaciones/almacen/retiros/nuevo" element={<WithdrawalCreatePage />} />
             <Route path="/cotizaciones/almacen/retiros" element={<div>LISTADO STUB</div>} />
+            <Route path="/cotizaciones/almacen/retiros/:id" element={<div>DETALLE STUB</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -343,12 +344,12 @@ describe('WithdrawalCreatePage', () => {
     )
   })
 
-  it('al registrar avisa y vuelve al listado', async () => {
+  it('al registrar avisa y abre el detalle del retiro creado', async () => {
     const user = userEvent.setup()
     renderRegistro()
     await fillMinimalWithdrawal(user)
     await user.click(screen.getByRole('button', { name: /registrar retiro/i }))
-    expect(await screen.findByText('LISTADO STUB')).toBeInTheDocument()
+    expect(await screen.findByText('DETALLE STUB')).toBeInTheDocument()
     const { toast } = await import('sonner')
     expect(toast.success).toHaveBeenCalledWith(expect.stringContaining('Filtro de aceite XYZ'))
   })
@@ -361,7 +362,7 @@ describe('WithdrawalCreatePage', () => {
     await fillMinimalWithdrawal(user)
     await user.click(screen.getByRole('button', { name: /registrar retiro/i }))
     expect(await screen.findByRole('button', { name: /registrando…/i })).toBeDisabled()
-    expect(await screen.findByText('LISTADO STUB')).toBeInTheDocument()
+    expect(await screen.findByText('DETALLE STUB')).toBeInTheDocument()
     expect(sink.calls ?? []).toHaveLength(1)
   })
 
@@ -403,7 +404,7 @@ describe('WithdrawalCreatePage', () => {
       await screen.findByText('Stock insuficiente: solo hay 4 UND disponibles de Filtro de aceite XYZ'),
     ).toBeInTheDocument()
     // El form no navega: se corrige la cantidad y se reintenta.
-    expect(screen.queryByText('LISTADO STUB')).not.toBeInTheDocument()
+    expect(screen.queryByText('DETALLE STUB')).not.toBeInTheDocument()
   })
 
   it('muestra el detalle del backend cuando un catálogo no es válido (WH-004)', async () => {

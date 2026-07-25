@@ -409,6 +409,9 @@ export const warehouseHandlers = [
   http.post(`${API}/warehouse/withdrawals`, () =>
     HttpResponse.json(fakeWithdrawal(), { status: 201, headers: { ETag: DEFAULT_WITHDRAWAL_ETAG } }),
   ),
+  http.get(`${API}/warehouse/withdrawals/:id`, () =>
+    HttpResponse.json(fakeWithdrawal(), { headers: { ETag: DEFAULT_WITHDRAWAL_ETAG } }),
+  ),
 ]
 
 // ----- Overrides para server.use(...) -----
@@ -1083,6 +1086,93 @@ export function createWithdrawalSlow(sink: BodyCaptureSink, ms = 40) {
 /** Responde un error en el POST del retiro (409 WH-001, 400 WH-004/WH-005, 500). */
 export function createWithdrawalError(status: number, problem: Partial<Problem> = {}) {
   return http.post(`${API}/warehouse/withdrawals`, () => problemResponse(status, problem))
+}
+
+/** Responde el detalle de un retiro con su ETag en el header. */
+export function warehouseWithdrawalDetail(
+  withdrawal: WarehouseWithdrawalResponse = fakeWithdrawal(),
+  etag: string = DEFAULT_WITHDRAWAL_ETAG,
+) {
+  return http.get(`${API}/warehouse/withdrawals/:id`, () =>
+    HttpResponse.json(withdrawal, { headers: { ETag: etag } }),
+  )
+}
+
+/** Responde el detalle SIN el header ETag (gateway que no lo expone). */
+export function warehouseWithdrawalDetailWithoutEtag(
+  withdrawal: WarehouseWithdrawalResponse = fakeWithdrawal(),
+) {
+  return http.get(`${API}/warehouse/withdrawals/:id`, () => HttpResponse.json(withdrawal))
+}
+
+/** Responde el detalle con un delay (para observar el estado de carga). */
+export function warehouseWithdrawalDetailSlow(
+  withdrawal: WarehouseWithdrawalResponse = fakeWithdrawal(),
+  ms = 40,
+) {
+  return http.get(`${API}/warehouse/withdrawals/:id`, async () => {
+    await delay(ms)
+    return HttpResponse.json(withdrawal, { headers: { ETag: DEFAULT_WITHDRAWAL_ETAG } })
+  })
+}
+
+/** Responde un error en el detalle (404 retiro inexistente WH-003, 500 fallo). */
+export function warehouseWithdrawalDetailError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/withdrawals/:id`, () => problemResponse(status, problem))
+}
+
+/** Primera respuesta del detalle y siguientes: para probar la recarga tras un 412. */
+export function warehouseWithdrawalDetailSequence(
+  responses: { withdrawal: WarehouseWithdrawalResponse; etag: string }[],
+) {
+  let call = 0
+  return http.get(`${API}/warehouse/withdrawals/:id`, () => {
+    const current = responses[Math.min(call, responses.length - 1)]
+    call += 1
+    return HttpResponse.json(current.withdrawal, { headers: { ETag: current.etag } })
+  })
+}
+
+/** Retiro anulado por defecto de los handlers de anulación. */
+export function fakeCancelledWithdrawal(
+  overrides: Partial<WarehouseWithdrawalResponse> = {},
+): WarehouseWithdrawalResponse {
+  return fakeWithdrawal({
+    status: 'CANCELLED',
+    cancelReason: 'Retiro cargado dos veces por error',
+    cancelledBy: AUDIT_USER,
+    cancelledAt: '2026-07-12T10:00:00Z',
+    ...overrides,
+  })
+}
+
+/** Captura el body `{ reason }` y el If-Match del POST de anulación del retiro. */
+export function cancelWithdrawalSuccess(
+  sink: UpdateCaptureSink,
+  response: WarehouseWithdrawalResponse = fakeCancelledWithdrawal(),
+) {
+  return http.post(`${API}/warehouse/withdrawals/:id/cancel`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    return HttpResponse.json(response, { headers: { ETag: '"v2"' } })
+  })
+}
+
+/** Responde el POST de anulación con un delay (para observar el estado en vuelo). */
+export function cancelWithdrawalSlow(sink: UpdateCaptureSink, ms = 40) {
+  return http.post(`${API}/warehouse/withdrawals/:id/cancel`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    await delay(ms)
+    return HttpResponse.json(fakeCancelledWithdrawal(), { headers: { ETag: '"v2"' } })
+  })
+}
+
+/** Responde un error en la anulación (412 versión vencida, 409 WH-008, 500). */
+export function cancelWithdrawalError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/warehouse/withdrawals/:id/cancel`, () =>
+    problemResponse(status, problem),
+  )
 }
 
 /** Responde el stock en vivo de un producto con los valores dados. */

@@ -51,6 +51,7 @@ export const warehouseKeys = {
   withdrawalLists: () => [...warehouseKeys.withdrawals(), 'list'] as const,
   withdrawalList: (params: WarehouseWithdrawalListParams) =>
     [...warehouseKeys.withdrawalLists(), params] as const,
+  withdrawalDetail: (id: number) => [...warehouseKeys.withdrawals(), 'detail', id] as const,
   // Catálogos COMPARTIDOS con operaciones (public.workers / fleet_units), no del
   // schema almacén, pero se consultan desde acá: el combobox de "quién recibe" y el
   // de unidad de flota. Rama propia para no cruzarlos con nada del almacén.

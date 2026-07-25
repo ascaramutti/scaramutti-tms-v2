@@ -6,10 +6,7 @@ import { EntryForm } from '../components/EntryForm'
 
 const ENTRIES_PATH = '/cotizaciones/almacen/entradas'
 
-/**
- * Registro de una entrada. Al guardar vuelve al listado: el detalle de la
- * entrada todavía no existe como pantalla.
- */
+/** Registro de una entrada. Al guardar abre el detalle de la entrada recién creada. */
 export function EntryCreatePage() {
   const navigate = useNavigate()
 
@@ -29,7 +26,7 @@ export function EntryCreatePage() {
           toast.success(
             `Factura ${invoice.invoiceNumber} registrada. El stock ya refleja la entrada.`,
           )
-          navigate(ENTRIES_PATH)
+          navigate(`${ENTRIES_PATH}/${invoice.id}`)
         }}
         onCancel={() => navigate(ENTRIES_PATH)}
       />

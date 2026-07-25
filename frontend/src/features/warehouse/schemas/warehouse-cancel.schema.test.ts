@@ -2,18 +2,18 @@ import { describe, expect, it } from 'vitest'
 import {
   CANCEL_REASON_MAX_LENGTH,
   CANCEL_REASON_MIN_LENGTH,
-  entryCancelSchema,
-} from './entry-cancel.schema'
+  warehouseCancelSchema,
+} from './warehouse-cancel.schema'
 
 function errorAt(input: unknown, field: string): string | undefined {
-  const result = entryCancelSchema.safeParse(input)
+  const result = warehouseCancelSchema.safeParse(input)
   if (result.success) return undefined
   return result.error.issues.find((issue) => issue.path[0] === field)?.message
 }
 
-describe('entryCancelSchema', () => {
+describe('warehouseCancelSchema', () => {
   it('acepta un motivo dentro del rango del contrato', () => {
-    expect(entryCancelSchema.safeParse({ reason: 'Factura cargada dos veces' }).success).toBe(true)
+    expect(warehouseCancelSchema.safeParse({ reason: 'Factura cargada dos veces' }).success).toBe(true)
   })
 
   it('rechaza un motivo más corto que el mínimo del contrato', () => {
@@ -35,7 +35,7 @@ describe('entryCancelSchema', () => {
   })
 
   it('recorta los espacios de los extremos del motivo', () => {
-    const result = entryCancelSchema.safeParse({ reason: '  Factura duplicada del proveedor  ' })
+    const result = warehouseCancelSchema.safeParse({ reason: '  Factura duplicada del proveedor  ' })
     expect(result.success && result.data.reason).toBe('Factura duplicada del proveedor')
   })
 })
