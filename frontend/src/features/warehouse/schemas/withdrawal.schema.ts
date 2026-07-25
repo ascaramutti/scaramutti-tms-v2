@@ -53,6 +53,38 @@ export const withdrawalFormSchema = z.object({
 export type WithdrawalFormInput = z.infer<typeof withdrawalFormSchema>
 
 /**
+ * Espejo de `WarehouseWithdrawalUpdateRequest.reason` en el contrato
+ * (`minLength: 10, maxLength: 500`, requerido). La edición exige una justificación
+ * que va a `almacen.audit_logs` con el diff por campo (RN-WH4). Constantes
+ * propias, no las de la anulación: son dos reglas de dominio distintas aunque hoy
+ * coincidan los números.
+ */
+export const WITHDRAWAL_EDIT_REASON_MIN_LENGTH = 10
+export const WITHDRAWAL_EDIT_REASON_MAX_LENGTH = 500
+
+/**
+ * Form de EDICIÓN de un retiro. Extiende el de alta con el motivo obligatorio. El
+ * `productId` sigue en el schema (prefilled, read-only en la UI) pero NO viaja al
+ * PUT: el producto es INMUTABLE (RN-WH4, producto equivocado = anular y registrar
+ * otro) y el contrato no lo acepta. Validar un campo que no se envía nunca bloquea.
+ */
+export const withdrawalEditFormSchema = withdrawalFormSchema.extend({
+  reason: z
+    .string()
+    .trim()
+    .min(
+      WITHDRAWAL_EDIT_REASON_MIN_LENGTH,
+      `El motivo debe tener al menos ${WITHDRAWAL_EDIT_REASON_MIN_LENGTH} caracteres`,
+    )
+    .max(
+      WITHDRAWAL_EDIT_REASON_MAX_LENGTH,
+      `Máximo ${WITHDRAWAL_EDIT_REASON_MAX_LENGTH} caracteres`,
+    ),
+})
+
+export type WithdrawalEditFormInput = z.infer<typeof withdrawalEditFormSchema>
+
+/**
  * Valores iniciales del form. El producto y el trabajador en 0 disparan sus
  * "selecciona…" del schema; la cantidad arranca sin valor (`NaN` es lo que produce
  * un input numérico vacío con `valueAsNumber`), no en 0, para no aparentar un

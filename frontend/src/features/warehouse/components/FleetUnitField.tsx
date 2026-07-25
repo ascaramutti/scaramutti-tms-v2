@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import type { FleetUnitResponse } from '../../../api'
+import type { FleetUnitRef, FleetUnitResponse } from '../../../api'
 import { Combobox, type ComboboxOption } from '../../../shared/ui/Combobox'
 import { useFleetUnits } from '../hooks/useFleetUnits'
 import { fleetUnitKey, fleetUnitLabel } from '../utils/fleetUnit'
@@ -8,12 +8,21 @@ interface FleetUnitFieldProps {
   id: string
   label?: string
   ariaLabel?: string
-  /** Unidad elegida (opcional). Vive en el consumidor. */
-  selected: FleetUnitResponse | null
+  /**
+   * Unidad elegida (opcional). Vive en el consumidor. Acepta la referencia mínima
+   * `(kind, id, plate)` porque el detalle de un retiro devuelve eso y no la unidad
+   * completa: al precargar la edición la marca y el modelo no están, y solo se usan
+   * como sublínea. Si la unidad original quedó inactiva no aparece en el catálogo,
+   * pero se sigue viendo como seleccionada, que es lo correcto: se conserva salvo
+   * que el usuario la cambie.
+   */
+  selected: (FleetUnitRef & Partial<Pick<FleetUnitResponse, 'brand' | 'model'>>) | null
   onSelectedChange: (fleetUnit: FleetUnitResponse | null) => void
 }
 
-function toOption(fleetUnit: FleetUnitResponse): ComboboxOption {
+function toOption(
+  fleetUnit: FleetUnitRef & Partial<Pick<FleetUnitResponse, 'brand' | 'model'>>,
+): ComboboxOption {
   const brandModel = [fleetUnit.brand, fleetUnit.model].filter(Boolean).join(' ')
   return {
     // Clave compuesta `kind:id`: el id suelto colisiona entre subtipos (un tracto
