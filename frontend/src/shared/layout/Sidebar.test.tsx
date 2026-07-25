@@ -156,13 +156,10 @@ describe('Sidebar - módulo Almacén', () => {
     expect(screen.queryByText(/^comercial$/i)).not.toBeInTheDocument()
   })
 
-  it('reportes espera su pantalla (deshabilitado)', async () => {
+  it('reportes navega a su pantalla', async () => {
     renderSidebarAs('warehouse_keeper')
-    await waitFor(() => {
-      expect(screen.getByText(/usuario warehouse_keeper/i)).toBeInTheDocument()
-    })
-    expect(screen.queryByRole('link', { name: /reportes/i })).not.toBeInTheDocument()
-    expect(screen.getByText('Reportes').closest('span')).toHaveAttribute('aria-disabled', 'true')
+    const reportes = await screen.findByRole('link', { name: /reportes/i })
+    expect(reportes).toHaveAttribute('href', '/cotizaciones/almacen/reportes')
   })
 
   it('entradas navega a su listado', async () => {

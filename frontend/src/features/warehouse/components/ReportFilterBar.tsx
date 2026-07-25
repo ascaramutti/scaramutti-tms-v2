@@ -1,0 +1,154 @@
+import { useRef } from 'react'
+import { CalendarRange } from 'lucide-react'
+import { SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
+import { cn } from '../../../shared/utils/cn'
+import { todayIsoDate } from '../../../shared/utils/formatters'
+import {
+  currentMonthStart,
+  isReportRangeIncomplete,
+  isReportRangeInverted,
+  type ReportFilters,
+} from '../schemas/report-filters.schema'
+import { REPORT_CUTS } from '../utils/reportCuts'
+
+interface ReportFilterBarProps {
+  value: ReportFilters
+  onChange: (next: ReportFilters) => void
+}
+
+const inputClasses =
+  'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+/**
+ * Corte y rango del reporte. Los cortes son un `tablist`: son cuatro vistas del
+ * mismo panel de resultados, no cuatro filtros acumulables.
+ *
+ * El rango inválido (invertido o incompleto) se avisa acá y la página no
+ * consulta hasta corregirlo. Son dos mensajes distintos a propósito: borrar una
+ * fecha y ponerlas al revés son errores distintos y se arreglan distinto.
+ */
+export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
+  function set<K extends keyof ReportFilters>(key: K, fieldValue: ReportFilters[K]) {
+    onChange({ ...value, [key]: fieldValue })
+  }
+
+  const inverted = isReportRangeInverted(value)
+  const incomplete = isReportRangeIncomplete(value)
+  const rangeMessage = incomplete
+    ? 'Completa ambas fechas para generar el reporte.'
+    : inverted
+      ? 'La fecha "desde" no puede ser posterior a la fecha "hasta".'
+      : null
+
+  const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
+
+  function handleCutKeyDown(event: React.KeyboardEvent<HTMLButtonElement>, index: number) {
+    // Navegación por flechas dentro del tablist (WAI-ARIA): sin esto el usuario
+    // de teclado tendría que tabular por cada corte para llegar al último.
+    const last = REPORT_CUTS.length - 1
+    const nextIndex =
+      event.key === 'ArrowRight'
+        ? (index + 1) % REPORT_CUTS.length
+        : event.key === 'ArrowLeft'
+          ? (index - 1 + REPORT_CUTS.length) % REPORT_CUTS.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : -1
+    if (nextIndex < 0) return
+    event.preventDefault()
+    set('cut', REPORT_CUTS[nextIndex].value)
+    // El foco DEBE seguir a la selección: con roving tabindex el botón que se
+    // deja atrás pasa a `tabIndex={-1}`, así que un foco parado ahí rompe tanto
+    // la flecha siguiente (calcularía desde el índice viejo) como el Tab.
+    tabRefs.current[nextIndex]?.focus()
+  }
+
+  return (
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Corte del reporte">
+        {REPORT_CUTS.map((option, index) => {
+          const selected = value.cut === option.value
+          return (
+            <button
+              key={option.value}
+              id={`report-tab-${option.value}`}
+              ref={(node) => {
+                tabRefs.current[index] = node
+              }}
+              type="button"
+              role="tab"
+              aria-selected={selected}
+              aria-controls="report-panel"
+              tabIndex={selected ? 0 : -1}
+              onClick={() => set('cut', option.value)}
+              onKeyDown={(event) => handleCutKeyDown(event, index)}
+              className={cn(
+                'rounded-lg border px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                selected
+                  ? 'border-blue-600 bg-blue-600 text-white'
+                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+              )}
+            >
+              {option.label}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <div>
+          <label
+            htmlFor="report-date-from"
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+          >
+            Desde
+          </label>
+          <input
+            id="report-date-from"
+            type="date"
+            value={value.dateFrom}
+            onChange={(event) => set('dateFrom', event.target.value)}
+            aria-invalid={!!rangeMessage}
+            aria-describedby={rangeMessage ? 'report-date-error' : undefined}
+            className={inputClasses}
+          />
+        </div>
+        <div>
+          <label
+            htmlFor="report-date-to"
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+          >
+            Hasta
+          </label>
+          <input
+            id="report-date-to"
+            type="date"
+            value={value.dateTo}
+            onChange={(event) => set('dateTo', event.target.value)}
+            aria-invalid={!!rangeMessage}
+            aria-describedby={rangeMessage ? 'report-date-error' : undefined}
+            className={inputClasses}
+          />
+        </div>
+        <button
+          type="button"
+          onClick={() =>
+            onChange({ ...value, dateFrom: currentMonthStart(), dateTo: todayIsoDate() })
+          }
+          className={SECONDARY_BUTTON}
+        >
+          <CalendarRange className="mr-2 h-4 w-4" aria-hidden="true" />
+          Mes actual
+        </button>
+      </div>
+
+      {rangeMessage && (
+        <p id="report-date-error" role="alert" className="text-xs text-red-600">
+          {rangeMessage}
+        </p>
+      )}
+    </div>
+  )
+}
