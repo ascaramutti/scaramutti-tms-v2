@@ -21,6 +21,7 @@ export function WithdrawalCreatePage() {
       />
 
       <WithdrawalForm
+        mode="create"
         onCreated={(withdrawal) => {
           toast.success(
             `Retiro de ${withdrawal.product.name} registrado. El stock ya refleja la salida.`,

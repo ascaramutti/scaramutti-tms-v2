@@ -47,6 +47,10 @@ function renderDetalle(id = '1') {
               path="/cotizaciones/almacen/productos/:id"
               element={<div>FICHA PRODUCTO</div>}
             />
+            <Route
+              path="/cotizaciones/almacen/retiros/:id/editar"
+              element={<div>EDITAR STUB</div>}
+            />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -195,6 +199,21 @@ describe('WithdrawalDetailPage', () => {
     renderDetalle()
     await screen.findByRole('heading', { level: 1 })
     expect(screen.queryByRole('button', { name: /anular/i })).not.toBeInTheDocument()
+  })
+
+  it('el botón Editar (solo si activo) lleva a la pantalla de edición', async () => {
+    server.use(warehouseWithdrawalDetail())
+    renderDetalle()
+    const user = userEvent.setup()
+    await user.click(await screen.findByRole('link', { name: /editar/i }))
+    expect(screen.getByText('EDITAR STUB')).toBeInTheDocument()
+  })
+
+  it('no muestra el botón Editar si el retiro ya está anulado', async () => {
+    server.use(warehouseWithdrawalDetail(CANCELLED_WITHDRAWAL))
+    renderDetalle()
+    await screen.findByRole('heading', { level: 1 })
+    expect(screen.queryByRole('link', { name: /editar/i })).not.toBeInTheDocument()
   })
 
   // ----- Anular: flujo -----

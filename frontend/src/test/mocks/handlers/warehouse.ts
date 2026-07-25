@@ -1133,6 +1133,47 @@ export function warehouseWithdrawalDetailSequence(
   })
 }
 
+/** Captura el body y el If-Match del PUT de edición del retiro. */
+export function updateWithdrawalSuccess(
+  sink: UpdateCaptureSink,
+  response: WarehouseWithdrawalResponse = fakeWithdrawal(),
+) {
+  return http.put(`${API}/warehouse/withdrawals/:id`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    return HttpResponse.json(response, { headers: { ETag: '"v2"' } })
+  })
+}
+
+/** Responde el PUT de edición con un delay (para observar el estado "Guardando…"). */
+export function updateWithdrawalSlow(sink: UpdateCaptureSink, ms = 40) {
+  return http.put(`${API}/warehouse/withdrawals/:id`, async ({ request }) => {
+    sink.body = (await request.json()) as Record<string, unknown>
+    sink.ifMatch = request.headers.get('If-Match')
+    await delay(ms)
+    return HttpResponse.json(fakeWithdrawal(), { headers: { ETag: '"v2"' } })
+  })
+}
+
+/** Responde un error en la edición (412 COM-004, 409 WH-001/WH-008, 400 WH-004, 500). */
+export function updateWithdrawalError(status: number, problem: Partial<Problem> = {}) {
+  return http.put(`${API}/warehouse/withdrawals/:id`, () => problemResponse(status, problem))
+}
+
+/** Captura los pedidos del stock en vivo (para ver cuántas veces se consultó). */
+export function warehouseProductStockCapture(
+  sink: ProductsCaptureSink,
+  overrides: Partial<WarehouseProductStockResponse> = {},
+) {
+  sink.calls = []
+  return http.get(`${API}/warehouse/products/:id/stock`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    sink.params = params
+    sink.calls = [...(sink.calls ?? []), params]
+    return HttpResponse.json(fakeProductStock(overrides))
+  })
+}
+
 /** Retiro anulado por defecto de los handlers de anulación. */
 export function fakeCancelledWithdrawal(
   overrides: Partial<WarehouseWithdrawalResponse> = {},
