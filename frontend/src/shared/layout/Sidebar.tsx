@@ -89,9 +89,13 @@ const MENU: MenuGroup[] = [
         activeWhen: (pathname) =>
           matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/retiros`),
       },
-      // Sin `to` hasta que exista su pantalla: el item se muestra deshabilitado
-      // ("Próximamente"), como ya se hace con Clientes.
-      { icon: FileBarChart2, label: 'Reportes', allowedRoles: WAREHOUSE_ROLES },
+      {
+        icon: FileBarChart2,
+        label: 'Reportes',
+        to: `${WAREHOUSE_BASE}/reportes`,
+        allowedRoles: WAREHOUSE_ROLES,
+        activeWhen: (pathname) => matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/reportes`),
+      },
     ],
   },
   {

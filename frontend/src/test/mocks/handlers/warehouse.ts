@@ -12,6 +12,8 @@ import type {
   WarehouseProductCategoryResponse,
   WarehouseProductResponse,
   WarehouseProductStockResponse,
+  WarehouseReportResponse,
+  WarehouseReportRowResponse,
   WarehousePurchaseInvoiceResponse,
   WarehousePurchaseInvoiceSummary,
   WarehouseStatsResponse,
@@ -108,6 +110,77 @@ export function fakeWarehouseStats(
     withdrawalsThisMonth: 31,
     ...overrides,
   }
+}
+
+/** Fixture de una fila del reporte. Default: consumo de una unidad de flota. */
+export function fakeReportRow(
+  overrides: Partial<WarehouseReportRowResponse> = {},
+): WarehouseReportRowResponse {
+  return {
+    label: 'Tracto ABC-123',
+    detail: null,
+    count: 4,
+    amountPEN: 1234.5,
+    amountUSD: 0,
+    ...overrides,
+  }
+}
+
+/**
+ * Fixture del reporte. Default: corte por unidad de flota sobre junio, con dos
+ * filas (una en soles y otra en dólares) para ejercitar la bi-moneda.
+ */
+export function fakeReport(
+  overrides: Partial<WarehouseReportResponse> = {},
+): WarehouseReportResponse {
+  return {
+    cut: 'BY_UNIT',
+    dateFrom: '2026-06-01',
+    dateTo: '2026-06-30',
+    rows: [
+      fakeReportRow(),
+      fakeReportRow({ label: 'Sin unidad asignada', count: 1, amountPEN: 0, amountUSD: 320 }),
+    ],
+    totalPEN: 1234.5,
+    totalUSD: 320,
+    totalCount: 5,
+    ...overrides,
+  }
+}
+
+/** Fixture del corte por semana: `detail` es la fecha ISO del lunes, en orden ASC. */
+export function fakeReportByPeriod(): WarehouseReportResponse {
+  return fakeReport({
+    cut: 'BY_PERIOD',
+    rows: [
+      fakeReportRow({ label: 'Semana 1', detail: '2026-06-01', count: 2, amountPEN: 100, amountUSD: 0 }),
+      fakeReportRow({ label: 'Semana 2', detail: '2026-06-08', count: 3, amountPEN: 900, amountUSD: 0 }),
+    ],
+    totalPEN: 1000,
+    totalUSD: 0,
+    totalCount: 5,
+  })
+}
+
+/** Fixture del corte por producto: `count` son unidades retiradas y `detail` la unidad. */
+export function fakeReportByProduct(): WarehouseReportResponse {
+  return fakeReport({
+    cut: 'BY_PRODUCT',
+    rows: [fakeReportRow({ label: 'Filtro de aceite XYZ', detail: 'UND', count: 24 })],
+    totalCount: 24,
+    totalUSD: 0,
+  })
+}
+
+/** Fixture del corte de compras por proveedor. */
+export function fakeReportBySupplier(): WarehouseReportResponse {
+  return fakeReport({
+    cut: 'BY_SUPPLIER',
+    rows: [fakeReportRow({ label: 'Repuestos del Sur S.A.C.', count: 3, amountPEN: 5000, amountUSD: 0 })],
+    totalPEN: 5000,
+    totalUSD: 0,
+    totalCount: 3,
+  })
 }
 
 /** Fixture de movimiento del kardex. Default: una entrada de compra. */
@@ -302,6 +375,7 @@ export const warehouseHandlers = [
     ),
   ),
   http.get(`${API}/warehouse/stats`, () => HttpResponse.json(fakeWarehouseStats())),
+  http.get(`${API}/warehouse/reports`, () => HttpResponse.json(fakeReport())),
   // El ETag del header difiere del `updatedAt` del body a propósito (un cero final
   // que Jackson recorta): es la única forma de que un test cace el If-Match armado
   // desde el body en vez del header.
@@ -541,6 +615,67 @@ export function warehouseStatsSlow(ms = 40) {
 /** Responde un error en los KPIs (Problem RFC 7807). */
 export function warehouseStatsError(status: number, problem: Partial<Problem> = {}) {
   return http.get(`${API}/warehouse/stats`, () => problemResponse(status, problem))
+}
+
+/** Responde el reporte con los overrides dados. */
+export function warehouseReport(overrides: Partial<WarehouseReportResponse> = {}) {
+  return http.get(`${API}/warehouse/reports`, () => HttpResponse.json(fakeReport(overrides)))
+}
+
+/** Responde un reporte sin filas (rango sin movimientos). */
+export function warehouseReportEmpty() {
+  return http.get(`${API}/warehouse/reports`, () =>
+    HttpResponse.json(fakeReport({ rows: [], totalPEN: 0, totalUSD: 0, totalCount: 0 })),
+  )
+}
+
+/** Responde el reporte que corresponde al `cut` pedido (para testear el cambio de corte). */
+export function warehouseReportByCut(
+  byCut: Partial<Record<WarehouseReportResponse['cut'], WarehouseReportResponse>>,
+) {
+  return http.get(`${API}/warehouse/reports`, ({ request }) => {
+    const cut = new URL(request.url).searchParams.get('cut') as WarehouseReportResponse['cut']
+    return HttpResponse.json(byCut[cut] ?? fakeReport({ cut }))
+  })
+}
+
+/** Responde el reporte con un delay (para observar el estado de carga). */
+export function warehouseReportSlow(report: WarehouseReportResponse = fakeReport(), ms = 40) {
+  return http.get(`${API}/warehouse/reports`, async () => {
+    await delay(ms)
+    return HttpResponse.json(report)
+  })
+}
+
+/** Responde un error del reporte (Problem RFC 7807). */
+export function warehouseReportError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/reports`, () => problemResponse(status, problem))
+}
+
+/** Captura los query params de cada request del reporte (corte y rango). */
+export function warehouseReportCapture(
+  sink: ProductsCaptureSink,
+  report: WarehouseReportResponse = fakeReport(),
+) {
+  sink.calls = []
+  return http.get(`${API}/warehouse/reports`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    sink.params = params
+    sink.calls = [...(sink.calls ?? []), params]
+    return HttpResponse.json(report)
+  })
+}
+
+/** OK para el corte dado y error para cualquier otro (degradación al cambiar de corte). */
+export function warehouseReportOkThenErrorOnOtherCut(
+  report: WarehouseReportResponse,
+  status = 500,
+) {
+  return http.get(`${API}/warehouse/reports`, ({ request }) => {
+    const cut = new URL(request.url).searchParams.get('cut')
+    if (cut === report.cut) return HttpResponse.json(report)
+    return problemResponse(status, { detail: 'Fallo al generar el reporte' })
+  })
 }
 
 /** Responde un error en el catálogo de categorías (Problem RFC 7807). */

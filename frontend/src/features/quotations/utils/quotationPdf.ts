@@ -1,21 +1,11 @@
 import { isAxiosError } from 'axios'
 import type { Problem } from '../../../api'
+import { downloadBlob } from '../../../shared/utils/downloadBlob'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 
 /** Dispara la descarga del PDF (blob) como archivo con el nombre dado. */
 export function saveQuotationPdf(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob)
-  try {
-    const link = document.createElement('a')
-    link.href = url
-    link.download = filename
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-  } finally {
-    // Siempre liberar el object URL, aunque algún paso intermedio falle.
-    URL.revokeObjectURL(url)
-  }
+  downloadBlob(blob, filename)
 }
 
 /**

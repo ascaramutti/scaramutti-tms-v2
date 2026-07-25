@@ -1,5 +1,6 @@
 import type {
   GetWarehouseProductKardexData,
+  GetWarehouseReportData,
   ListWarehouseProductsData,
   ListWarehousePurchaseInvoicesData,
   ListWarehouseWithdrawalsData,
@@ -11,6 +12,7 @@ type WarehousePurchaseInvoiceListParams = NonNullable<
   ListWarehousePurchaseInvoicesData['query']
 >
 type WarehouseWithdrawalListParams = NonNullable<ListWarehouseWithdrawalsData['query']>
+type WarehouseReportParams = NonNullable<GetWarehouseReportData['query']>
 
 /**
  * Query keys del dominio Almacén. Factory centralizado para que las
@@ -36,6 +38,10 @@ export const warehouseKeys = {
   kardex: (productId: number, params: WarehouseKardexParams) =>
     [...warehouseKeys.kardexes(), productId, params] as const,
   stats: () => [...warehouseKeys.all, 'stats'] as const,
+  // Los params entran en la key: cada combinación de corte y rango es un reporte
+  // distinto, y volver a un corte ya consultado debe salir del cache.
+  reports: () => [...warehouseKeys.all, 'reports'] as const,
+  report: (params: WarehouseReportParams) => [...warehouseKeys.reports(), params] as const,
   productCategories: () => [...warehouseKeys.all, 'product-categories'] as const,
   purchaseInvoices: () => [...warehouseKeys.all, 'purchase-invoices'] as const,
   purchaseInvoiceLists: () => [...warehouseKeys.purchaseInvoices(), 'list'] as const,
