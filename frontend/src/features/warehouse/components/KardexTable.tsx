@@ -38,6 +38,15 @@ const MOVEMENT_VARIANTS: Record<WarehouseKardexMovementType, BadgeVariant> = {
   SALIDA: 'danger',
 }
 
+/**
+ * Pantalla de detalle del documento que originó el movimiento. La APERTURA queda
+ * afuera a propósito: el corte inicial no tiene documento que abrir.
+ */
+const MOVEMENT_SOURCE_PATHS: Record<Exclude<WarehouseKardexMovementType, 'APERTURA'>, string> = {
+  ENTRADA: '/cotizaciones/almacen/entradas',
+  SALIDA: '/cotizaciones/almacen/retiros',
+}
+
 /** Las salidas restan; apertura y entradas suman. El backend manda la cantidad siempre positiva. */
 function isOutgoing(movementType: WarehouseKardexMovementType): boolean {
   return movementType === 'SALIDA'
@@ -103,14 +112,13 @@ export function KardexTable({
     {
       key: 'reference',
       header: 'Referencia',
-      // Solo las ENTRADA linkean a su factura: su detalle ya existe (`sourceId` es
-      // el id de la factura). La APERTURA no tiene origen que abrir (`sourceId`
-      // null). La SALIDA linkeará a su retiro cuando esa pantalla de detalle
-      // exista; hasta entonces queda como texto plano.
+      // ENTRADA y SALIDA linkean a su origen (`sourceId` es el id de la factura o
+      // del retiro, según el tipo). La APERTURA no tiene origen que abrir
+      // (`sourceId` null) y queda como texto plano.
       render: (movement) =>
-        movement.movementType === 'ENTRADA' && movement.sourceId != null ? (
+        movement.movementType !== 'APERTURA' && movement.sourceId != null ? (
           <Link
-            to={`/cotizaciones/almacen/entradas/${movement.sourceId}`}
+            to={`${MOVEMENT_SOURCE_PATHS[movement.movementType]}/${movement.sourceId}`}
             className="rounded font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
           >
             {movement.reference}

@@ -9,7 +9,7 @@ import { z } from 'zod'
 export const CANCEL_REASON_MIN_LENGTH = 10
 export const CANCEL_REASON_MAX_LENGTH = 500
 
-export const entryCancelSchema = z.object({
+export const warehouseCancelSchema = z.object({
   reason: z
     .string()
     .trim()
@@ -17,4 +17,4 @@ export const entryCancelSchema = z.object({
     .max(CANCEL_REASON_MAX_LENGTH, `Máximo ${CANCEL_REASON_MAX_LENGTH} caracteres`),
 })
 
-export type EntryCancelInput = z.infer<typeof entryCancelSchema>
+export type WarehouseCancelInput = z.infer<typeof warehouseCancelSchema>

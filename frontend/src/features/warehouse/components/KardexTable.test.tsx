@@ -154,11 +154,19 @@ describe('KardexTable', () => {
     expect(within(row).queryByRole('link')).not.toBeInTheDocument()
   })
 
-  it('no linkea la salida hasta que exista el detalle del retiro', () => {
+  it('linkea la referencia de una SALIDA al detalle de su retiro', () => {
     renderKardex([
       fakeKardexMovement({ movementType: 'SALIDA', sourceId: 9, reference: 'Retiro RET-0009' }),
     ])
-    const row = rowOf(screen.getByText('Retiro RET-0009'))
+    const link = screen.getByRole('link', { name: 'Retiro RET-0009' })
+    expect(link).toHaveAttribute('href', '/cotizaciones/almacen/retiros/9')
+  })
+
+  it('no linkea un movimiento sin origen aunque no sea una apertura', () => {
+    renderKardex([
+      fakeKardexMovement({ movementType: 'SALIDA', sourceId: null, reference: 'Retiro sin origen' }),
+    ])
+    const row = rowOf(screen.getByText('Retiro sin origen'))
     expect(within(row).queryByRole('link')).not.toBeInTheDocument()
   })
 })

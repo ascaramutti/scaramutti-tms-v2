@@ -18,13 +18,14 @@ interface WithdrawalsTableProps {
   onPageChange: (page: number) => void
   /** Hay filtros aplicados: cambia el copy del estado vacío. */
   hasActiveFilters: boolean
+  onRowClick: (withdrawal: WarehouseWithdrawalResponse) => void
 }
 
 /**
- * Listado de retiros (salidas de stock). Las filas todavía no navegan: el detalle
- * del retiro es una pantalla posterior; se hará clickeable cuando exista, igual
- * que se hizo con las entradas. La cantidad y el producto se muestran tal como los
- * devuelve el backend; el frontend no recalcula nada.
+ * Listado de retiros (salidas de stock). La fila entera abre el detalle del retiro
+ * (`onRowClick`), anulados incluidos: ahí se ve el motivo de la anulación. La
+ * cantidad y el producto se muestran tal como los devuelve el backend; el frontend
+ * no recalcula nada.
  */
 export function WithdrawalsTable({
   data,
@@ -39,6 +40,7 @@ export function WithdrawalsTable({
   onRetry,
   onPageChange,
   hasActiveFilters,
+  onRowClick,
 }: WithdrawalsTableProps) {
   const columns: Column<WarehouseWithdrawalResponse>[] = [
     {
@@ -112,6 +114,8 @@ export function WithdrawalsTable({
       columns={columns}
       data={data}
       keyExtractor={(withdrawal) => withdrawal.id}
+      onRowClick={onRowClick}
+      rowLabel={(withdrawal) => `Ver el retiro de ${withdrawal.product.name}`}
       page={page}
       size={size}
       total={total}

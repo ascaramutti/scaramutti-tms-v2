@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { PRIMARY_BUTTON } from '../../../shared/ui/buttonStyles'
@@ -23,6 +23,7 @@ function hasValidRange(filters: WithdrawalFilters): boolean {
 
 /** Retiros del almacén: las salidas que descuentan stock. */
 export function WithdrawalsListPage() {
+  const navigate = useNavigate()
   const [filters, setFilters] = useState<WithdrawalFilters>(EMPTY_WITHDRAWAL_FILTERS)
   const [page, setPage] = useState(0)
 
@@ -83,6 +84,9 @@ export function WithdrawalsListPage() {
         onRetry={() => refetch()}
         onPageChange={setPage}
         hasActiveFilters={hasActiveFilters}
+        onRowClick={(withdrawal) =>
+          navigate(`/cotizaciones/almacen/retiros/${withdrawal.id}`)
+        }
       />
     </div>
   )

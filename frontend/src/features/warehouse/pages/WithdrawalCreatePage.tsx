@@ -6,10 +6,7 @@ import { WithdrawalForm } from '../components/WithdrawalForm'
 
 const WITHDRAWALS_PATH = '/cotizaciones/almacen/retiros'
 
-/**
- * Registro de un retiro. Al guardar vuelve al listado: el detalle del retiro
- * todavía no existe como pantalla.
- */
+/** Registro de un retiro. Al guardar abre el detalle del retiro recién creado. */
 export function WithdrawalCreatePage() {
   const navigate = useNavigate()
 
@@ -28,7 +25,7 @@ export function WithdrawalCreatePage() {
           toast.success(
             `Retiro de ${withdrawal.product.name} registrado. El stock ya refleja la salida.`,
           )
-          navigate(WITHDRAWALS_PATH)
+          navigate(`${WITHDRAWALS_PATH}/${withdrawal.id}`)
         }}
         onCancel={() => navigate(WITHDRAWALS_PATH)}
       />
