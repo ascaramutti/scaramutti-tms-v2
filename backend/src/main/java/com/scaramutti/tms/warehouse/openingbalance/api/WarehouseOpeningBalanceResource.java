@@ -41,8 +41,13 @@ public class WarehouseOpeningBalanceResource {
         );
     }
 
+    /**
+     * Registrar el corte inicial queda restringido a `admin`: fija la línea base del
+     * kardex de un producto, es inmutable y no tiene anulación, así que un error solo
+     * se corrige en base de datos. Consultarlo sigue abierto a los roles del módulo.
+     */
     @POST
-    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    @RolesAllowed("admin")
     @ResponseStatus(201)
     public WarehouseOpeningBalanceResponse createOpeningBalance(
         @Valid @NotNull WarehouseOpeningBalanceRequest warehouseOpeningBalanceRequest
