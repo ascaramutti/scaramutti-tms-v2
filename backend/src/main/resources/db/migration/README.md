@@ -2,8 +2,11 @@
 
 Esta carpeta es la **única fuente de verdad del schema**. Flyway la aplica al arrancar el
 backend (`quarkus.flyway.migrate-at-start=true`). `V001__baseline.sql` es la foto schema-only
-de producción al 2026-07-06; en DBs que ya tenían el schema, `baseline-on-migrate` la marca
-como aplicada sin ejecutarla — solo una DB vacía (tests/CI) la ejecuta completa.
+de producción al 2026-07-06. Las DBs que ya tenían ese schema fueron baselineadas en su
+momento (la V001 quedó marcada como aplicada sin ejecutarse) y después se retiró
+`baseline-on-migrate` a propósito: una DB no vacía sin `flyway_schema_history` falla
+ruidosamente en vez de adoptarse en silencio. Solo una DB vacía (dev local, tests, CI)
+ejecuta la V001 completa.
 
 ## Reglas (contrato entre los dos proyectos paralelos — Almacén y Operaciones)
 
@@ -24,5 +27,12 @@ como aplicada sin ejecutarla — solo una DB vacía (tests/CI) la ejecuta comple
 
 ## Datos, no schema
 
-Los seeds viven fuera de la cadena: `db/seed_system_settings.sql` (datos reales de la empresa,
-manual e idempotente) y `DevDataSeeder` (fixtures de dev/test, nunca en prod).
+Los seeds de **datos de negocio** viven fuera de la cadena: `db/seed_system_settings.sql` (datos
+reales de la empresa, manual e idempotente) y `DevDataSeeder` (fixtures de dev/test, nunca en prod).
+
+Excepción: los **catálogos fundacionales del módulo** (roles nuevos, listas cerradas que el
+propio módulo necesita para funcionar desde el día 1 — ej. `almacen.units_of_measure`,
+`operaciones.trip_scopes`) **sí viajan dentro de su migración** vía `INSERT` literal (ver la
+migración del schema `almacen`). Motivo: son parte del contrato del módulo, no datos operativos que
+cambien por fuera de una migración coordinada — y así llegan solos a todo entorno (dev/staging/prod)
+sin depender de un paso manual (regla del programa: cambios de DB = solo Flyway).

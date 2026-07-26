@@ -34,4 +34,39 @@ public final class StringUtils {
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
     }
+
+    /**
+     * `trimToNull` + uppercase. Para campos que se almacenan en mayúsculas
+     * (razón social de clientes/proveedores, nombre de cargo-types): se
+     * uppercasea porque el ranking por `similarity()` (pg_trgm) es
+     * case-sensitive, así la query matchea contra el valor ya guardado en
+     * mayúsculas. Antes duplicado como método `default` idéntico en
+     * ClientResourceMapper, CargoTypeResourceMapper y
+     * WarehouseSupplierResourceMapper; extraído acá al 3er caso.
+     */
+    @Named("trimUpperOrNull")
+    public static String trimUpperOrNull(String value) {
+        String trimmed = trimToNull(value);
+        return trimmed == null ? null : trimmed.toUpperCase();
+    }
+
+    /**
+     * Escapa los metacaracteres de LIKE/ILIKE ({@code \ % _}) para que un
+     * input de búsqueda se trate como literal en un patrón {@code ILIKE
+     * :param ESCAPE '\'}. El backslash primero (es el char de escape, no debe
+     * duplicarse después). Usado por los repos con búsqueda `q` (Client,
+     * Quotation, Supplier) — antes duplicado en cada uno, extraído acá al
+     * aparecer el 3er caso.
+     *
+     * @Named aunque ningún mapper lo invoque hoy vía qualifiedByName: sin él,
+     * MapStruct lo trata como candidato AUTOMATICO para cualquier campo
+     * String→String sin anotar en los mappers que usan `uses = StringUtils.class`
+     * (ej. ruc/phone "pasan tal cual" en ClientResourceMapper) — pisaba el
+     * passthrough directo con un escape no pedido (bug real, cazado por los
+     * tests de create al agregar este método).
+     */
+    @Named("escapeLikeWildcards")
+    public static String escapeLikeWildcards(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
 }

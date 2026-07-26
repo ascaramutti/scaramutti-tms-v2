@@ -1,0 +1,39 @@
+-- R__almacen_stock_views.sql
+-- VIEWs de stock y kardex del modulo Almacen (repeatable: Flyway las re-aplica
+-- si cambia su contenido). Fuente de diseno: almacen/03_ESQUEMA_BD.md seccion 6.
+-- El stock NUNCA se persiste -- siempre se calcula desde estas VIEWs.
+
+-- Kardex unificado: apertura (+) union entradas activas (+) union retiros activos (-).
+-- movement_seq: id monotonico de la fila origen (ob.id / pii.id -- el item, no
+-- la factura / w.id), usado por el kardex (GET /warehouse/products/{id}/kardex)
+-- como tercer criterio de desempate cuando dos movimientos comparten moved_at
+-- exacto (la VIEW no ordena por si sola).
+CREATE OR REPLACE VIEW almacen.stock_movements AS
+  SELECT 'APERTURA'::text AS movement_type, ob.product_id, ob.quantity,
+         ob.registered_at AS moved_at, ob.registered_by, NULL::integer AS source_id,
+         ob.id AS movement_seq
+    FROM almacen.opening_balances ob
+  UNION ALL
+  SELECT 'ENTRADA', pii.product_id, pii.quantity, pi.created_at, pi.registered_by, pi.id,
+         pii.id
+    FROM almacen.purchase_invoice_items pii
+    JOIN almacen.purchase_invoices pi ON pi.id = pii.invoice_id
+   WHERE pi.status = 'ACTIVE'          -- entradas anuladas no mueven stock
+  UNION ALL
+  SELECT 'SALIDA', w.product_id, -w.quantity, w.withdrawn_at, w.registered_by, w.id,
+         w.id
+    FROM almacen.withdrawals w
+   WHERE w.status = 'ACTIVE';
+
+-- Stock actual por producto (nunca persistido -- siempre exacto) y lowStock.
+-- low_stock (RN-WH11): stock < min_stock, desigualdad ESTRICTA. Se define UNA
+-- sola vez aca (definicion canonica): los consumidores la LEEN, nadie la
+-- recalcula ad-hoc. GROUP BY p.id alcanza porque es PK (min_stock queda
+-- funcionalmente determinado, Postgres lo permite en el SELECT).
+CREATE OR REPLACE VIEW almacen.product_stock AS
+  SELECT p.id AS product_id,
+         COALESCE(SUM(m.quantity), 0) AS stock,
+         COALESCE(SUM(m.quantity), 0) < p.min_stock AS low_stock
+    FROM almacen.products p
+    LEFT JOIN almacen.stock_movements m ON m.product_id = p.id
+   GROUP BY p.id;

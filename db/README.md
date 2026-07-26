@@ -17,8 +17,8 @@
 
 ## Setup de desarrollo
 
-1. Levantar la DB (`docker compose up -d db` del compose de v1, o el contenedor
-   `scaramutti-tms-db-dev` existente).
+1. Levantar la DB (`docker compose up -d` con el compose del repo, o reusar un
+   contenedor Postgres 16 existente con las credenciales de desarrollo).
 2. **Arrancar el backend** (`mvn quarkus:dev`): Flyway crea/baselinea el schema y el
    `DevDataSeeder` siembra los fixtures de desarrollo (usuarios, monedas, términos de pago,
    tipos de servicio). Solo corre en dev/test (`@UnlessBuildProfile("prod")`), nunca en prod.

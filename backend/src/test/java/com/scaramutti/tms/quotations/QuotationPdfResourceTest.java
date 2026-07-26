@@ -8,7 +8,9 @@ import io.restassured.http.ContentType;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
+import com.scaramutti.tms.support.HermeticTestData;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -45,11 +47,22 @@ class QuotationPdfResourceTest {
     }
 
     @Inject EntityManager entityManager;
+    @Inject HermeticTestData fixtures;
 
-    private static final int CLIENT_ID = 1;
-    private static final int CURRENCY_ID = 1;
-    private static final int PAYMENT_TERM_ID = 1;
-    private static final int ST_SCB = 1;
+    private int CLIENT_ID;
+    private int CURRENCY_ID;
+    private int PAYMENT_TERM_ID;
+    private int ST_SCB;
+    private int CARGO_TYPE_ID;
+
+    @BeforeEach
+    void resolveHermeticIds() {
+        CURRENCY_ID = fixtures.currencyId("USD");
+        PAYMENT_TERM_ID = fixtures.paymentTermId("Contado");
+        ST_SCB = fixtures.serviceTypeId("SCB");
+        CLIENT_ID = fixtures.seedClient();
+        CARGO_TYPE_ID = fixtures.seedCargoType();
+    }
 
     @AfterEach
     void cleanupQuotations() {
@@ -61,6 +74,7 @@ class QuotationPdfResourceTest {
                 + "   OR destination LIKE 'ZTEST_%'"
             ).executeUpdate();
         });
+        fixtures.cleanup();
     }
 
     private String loginAdmin() {
@@ -98,10 +112,10 @@ class QuotationPdfResourceTest {
               "origin": "%s",
               "destination": "ZTEST_DEST",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, origin, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, origin, ST_SCB, CARGO_TYPE_ID);
     }
 
     private long createQuotation(String token, String origin) {

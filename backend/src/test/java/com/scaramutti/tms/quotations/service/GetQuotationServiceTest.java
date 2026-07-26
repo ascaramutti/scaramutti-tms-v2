@@ -1,19 +1,18 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
-import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.quotations.dto.QuotationResponse;
 import com.scaramutti.tms.quotations.mapper.QuotationEmbeddedSummaryMapper;
 import com.scaramutti.tms.quotations.service.QuotationDependencyLoaderService.LoadedDependencies;
 import com.scaramutti.tms.shared.entity.Quotation;
 import com.scaramutti.tms.shared.entity.QuotationItem;
-import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
 import com.scaramutti.tms.shared.repository.QuotationItemRepository;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
 import com.scaramutti.tms.shared.repository.QuotationStandbyCostRepository;
-import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.auth.service.UserLookup;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -69,12 +68,11 @@ class GetQuotationServiceTest {
     @Mock QuotationItemRepository quotationItemRepository;
     @Mock QuotationStandbyCostRepository quotationStandbyCostRepository;
     @Mock ConditionRepository conditionRepository;
-    @Mock UserRepository userRepository;
+    @Mock UserLookup userLookup;
     @Mock QuotationDependencyLoaderService dependencyLoader;
     @Mock QuotationCalculatorService calculator;
     @Mock QuotationResponseAssemblerService assembler;
     @Mock QuotationEmbeddedSummaryMapper summaryMapper;
-    @Mock AuthServiceMapper authServiceMapper;
 
     @InjectMocks GetQuotationService service;
 
@@ -105,12 +103,11 @@ class GetQuotationServiceTest {
         when(calculator.calculateFromEntities(any()))
             .thenReturn(new QuotationCalculatorService.Totals(
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
-        when(userRepository.findById(42)).thenReturn(new User());
         // thenAnswer (no thenReturn): nueva instancia por llamada. Asi el test
         // de dedup puede verificar assertSame load-bearing — solo pasa si el
-        // service NO re-invoco loadUser (dedup hit), no si Mockito devuelve
+        // service NO re-invoco require (dedup hit), no si Mockito devuelve
         // siempre el mismo objeto.
-        when(authServiceMapper.toUserResponse(any())).thenAnswer(inv ->
+        when(userLookup.require(42)).thenAnswer(inv ->
             new UserResponse(42, "admin", "Admin Sistema", "Admin", "admin", true));
         when(assembler.assemble(any(), any(), any(), any(), any(), any(), any(), any(), anyBoolean()))
             .thenReturn(expectedResponse);
@@ -234,8 +231,8 @@ class GetQuotationServiceTest {
 
         service.getById(123L);
 
-        verify(userRepository, times(1)).findById(42);
-        verify(userRepository, never()).findById(eq(43));
+        verify(userLookup, times(1)).require(42);
+        verify(userLookup, never()).require(eq(43));
 
         // Verificar referential equality en el assembler — captura los args.
         ArgumentCaptor<UserResponse> createdByCaptor = ArgumentCaptor.forClass(UserResponse.class);
@@ -255,12 +252,13 @@ class GetQuotationServiceTest {
         quotation.updatedBy = 99;
         when(quotationRepository.findByIdOptional(123L)).thenReturn(Optional.of(quotation));
         setupHappyPathMocks();
-        when(userRepository.findById(99)).thenReturn(new User());
+        when(userLookup.require(99)).thenAnswer(inv ->
+            new UserResponse(99, "otro", "Otro Usuario", "Ventas", "otro", true));
 
         service.getById(123L);
 
-        verify(userRepository).findById(42);
-        verify(userRepository).findById(99);
+        verify(userLookup).require(42);
+        verify(userLookup).require(99);
     }
 
     // ---------- Orfandad de User FK → COM-500 -------------------------------
@@ -268,9 +266,9 @@ class GetQuotationServiceTest {
     @Test
     void getById_createdByUserDeleted_throws_COM500() {
         // Edge: un admin borro el row de users que esta cotizacion referencia
-        // (FK huerfana). El loader trata esto como bug de integridad — log +
-        // INTERNAL_ERROR. Consistente con el manejo de orphan FK en
-        // QuotationDependencyLoaderService.
+        // (FK huerfana). UserLookup lo trata como bug de integridad — log +
+        // INTERNAL_ERROR (su unit test cubre el detalle); aca verificamos que el
+        // service lo propaga sin llamar al assembler.
         when(quotationRepository.findByIdOptional(123L)).thenReturn(Optional.of(quotation));
         when(quotationItemRepository.findByQuotationId(123L)).thenReturn(List.of());
         when(quotationStandbyCostRepository.findByQuotationId(123L)).thenReturn(List.of());
@@ -279,7 +277,8 @@ class GetQuotationServiceTest {
         when(calculator.calculateFromEntities(any()))
             .thenReturn(new QuotationCalculatorService.Totals(
                 BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO));
-        when(userRepository.findById(42)).thenReturn(null);  // ← user no existe
+        when(userLookup.require(42)).thenThrow(CommonError.INTERNAL_ERROR.toException(
+            "La cotizacion referencia un usuario inexistente (id=42). Reporte a soporte."));
 
         ApiException ex = assertThrows(ApiException.class, () -> service.getById(123L));
 

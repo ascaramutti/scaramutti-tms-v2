@@ -7,10 +7,12 @@ import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import com.scaramutti.tms.quotations.service.QuotationExpiryJob;
 import com.scaramutti.tms.shared.repository.QuotationRepository;
+import com.scaramutti.tms.support.HermeticTestData;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -49,11 +51,22 @@ class QuotationStatusResourceTest {
     @Inject EntityManager entityManager;
     @Inject QuotationRepository quotationRepository;
     @Inject QuotationExpiryJob quotationExpiryJob;
+    @Inject HermeticTestData fixtures;
 
-    private static final int CLIENT_ID = 1;
-    private static final int CURRENCY_ID = 1;
-    private static final int PAYMENT_TERM_ID = 1;
-    private static final int ST_SCB = 1;
+    private int CLIENT_ID;
+    private int CURRENCY_ID;
+    private int PAYMENT_TERM_ID;
+    private int ST_SCB;
+    private int CARGO_TYPE_ID;
+
+    @BeforeEach
+    void resolveHermeticIds() {
+        CURRENCY_ID = fixtures.currencyId("USD");
+        PAYMENT_TERM_ID = fixtures.paymentTermId("Contado");
+        ST_SCB = fixtures.serviceTypeId("SCB");
+        CLIENT_ID = fixtures.seedClient();
+        CARGO_TYPE_ID = fixtures.seedCargoType();
+    }
 
     @AfterEach
     void cleanupQuotations() {
@@ -64,6 +77,7 @@ class QuotationStatusResourceTest {
                 + "   OR origin LIKE 'ZTEST_%' "
                 + "   OR destination LIKE 'ZTEST_%'"
             ).executeUpdate());
+        fixtures.cleanup();
     }
 
     // ---------- Helpers ------------------------------------------------------
@@ -125,10 +139,10 @@ class QuotationStatusResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_AREQUIPA",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ]
             }
-            """, CLIENT_ID, contact, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB);
+            """, CLIENT_ID, contact, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB, CARGO_TYPE_ID);
     }
 
     /** Fuerza el status en BD (bypassa la maquina) para fabricar terminales/SENT en una tx propia. */
@@ -506,8 +520,8 @@ class QuotationStatusResourceTest {
     void patch_withGeneralManagerRole_returns200() {
         String adminToken = loginAdmin();
         long id = createQuotation(adminToken, "ZTEST_GM");
-        // subject=1 (admin, usuario real → FK updatedBy resuelve), role=general_manager (guard).
-        String gmToken = fabricateTokenForRealUser(1, "admin", "general_manager");
+        // subject=admin (usuario real → FK updatedBy resuelve), role=general_manager (guard).
+        String gmToken = fabricateTokenForRealUser(fixtures.userId("admin"), "admin", "general_manager");
         String etag = getEtag(gmToken, id);
 
         patchStatus(gmToken, id, etag, "{\"status\":\"SENT\"}")
@@ -518,7 +532,7 @@ class QuotationStatusResourceTest {
     void patch_withOperationsManagerRole_returns200() {
         String adminToken = loginAdmin();
         long id = createQuotation(adminToken, "ZTEST_OM");
-        String omToken = fabricateTokenForRealUser(1, "admin", "operations_manager");
+        String omToken = fabricateTokenForRealUser(fixtures.userId("admin"), "admin", "operations_manager");
         String etag = getEtag(omToken, id);
 
         patchStatus(omToken, id, etag, "{\"status\":\"SENT\"}")

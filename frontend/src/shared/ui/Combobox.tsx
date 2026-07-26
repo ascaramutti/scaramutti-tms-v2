@@ -5,7 +5,13 @@ import { cn } from '../utils/cn'
 import { Spinner } from './Spinner'
 
 export interface ComboboxOption {
-  id: number
+  /**
+   * Identidad de la opción (React key + para que el consumidor resuelva el objeto
+   * elegido). Admite string para entidades cuya identidad NO es un id numérico
+   * suelto: p. ej. una unidad de flota se identifica por el par (kind, id), y un
+   * tracto y una carreta pueden compartir id, así que su clave es `kind:id`.
+   */
+  id: number | string
   label: string
   sublabel?: string
 }
@@ -13,6 +19,12 @@ export interface ComboboxOption {
 interface ComboboxProps {
   id: string
   label?: ReactNode
+  /**
+   * Nombre accesible cuando NO se muestra un label visible (p. ej. una fila de
+   * tabla donde el encabezado de la columna hace de rótulo). Evita el `<label>`
+   * fantasma, cuyo `mb` desalinea verticalmente el input respecto a sus vecinos.
+   */
+  ariaLabel?: string
   placeholder?: string
   /** Opciones YA filtradas por el backend (este componente NO filtra localmente). */
   options: ComboboxOption[]
@@ -42,6 +54,7 @@ interface ComboboxProps {
 export function Combobox({
   id,
   label,
+  ariaLabel,
   placeholder = 'Buscar…',
   options,
   selected,
@@ -107,10 +120,15 @@ export function Combobox({
 
   function handleKeyDown(event: KeyboardEvent) {
     if (!open) {
-      if ((event.key === 'ArrowDown' || event.key === 'Enter') && meetsMin) {
-        setIsOpen(true)
-        setHighlighted(0)
+      if (event.key === 'ArrowDown' || event.key === 'Enter') {
+        // Se frena el Enter aunque no haya con qué abrir el dropdown: si no, cae en
+        // el submit implícito del form que contiene al buscador, y quien está
+        // tipeando una búsqueda no espera enviar el formulario.
         event.preventDefault()
+        if (meetsMin) {
+          setIsOpen(true)
+          setHighlighted(0)
+        }
       }
       return
     }
@@ -177,6 +195,7 @@ export function Combobox({
               id={id}
               type="text"
               role="combobox"
+              aria-label={ariaLabel}
               aria-expanded={open}
               aria-controls={listboxId}
               aria-invalid={!!error}

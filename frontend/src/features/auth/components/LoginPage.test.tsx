@@ -21,6 +21,7 @@ function renderLogin(initialPath = '/cotizaciones/login') {
           <Routes>
             <Route path="/cotizaciones/login" element={<LoginPage />} />
             <Route path="/cotizaciones" element={<div>HOME</div>} />
+            <Route path="/cotizaciones/almacen" element={<div>ALMACEN</div>} />
             <Route path="/clients" element={<div>CLIENTS</div>} />
           </Routes>
         </MemoryRouter>
@@ -126,6 +127,25 @@ describe('LoginPage', () => {
     // No navegó dentro de la SPA:
     expect(screen.queryByText('HOME')).not.toBeInTheDocument()
   })
+
+  it.each(['finance_manager', 'warehouse_keeper'] as const)(
+    'login como %s aterriza en almacén sin salir de la SPA',
+    async (role) => {
+      server.use(loginAsRoleResponse(role))
+      const assignSpy = vi.fn()
+      vi.stubGlobal('location', { ...window.location, assign: assignSpy })
+
+      const user = userEvent.setup()
+      renderLogin()
+      await user.type(screen.getByLabelText(/usuario/i), 'almacenera')
+      await user.type(screen.getByLabelText(/contraseña/i), 'Almacen1234')
+      await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+
+      expect(await screen.findByText('ALMACEN')).toBeInTheDocument()
+      // Almacén vive en esta SPA: navega el router, no un full page load.
+      expect(assignSpy).not.toHaveBeenCalled()
+    },
+  )
 
   it('login como operations_manager aterriza en cotizaciones (confirmado 2026-06-12)', async () => {
     server.use(loginAsRoleResponse('operations_manager'))

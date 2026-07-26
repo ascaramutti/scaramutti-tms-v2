@@ -1,0 +1,77 @@
+package com.scaramutti.tms.warehouse.product.mapper;
+
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
+import com.scaramutti.tms.shared.util.StringUtils;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductRequest;
+import com.scaramutti.tms.warehouse.product.dto.WarehouseProductUpdateRequest;
+import com.scaramutti.tms.warehouse.product.service.cmd.CreateWarehouseProductCommand;
+import com.scaramutti.tms.warehouse.product.service.cmd.ListWarehouseProductsQuery;
+import com.scaramutti.tms.warehouse.product.service.cmd.UpdateWarehouseProductCommand;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+import org.mapstruct.NullValueMappingStrategy;
+
+import java.math.BigDecimal;
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+/**
+ * Mapper de la capa REST. Normaliza los campos de texto (trim, "" → null) y
+ * aplica los defaults de los campos ausentes:
+ *  - name/brand/partNumber: {@code trimToNull}. A diferencia de proveedores
+ *    (razón social en mayúsculas), el nombre de producto NO se uppercasea: el
+ *    índice {@code uq_products_identity} usa {@code lower(name)} y la búsqueda
+ *    es trgm sobre el valor guardado tal cual.
+ *  - attributes: null → {} (JSONB NOT NULL en BD).
+ *  - minStock: null → 0 (default del contrato).
+ */
+@Mapper(
+    config = SharedMapperConfig.class,
+    uses = StringUtils.class,
+    nullValueMappingStrategy = NullValueMappingStrategy.RETURN_DEFAULT
+)
+public interface WarehouseProductResourceMapper {
+
+    @Mapping(target = "name",         source = "name",         qualifiedByName = "trimToNull")
+    @Mapping(target = "brand",        source = "brand",        qualifiedByName = "trimToNull")
+    @Mapping(target = "partNumber",   source = "partNumber",   qualifiedByName = "trimToNull")
+    @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")
+    @Mapping(target = "attributes",
+             expression = "java(defaultAttributes(warehouseProductRequest.attributes()))")
+    @Mapping(target = "minStock",
+             expression = "java(warehouseProductRequest.minStock() != null ? warehouseProductRequest.minStock() : java.math.BigDecimal.ZERO)")
+    CreateWarehouseProductCommand toCreateWarehouseProductCommand(WarehouseProductRequest warehouseProductRequest);
+
+    /**
+     * q se normaliza con trimToNull (NO uppercase, a diferencia de suppliers): el
+     * name de producto se almacena tal cual y la búsqueda es case-insensitive via
+     * ILIKE, con ranking similarity(lower(...)) en el repo. lowOnly/page/size/
+     * categoryId/isActive pasan tal cual.
+     */
+    @Mapping(target = "q", source = "q", qualifiedByName = "trimToNull")
+    ListWarehouseProductsQuery toListWarehouseProductsQuery(
+        String q, Integer categoryId, Boolean isActive, boolean lowOnly, int page, int size
+    );
+
+    /**
+     * Misma normalización que el create, más {@code isActive}: null → true (el
+     * PUT es un replace del objeto completo — decisión Nivel A: el form manda el
+     * objeto entero, no un patch parcial).
+     */
+    @Mapping(target = "name",         source = "name",         qualifiedByName = "trimToNull")
+    @Mapping(target = "brand",        source = "brand",        qualifiedByName = "trimToNull")
+    @Mapping(target = "partNumber",   source = "partNumber",   qualifiedByName = "trimToNull")
+    @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")
+    @Mapping(target = "attributes",
+             expression = "java(defaultAttributes(warehouseProductUpdateRequest.attributes()))")
+    @Mapping(target = "minStock",
+             expression = "java(warehouseProductUpdateRequest.minStock() != null ? warehouseProductUpdateRequest.minStock() : java.math.BigDecimal.ZERO)")
+    @Mapping(target = "isActive",
+             expression = "java(warehouseProductUpdateRequest.isActive() != null ? warehouseProductUpdateRequest.isActive() : Boolean.TRUE)")
+    UpdateWarehouseProductCommand toUpdateWarehouseProductCommand(WarehouseProductUpdateRequest warehouseProductUpdateRequest);
+
+    /** Copia defensiva y default {}: attributes es JSONB NOT NULL en BD. */
+    default Map<String, String> defaultAttributes(Map<String, String> attributes) {
+        return attributes != null ? new LinkedHashMap<>(attributes) : new LinkedHashMap<>();
+    }
+}

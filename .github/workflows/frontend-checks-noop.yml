@@ -1,0 +1,27 @@
+# Gemelo no-op de frontend-checks.yml, receta oficial de GitHub para required
+# checks con paths filter ("Handling skipped but required checks"). Si el check
+# `checks` se marca required en la branch protection de develop, el workflow real
+# solo corre cuando el PR toca frontend/**: en un PR sin frontend nunca reporta y
+# el merge queda bloqueado en "Expected / Waiting for status to be reported".
+# Este gemelo usa el MISMO name y el MISMO job id (el nombre del check sale de
+# ahí) con paths-ignore espejo de los paths del real: corre exactamente cuando
+# el real no, y reporta `checks` en verde al instante. En un PR mixto corren los
+# dos y queda el resultado del real (termina después). Si se cambian los paths
+# del real, cambiar este espejo a la par.
+name: Frontend checks
+
+on:
+  pull_request:
+    paths-ignore:
+      - 'frontend/**'
+      - '.github/workflows/frontend-checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Sin cambios de frontend
+        run: echo "El PR no toca frontend/**, no hay nada que chequear."

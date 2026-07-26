@@ -8,6 +8,7 @@ import com.scaramutti.tms.quotations.dto.embedded.QuotationConditionSummary;
 import com.scaramutti.tms.quotations.service.PdfSettingsService;
 import com.scaramutti.tms.quotations.util.AmountToWords;
 import com.scaramutti.tms.shared.exception.CommonError;
+import com.scaramutti.tms.shared.util.DateUtils;
 import io.quarkus.qute.Location;
 import io.quarkus.qute.Template;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -20,7 +21,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -37,7 +37,6 @@ public class QuotationPdfService {
 
     private static final Logger LOG = Logger.getLogger(QuotationPdfService.class);
 
-    private static final ZoneId LIMA = ZoneId.of("America/Lima");
     private static final BigDecimal HUNDRED = new BigDecimal("100");
 
     @Inject
@@ -249,7 +248,7 @@ public class QuotationPdfService {
 
     private String formatDateSpanish(OffsetDateTime dateTime) {
         if (dateTime == null) return "";
-        String formatted = dateTime.atZoneSameInstant(LIMA)
+        String formatted = dateTime.atZoneSameInstant(DateUtils.LIMA)
             .format(DateTimeFormatter.ofPattern("dd 'de' MMMM 'del' yyyy", new Locale("es")));
         String[] parts = formatted.split(" ");
         if (parts.length >= 3) {

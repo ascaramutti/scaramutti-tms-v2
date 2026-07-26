@@ -2,6 +2,8 @@ package com.scaramutti.tms.shared.repository;
 
 import com.scaramutti.tms.quotations.service.cmd.ListQuotationsQuery;
 import com.scaramutti.tms.shared.entity.Quotation;
+import com.scaramutti.tms.shared.util.DateUtils;
+import com.scaramutti.tms.shared.util.StringUtils;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -11,7 +13,6 @@ import jakarta.persistence.Tuple;
 import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -34,9 +35,6 @@ import java.util.Map;
  */
 @ApplicationScoped
 public class QuotationRepository implements PanacheRepositoryBase<Quotation, Long> {
-
-    /** Zona horaria del negocio (Peru). Los filtros de fecha se interpretan aca. */
-    private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     @Inject
     EntityManager entityManager;
@@ -121,9 +119,8 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
      *
      * Native query (no Panache JPQL) por los JOINs a clients/currencies y para
      * proyectar columnas que no son campos de la entity. Patron analogo a
-     * {@code ClientRepository.searchPaged} — con una diferencia: aca el filtro q
-     * escapa los wildcards de LIKE ({@link #escapeLikeWildcards}); ClientRepository
-     * aun NO lo hace (misma vulnerabilidad de sobre-match, deuda pendiente).
+     * {@code ClientRepository.searchPaged}, incluido el escape de wildcards de
+     * LIKE ({@link StringUtils#escapeLikeWildcards}).
      */
     public List<QuotationSummaryRow> searchPaged(ListQuotationsQuery listQuotationsQuery) {
         Map<String, Object> params = new HashMap<>();
@@ -188,7 +185,7 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
             conditions.add("(qt.code ILIKE :qLike ESCAPE '\\' OR cli.name ILIKE :qLike ESCAPE '\\' "
                 + "OR cli.ruc ILIKE :qLike ESCAPE '\\' OR qt.origin ILIKE :qLike ESCAPE '\\' "
                 + "OR qt.destination ILIKE :qLike ESCAPE '\\')");
-            params.put("qLike", "%" + escapeLikeWildcards(q.q()) + "%");
+            params.put("qLike", "%" + StringUtils.escapeLikeWildcards(q.q()) + "%");
         }
         if (q.status() != null) {
             conditions.add("qt.status = :status");
@@ -222,26 +219,17 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
             params.put("serviceTypeId", q.serviceTypeId());
         }
         if (q.dateFrom() != null) {
-            // Inicio del dia en zona Lima → instante UTC para comparar contra created_at (timestamptz).
+            // Inicio del dia en zona Lima como instante UTC para comparar contra created_at (timestamptz).
             conditions.add("qt.created_at >= :dateFrom");
-            params.put("dateFrom", q.dateFrom().atStartOfDay(LIMA).toOffsetDateTime());
+            params.put("dateFrom", DateUtils.limaDayStart(q.dateFrom()));
         }
         if (q.dateTo() != null) {
-            // dateTo inclusivo del dia completo → < inicio del dia siguiente (Lima).
+            // dateTo inclusivo del dia completo: < inicio del dia siguiente (Lima).
             conditions.add("qt.created_at < :dateToExclusive");
-            params.put("dateToExclusive", q.dateTo().plusDays(1).atStartOfDay(LIMA).toOffsetDateTime());
+            params.put("dateToExclusive", DateUtils.limaNextDayStart(q.dateTo()));
         }
 
         return conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions);
-    }
-
-    /**
-     * Escapa los metacaracteres de LIKE/ILIKE ({@code \ % _}) para que el input
-     * de busqueda se trate como literal. El backslash primero (es el char de
-     * escape, no debe duplicarse despues). Usado con {@code ESCAPE '\'} en el SQL.
-     */
-    private static String escapeLikeWildcards(String value) {
-        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 
     /**
@@ -261,21 +249,9 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
             ((Number) t.get(8)).intValue(),       // validity_days
             (String) t.get(9),                    // origin
             (String) t.get(10),                   // destination
-            toOffsetDateTime(t.get(11)),          // created_at
+            DateUtils.toOffsetDateTime(t.get(11)), // created_at
             ((Number) t.get(12)).intValue()       // created_by
         );
-    }
-
-    /**
-     * Conversion defensiva del created_at native a OffsetDateTime. Hibernate/PG
-     * puede devolver OffsetDateTime, Instant o Timestamp segun version/driver.
-     */
-    private static OffsetDateTime toOffsetDateTime(Object value) {
-        if (value instanceof OffsetDateTime odt) return odt;
-        if (value instanceof java.time.Instant inst) return inst.atOffset(ZoneOffset.UTC);
-        if (value instanceof java.sql.Timestamp ts) return ts.toInstant().atOffset(ZoneOffset.UTC);
-        throw new IllegalStateException("Unexpected created_at type: "
-            + (value == null ? "null" : value.getClass().getName()));
     }
 
     /**

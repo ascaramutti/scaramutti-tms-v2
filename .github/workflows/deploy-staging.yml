@@ -1,0 +1,81 @@
+name: Deploy staging (runner self-hosted)
+
+# SEGURIDAD (repo público + runner self-hosted — no negociable):
+# - Se dispara SOLO con push a develop (y a mano). NUNCA agregar
+#   pull_request acá: un fork podría ejecutar código en el server.
+# - El runner tiene label dedicado (staging-canada) y corre como usuario
+#   sin sudo, alcanzable solo por Tailscale.
+# - Cero secretos de GitHub: los valores reales viven en el env file
+#   local del server (/opt/tms-staging/staging.env, fuera del repo).
+on:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un deploy a la vez; los pushes seguidos se encolan (no se cancelan:
+# el último push siempre termina deployado).
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false
+
+env:
+  STAGING_ENV_FILE: /opt/tms-staging/staging.env
+  COMPOSE_FILE_PATH: deploy/staging/docker-compose.staging.yml
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, staging-canada]
+    # Un build colgado no debe bloquear la cola del runner
+    timeout-minutes: 30
+    steps:
+      # Action pineada a SHA completo (runner self-hosted en repo público) y
+      # sin persistir credenciales: el job solo lee el código.
+      - name: Checkout del código
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Build de imágenes (backend + frontend)
+        run: |
+          docker compose --env-file "$STAGING_ENV_FILE" -f "$COMPOSE_FILE_PATH" build
+
+      - name: Levantar staging
+        run: |
+          docker compose --env-file "$STAGING_ENV_FILE" -f "$COMPOSE_FILE_PATH" up -d
+
+      # El backend arranca Flyway contra la copia de prod: si una migración
+      # nueva rompe, el healthcheck no llega a healthy y el job falla acá.
+      # También se espera el frontend: su nginx tarda unos segundos en
+      # atender y el smoke inmediato daba "connection refused" espurio.
+      - name: Esperar healthcheck de backend y frontend
+        run: |
+          for c in scaramutti-tms-v2-backend-staging scaramutti-tms-v2-frontend-staging; do
+            HEALTHY=""
+            for i in $(seq 1 36); do
+              STATUS=$(docker inspect --format '{{.State.Health.Status}}' "$c" 2>/dev/null || echo starting)
+              [ "$STATUS" = "healthy" ] && HEALTHY=1 && break
+              sleep 5
+            done
+            if [ -z "$HEALTHY" ]; then
+              echo "::error::$c no llegó a healthy"
+              docker logs --tail 100 "$c"
+              exit 1
+            fi
+          done
+
+      - name: Smoke básico
+        run: |
+          # Salud del backend (dentro de la red del compose; staging no se
+          # publica fuera de Tailscale)
+          docker exec scaramutti-tms-v2-backend-staging \
+            wget --quiet --tries=1 -O- http://127.0.0.1:8080/api/v1/q/health
+          # SPA servida por el frontend
+          docker exec scaramutti-tms-v2-frontend-staging \
+            wget --quiet --tries=1 --spider http://127.0.0.1/cotizaciones/
+
+      - name: Limpiar imágenes colgantes
+        if: always()
+        run: docker image prune -f

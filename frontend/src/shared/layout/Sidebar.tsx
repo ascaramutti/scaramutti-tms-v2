@@ -1,8 +1,22 @@
-import { FileText, KeyRound, Route, Truck, Users, type LucideIcon } from 'lucide-react'
+import {
+  ArrowDownToLine,
+  ArrowUpFromLine,
+  Boxes,
+  ClipboardList,
+  FileBarChart2,
+  FileText,
+  KeyRound,
+  Route,
+  Truck,
+  Users,
+  type LucideIcon,
+} from 'lucide-react'
 import { SidebarNavItem } from './SidebarNavItem'
+import { matchesPathPrefix } from './pathMatching'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
+import { OPERATIONS_ROLES, QUOTATION_ROLES, WAREHOUSE_ROLES } from '../auth/moduleRoles'
 import type { UserRole } from '../../api'
 
 interface MenuItem {
@@ -24,6 +38,15 @@ interface MenuGroup {
   items: MenuItem[]
 }
 
+/**
+ * Subárboles que cuelgan de /cotizaciones (el `base` de Vite, o sea la SPA
+ * entera) pero NO son el módulo comercial. Sin esta lista el prefijo marcaría
+ * activo el item de Cotizaciones mientras el usuario está en otro módulo.
+ */
+const NON_QUOTATION_SUBTREES = ['/cotizaciones/cuenta', '/cotizaciones/almacen']
+
+const WAREHOUSE_BASE = '/cotizaciones/almacen'
+
 // Matriz de permisos del menú alineada con `x-required-roles` del contrato OpenAPI.
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
 const MENU: MenuGroup[] = [
@@ -31,8 +54,58 @@ const MENU: MenuGroup[] = [
     label: 'Operaciones',
     items: [
       // Cross-link a v1 (servicios/viajes, otra SPA en la raíz del dominio).
-      // Visible para todos: cualquier rol puede tener trabajo en v1.
-      { icon: Route, label: 'Servicios / Viajes', href: '/' },
+      // Los roles de almacén no tienen cuenta allá: el link los dejaría en un
+      // login ajeno.
+      { icon: Route, label: 'Servicios / Viajes', href: '/', allowedRoles: OPERATIONS_ROLES },
+    ],
+  },
+  {
+    label: 'Almacén',
+    items: [
+      {
+        icon: Boxes,
+        label: 'Existencias',
+        to: WAREHOUSE_BASE,
+        allowedRoles: WAREHOUSE_ROLES,
+        // El detalle de un producto se abre desde acá, así que sigue marcando
+        // activo Existencias. El prefijo pelado no sirve: marcaría activo el
+        // item también en entradas, retiros y reportes.
+        activeWhen: (pathname) =>
+          pathname === WAREHOUSE_BASE ||
+          matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/productos`),
+      },
+      {
+        icon: ArrowDownToLine,
+        label: 'Entradas',
+        to: `${WAREHOUSE_BASE}/entradas`,
+        allowedRoles: WAREHOUSE_ROLES,
+        activeWhen: (pathname) =>
+          matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/entradas`),
+      },
+      {
+        icon: ArrowUpFromLine,
+        label: 'Retiros',
+        to: `${WAREHOUSE_BASE}/retiros`,
+        allowedRoles: WAREHOUSE_ROLES,
+        activeWhen: (pathname) =>
+          matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/retiros`),
+      },
+      {
+        icon: FileBarChart2,
+        label: 'Reportes',
+        to: `${WAREHOUSE_BASE}/reportes`,
+        allowedRoles: WAREHOUSE_ROLES,
+        activeWhen: (pathname) => matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/reportes`),
+      },
+      {
+        // Último del grupo: es una tarea de arranque del módulo, no del día a día.
+        icon: ClipboardList,
+        label: 'Corte inicial',
+        to: `${WAREHOUSE_BASE}/corte-inicial`,
+        allowedRoles: WAREHOUSE_ROLES,
+        activeWhen: (pathname) =>
+          matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/corte-inicial`),
+      },
     ],
   },
   {
@@ -42,16 +115,15 @@ const MENU: MenuGroup[] = [
         icon: FileText,
         label: 'Cotizaciones',
         to: '/cotizaciones',
-        allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
-        // Prefix-matching marcaría activo también en /cotizaciones/cuenta/*
-        // (cuenta anida bajo el mismo prefijo pero no es parte del módulo).
+        allowedRoles: QUOTATION_ROLES,
         activeWhen: (pathname) =>
-          pathname.startsWith('/cotizaciones') && !pathname.startsWith('/cotizaciones/cuenta'),
+          matchesPathPrefix(pathname, '/cotizaciones') &&
+          !NON_QUOTATION_SUBTREES.some((subtree) => matchesPathPrefix(pathname, subtree)),
       },
       {
         icon: Users,
         label: 'Clientes',
-        allowedRoles: ['admin', 'sales', 'general_manager', 'operations_manager'],
+        allowedRoles: QUOTATION_ROLES,
       },
     ],
   },

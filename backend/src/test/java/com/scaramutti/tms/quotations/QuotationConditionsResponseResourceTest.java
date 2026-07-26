@@ -2,6 +2,7 @@ package com.scaramutti.tms.quotations;
 
 import com.scaramutti.tms.shared.entity.Condition;
 import com.scaramutti.tms.shared.repository.ConditionRepository;
+import com.scaramutti.tms.support.HermeticTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -42,11 +43,13 @@ class QuotationConditionsResponseResourceTest {
 
     @Inject EntityManager entityManager;
     @Inject ConditionRepository conditionRepository;
+    @Inject HermeticTestData fixtures;
 
-    private static final int CLIENT_ID = 1;
-    private static final int CURRENCY_ID = 1;
-    private static final int PAYMENT_TERM_ID = 1;
-    private static final int ST_SCB = 1;
+    private int CLIENT_ID;
+    private int CURRENCY_ID;
+    private int PAYMENT_TERM_ID;
+    private int ST_SCB;
+    private int CARGO_TYPE_ID;
 
     private static final String ACTIVE_TEXT = "ZTEST_COND_ACTIVE";
     private static final String ACTIVE_TEXT_2 = "ZTEST_COND_ACTIVE_2";
@@ -58,6 +61,11 @@ class QuotationConditionsResponseResourceTest {
 
     @BeforeEach
     void seedConditions() {
+        CURRENCY_ID = fixtures.currencyId("USD");
+        PAYMENT_TERM_ID = fixtures.paymentTermId("Contado");
+        ST_SCB = fixtures.serviceTypeId("SCB");
+        CLIENT_ID = fixtures.seedClient();
+        CARGO_TYPE_ID = fixtures.seedCargoType();
         QuarkusTransaction.requiringNew().run(() -> {
             conditionRepository.delete("text like ?1", "ZTEST_COND_%");
             Condition active = newCondition(ACTIVE_TEXT, 91001, true);
@@ -81,6 +89,7 @@ class QuotationConditionsResponseResourceTest {
             ).executeUpdate();
             conditionRepository.delete("text like ?1", "ZTEST_COND_%");
         });
+        fixtures.cleanup();
     }
 
     private static Condition newCondition(String text, int order, boolean active) {
@@ -111,11 +120,11 @@ class QuotationConditionsResponseResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_AREQUIPA",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": 1000.00 }
               ],
               "conditionIds": %s
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB, conditionIdsJson);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, ST_SCB, CARGO_TYPE_ID, conditionIdsJson);
     }
 
     private int createWith(String token, String conditionIdsJson) {

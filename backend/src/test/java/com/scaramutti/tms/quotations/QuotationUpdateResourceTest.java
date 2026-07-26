@@ -2,6 +2,7 @@ package com.scaramutti.tms.quotations;
 
 import com.scaramutti.tms.shared.entity.Currency;
 import com.scaramutti.tms.shared.repository.CurrencyRepository;
+import com.scaramutti.tms.support.HermeticTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -11,6 +12,7 @@ import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -45,15 +47,33 @@ class QuotationUpdateResourceTest {
 
     @Inject EntityManager entityManager;
     @Inject CurrencyRepository currencyRepository;
+    @Inject HermeticTestData fixtures;
 
-    private static final int CLIENT_ID = 1;
-    private static final int CURRENCY_ID = 1;
-    private static final int PAYMENT_TERM_ID = 1;
-    private static final int ST_SCB = 1;
-    private static final int ST_SPL = 3;
-    private static final int ST_CES = 18;
-    private static final int ST_INT = 24;
+    private int CLIENT_ID;
+    private int CURRENCY_ID;
+    private int PAYMENT_TERM_ID;
+    private int ST_SCB;
+    private int ST_SPL;
+    private int ST_CES;
+    private int ST_INT;
+    private int CARGO_TYPE_ID;
+    private int OTHER_CLIENT_ID;
+    private int ST_ACB;
     private static final String TEST_CURRENCY_CODE = "ZTC";   // throwaway propia (code CHAR(3)), no toca el id=1 compartido
+
+    @BeforeEach
+    void seedFixtures() {
+        CURRENCY_ID = fixtures.currencyId("USD");
+        PAYMENT_TERM_ID = fixtures.paymentTermId("Contado");
+        ST_SCB = fixtures.serviceTypeId("SCB");
+        ST_SPL = fixtures.serviceTypeId("SPL");
+        ST_CES = fixtures.serviceTypeId("CES");
+        ST_INT = fixtures.serviceTypeId("INT");
+        ST_ACB = fixtures.serviceTypeId("ACB");
+        CLIENT_ID = fixtures.seedClient();
+        OTHER_CLIENT_ID = fixtures.seedClient();
+        CARGO_TYPE_ID = fixtures.seedCargoType();
+    }
 
     @AfterEach
     void cleanupQuotations() {
@@ -71,6 +91,7 @@ class QuotationUpdateResourceTest {
                 "DELETE FROM public.currencies WHERE code = :code"
             ).setParameter("code", TEST_CURRENCY_CODE).executeUpdate();
         });
+        fixtures.cleanup();
     }
 
     // ---------- Helpers ------------------------------------------------------
@@ -121,10 +142,10 @@ class QuotationUpdateResourceTest {
               "origin": "ZTEST_LIMA",
               "destination": "ZTEST_AREQUIPA",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": %s }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": %s }
               ]
             }
-            """, CLIENT_ID, contact, CURRENCY_ID, PAYMENT_TERM_ID, validityDays, ST_SCB, unitPrice);
+            """, CLIENT_ID, contact, CURRENCY_ID, PAYMENT_TERM_ID, validityDays, ST_SCB, CARGO_TYPE_ID, unitPrice);
     }
 
     private String baseTransporte() {
@@ -201,11 +222,11 @@ class QuotationUpdateResourceTest {
               "quotationType": "TRANSPORTE", "clientId": %d, "contactName": "ZTEST_2ITEMS",
               "currencyId": %d, "validityDays": 15, "origin": "ZTEST_O", "destination": "ZTEST_D",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 },
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1500.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 },
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 1500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_SCB, ST_SPL);
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID, ST_SPL, CARGO_TYPE_ID);
 
         given().header("Authorization", "Bearer " + token).header("If-Match", etag)
             .contentType(ContentType.JSON).body(body)
@@ -226,11 +247,11 @@ class QuotationUpdateResourceTest {
               "quotationType": "TRANSPORTE", "clientId": %d, "contactName": "ZTEST_MULTI",
               "currencyId": %d, "validityDays": 15, "origin": "ZTEST_O", "destination": "ZTEST_D",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 },
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 1, "unitPrice": 1500.00 }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 1000.00 },
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 1, "unitPrice": 1500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_SCB, ST_SPL);
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID, ST_SPL, CARGO_TYPE_ID);
         long id = createQuotation(token, createBody);
         String etag = getEtag(token, id);
 
@@ -256,10 +277,10 @@ class QuotationUpdateResourceTest {
                   "quotationType": "TRANSPORTE", "clientId": %d, "contactName": "ZTEST_PRICE",
                   "currencyId": %d, "validityDays": 15, "origin": "ZTEST_O", "destination": "ZTEST_D",
                   "items": [
-                    { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10, "quantity": 2, "unitPrice": 2000.00 }
+                    { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10, "quantity": 2, "unitPrice": 2000.00 }
                   ]
                 }
-                """, CLIENT_ID, CURRENCY_ID, ST_SCB))
+                """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID))
         .when().put("/quotations/" + id)
         .then().statusCode(200)
             .body("items[0].subtotal", equalTo(4000.00f))
@@ -275,11 +296,11 @@ class QuotationUpdateResourceTest {
               "quotationType": "TRANSPORTE", "clientId": %d, "contactName": "ZTEST_STBY",
               "currencyId": %d, "validityDays": 15, "origin": "ZTEST_O", "destination": "ZTEST_D",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 12, "quantity": 1, "unitPrice": 1500.00,
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 12, "quantity": 1, "unitPrice": 1500.00,
                   "standby": { "pricePerDay": 200.00, "includesIgv": false } }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_SCB);
+            """, CLIENT_ID, CURRENCY_ID, ST_SCB, CARGO_TYPE_ID);
         long id = createQuotation(token, withStandby);
         String etag = getEtag(token, id);
 
@@ -300,11 +321,11 @@ class QuotationUpdateResourceTest {
               "currencyId": %d, "validityDays": 15, "origin": "ZTEST_O", "destination": "ZTEST_D",
               "items": [
                 { "itemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 8000.00 },
-                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 25, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 5000.00 },
+                { "itemNumber": 2, "parentItemNumber": 1, "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 25, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 5000.00 },
                 { "itemNumber": 3, "parentItemNumber": 1, "serviceTypeId": %d, "quantity": 1, "unitPrice": 0, "internalReferencePrice": 1500.00 }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, ST_CES);
+            """, CLIENT_ID, CURRENCY_ID, ST_INT, ST_SCB, CARGO_TYPE_ID, ST_CES);
         long id = createQuotation(token, integral);
         String etag = getEtag(token, id);
 
@@ -392,9 +413,9 @@ class QuotationUpdateResourceTest {
             {
               "quotationType": "ALQUILER", "clientId": %d, "contactName": "ZTEST_TYPE",
               "currencyId": %d, "validityDays": 30,
-              "items": [ { "serviceTypeId": 9, "quantity": 1, "unitPrice": 500.00 } ]
+              "items": [ { "serviceTypeId": %d, "quantity": 1, "unitPrice": 500.00 } ]
             }
-            """, CLIENT_ID, CURRENCY_ID);
+            """, CLIENT_ID, CURRENCY_ID, ST_ACB);
 
         given().header("Authorization", "Bearer " + token).header("If-Match", etag)
             .contentType(ContentType.JSON).body(alquiler)
@@ -408,7 +429,7 @@ class QuotationUpdateResourceTest {
         long id = createQuotation(token, baseTransporte());
         String etag = getEtag(token, id);
 
-        String otherClient = baseTransporte().replace("\"clientId\": " + CLIENT_ID, "\"clientId\": 2");
+        String otherClient = baseTransporte().replace("\"clientId\": " + CLIENT_ID, "\"clientId\": " + OTHER_CLIENT_ID);
 
         given().header("Authorization", "Bearer " + token).header("If-Match", etag)
             .contentType(ContentType.JSON).body(otherClient)
@@ -567,7 +588,7 @@ class QuotationUpdateResourceTest {
         StringBuilder items = new StringBuilder();
         for (int i = 0; i < 6; i++) {
             if (i > 0) items.append(",");
-            items.append(String.format("{ \"serviceTypeId\": %d, \"cargoTypeId\": 1, \"weightKg\": 10, \"quantity\": 1, \"unitPrice\": 100.00 }", ST_SCB));
+            items.append(String.format("{ \"serviceTypeId\": %d, \"cargoTypeId\": %d, \"weightKg\": 10, \"quantity\": 1, \"unitPrice\": 100.00 }", ST_SCB, CARGO_TYPE_ID));
         }
         String body = String.format("""
             {

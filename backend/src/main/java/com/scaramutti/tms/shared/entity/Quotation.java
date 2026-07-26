@@ -1,5 +1,6 @@
 package com.scaramutti.tms.shared.entity;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -11,7 +12,6 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
 /**
  * Cabecera de cotizacion. Tabla `cotizaciones.quotations`.
@@ -100,15 +100,21 @@ public class Quotation {
     @Column(name = "updated_at", nullable = false)
     public OffsetDateTime updatedAt;
 
+    // updatedAt es la "version" del ETag (optimistic locking). Se trunca a
+    // MICROSEGUNDOS porque Postgres (timestamptz) guarda esa precisión: si se
+    // dejara en nanos, el ETag del POST (valor en memoria) no coincidiría con el
+    // del GET (releído de la BD) en JVMs con reloj de nanosegundos (Linux) → 412
+    // espurio / test de ETag rojo. Truncar acá hace que el valor en memoria sea
+    // idéntico al persistido en todas las plataformas.
     @PrePersist
     public void onCreate() {
-        OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
+        OffsetDateTime now = DateUtils.nowUtcMicros();
         if (createdAt == null) createdAt = now;
         if (updatedAt == null) updatedAt = now;
     }
 
     @PreUpdate
     public void onUpdate() {
-        updatedAt = OffsetDateTime.now(ZoneOffset.UTC);
+        updatedAt = DateUtils.nowUtcMicros();
     }
 }

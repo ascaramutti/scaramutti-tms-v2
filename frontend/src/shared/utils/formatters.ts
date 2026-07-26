@@ -47,3 +47,43 @@ export function formatDateOnly(isoDate: string): string {
     year: 'numeric',
   }).format(new Date(year, month - 1, day))
 }
+
+/**
+ * Fecha de hoy como `YYYY-MM-DD` en la zona del navegador, para comparar contra
+ * los date-only del contrato (`invoiceDate`) y para el `max` de los inputs de
+ * fecha. Se arma con los componentes locales a propósito: `toISOString()` pasa
+ * por UTC y en Lima (UTC-5) devolvería el día siguiente después de las 19:00.
+ */
+export function todayIsoDate(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
+/**
+ * Formatea una cantidad de inventario en formato es-PE (separador de miles).
+ * El contrato tipa stock y mínimos como `number`, así que admite decimales
+ * (unidades como litros o galones): se muestran hasta 2, sin rellenar con
+ * ceros las cantidades enteras ("1,250" y no "1,250.00").
+ */
+export function formatQuantity(value: number): string {
+  return new Intl.NumberFormat('es-PE', { maximumFractionDigits: 2 }).format(value)
+}
+
+/**
+ * Formatea una fecha ISO (UTC) a dd/mm/aaaa, hh:mm en zona horaria de Lima. Es
+ * `formatDate` con hora: el kardex necesita distinguir varios movimientos del
+ * mismo día, donde solo la fecha los volvería indistinguibles.
+ */
+export function formatDateTime(isoDate: string): string {
+  return new Intl.DateTimeFormat('es-PE', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'America/Lima',
+  }).format(new Date(isoDate))
+}

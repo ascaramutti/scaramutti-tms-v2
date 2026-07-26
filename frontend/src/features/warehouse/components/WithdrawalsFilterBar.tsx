@@ -1,0 +1,155 @@
+import { useState } from 'react'
+import type {
+  FleetUnitResponse,
+  WarehouseProductSummary,
+  WorkerResponse,
+} from '../../../api'
+import { fleetUnitToWithdrawalFields } from '../hooks/useCreateWarehouseWithdrawal'
+import type { WithdrawalFilters } from '../schemas/withdrawal-filters.schema'
+import { FleetUnitField } from './FleetUnitField'
+import { WarehouseProductField } from './WarehouseProductField'
+import { WorkerField } from './WorkerField'
+
+interface WithdrawalsFilterBarProps {
+  value: WithdrawalFilters
+  onChange: (next: WithdrawalFilters) => void
+}
+
+const inputClasses =
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+
+/**
+ * Filtros del listado de retiros: producto, trabajador y unidad de flota (los tres
+ * comboboxes), estado y rango de fechas de `withdrawnAt`. Los objetos elegidos
+ * viven acá (el label los necesita); a la página solo suben los ids/estado.
+ *
+ * Un rango invertido no se manda al backend: el contrato no define ese 400 para
+ * este listado, así que devolvería un resultado vacío indistinguible de "no hay".
+ * Se avisa acá y la página omite las fechas hasta que el rango vuelva a tener
+ * sentido.
+ */
+export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarProps) {
+  const [selectedProduct, setSelectedProduct] = useState<WarehouseProductSummary | null>(null)
+  const [selectedWorker, setSelectedWorker] = useState<WorkerResponse | null>(null)
+  const [selectedFleetUnit, setSelectedFleetUnit] = useState<FleetUnitResponse | null>(null)
+
+  const invalidRange = !!value.dateFrom && !!value.dateTo && value.dateFrom > value.dateTo
+
+  function handleProduct(product: WarehouseProductSummary | null) {
+    setSelectedProduct(product)
+    onChange({ ...value, productId: product?.id })
+  }
+
+  function handleWorker(worker: WorkerResponse | null) {
+    setSelectedWorker(worker)
+    onChange({ ...value, receivedByWorkerId: worker?.id })
+  }
+
+  function handleFleetUnit(fleetUnit: FleetUnitResponse | null) {
+    setSelectedFleetUnit(fleetUnit)
+    // El trío disyunto: la unidad elegida va a su campo por `kind`, los otros dos
+    // quedan sin filtro. Sin unidad, los tres se limpian.
+    const { tractorId, trailerId, escortVehicleId } = fleetUnitToWithdrawalFields(fleetUnit)
+    onChange({
+      ...value,
+      tractorId: tractorId ?? undefined,
+      trailerId: trailerId ?? undefined,
+      escortVehicleId: escortVehicleId ?? undefined,
+    })
+  }
+
+  return (
+    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <WarehouseProductField
+          id="withdrawals-filter-product"
+          label="Producto"
+          selected={selectedProduct}
+          onSelectedChange={handleProduct}
+        />
+        <WorkerField
+          id="withdrawals-filter-worker"
+          label="Recibido por"
+          selected={selectedWorker}
+          onSelectedChange={handleWorker}
+        />
+        <FleetUnitField
+          id="withdrawals-filter-fleet-unit"
+          label="Unidad de flota"
+          selected={selectedFleetUnit}
+          onSelectedChange={handleFleetUnit}
+        />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <label
+            htmlFor="withdrawals-status"
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+          >
+            Estado
+          </label>
+          <select
+            id="withdrawals-status"
+            value={value.status ?? ''}
+            onChange={(event) =>
+              onChange({
+                ...value,
+                status: event.target.value
+                  ? (event.target.value as 'ACTIVE' | 'CANCELLED')
+                  : undefined,
+              })
+            }
+            className={inputClasses}
+          >
+            <option value="">Todos</option>
+            <option value="ACTIVE">Activos</option>
+            <option value="CANCELLED">Anulados</option>
+          </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor="withdrawals-date-from"
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+          >
+            Desde
+          </label>
+          <input
+            id="withdrawals-date-from"
+            type="date"
+            value={value.dateFrom ?? ''}
+            onChange={(event) => onChange({ ...value, dateFrom: event.target.value || undefined })}
+            aria-invalid={invalidRange}
+            aria-describedby={invalidRange ? 'withdrawals-date-error' : undefined}
+            className={inputClasses}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="withdrawals-date-to"
+            className="mb-1.5 block text-sm font-medium text-slate-700"
+          >
+            Hasta
+          </label>
+          <input
+            id="withdrawals-date-to"
+            type="date"
+            value={value.dateTo ?? ''}
+            onChange={(event) => onChange({ ...value, dateTo: event.target.value || undefined })}
+            aria-invalid={invalidRange}
+            aria-describedby={invalidRange ? 'withdrawals-date-error' : undefined}
+            className={inputClasses}
+          />
+        </div>
+      </div>
+
+      {invalidRange && (
+        <p id="withdrawals-date-error" role="alert" className="text-xs text-red-600">
+          La fecha "desde" no puede ser posterior a la fecha "hasta".
+        </p>
+      )}
+    </div>
+  )
+}

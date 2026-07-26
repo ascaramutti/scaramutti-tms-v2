@@ -82,7 +82,12 @@ class CargoTypesResourceTest {
 
     @Test
     void list_withoutQueryParams_returnsFirstPageWithDefaults() {
-        // BD prod tiene 69 cargo_types reales. Verifica defaults page=0, size=20.
+        // Hermetico (follow-up D-1): siembra 21 cargo_types propios (>1 pagina de 20)
+        // para verificar los defaults page=0/size=20 sin depender de las filas
+        // ambientales del dev-DB. Se limpian en @AfterEach por prefijo.
+        for (int i = 0; i < 21; i++) {
+            seedCargoType(String.format("%sPag %02d", TEST_NAME_PREFIX, i), true);
+        }
         String token = login("admin", "Admin1234");
 
         given()
@@ -95,7 +100,7 @@ class CargoTypesResourceTest {
             .body("page", equalTo(0))
             .body("size", equalTo(20))
             .body("numberOfElements", equalTo(20))
-            .body("totalElements", greaterThanOrEqualTo(69))
+            .body("totalElements", greaterThanOrEqualTo(21))
             .body("first", equalTo(true))
             .body("last", equalTo(false))
             .body("empty", equalTo(false))

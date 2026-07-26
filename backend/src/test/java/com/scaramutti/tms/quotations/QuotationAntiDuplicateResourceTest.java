@@ -1,5 +1,6 @@
 package com.scaramutti.tms.quotations;
 
+import com.scaramutti.tms.support.HermeticTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -8,6 +9,7 @@ import io.restassured.http.ContentType;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -35,12 +37,25 @@ class QuotationAntiDuplicateResourceTest {
         }
     }
 
-    private static final int CLIENT_ID = 1;
-    private static final int CURRENCY_ID = 1;
-    private static final int PAYMENT_TERM_ID = 1;
-    private static final int ST_SCB = 1;
+    // Hermetico (follow-up D-1): catalogos resueltos por clave natural y client/
+    // cargoType sembrados sinteticos en @BeforeEach — sin IDs fijos del dev-DB.
+    private int CLIENT_ID;
+    private int CURRENCY_ID;
+    private int PAYMENT_TERM_ID;
+    private int ST_SCB;
+    private int CARGO_TYPE_ID;
 
     @Inject EntityManager entityManager;
+    @Inject HermeticTestData fixtures;
+
+    @BeforeEach
+    void resolveHermeticIds() {
+        CURRENCY_ID = fixtures.currencyId("USD");
+        PAYMENT_TERM_ID = fixtures.paymentTermId("Contado");
+        ST_SCB = fixtures.serviceTypeId("SCB");
+        CLIENT_ID = fixtures.seedClient();
+        CARGO_TYPE_ID = fixtures.seedCargoType();
+    }
 
     @AfterEach
     void cleanupQuotations() {
@@ -50,6 +65,7 @@ class QuotationAntiDuplicateResourceTest {
                 + "WHERE contact_name LIKE 'ZTEST_%' OR origin LIKE 'ZTEST_%' OR destination LIKE 'ZTEST_%'"
             ).executeUpdate()
         );
+        fixtures.cleanup();
     }
 
     private String loginAdmin() {
@@ -75,10 +91,10 @@ class QuotationAntiDuplicateResourceTest {
               "origin": "%s",
               "destination": "%s",
               "items": [
-                { "serviceTypeId": %d, "cargoTypeId": 1, "weightKg": 10.00, "quantity": 1, "unitPrice": %s }
+                { "serviceTypeId": %d, "cargoTypeId": %d, "weightKg": 10.00, "quantity": 1, "unitPrice": %s }
               ]
             }
-            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, origin, destination, serviceTypeId, unitPrice);
+            """, CLIENT_ID, CURRENCY_ID, PAYMENT_TERM_ID, origin, destination, serviceTypeId, CARGO_TYPE_ID, unitPrice);
     }
 
     @Test
