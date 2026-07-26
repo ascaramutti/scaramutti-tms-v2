@@ -14,6 +14,8 @@ interface TextFieldProps {
   placeholder?: string
   /** Mensaje de error inline (suele venir de `formState.errors[field].message`). */
   error?: string
+  /** Ayuda bajo el campo, anunciada por lector de pantalla (como en `Textarea`). */
+  helperText?: string
   disabled?: boolean
   /** Para `type='number'`: límites y paso del input nativo (acotan el spinner + validación HTML).
    * `step='any'` acepta decimales sin atarlos a una escala: un `step` numérico chico (0.01) hace
@@ -45,6 +47,7 @@ export function TextField({
   autoComplete,
   placeholder,
   error,
+  helperText,
   disabled,
   min,
   max,
@@ -54,6 +57,12 @@ export function TextField({
 }: TextFieldProps) {
   const finalPlaceholder =
     placeholder ?? (type === 'password' ? PASSWORD_PLACEHOLDER : undefined)
+
+  // Encadenado como en `Textarea`: la ayuda y el error se anuncian juntos al
+  // enfocar el campo, no solo el error.
+  const helperId = helperText ? `${id}-helper` : undefined
+  const errorId = error ? `${id}-error` : undefined
+  const describedBy = [helperId, errorId].filter(Boolean).join(' ') || undefined
 
   return (
     <div>
@@ -68,7 +77,7 @@ export function TextField({
         step={step}
         autoComplete={autoComplete}
         aria-invalid={!!error}
-        aria-describedby={error ? `${id}-error` : undefined}
+        aria-describedby={describedBy}
         disabled={disabled}
         placeholder={finalPlaceholder}
         onKeyDown={
@@ -90,8 +99,13 @@ export function TextField({
         )}
         {...register}
       />
+      {helperText && (
+        <p id={helperId} className="mt-1.5 text-xs text-slate-500">
+          {helperText}
+        </p>
+      )}
       {error && (
-        <p id={`${id}-error`} role="alert" className="mt-1.5 text-sm text-red-600">
+        <p id={errorId} role="alert" className="mt-1.5 text-sm text-red-600">
           {error}
         </p>
       )}

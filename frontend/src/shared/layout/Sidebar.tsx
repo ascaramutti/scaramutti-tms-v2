@@ -2,6 +2,7 @@ import {
   ArrowDownToLine,
   ArrowUpFromLine,
   Boxes,
+  ClipboardList,
   FileBarChart2,
   FileText,
   KeyRound,
@@ -95,6 +96,15 @@ const MENU: MenuGroup[] = [
         to: `${WAREHOUSE_BASE}/reportes`,
         allowedRoles: WAREHOUSE_ROLES,
         activeWhen: (pathname) => matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/reportes`),
+      },
+      {
+        // Último del grupo: es una tarea de arranque del módulo, no del día a día.
+        icon: ClipboardList,
+        label: 'Corte inicial',
+        to: `${WAREHOUSE_BASE}/corte-inicial`,
+        allowedRoles: WAREHOUSE_ROLES,
+        activeWhen: (pathname) =>
+          matchesPathPrefix(pathname, `${WAREHOUSE_BASE}/corte-inicial`),
       },
     ],
   },

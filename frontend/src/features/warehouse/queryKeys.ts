@@ -1,6 +1,7 @@
 import type {
   GetWarehouseProductKardexData,
   GetWarehouseReportData,
+  ListWarehouseOpeningBalancesData,
   ListWarehouseProductsData,
   ListWarehousePurchaseInvoicesData,
   ListWarehouseWithdrawalsData,
@@ -13,6 +14,9 @@ type WarehousePurchaseInvoiceListParams = NonNullable<
 >
 type WarehouseWithdrawalListParams = NonNullable<ListWarehouseWithdrawalsData['query']>
 type WarehouseReportParams = NonNullable<GetWarehouseReportData['query']>
+type WarehouseOpeningBalanceListParams = NonNullable<
+  ListWarehouseOpeningBalancesData['query']
+>
 
 /**
  * Query keys del dominio Almacén. Factory centralizado para que las
@@ -42,6 +46,12 @@ export const warehouseKeys = {
   // distinto, y volver a un corte ya consultado debe salir del cache.
   reports: () => [...warehouseKeys.all, 'reports'] as const,
   report: (params: WarehouseReportParams) => [...warehouseKeys.reports(), params] as const,
+  // Cortes iniciales. Sin `detail`: el contrato no expone GET por id (la apertura
+  // es inmutable y no tiene pantalla propia de detalle).
+  openingBalances: () => [...warehouseKeys.all, 'opening-balances'] as const,
+  openingBalanceLists: () => [...warehouseKeys.openingBalances(), 'list'] as const,
+  openingBalanceList: (params: WarehouseOpeningBalanceListParams) =>
+    [...warehouseKeys.openingBalanceLists(), params] as const,
   productCategories: () => [...warehouseKeys.all, 'product-categories'] as const,
   purchaseInvoices: () => [...warehouseKeys.all, 'purchase-invoices'] as const,
   purchaseInvoiceLists: () => [...warehouseKeys.purchaseInvoices(), 'list'] as const,

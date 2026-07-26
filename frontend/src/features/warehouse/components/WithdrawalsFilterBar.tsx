@@ -7,7 +7,7 @@ import type {
 import { fleetUnitToWithdrawalFields } from '../hooks/useCreateWarehouseWithdrawal'
 import type { WithdrawalFilters } from '../schemas/withdrawal-filters.schema'
 import { FleetUnitField } from './FleetUnitField'
-import { WithdrawalProductField } from './WithdrawalProductField'
+import { WarehouseProductField } from './WarehouseProductField'
 import { WorkerField } from './WorkerField'
 
 interface WithdrawalsFilterBarProps {
@@ -61,7 +61,7 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
   return (
     <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <WithdrawalProductField
+        <WarehouseProductField
           id="withdrawals-filter-product"
           label="Producto"
           selected={selectedProduct}

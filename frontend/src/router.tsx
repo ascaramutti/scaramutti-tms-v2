@@ -19,6 +19,7 @@ import { WithdrawalCreatePage } from './features/warehouse/pages/WithdrawalCreat
 import { WithdrawalDetailPage } from './features/warehouse/pages/WithdrawalDetailPage'
 import { WithdrawalEditPage } from './features/warehouse/pages/WithdrawalEditPage'
 import { WarehouseReportsPage } from './features/warehouse/pages/WarehouseReportsPage'
+import { OpeningBalancesPage } from './features/warehouse/pages/OpeningBalancesPage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
 // con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
@@ -152,6 +153,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <WarehouseReportsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: '/cotizaciones/almacen/corte-inicial',
+        element: (
+          <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
+            <OpeningBalancesPage />
           </ProtectedRoute>
         ),
       },
