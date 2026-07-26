@@ -390,6 +390,23 @@ class WarehouseOpeningBalanceResourceTest {
 
     // ---------- POST: roles ----------------------------------------------------------
 
+    // Registrar el corte inicial es solo de `admin`: fija la línea base del kardex,
+    // es inmutable y no se puede anular. Consultarlo sigue abierto al módulo (ver
+    // los tests del GET más abajo, que corren con otros roles).
+    @Test
+    void create_withAdminRole_returns201() {
+        int productId = fixtures.seedProduct("ZTEST_OB RoleAdmin");
+
+        given()
+            .header("Authorization", "Bearer " + login("admin", "Admin1234"))
+            .contentType(ContentType.JSON)
+            .body(requestBody(productId, "10", null))
+        .when()
+            .post("/warehouse/opening-balances")
+        .then()
+            .statusCode(201);
+    }
+
     @Test
     void create_withoutToken_returns401() {
         int productId = fixtures.seedProduct("ZTEST_OB NoToken");
@@ -435,7 +452,7 @@ class WarehouseOpeningBalanceResourceTest {
     }
 
     @Test
-    void create_withOperationsManagerRole_returns201() {
+    void create_withOperationsManagerRole_returns403_COM003() {
         int productId = fixtures.seedProduct("ZTEST_OB RoleOM");
 
         given()
@@ -445,11 +462,12 @@ class WarehouseOpeningBalanceResourceTest {
         .when()
             .post("/warehouse/opening-balances")
         .then()
-            .statusCode(201);
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
     }
 
     @Test
-    void create_withFinanceManagerRole_returns201() {
+    void create_withFinanceManagerRole_returns403_COM003() {
         int productId = fixtures.seedProduct("ZTEST_OB RoleFM");
 
         given()
@@ -459,11 +477,12 @@ class WarehouseOpeningBalanceResourceTest {
         .when()
             .post("/warehouse/opening-balances")
         .then()
-            .statusCode(201);
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
     }
 
     @Test
-    void create_withWarehouseKeeperRole_returns201() {
+    void create_withWarehouseKeeperRole_returns403_COM003() {
         int productId = fixtures.seedProduct("ZTEST_OB RoleWK");
 
         given()
@@ -473,11 +492,12 @@ class WarehouseOpeningBalanceResourceTest {
         .when()
             .post("/warehouse/opening-balances")
         .then()
-            .statusCode(201);
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
     }
 
     @Test
-    void create_withGeneralManagerRole_returns201() {
+    void create_withGeneralManagerRole_returns403_COM003() {
         int productId = fixtures.seedProduct("ZTEST_OB RoleGM");
 
         given()
@@ -487,7 +507,8 @@ class WarehouseOpeningBalanceResourceTest {
         .when()
             .post("/warehouse/opening-balances")
         .then()
-            .statusCode(201);
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
     }
 
     // ---------- GET: listado ----------------------------------------------------------
@@ -667,5 +688,17 @@ class WarehouseOpeningBalanceResourceTest {
         .then()
             .statusCode(403)
             .body("code", equalTo("COM-003"));
+    }
+
+    // Consultar no se restringió junto con el registro: un rol del módulo que ya NO
+    // puede registrar sigue viendo el listado.
+    @Test
+    void list_withWarehouseKeeperRole_returns200() {
+        given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("wk_test", "warehouse_keeper"))
+        .when()
+            .get("/warehouse/opening-balances")
+        .then()
+            .statusCode(200);
     }
 }

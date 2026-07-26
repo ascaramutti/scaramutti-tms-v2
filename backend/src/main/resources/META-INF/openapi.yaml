@@ -1137,7 +1137,11 @@ paths:
         - Producto que ya tiene movimientos → `409 WH-011` (una apertura posterior
           falsearía el saldo corrido).
         - Producto inexistente o inactivo → `400 WH-004`.
-      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+
+        Registrarlo queda restringido a `admin`: fija la línea base del kardex, es
+        inmutable y no tiene anulación, así que un error solo se corrige en base de
+        datos. Consultar las aperturas sigue abierto a los roles del módulo.
+      x-required-roles: [admin]
       requestBody:
         required: true
         content:
