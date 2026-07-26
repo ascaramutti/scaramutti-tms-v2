@@ -2,6 +2,7 @@ import { http, HttpResponse, delay } from 'msw'
 import type {
   PageMeta,
   PageOfWarehouseKardexMovement,
+  PageOfWarehouseOpeningBalance,
   PageOfWarehouseProduct,
   PageOfWarehousePurchaseInvoiceSummary,
   PageOfWarehouseSupplier,
@@ -9,6 +10,7 @@ import type {
   Problem,
   UserResponse,
   WarehouseKardexMovementResponse,
+  WarehouseOpeningBalanceResponse,
   WarehouseProductCategoryResponse,
   WarehouseProductResponse,
   WarehouseProductStockResponse,
@@ -341,6 +343,29 @@ export function pageOfWithdrawals(
   return { ...pageMeta(content.length, meta), content }
 }
 
+/** Fixture de un corte inicial (fila del listado y respuesta del POST). */
+export function fakeOpeningBalance(
+  overrides: Partial<WarehouseOpeningBalanceResponse> = {},
+): WarehouseOpeningBalanceResponse {
+  return {
+    id: 1,
+    product: { id: 1, code: 'PRO-0001', name: 'Filtro de aceite XYZ', unitCode: 'UND' },
+    quantity: 6,
+    observations: 'Conteo físico del arranque',
+    registeredBy: AUDIT_USER,
+    registeredAt: '2026-06-01T13:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Envuelve cortes iniciales en una página completa (PageMeta + content). */
+export function pageOfOpeningBalances(
+  content: WarehouseOpeningBalanceResponse[],
+  meta: Partial<PageOfWarehouseOpeningBalance> = {},
+): PageOfWarehouseOpeningBalance {
+  return { ...pageMeta(content.length, meta), content }
+}
+
 /** Fixture del stock disponible en vivo de un producto. */
 export function fakeProductStock(
   overrides: Partial<WarehouseProductStockResponse> = {},
@@ -485,6 +510,29 @@ export const warehouseHandlers = [
   ),
   http.get(`${API}/warehouse/withdrawals/:id`, () =>
     HttpResponse.json(fakeWithdrawal(), { headers: { ETag: DEFAULT_WITHDRAWAL_ETAG } }),
+  ),
+  // La tercera fila arranca en 0 a propósito: cualquier regresión que trate el cero
+  // como "sin dato" (un `||` o un guion) se cae acá y no solo en su propia suite.
+  http.get(`${API}/warehouse/opening-balances`, () =>
+    HttpResponse.json(
+      pageOfOpeningBalances([
+        fakeOpeningBalance(),
+        fakeOpeningBalance({
+          id: 2,
+          product: { id: 2, code: 'PRO-0002', name: 'Aceite 15W40', unitCode: 'GAL' },
+          quantity: 2,
+        }),
+        fakeOpeningBalance({
+          id: 3,
+          product: { id: 3, code: 'PRO-0003', name: 'Perno hexagonal 1/2', unitCode: 'UND' },
+          quantity: 0,
+          observations: null,
+        }),
+      ]),
+    ),
+  ),
+  http.post(`${API}/warehouse/opening-balances`, () =>
+    HttpResponse.json(fakeOpeningBalance(), { status: 201 }),
   ),
 ]
 
@@ -1374,3 +1422,114 @@ export function warehouseProductStockError(status: number, problem: Partial<Prob
   return http.get(`${API}/warehouse/products/:id/stock`, () => problemResponse(status, problem))
 }
 
+/** Responde una página fija de cortes iniciales. */
+export function openingBalancesPage(
+  content: WarehouseOpeningBalanceResponse[],
+  meta?: Partial<PageOfWarehouseOpeningBalance>,
+) {
+  return http.get(`${API}/warehouse/opening-balances`, () =>
+    HttpResponse.json(pageOfOpeningBalances(content, meta)),
+  )
+}
+
+/** Responde un listado de cortes iniciales vacío. */
+export function openingBalancesEmpty() {
+  return http.get(`${API}/warehouse/opening-balances`, () =>
+    HttpResponse.json(pageOfOpeningBalances([])),
+  )
+}
+
+/** Responde el listado con un delay (para observar el estado de carga). */
+export function openingBalancesSlow(
+  content: WarehouseOpeningBalanceResponse[] = [fakeOpeningBalance()],
+  ms = 40,
+) {
+  return http.get(`${API}/warehouse/opening-balances`, async () => {
+    await delay(ms)
+    return HttpResponse.json(pageOfOpeningBalances(content))
+  })
+}
+
+/** Responde un error en el listado (Problem RFC 7807). */
+export function openingBalancesError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/warehouse/opening-balances`, () => problemResponse(status, problem))
+}
+
+/** Captura los query params del listado (filtro por producto y paginación). */
+export function openingBalancesCapture(
+  sink: ProductsCaptureSink,
+  content: WarehouseOpeningBalanceResponse[] = [fakeOpeningBalance()],
+  meta?: Partial<PageOfWarehouseOpeningBalance>,
+) {
+  sink.calls = []
+  return http.get(`${API}/warehouse/opening-balances`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    sink.params = params
+    sink.calls = [...(sink.calls ?? []), params]
+    return HttpResponse.json(pageOfOpeningBalances(content, meta))
+  })
+}
+
+/** Responde según el `page` solicitado (para testear navegación entre páginas). */
+export function openingBalancesPagedByParam(totalElements = 25, size = 10) {
+  return http.get(`${API}/warehouse/opening-balances`, ({ request }) => {
+    const page = Number(new URL(request.url).searchParams.get('page') ?? 0)
+    return HttpResponse.json(
+      pageOfOpeningBalances(
+        [
+          fakeOpeningBalance({
+            id: page * 100 + 1,
+            product: {
+              id: page * 100 + 1,
+              code: `P${page}`,
+              name: `Producto de la página ${page}`,
+              unitCode: 'UND',
+            },
+          }),
+        ],
+        { totalElements, size, page },
+      ),
+    )
+  })
+}
+
+/** Devuelve una página distinta por llamada (para ver el listado tras registrar). */
+export function openingBalancesSequence(pages: PageOfWarehouseOpeningBalance[]) {
+  let call = 0
+  return http.get(`${API}/warehouse/opening-balances`, () => {
+    const page = pages[Math.min(call, pages.length - 1)]
+    call += 1
+    return HttpResponse.json(page)
+  })
+}
+
+/** Captura el body del POST del corte inicial. */
+export function openingBalanceCapture(
+  sink: BodyCaptureSink,
+  response: WarehouseOpeningBalanceResponse = fakeOpeningBalance(),
+) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/opening-balances`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.body = body
+    sink.calls = [...(sink.calls ?? []), body]
+    return HttpResponse.json(response, { status: 201 })
+  })
+}
+
+/** Responde el POST con un delay (para observar el estado en vuelo). */
+export function openingBalanceSlow(sink: BodyCaptureSink, ms = 40) {
+  sink.calls = []
+  return http.post(`${API}/warehouse/opening-balances`, async ({ request }) => {
+    const body = (await request.json()) as Record<string, unknown>
+    sink.body = body
+    sink.calls = [...(sink.calls ?? []), body]
+    await delay(ms)
+    return HttpResponse.json(fakeOpeningBalance(), { status: 201 })
+  })
+}
+
+/** Responde un error en el POST (409 WH-009 / WH-011, 400 WH-004, 500). */
+export function openingBalanceError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/warehouse/opening-balances`, () => problemResponse(status, problem))
+}

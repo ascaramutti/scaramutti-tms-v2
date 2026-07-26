@@ -29,7 +29,7 @@ import {
   type WithdrawalEditFormInput,
 } from '../schemas/withdrawal.schema'
 import { FleetUnitField } from './FleetUnitField'
-import { WithdrawalProductField } from './WithdrawalProductField'
+import { WarehouseProductField } from './WarehouseProductField'
 import { WorkerField } from './WorkerField'
 
 interface WithdrawalCreateModeProps {
@@ -258,7 +258,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
                 </p>
               </div>
             ) : (
-              <WithdrawalProductField
+              <WarehouseProductField
                 id="withdrawal-product"
                 label="Producto"
                 selected={selectedProduct}
