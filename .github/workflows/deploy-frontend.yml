@@ -73,25 +73,14 @@ jobs:
             -t ghcr.io/${{ github.repository_owner }}/frontend:${{ github.sha }}-azure \
             ./azure-build
 
-      # Las MISMAS imágenes van a los dos registries mientras dura la migración
-      # de registry: GHCR (destino) y ACR (del que las apps deployan hoy).
-      # Cuando las apps pasen a GHCR y el ACR se apague, el push al ACR se
-      # elimina.
       - name: Push a GHCR
         run: |
           docker push ghcr.io/${{ github.repository_owner }}/frontend:${{ github.sha }}
           docker push ghcr.io/${{ github.repository_owner }}/frontend:${{ github.sha }}-azure
 
-      - name: Push al ACR (transitorio)
-        run: |
-          az acr login --name ${{ secrets.ACR_NAME }}
-          for TAG in "${{ github.sha }}" "${{ github.sha }}-azure"; do
-            docker tag "ghcr.io/${{ github.repository_owner }}/frontend:$TAG" \
-              "${{ secrets.ACR_NAME }}.azurecr.io/frontend:$TAG"
-            docker push "${{ secrets.ACR_NAME }}.azurecr.io/frontend:$TAG"
-          done
-
+      # Deploy: solo cambia la imagen (el pull privado usa el secret
+      # ghcr-pull-token ya configurado en la app).
       - name: Desplegar al Container App
         run: |
           az containerapp update -n frontend -g ${{ secrets.RG_NAME }} \
-            --image ${{ secrets.ACR_NAME }}.azurecr.io/frontend:${{ github.sha }}-azure
+            --image ghcr.io/${{ github.repository_owner }}/frontend:${{ github.sha }}-azure
