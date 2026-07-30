@@ -7,8 +7,9 @@ info:
     name: Equipo Scaramutti TMS
     email: ascaramutti@hotmail.com
   description: |
-    API del sistema de gestión Scaramutti TMS. Cubre autenticación, módulo de
-    cotizaciones y catálogos compartidos.
+    API del sistema de gestión Scaramutti TMS. Cubre autenticación, el módulo de
+    cotizaciones, el de almacén (inventario), el de operaciones (control de
+    viajes) y los catálogos compartidos.
 
     ## Convenciones generales
 
@@ -48,8 +49,9 @@ info:
 
     Siete roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`,
     `finance_manager`, `warehouse_keeper`.
-    `dispatcher` (Coordinador de Operaciones) por ahora no tiene endpoints accesibles; queda
-    reservado para integracion futura con el modulo de servicios de la app legacy.
+    `dispatcher` (Coordinador de Operaciones) opera los viajes: ve el listado y el detalle, asigna
+    recursos, inicia y finaliza. No crea ni edita servicios, no los cancela y **nunca ve precios**
+    (el servidor los omite de sus respuestas y el reporte le responde 403).
     Cada operación documenta los roles permitidos en `x-required-roles`.
 
 servers:
@@ -76,8 +78,10 @@ tags:
     description: Endpoints de salud y monitoreo
   - name: Warehouse
     description: Almacén — catálogos del módulo, productos+stock, corte inicial, entradas, retiros, kardex, reportes
+  - name: Operations
+    description: Operaciones — servicios de transporte, asignación de recursos, bitácora, dashboard y reporte
   - name: SharedCatalogs
-    description: Catálogos compartidos de `public` (trabajadores y flota unificada) — read-only; sin prefijo /warehouse porque los reutilizará Operaciones
+    description: Catálogos compartidos de `public` (trabajadores, flota unificada y conductores) — read-only; sin prefijo de módulo porque los usan Almacén y Operaciones
 
 # =============================================================================
 paths:
@@ -1132,7 +1136,8 @@ paths:
         almacén; RN-WH9). Sin paginar — plantilla chica. `q` es multi-palabra
         case-insensitive (≥ 3 caracteres): cada palabra debe matchear en el
         nombre O el apellido (RN-WH14); para no filtrar, OMITIR el parámetro.
-        Cuando Operaciones lo consuma, sus roles se suman acá.
+        Operaciones NO lo consume: para asignar un viaje necesita conductores
+        (`GET /drivers`), no la planilla completa.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
         - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
@@ -1165,10 +1170,14 @@ paths:
         **`id` es el id de la tabla del SUBTIPO** — la dirección de una unidad es
         el par `(kind, id)`; el frontend lo mapea a `tractorId | trailerId |
         escortVehicleId` en el request del retiro. Sin paginar — flota chica.
-        Convive con los `GET /tractors|/trailers` planos del contrato de
-        Operaciones (usos distintos: allá selects por subtipo, acá el selector
-        disyunto del retiro); convergen cuando exista el supertipo físico.
-      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+
+        Lo consumen los dos módulos: almacén elige la unidad destino del retiro
+        (los tres subtipos) y operaciones elige tracto y carreta al asignar un
+        viaje (`?kind=TRACTOR` / `?kind=TRAILER`), por eso la respuesta incluye
+        `status` (disponibilidad). Las escoltas no participan de la asignación de
+        viajes: su `status` viaja en null. Además de quienes asignan recursos,
+        `sales` puede consultarlos: registra y edita servicios.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper, dispatcher, sales]
       parameters:
         - name: kind
           in: query
@@ -1183,6 +1192,34 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/FleetUnitResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /drivers:
+    get:
+      tags: [SharedCatalogs]
+      operationId: listDrivers
+      summary: Listar conductores (combobox de asignación del viaje)
+      description: |
+        Catálogo compartido `public.drivers`: quién puede conducir, con su
+        licencia y su disponibilidad. El nombre sale del trabajador asociado, y
+        el `id` que devuelve es el que guarda la asignación del servicio.
+        **Solo lectura desde v2, sin creación al vuelo** — el alta de conductores
+        pertenece a la futura gestión de flota y personal. Sin paginar: plantilla
+        chica. Además de quienes asignan recursos, `sales` puede consultarlos:
+        registra y edita servicios.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher, sales]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Conductores con su disponibilidad
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DriverResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -2123,6 +2160,370 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  # ----- Operations: servicios de transporte (schema operaciones) -------------
+  # Control de viajes: alta, edición con justificación, transiciones de estado,
+  # asignación de recursos con conflictos forzables, bitácora y reporte.
+
+  /services:
+    get:
+      tags: [Operations]
+      operationId: listServices
+      summary: Listar servicios con filtros
+      description: |
+        RN-OP15 — búsqueda `q` de 3 caracteres o más sobre código, cliente
+        (nombre/RUC), origen y destino, **multi-palabra**: `q` se tokeniza por
+        espacios y cada palabra debe matchear en algún campo ("IPH piura"
+        encuentra al cliente IPH con destino Piura). Los filtros se combinan
+        entre sí. Orden fijo por fecha de creación descendente: no hay parámetro
+        de ordenamiento.
+
+        RN-OP8 — al rol `dispatcher` el servidor le OMITE `price` y
+        `currencyCode` de cada fila (ausentes, no null).
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ServiceStatus' } }
+        - { name: clientId, in: query, description: Filtra por cliente exacto, schema: { type: integer } }
+        - { name: dateFrom, in: query, description: Fecha tentativa desde (inclusive), schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: Fecha tentativa hasta (inclusive), schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de servicios
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfServiceSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Operations]
+      operationId: createService
+      summary: Crear servicio
+      description: |
+        El servicio nace en `PENDING_ASSIGNMENT` y el backend le asigna el
+        código (RN-OP11): `SRV-` seguido del id del servicio, rellenado con ceros
+        a la izquierda hasta un mínimo de 4 dígitos; a partir del id 10000 el
+        código crece a 5 o más dígitos y **nunca se trunca**.
+
+        RN-OP9 — la fecha tentativa PUEDE ser pasada (registro retroactivo); la
+        interfaz avisa, el servidor no bloquea. Cliente, tipo de carga o moneda
+        inexistentes o inactivos → 400 `COM-001`. El alta escribe la primera
+        línea de la bitácora y su registro de auditoría.
+
+        Contra el doble-click: un alta con el mismo cliente, la misma ruta y el
+        mismo usuario dentro de los 30 segundos previos responde 409 `OPS-007`
+        (mismo criterio que `QUO-002` en cotizaciones). No es una restricción de
+        unicidad — dos viajes iguales separados en el tiempo se registran sin
+        problema, y el código permite al cliente distinguir este 409 benigno de
+        un conflicto real.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceCreateRequest' }
+            example:
+              clientId: 12
+              tripScope: 'PROVINCIA'
+              tentativeDate: '2026-07-10'
+              origin: 'Piura'
+              destination: 'Lima — Callao'
+              cargoTypeId: 3
+              weightKg: 28000
+              lengthM: 12.5
+              price: 5800
+              currencyId: 1
+              observations: 'Coordinar ingreso al puerto con 24 h de anticipación'
+      responses:
+        '201':
+          description: Servicio creado
+          headers:
+            Location: { schema: { type: string }, description: URL del recurso creado }
+            ETag: { schema: { type: string }, description: 'Versión opaca del recurso (usarla en el If-Match posterior)' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /services/stats:
+    get:
+      tags: [Operations]
+      operationId: getServiceStats
+      summary: Indicadores del tablero operativo
+      description: |
+        RN-OP14 — `completedThisWeek` y `weekCycle` usan el ciclo operativo de la
+        empresa: miércoles 00:00 a martes 23:59, hora de América/Lima.
+
+        En los dos contadores de recursos, `active` = los que están en servicios
+        en ruta. El `total` es el padrón de cada recurso: `driversOnRoad.total` =
+        conductores activos (`public.drivers`, personal, no flota) y
+        `unitsOnRoad.total` = unidades de flota activas.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      responses:
+        '200':
+          description: Contadores del tablero
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceStatsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /services/report:
+    get:
+      tags: [Operations]
+      operationId: getServicesReport
+      summary: Reporte de servicios completados por rango
+      description: |
+        Servicios completados con fecha de fin dentro del rango (fechas
+        América/Lima, ambos extremos inclusive). Totales POR MONEDA sin
+        conversión, mismo criterio que el reporte de almacén. `from > to` → 400
+        `COM-001`. Exportación = client-side (sin endpoint).
+
+        RN-OP8 — es un reporte de facturación: `dispatcher` recibe 403.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, format: date } }
+        - { name: to, in: query, required: true, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: Filas + totales por moneda
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServicesReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /services/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+
+    get:
+      tags: [Operations]
+      operationId: getService
+      summary: Detalle del servicio (con bitácora y recursos)
+      description: |
+        Incluye la bitácora (`events`, orden cronológico) y los recursos
+        adicionales asignados en ruta. Devuelve el header `ETag` que exigen el
+        PUT y la cancelación. RN-OP8 — `dispatcher` no recibe `price` ni
+        `currencyCode`.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      responses:
+        '200':
+          description: Detalle completo
+          headers:
+            ETag: { schema: { type: string }, description: 'Versión opaca del recurso (usarla en el If-Match)' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    put:
+      tags: [Operations]
+      operationId: updateService
+      summary: Editar servicio (justificación obligatoria)
+      description: |
+        RN-OP6 — editables: origen, destino, fecha tentativa, peso, dimensiones,
+        precio, moneda y observaciones. Cliente, ámbito del viaje y tipo de carga
+        son INMUTABLES después del alta (si se equivocaron, se crea otro
+        servicio), por eso no viajan en el body. Cada campo cambiado deja su
+        línea de auditoría y una entrada de bitácora con la justificación.
+
+        RN-OP10 — un body sin cambios reales responde 200 sin escribir auditoría
+        ni tocar la fecha de actualización.
+
+        El servicio cancelado es inmutable → 409 `OPS-004`. El completado SÍ se
+        edita (corrección de datos). Concurrencia: `If-Match` con el ETag del
+        detalle; versión vieja → 412 `COM-004`.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceUpdateRequest' }
+      responses:
+        '200':
+          description: Servicio actualizado (o sin cambios)
+          headers:
+            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /services/{id}/assignment:
+    post:
+      tags: [Operations]
+      operationId: assignServiceResources
+      summary: Asignar recursos principales (el servicio pasa a pendiente de inicio)
+      description: |
+        RN-OP2 — conductor y tracto obligatorios, carreta opcional; solo desde
+        `PENDING_ASSIGNMENT`. Otro estado → 409 `OPS-006`.
+
+        RN-OP3 — si un recurso ya participa de OTRO servicio activo, responde 409
+        `OPS-002` con `forcible: true` y el detalle en `conflicts`. Reintentar con
+        `force: true` lo asigna igual y deja constancia en la bitácora y en la
+        auditoría (así trabajaba el sistema anterior: el conflicto avisa, no
+        prohíbe).
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignResourcesRequest' }
+            example: { driverId: 4, tractorId: 7, trailerId: 3, note: 'Sale del patio a las 05:00', force: false }
+      responses:
+        '200':
+          description: Recursos asignados; el servicio queda pendiente de inicio
+          headers:
+            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`OPS-006` (el estado no admite la acción) u `OPS-002` (conflicto forzable)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
+              examples:
+                forcibleConflict:
+                  summary: Conflicto de recursos — la interfaz ofrece "Forzar asignación"
+                  value:
+                    type: 'urn:tms:error:ops-002'
+                    title: 'Resource conflict'
+                    status: 409
+                    detail: 'El conductor Juan Pérez ya está asignado al servicio SRV-0042 (en ruta).'
+                    instance: '/api/v1/services/118/assignment'
+                    code: 'OPS-002'
+                    traceId: '3f2a1b0c-9d8e-7f6a-5b4c-3d2e1f0a9b8c'
+                    forcible: true
+                    conflicts:
+                      - { resource: 'DRIVER', resourceName: 'Juan Pérez', serviceCode: 'SRV-0042', serviceStatus: 'IN_PROGRESS' }
+
+  /services/{id}/status:
+    post:
+      tags: [Operations]
+      operationId: changeServiceStatus
+      summary: Transicionar estado (iniciar / finalizar / cancelar)
+      description: |
+        RN-OP1 — transiciones válidas: pendiente de inicio → en ruta, en ruta →
+        completado, y a cancelado desde los tres estados no terminales. El resto
+        → 409 `OPS-001`. El paso de pendiente de asignación a pendiente de inicio
+        NO se pide acá: es efecto de asignar recursos.
+
+        `dateTime` es opcional (por defecto, ahora). RN-OP13 — al finalizar, la
+        fecha de fin no puede ser anterior a la de inicio (400 `COM-001`).
+
+        RN-OP7 — cancelar exige motivo de 10 caracteres o más, no lo puede hacer
+        `dispatcher` (403: opera el viaje, no decide matarlo) y pide `If-Match`
+        con el ETag del detalle, porque es destructivo y el estado que el usuario
+        vio en pantalla pudo haber cambiado (versión vieja → 412 `COM-004`).
+        Cancelar SIN el header, o con el header vacío, → 400 `COM-001`: la
+        condicionalidad no se puede declarar en el esquema, la valida el servidor.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - name: If-Match
+          in: header
+          required: false
+          description: 'Obligatorio cuando `target` es `CANCELLED` (si falta, 400 `COM-001`); se ignora en las demás transiciones.'
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeStatusRequest' }
+            examples:
+              start:   { summary: Iniciar,   value: { target: 'IN_PROGRESS', dateTime: '2026-07-10T05:12:00Z' } }
+              finish:  { summary: Finalizar, value: { target: 'COMPLETED', note: 'Descarga conforme, sin observaciones' } }
+              cancel:  { summary: Cancelar,  value: { target: 'CANCELLED', note: 'El cliente reprogramó el embarque para agosto' } }
+      responses:
+        '200':
+          description: Estado actualizado
+          headers:
+            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: 'Transición inválida (`OPS-001`) o servicio ya cancelado (`OPS-004`)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: 'urn:tms:error:ops-001'
+                title: 'Invalid status transition'
+                status: 409
+                detail: 'No se puede pasar de "Completado" a "En ruta".'
+                instance: '/api/v1/services/118/status'
+                code: 'OPS-001'
+                traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /services/{id}/resources:
+    post:
+      tags: [Operations]
+      operationId: addServiceResources
+      summary: Agregar recursos adicionales (solo con el viaje en ruta)
+      description: |
+        RN-OP5 — solo con el servicio en ruta (otro estado → 409 `OPS-006`), al
+        menos un recurso y motivo de 10 caracteres o más.
+
+        RN-OP4 — un recurso que ya participa del MISMO servicio → 409 `OPS-003`,
+        duro: no se fuerza. RN-OP3 — ocupado en OTRO servicio activo → 409
+        `OPS-002`, forzable con `force: true`.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddResourcesRequest' }
+            example: { driverId: 9, reason: 'Relevo por descanso reglamentario del conductor principal', force: false }
+      responses:
+        '200':
+          description: Recursos agregados
+          headers:
+            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`OPS-006` (el estado no admite la acción), `OPS-002` (forzable) u `OPS-003` (duro)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -2283,6 +2684,16 @@ components:
                 instance: '/api/v1/warehouse/products/999'
                 code: 'WH-003'
                 traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+            serviceNotFound:
+              summary: Servicio de operaciones inexistente
+              value:
+                type: 'urn:tms:error:ops-005'
+                title: 'Resource not found'
+                status: 404
+                detail: 'El servicio con id 999 no existe'
+                instance: '/api/v1/services/999'
+                code: 'OPS-005'
+                traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
     Conflict:
       description: Conflicto (recurso ya existe, restricción de unicidad violada)
       content:
@@ -2328,6 +2739,16 @@ components:
                 detail: 'Se detectó una cotización idéntica creada hace menos de 30 segundos'
                 instance: '/api/v1/quotations'
                 code: 'QUO-002'
+                traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
+            duplicateServiceDetected:
+              summary: Servicio duplicado detectado (protección anti doble-click backend-side)
+              value:
+                type: 'urn:tms:error:ops-007'
+                title: 'Conflict'
+                status: 409
+                detail: 'Se detectó un servicio idéntico creado hace menos de 30 segundos'
+                instance: '/api/v1/services'
+                code: 'OPS-007'
                 traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
             invalidStatusTransition:
               summary: Transición de estado no permitida (PATCH /quotations/{id}/status)
@@ -3158,7 +3579,42 @@ components:
           properties:
             brand:    { type: [string, 'null'], maxLength: 50 }
             model:    { type: [string, 'null'], maxLength: 50 }
+            status:
+              description: 'null en las escoltas: no participan de la asignación de viajes.'
+              anyOf:
+                - $ref: '#/components/schemas/FleetResourceStatus'
+                - type: 'null'
             isActive: { type: boolean }
+
+    FleetResourceStatus:
+      type: string
+      enum: [AVAILABLE, MAINTENANCE, NOT_AVAILABLE]
+      description: |
+        Disponibilidad del recurso (unidad de flota o conductor), en mayúsculas
+        como el resto de los enums de la API. Donde el recurso puede no tenerla
+        (las escoltas), la propiedad se declara admitiendo null.
+
+    DriverRef:
+      type: object
+      description: |
+        Referencia mínima a un conductor (`public.drivers`). El `id` es el que
+        guarda la asignación del servicio; el nombre sale del trabajador asociado.
+      required: [id, fullName]
+      properties:
+        id:       { type: integer }
+        fullName: { type: string, example: 'Juan Pérez Huamán' }
+
+    DriverResponse:
+      allOf:
+        - $ref: '#/components/schemas/DriverRef'
+        - type: object
+          required: [licenseNumber, status, isActive]
+          properties:
+            licenseNumber:   { type: string }
+            licenseCategory: { type: [string, 'null'] }
+            phone:           { type: [string, 'null'], pattern: '^\d{9}$' }
+            status:          { $ref: '#/components/schemas/FleetResourceStatus' }
+            isActive:        { type: boolean }
 
     # -------- Warehouse: catálogos del módulo ----------------------------------
     WarehouseProductCategoryResponse:
@@ -3671,3 +4127,295 @@ components:
         totalPEN:   { type: number }
         totalUSD:   { type: number }
         totalCount: { type: number }
+
+    # -------- Operations: servicios de transporte ------------------------------
+    ServiceStatus:
+      type: string
+      enum: [PENDING_ASSIGNMENT, PENDING_START, IN_PROGRESS, COMPLETED, CANCELLED]
+      description: |
+        Ciclo de vida del servicio (RN-OP1):
+        `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`, y
+        `CANCELLED` desde cualquiera de los tres no terminales.
+
+        - `PENDING_ASSIGNMENT`: registrado, todavía sin conductor ni unidad.
+        - `PENDING_START`: con recursos asignados, esperando salir.
+        - `IN_PROGRESS`: en ruta.
+        - `COMPLETED`: terminado (sigue siendo editable con justificación).
+        - `CANCELLED`: terminal e inmutable.
+
+    TripScope:
+      type: string
+      enum: [LOCAL, PROVINCIA]
+      description: |
+        Ámbito del viaje. Dominio cerrado sin catálogo administrable: viaja como
+        enum y la base de datos lo fija con una restricción, igual que el estado.
+        No hay endpoint de ámbitos — el selector de la interfaz sale de este enum.
+
+    ServiceEventType:
+      type: string
+      enum: [CREATED, ASSIGNMENT, STATUS_CHANGE, FIELD_EDIT, NOTE]
+      description: |
+        Tipo de la entrada de bitácora, para que la interfaz la muestre con su
+        etiqueta sin interpretar el texto. Las entradas heredadas del sistema
+        anterior llegan como `NOTE`.
+
+    ServiceSummaryResponse:
+      type: object
+      description: |
+        Fila del listado. `price` y `currencyCode` están AUSENTES (no en null)
+        para el rol `dispatcher`, RN-OP8. `driver` y `tractor` también pueden
+        estar ausentes, pero por otra razón: el servicio todavía no tiene
+        recursos asignados (los tiene recién desde `PENDING_START`). Origen y
+        destino viajan separados porque la tabla los muestra en dos líneas.
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, createdAt]
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string, example: 'SRV-0042' }
+        client:        { $ref: '#/components/schemas/ClientRef' }
+        origin:        { type: string, maxLength: 255 }
+        destination:   { type: string, maxLength: 255 }
+        tentativeDate: { type: string, format: date }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        status:        { $ref: '#/components/schemas/ServiceStatus' }
+        driver:        { $ref: '#/components/schemas/DriverRef' }
+        tractor:       { $ref: '#/components/schemas/FleetUnitRef' }
+        price:         { type: number, format: double, description: 'Ausente para dispatcher (RN-OP8)' }
+        currencyCode:  { type: string, enum: [PEN, USD], description: 'Ausente para dispatcher (RN-OP8)' }
+        createdAt:     { type: string, format: date-time }
+
+    PageOfServiceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/ServiceSummaryResponse' }
+
+    ServiceAdditionalResourceResponse:
+      type: object
+      description: Recurso sumado al viaje ya en ruta (relevo, apoyo), con su motivo.
+      required: [id, reason, assignedBy, assignedAt]
+      properties:
+        id:         { type: integer, format: int64 }
+        driver:     { $ref: '#/components/schemas/DriverRef' }
+        tractor:    { $ref: '#/components/schemas/FleetUnitRef' }
+        trailer:    { $ref: '#/components/schemas/FleetUnitRef' }
+        reason:     { type: string, maxLength: 500 }
+        assignedBy: { $ref: '#/components/schemas/UserRef' }
+        assignedAt: { type: string, format: date-time }
+
+    ServiceEventResponse:
+      type: object
+      description: Entrada de la bitácora del servicio (una fila por acción).
+      required: [id, eventType, note, createdBy, createdAt]
+      properties:
+        id:        { type: integer, format: int64 }
+        eventType: { $ref: '#/components/schemas/ServiceEventType' }
+        note:      { type: string }
+        createdBy: { $ref: '#/components/schemas/UserRef' }
+        createdAt: { type: string, format: date-time }
+
+    ServiceDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/ServiceSummaryResponse'
+        - type: object
+          required: [cargoType, weightKg, additionalResources, events, createdBy, updatedAt]
+          properties:
+            cargoType:     { $ref: '#/components/schemas/CargoTypeRef' }
+            weightKg:      { type: number, format: double }
+            lengthM:       { type: [number, 'null'], format: double }
+            widthM:        { type: [number, 'null'], format: double }
+            heightM:       { type: [number, 'null'], format: double }
+            observations:  { type: [string, 'null'], maxLength: 500 }
+            trailer:       { $ref: '#/components/schemas/FleetUnitRef' }
+            startDateTime: { type: [string, 'null'], format: date-time }
+            endDateTime:   { type: [string, 'null'], format: date-time }
+            additionalResources:
+              type: array
+              items: { $ref: '#/components/schemas/ServiceAdditionalResourceResponse' }
+            events:
+              type: array
+              description: Bitácora en orden cronológico ascendente
+              items: { $ref: '#/components/schemas/ServiceEventResponse' }
+            createdBy: { $ref: '#/components/schemas/UserRef' }
+            updatedAt: { type: string, format: date-time }
+
+    ServiceCreateRequest:
+      type: object
+      required: [clientId, tripScope, tentativeDate, origin, destination, cargoTypeId, weightKg, price, currencyId]
+      properties:
+        clientId:      { type: integer }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo, RN-OP9)' }
+        origin:        { type: string, minLength: 1, maxLength: 255 }
+        destination:   { type: string, minLength: 1, maxLength: 255 }
+        cargoTypeId:   { type: integer }
+        weightKg:      { type: number, format: double, exclusiveMinimum: 0 }
+        lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        price:         { type: number, format: double, minimum: 0 }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+
+    ServiceUpdateRequest:
+      type: object
+      description: |
+        RN-OP6 — cliente, ámbito del viaje y tipo de carga NO viajan: son
+        inmutables después del alta. `justification` es obligatoria (10
+        caracteres o más). RN-OP10 — sin cambios reales, la respuesta es 200 y no
+        se escribe nada.
+      required: [tentativeDate, origin, destination, weightKg, price, currencyId, justification]
+      properties:
+        tentativeDate: { type: string, format: date }
+        origin:        { type: string, minLength: 1, maxLength: 255 }
+        destination:   { type: string, minLength: 1, maxLength: 255 }
+        weightKg:      { type: number, format: double, exclusiveMinimum: 0 }
+        lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        price:         { type: number, format: double, minimum: 0 }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+        justification: { type: string, minLength: 10, maxLength: 500 }
+
+    AssignResourcesRequest:
+      type: object
+      description: RN-OP2 — conductor y tracto obligatorios, carreta opcional.
+      required: [driverId, tractorId]
+      properties:
+        driverId:  { type: integer }
+        tractorId: { type: integer }
+        trailerId: { type: [integer, 'null'] }
+        note:      { type: [string, 'null'], maxLength: 500 }
+        force:     { type: boolean, default: false, description: 'true = asigna pese al conflicto OPS-002; queda registrado en la bitácora' }
+
+    ChangeStatusRequest:
+      type: object
+      required: [target]
+      properties:
+        target:
+          type: string
+          enum: [IN_PROGRESS, COMPLETED, CANCELLED]
+        dateTime:
+          type: [string, 'null']
+          format: date-time
+          description: 'Inicio o fin real; por defecto, ahora. Al finalizar debe ser posterior o igual al inicio (RN-OP13).'
+        note:
+          type: [string, 'null']
+          maxLength: 500
+          description: 'Opcional al iniciar o finalizar; OBLIGATORIA (10 caracteres o más) al cancelar (RN-OP7).'
+
+    AddResourcesRequest:
+      type: object
+      description: Al menos uno de `driverId`, `tractorId` o `trailerId`; si no viene ninguno, 400.
+      required: [reason]
+      properties:
+        driverId:  { type: [integer, 'null'] }
+        tractorId: { type: [integer, 'null'] }
+        trailerId: { type: [integer, 'null'] }
+        reason:    { type: string, minLength: 10, maxLength: 500 }
+        force:     { type: boolean, default: false }
+
+    ServiceStatsResponse:
+      type: object
+      required: [pendingAssignment, pendingStart, inProgress, completedThisWeek, driversOnRoad, unitsOnRoad, weekCycle]
+      properties:
+        pendingAssignment: { type: integer }
+        pendingStart:      { type: integer }
+        inProgress:        { type: integer }
+        completedThisWeek: { type: integer, description: 'Ciclo operativo miércoles→martes, América/Lima (RN-OP14)' }
+        driversOnRoad:
+          type: object
+          required: [active, total]
+          properties:
+            active: { type: integer }
+            total:  { type: integer }
+        unitsOnRoad:
+          type: object
+          required: [active, total]
+          properties:
+            active: { type: integer }
+            total:  { type: integer }
+        weekCycle:
+          type: object
+          required: [start, end]
+          properties:
+            start: { type: string, format: date }
+            end:   { type: string, format: date }
+
+    ServicesReportRowResponse:
+      type: object
+      required: [serviceId, code, clientName, tripScope, origin, destination, startDateTime, endDateTime, price, currencyCode, principalDriver, additionalDrivers]
+      properties:
+        serviceId:       { type: integer, format: int64 }
+        code:            { type: string }
+        clientName:      { type: string }
+        tripScope:       { $ref: '#/components/schemas/TripScope' }
+        origin:          { type: string }
+        destination:     { type: string }
+        startDateTime:   { type: string, format: date-time }
+        endDateTime:     { type: string, format: date-time }
+        price:           { type: number, format: double }
+        currencyCode:    { type: string, enum: [PEN, USD] }
+        principalDriver: { type: string }
+        additionalDrivers:
+          type: array
+          description: Conductores sumados en ruta, con el motivo de cada relevo.
+          items:
+            type: object
+            required: [name, reason]
+            properties:
+              name:   { type: string }
+              reason: { type: string }
+
+    ServicesReportTotalsResponse:
+      type: object
+      description: Una fila por moneda, sin conversión (mismo criterio que el reporte de almacén).
+      required: [currencyCode, totalServices, totalRevenue]
+      properties:
+        currencyCode:  { type: string, enum: [PEN, USD] }
+        totalServices: { type: integer }
+        totalRevenue:  { type: number, format: double }
+
+    ServicesReportResponse:
+      type: object
+      required: [from, to, rows, totals]
+      properties:
+        from: { type: string, format: date }
+        to:   { type: string, format: date }
+        rows:
+          type: array
+          description: Lista vacía si no hubo servicios completados en el rango (nunca null).
+          items: { $ref: '#/components/schemas/ServicesReportRowResponse' }
+        totals:
+          type: array
+          items: { $ref: '#/components/schemas/ServicesReportTotalsResponse' }
+
+    ServiceResourceConflictProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          description: |
+            Extensión del error para `OPS-002`: le dice a la interfaz que el
+            conflicto se puede forzar y qué recurso está ocupado.
+          properties:
+            forcible: { type: boolean, description: 'true solo en OPS-002' }
+            conflicts:
+              type: array
+              items:
+                type: object
+                required: [resource, resourceName, serviceCode, serviceStatus]
+                properties:
+                  resource:      { type: string, enum: [DRIVER, TRACTOR, TRAILER] }
+                  resourceName:  { type: string, description: 'Nombre del conductor o placa de la unidad' }
+                  serviceCode:   { type: string, example: 'SRV-0042' }
+                  serviceStatus:
+                    type: string
+                    enum: [PENDING_START, IN_PROGRESS]
+                    description: |
+                      Estado del servicio que retiene el recurso. Solo estos dos:
+                      antes de asignar no hay recursos, y los terminales
+                      (completado, cancelado) ya los liberaron.
