@@ -31,8 +31,9 @@ Los seeds de **datos de negocio** viven fuera de la cadena: `db/seed_system_sett
 reales de la empresa, manual e idempotente) y `DevDataSeeder` (fixtures de dev/test, nunca en prod).
 
 Excepción: los **catálogos fundacionales del módulo** (roles nuevos, listas cerradas que el
-propio módulo necesita para funcionar desde el día 1 — ej. `almacen.units_of_measure`,
-`operaciones.trip_scopes`) **sí viajan dentro de su migración** vía `INSERT` literal (ver la
-migración del schema `almacen`). Motivo: son parte del contrato del módulo, no datos operativos que
+propio módulo necesita para funcionar desde el día 1 — ej. `almacen.units_of_measure`)
+**sí viajan dentro de su migración** vía `INSERT` literal (ver la migración del schema
+`almacen`). Un dominio cerrado sin CRUD ni atributos propios no es un catálogo: va como
+columna + `CHECK` y enum en el código (ej. `operaciones.services.trip_scope`). Motivo: son parte del contrato del módulo, no datos operativos que
 cambien por fuera de una migración coordinada — y así llegan solos a todo entorno (dev/staging/prod)
 sin depender de un paso manual (regla del programa: cambios de DB = solo Flyway).
