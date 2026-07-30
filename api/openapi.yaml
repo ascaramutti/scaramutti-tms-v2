@@ -34,9 +34,9 @@ info:
       recurso (índice único, o heurística anti doble-click) y responde `409 Conflict`.
       No hay cabecera de idempotencia.
     - **Recursos de negocio versionados** (cotizaciones, facturas de compra, retiros,
-      productos): sus **PUT/PATCH y acciones de estado (cancel)** exigen `If-Match` con la
-      versión (ETag) del recurso. Si el recurso fue modificado entretanto, responde `412
-      Precondition Failed` (`COM-004`). El ETag viaja en el header de las respuestas que
+      productos, servicios): sus **PUT/PATCH y acciones de estado (cancelación/eliminación)**
+      exigen `If-Match` con la versión (ETag) del recurso. `If-Match` ausente o sin coincidir
+      con la versión vigente responde `412 Precondition Failed` (`COM-004`). El ETag viaja en el header de las respuestas que
       devuelven el recurso (GET del detalle, PUT, y POST/PATCH donde el flujo lo aprovecha);
       usar ese header, no el `updatedAt` del body (difieren por µs entre memoria y BD y
       provocan 412 espurios).
@@ -50,8 +50,8 @@ info:
     Siete roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`,
     `finance_manager`, `warehouse_keeper`.
     `dispatcher` (Coordinador de Operaciones) opera los viajes: ve el listado y el detalle, asigna
-    recursos, inicia y finaliza. No crea ni edita servicios, no los cancela y **nunca ve precios**
-    (el servidor los omite de sus respuestas y el reporte le responde 403).
+    recursos, inicia y finaliza. No crea ni edita servicios, no los cancela ni los elimina y
+    **nunca ve precios** (el servidor los omite de sus respuestas y el reporte le responde 403).
     Cada operación documenta los roles permitidos en `x-required-roles`.
 
 servers:
@@ -2175,7 +2175,8 @@ paths:
         espacios y cada palabra debe matchear en algún campo ("IPH piura"
         encuentra al cliente IPH con destino Piura). Los filtros se combinan
         entre sí. Orden fijo por fecha de creación descendente: no hay parámetro
-        de ordenamiento.
+        de ordenamiento. Los servicios eliminados (`DELETED`) NO aparecen salvo
+        pedirlos explícitamente con `status=DELETED`.
 
         RN-OP8 — al rol `dispatcher` el servidor le OMITE `price` y
         `currencyCode` de cada fila (ausentes, no null).
@@ -2260,10 +2261,17 @@ paths:
         RN-OP14 — `completedThisWeek` y `weekCycle` usan el ciclo operativo de la
         empresa: miércoles 00:00 a martes 23:59, hora de América/Lima.
 
-        En los dos contadores de recursos, `active` = los que están en servicios
-        en ruta. El `total` es el padrón de cada recurso: `driversOnRoad.total` =
-        conductores activos (`public.drivers`, personal, no flota) y
-        `unitsOnRoad.total` = unidades de flota activas.
+        Los contadores de recursos miden lo MISMO que el tablero del sistema
+        anterior, para que el número no cambie de significado con el cambio de
+        sistema: `driversOnRoad` = conductores PRINCIPALES distintos en
+        servicios en ruta (los refuerzos no cuentan) sobre el total de
+        conductores activos (`public.drivers`); `unitsOnRoad` = tractos
+        PRINCIPALES distintos en servicios en ruta (los de refuerzo tampoco
+        cuentan) sobre el total de TRACTOS activos (carretas y escoltas no
+        participan del indicador).
+
+        En ambos objetos, `active` = el numerador (los que están en ruta AHORA)
+        y `total` = el denominador (el padrón vigente de ese recurso).
       x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
       responses:
         '200':
@@ -2311,8 +2319,8 @@ paths:
       description: |
         Incluye la bitácora (`events`, orden cronológico) y los recursos
         adicionales asignados en ruta. Devuelve el header `ETag` que exigen el
-        PUT y la cancelación. RN-OP8 — `dispatcher` no recibe `price` ni
-        `currencyCode`.
+        PUT, la cancelación y la eliminación. RN-OP8 — `dispatcher` no recibe
+        `price` ni `currencyCode`.
       x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
       responses:
         '200':
@@ -2332,17 +2340,26 @@ paths:
       summary: Editar servicio (justificación obligatoria)
       description: |
         RN-OP6 — editables: origen, destino, fecha tentativa, peso, dimensiones,
-        precio, moneda y observaciones. Cliente, ámbito del viaje y tipo de carga
-        son INMUTABLES después del alta (si se equivocaron, se crea otro
-        servicio), por eso no viajan en el body. Cada campo cambiado deja su
-        línea de auditoría y una entrada de bitácora con la justificación.
+        precio, moneda, observaciones y las fechas reales de inicio y fin.
+        Cliente, ámbito del viaje y tipo de carga son INMUTABLES después del
+        alta (si se equivocaron, se crea otro servicio), por eso no viajan en el
+        body. Cada campo cambiado deja su línea de auditoría y una entrada de
+        bitácora con la justificación.
+
+        Las fechas reales solo se CORRIGEN acá, no se fijan: cada una es
+        editable únicamente cuando el servicio ya la tiene (el inicio desde que
+        está en ruta; el fin solo completado); mandarla antes → 400 `COM-001`.
+        Ausente = sin cambio; `null` NO se acepta (una fecha real nunca se
+        borra). Cerrar el viaje sigue siendo la transición de estado, no este
+        endpoint.
+        Al corregir rige RN-OP13: fin >= inicio (400 `COM-001`).
 
         RN-OP10 — un body sin cambios reales responde 200 sin escribir auditoría
         ni tocar la fecha de actualización.
 
-        El servicio cancelado es inmutable → 409 `OPS-004`. El completado SÍ se
-        edita (corrección de datos). Concurrencia: `If-Match` con el ETag del
-        detalle; versión vieja → 412 `COM-004`.
+        El servicio cancelado o eliminado es inmutable → 409 `OPS-004`. El
+        completado SÍ se edita (corrección de datos). Concurrencia: `If-Match`
+        con el ETag del detalle; ausente o sin coincidir → 412 `COM-004`.
       x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - { name: If-Match, in: header, required: true, schema: { type: string } }
@@ -2375,7 +2392,9 @@ paths:
         RN-OP2 — conductor y tracto obligatorios, carreta opcional; solo desde
         `PENDING_ASSIGNMENT`. Otro estado → 409 `OPS-006`.
 
-        RN-OP3 — si un recurso ya participa de OTRO servicio activo, responde 409
+        RN-OP3 — si un recurso ya participa de OTRO servicio activo, sea como
+        recurso principal o como refuerzo (se revisan AMBAS fuentes; el sistema
+        anterior solo miraba los principales acá), responde 409
         `OPS-002` con `forcible: true` y el detalle en `conflicts`. Reintentar con
         `force: true` lo asigna igual y deja constancia en la bitácora y en la
         auditoría (así trabajaba el sistema anterior: el conflicto avisa, no
@@ -2425,29 +2444,43 @@ paths:
     post:
       tags: [Operations]
       operationId: changeServiceStatus
-      summary: Transicionar estado (iniciar / finalizar / cancelar)
+      summary: Transicionar estado (iniciar / finalizar / cancelar / eliminar)
       description: |
         RN-OP1 — transiciones válidas: pendiente de inicio → en ruta, en ruta →
-        completado, y a cancelado desde los tres estados no terminales. El resto
-        → 409 `OPS-001`. El paso de pendiente de asignación a pendiente de inicio
-        NO se pide acá: es efecto de asignar recursos.
+        completado, cancelado desde los tres estados no terminales, y eliminado
+        SOLO desde los dos pendientes. El resto → 409 `OPS-001`. El paso de
+        pendiente de asignación a pendiente de inicio NO se pide acá: es efecto
+        de asignar recursos.
 
-        `dateTime` es opcional (por defecto, ahora). RN-OP13 — al finalizar, la
+        Eliminar y cancelar son cosas distintas: `DELETED` etiqueta el registro
+        que nunca debió existir (error de digitación) y lo saca de listados e
+        indicadores; `CANCELLED` es un viaje real que se abortó. Un servicio en
+        ruta o completado no se elimina: se cancela o se corrige. Nada se borra
+        de la base de datos.
+
+        `dateTime` es opcional (por defecto, ahora) y solo aplica al iniciar o
+        finalizar; se ignora al cancelar o eliminar. RN-OP13 — al finalizar, la
         fecha de fin no puede ser anterior a la de inicio (400 `COM-001`).
 
-        RN-OP7 — cancelar exige motivo de 10 caracteres o más, no lo puede hacer
-        `dispatcher` (403: opera el viaje, no decide matarlo) y pide `If-Match`
-        con el ETag del detalle, porque es destructivo y el estado que el usuario
-        vio en pantalla pudo haber cambiado (versión vieja → 412 `COM-004`).
-        Cancelar SIN el header, o con el header vacío, → 400 `COM-001`: la
-        condicionalidad no se puede declarar en el esquema, la valida el servidor.
-      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+        RN-OP7 — cancelar y eliminar exigen motivo de 10 caracteres o más, no
+        los puede hacer `dispatcher` (403: opera el viaje, no decide matarlo ni
+        descartarlo) y piden `If-Match` con el ETag del detalle, porque son
+        destructivos y el estado que el usuario vio en pantalla pudo haber
+        cambiado. `If-Match` ausente o sin coincidir → 412 `COM-004`, el mismo
+        comportamiento que en el resto de la API; la condicionalidad (solo se
+        exige en esos dos targets) no se puede declarar en el esquema, la valida
+        el servidor.
+
+        `sales` no participa de las transiciones: registra y edita el servicio,
+        pero la operación del viaje es del despacho y la gerencia (misma regla
+        que el sistema anterior).
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
         - name: If-Match
           in: header
           required: false
-          description: 'Obligatorio cuando `target` es `CANCELLED` (si falta, 400 `COM-001`); se ignora en las demás transiciones.'
+          description: 'Obligatorio cuando `target` es `CANCELLED` o `DELETED` (ausente o sin coincidir → 412 `COM-004`); se ignora en las demás transiciones.'
           schema: { type: string }
       requestBody:
         required: true
@@ -2458,6 +2491,7 @@ paths:
               start:   { summary: Iniciar,   value: { target: 'IN_PROGRESS', dateTime: '2026-07-10T05:12:00Z' } }
               finish:  { summary: Finalizar, value: { target: 'COMPLETED', note: 'Descarga conforme, sin observaciones' } }
               cancel:  { summary: Cancelar,  value: { target: 'CANCELLED', note: 'El cliente reprogramó el embarque para agosto' } }
+              delete:  { summary: Eliminar,  value: { target: 'DELETED', note: 'Registro duplicado por error de digitación' } }
       responses:
         '200':
           description: Estado actualizado
@@ -2471,7 +2505,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: 'Transición inválida (`OPS-001`) o servicio ya cancelado (`OPS-004`)'
+          description: 'Transición inválida (`OPS-001`) o servicio ya cancelado o eliminado (`OPS-004`)'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -2495,8 +2529,9 @@ paths:
         menos un recurso y motivo de 10 caracteres o más.
 
         RN-OP4 — un recurso que ya participa del MISMO servicio → 409 `OPS-003`,
-        duro: no se fuerza. RN-OP3 — ocupado en OTRO servicio activo → 409
-        `OPS-002`, forzable con `force: true`.
+        duro: no se fuerza. RN-OP3 — ocupado en OTRO servicio activo (como
+        principal o como refuerzo, ambas fuentes) → 409 `OPS-002`, forzable con
+        `force: true`.
       x-required-roles: [admin, general_manager, operations_manager, dispatcher]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
@@ -4131,17 +4166,21 @@ components:
     # -------- Operations: servicios de transporte ------------------------------
     ServiceStatus:
       type: string
-      enum: [PENDING_ASSIGNMENT, PENDING_START, IN_PROGRESS, COMPLETED, CANCELLED]
+      enum: [PENDING_ASSIGNMENT, PENDING_START, IN_PROGRESS, COMPLETED, CANCELLED, DELETED]
       description: |
         Ciclo de vida del servicio (RN-OP1):
-        `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`, y
-        `CANCELLED` desde cualquiera de los tres no terminales.
+        `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`;
+        `CANCELLED` desde cualquiera de los tres no terminales; `DELETED` solo
+        desde los dos pendientes.
 
         - `PENDING_ASSIGNMENT`: registrado, todavía sin conductor ni unidad.
         - `PENDING_START`: con recursos asignados, esperando salir.
         - `IN_PROGRESS`: en ruta.
         - `COMPLETED`: terminado (sigue siendo editable con justificación).
-        - `CANCELLED`: terminal e inmutable.
+        - `CANCELLED`: terminal e inmutable; viaje real que se abortó.
+        - `DELETED`: terminal e inmutable; registro que nunca debió existir
+          (error de digitación). Excluido por defecto del listado y de los
+          indicadores; se consulta solo con el filtro `status=DELETED`.
 
     TripScope:
       type: string
@@ -4266,7 +4305,8 @@ components:
         RN-OP6 — cliente, ámbito del viaje y tipo de carga NO viajan: son
         inmutables después del alta. `justification` es obligatoria (10
         caracteres o más). RN-OP10 — sin cambios reales, la respuesta es 200 y no
-        se escribe nada.
+        se escribe nada. Las fechas reales son opcionales y solo CORRIGEN un
+        valor que el servicio ya tiene (ver el endpoint).
       required: [tentativeDate, origin, destination, weightKg, price, currencyId, justification]
       properties:
         tentativeDate: { type: string, format: date }
@@ -4279,6 +4319,8 @@ components:
         price:         { type: number, format: double, minimum: 0 }
         currencyId:    { type: integer }
         observations:  { type: [string, 'null'], maxLength: 500 }
+        startDateTime: { type: string, format: date-time, description: 'Corrección del inicio real; solo si el servicio ya lo tiene (en ruta o completado). Ausente = sin cambio; NO acepta null: una fecha real nunca se borra' }
+        endDateTime:   { type: string, format: date-time, description: 'Corrección del fin real; solo en completado, y >= inicio (RN-OP13). Ausente = sin cambio; NO acepta null' }
         justification: { type: string, minLength: 10, maxLength: 500 }
 
     AssignResourcesRequest:
@@ -4298,15 +4340,15 @@ components:
       properties:
         target:
           type: string
-          enum: [IN_PROGRESS, COMPLETED, CANCELLED]
+          enum: [IN_PROGRESS, COMPLETED, CANCELLED, DELETED]
         dateTime:
           type: [string, 'null']
           format: date-time
-          description: 'Inicio o fin real; por defecto, ahora. Al finalizar debe ser posterior o igual al inicio (RN-OP13).'
+          description: 'Inicio o fin real; por defecto, ahora. Solo aplica al iniciar o finalizar (se ignora al cancelar o eliminar). Al finalizar debe ser posterior o igual al inicio (RN-OP13).'
         note:
           type: [string, 'null']
           maxLength: 500
-          description: 'Opcional al iniciar o finalizar; OBLIGATORIA (10 caracteres o más) al cancelar (RN-OP7).'
+          description: 'Opcional al iniciar o finalizar; OBLIGATORIA (10 caracteres o más) al cancelar o eliminar (RN-OP7).'
 
     AddResourcesRequest:
       type: object
@@ -4418,4 +4460,4 @@ components:
                     description: |
                       Estado del servicio que retiene el recurso. Solo estos dos:
                       antes de asignar no hay recursos, y los terminales
-                      (completado, cancelado) ya los liberaron.
+                      (completado, cancelado, eliminado) ya los liberaron.
