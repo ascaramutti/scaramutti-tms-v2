@@ -1,0 +1,86 @@
+package com.scaramutti.tms.operations.mapper;
+
+import com.scaramutti.tms.auth.dto.UserResponse;
+import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
+import com.scaramutti.tms.operations.dto.ServiceEventResponse;
+import com.scaramutti.tms.operations.dto.embedded.ServiceCargoTypeSummary;
+import com.scaramutti.tms.operations.dto.embedded.ServiceClientSummary;
+import com.scaramutti.tms.operations.dto.embedded.ServiceUserSummary;
+import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
+import com.scaramutti.tms.shared.entity.CargoType;
+import com.scaramutti.tms.shared.entity.Client;
+import com.scaramutti.tms.shared.entity.Service;
+import com.scaramutti.tms.shared.entity.ServiceEvent;
+import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
+
+import java.util.List;
+
+/**
+ * Mapper de la capa Service: arma la entity del viaje a partir del command + el usuario
+ * autenticado, y le da forma al detalle. Los lookups (cliente, tipo de carga, moneda, usuarios)
+ * los resuelve el service; aca llegan resueltos.
+ *
+ * <p>El {@code code} NO se mapea: se deriva del id, asi que lo asigna el service cuando la
+ * secuencia ya entrego el id.
+ */
+@Mapper(config = SharedMapperConfig.class)
+public interface ServiceServiceMapper {
+
+    @Mapping(target = "id",            ignore = true)
+    @Mapping(target = "code",          ignore = true)
+    @Mapping(target = "status",        constant = "PENDING_ASSIGNMENT")
+    @Mapping(target = "driverId",      ignore = true)
+    @Mapping(target = "tractorId",     ignore = true)
+    @Mapping(target = "trailerId",     ignore = true)
+    @Mapping(target = "startDateTime", ignore = true)
+    @Mapping(target = "endDateTime",   ignore = true)
+    @Mapping(target = "createdAt",     ignore = true)
+    @Mapping(target = "updatedAt",     ignore = true)
+    @Mapping(target = "weight",        source = "command.weightKg")
+    @Mapping(target = "length",        source = "command.lengthM")
+    @Mapping(target = "width",         source = "command.widthM")
+    @Mapping(target = "height",        source = "command.heightM")
+    @Mapping(target = "createdBy",     source = "userId")
+    @Mapping(target = "updatedBy",     source = "userId")
+    Service toServiceEntity(CreateServiceCommand command, Integer userId);
+
+    @Mapping(target = "id",            source = "service.id")
+    @Mapping(target = "code",          source = "service.code")
+    @Mapping(target = "client",        source = "client")
+    @Mapping(target = "origin",        source = "service.origin")
+    @Mapping(target = "destination",   source = "service.destination")
+    @Mapping(target = "tentativeDate", source = "service.tentativeDate")
+    @Mapping(target = "tripScope",     source = "service.tripScope")
+    @Mapping(target = "cargoType",     source = "cargoType")
+    @Mapping(target = "weightKg",      source = "service.weight")
+    @Mapping(target = "lengthM",       source = "service.length")
+    @Mapping(target = "widthM",        source = "service.width")
+    @Mapping(target = "heightM",       source = "service.height")
+    @Mapping(target = "observations",  source = "service.observations")
+    @Mapping(target = "price",         source = "service.price")
+    @Mapping(target = "currencyCode",  source = "currencyCode")
+    @Mapping(target = "status",        source = "service.status")
+    @Mapping(target = "events",        source = "events")
+    @Mapping(target = "createdBy",     source = "createdBy")
+    @Mapping(target = "createdAt",     source = "service.createdAt")
+    @Mapping(target = "updatedAt",     source = "service.updatedAt")
+    ServiceDetailResponse toServiceDetailResponse(
+        Service service, ServiceClientSummary client, ServiceCargoTypeSummary cargoType,
+        String currencyCode, List<ServiceEventResponse> events, ServiceUserSummary createdBy
+    );
+
+    ServiceClientSummary toServiceClientSummary(Client client);
+
+    ServiceCargoTypeSummary toServiceCargoTypeSummary(CargoType cargoType);
+
+    ServiceUserSummary toServiceUserSummary(UserResponse user);
+
+    @Mapping(target = "id",        source = "event.id")
+    @Mapping(target = "eventType", source = "event.eventType")
+    @Mapping(target = "note",      source = "event.note")
+    @Mapping(target = "createdBy", source = "createdBy")
+    @Mapping(target = "createdAt", source = "event.createdAt")
+    ServiceEventResponse toServiceEventResponse(ServiceEvent event, ServiceUserSummary createdBy);
+}

@@ -4295,7 +4295,7 @@ components:
         lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
         widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
         heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
-        price:         { type: number, format: double, minimum: 0 }
+        price:         { type: number, format: double, exclusiveMinimum: 0, description: 'Mayor que cero: un viaje siempre tiene precio' }
         currencyId:    { type: integer }
         observations:  { type: [string, 'null'], maxLength: 500 }
 
@@ -4316,7 +4316,7 @@ components:
         lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
         widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
         heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
-        price:         { type: number, format: double, minimum: 0 }
+        price:         { type: number, format: double, exclusiveMinimum: 0, description: 'Mayor que cero: un viaje siempre tiene precio' }
         currencyId:    { type: integer }
         observations:  { type: [string, 'null'], maxLength: 500 }
         startDateTime: { type: string, format: date-time, description: 'Corrección del inicio real; solo si el servicio ya lo tiene (en ruta o completado). Ausente = sin cambio; NO acepta null: una fecha real nunca se borra' }

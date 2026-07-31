@@ -3,12 +3,21 @@ package com.scaramutti.tms.operations;
 import com.scaramutti.tms.shared.exception.ApiError;
 
 /**
- * Catalogo de errores del modulo Operaciones con codigos trazables (OPS-XXX).
- * Vacio en O1 (solo DB); los codigos se agregan a medida que cada endpoint
- * (O3+) los necesita, segun v1-operations/06_CONTRATO_OPERACIONES.md. Un codigo
- * ya usado no se recodifica: cada caso nuevo toma el siguiente libre.
+ * Catalogo de errores del modulo Operaciones con codigos trazables (OPS-XXX). Los codigos se
+ * agregan a medida que cada endpoint los necesita, tomando el numero que el contrato le reservo
+ * (por eso el primero en implementarse no es OPS-001). Un codigo ya usado NO se recodifica:
+ * cada caso nuevo toma el siguiente libre.
  */
 public enum OperationsError implements ApiError {
+
+    /**
+     * Alta repetida en cuestion de segundos (doble-click o reintento del navegador): mismo
+     * usuario, mismo cliente y misma ruta dentro de la ventana configurada. NO es una
+     * restriccion de unicidad — dos viajes iguales separados en el tiempo son legitimos —,
+     * y por eso lleva codigo propio: el cliente distingue este 409 benigno de un conflicto real.
+     */
+    DUPLICATE_SERVICE_DETECTED("OPS-007", 409, "Conflict",
+        "Se detectó un servicio idéntico creado hace menos de 30 segundos"),
     ;
 
     private final String code;

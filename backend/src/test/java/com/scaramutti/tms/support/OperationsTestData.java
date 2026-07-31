@@ -33,6 +33,21 @@ public class OperationsTestData {
     @Inject WarehouseTestData warehouseFixtures;
     @Inject EntityManager entityManager;
 
+    /**
+     * Borra los servicios de transporte que cuelgan de un cliente de test ({@code ZTEST}), con
+     * su bitácora, su auditoría y sus refuerzos (las FK del módulo son ON DELETE CASCADE). Los
+     * servicios no tienen prefijo propio: su código lo deriva el backend del id, así que el
+     * cliente sintético es lo que los hace reconocibles.
+     *
+     * <p>Fragmento idempotente que el test compone en su {@code @AfterEach} ANTES de
+     * {@link HermeticTestData#cleanup()}, que borra esos clientes (son su FK).
+     */
+    public void deleteTestServices() {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "DELETE FROM operaciones.services WHERE client_id IN "
+                + "(SELECT id FROM public.clients WHERE name LIKE 'ZTEST%')").executeUpdate());
+    }
+
     /** Conductor activo, disponible, sin categoría ni teléfono. */
     public int seedDriver(String firstName, String lastName) {
         return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true);

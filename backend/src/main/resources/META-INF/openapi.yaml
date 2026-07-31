@@ -48,6 +48,8 @@ tags:
     description: Cotizaciones — wizard de creación, listing, edición y PDF
   - name: Warehouse
     description: Almacén — catálogos del módulo, productos+stock, corte inicial, entradas, retiros, kardex, reportes
+  - name: Operations
+    description: Operaciones — servicios de transporte (viajes)
   - name: SharedCatalogs
     description: 'Catálogos compartidos read-only (public): trabajadores y unidades de flota, reutilizados por Almacén y Operaciones'
 
@@ -1775,6 +1777,60 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  # ----- Operations: servicios de transporte (schema operaciones) -------------
+  /services:
+    post:
+      tags: [Operations]
+      operationId: createService
+      summary: Crear servicio
+      description: |
+        El servicio nace en `PENDING_ASSIGNMENT` y el backend le asigna el código:
+        `SRV-` seguido del id del servicio, rellenado con ceros a la izquierda hasta
+        un mínimo de 4 dígitos; a partir del id 10000 el código crece a 5 o más
+        dígitos y **nunca se trunca**.
+
+        La fecha tentativa PUEDE ser pasada (registro retroactivo); la interfaz
+        avisa, el servidor no bloquea. Cliente, tipo de carga o moneda inexistentes
+        o inactivos → 400 `COM-001`. El alta escribe la primera línea de la bitácora
+        y su registro de auditoría.
+
+        Contra el doble-click: un alta con el mismo cliente, la misma ruta y el mismo
+        usuario dentro de los 30 segundos previos responde 409 `OPS-007`. No es una
+        restricción de unicidad — dos viajes iguales separados en el tiempo se
+        registran sin problema, y el código permite al cliente distinguir este 409
+        benigno de un conflicto real.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceCreateRequest' }
+            example:
+              clientId: 12
+              tripScope: 'PROVINCIA'
+              tentativeDate: '2026-07-10'
+              origin: 'Piura'
+              destination: 'Lima — Callao'
+              cargoTypeId: 3
+              weightKg: 28000
+              lengthM: 12.5
+              price: 5800
+              currencyId: 1
+              observations: 'Coordinar ingreso al puerto con 24 h de anticipación'
+      responses:
+        '201':
+          description: Servicio creado
+          headers:
+            Location: { schema: { type: string }, description: URL del recurso creado }
+            ETag: { schema: { type: string }, description: 'Versión opaca del recurso (usarla en el If-Match posterior)' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
 # =============================================================================
 components:
 # =============================================================================
@@ -1895,6 +1951,16 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            duplicateServiceDetected:
+              summary: Servicio duplicado detectado (protección anti doble-click backend-side)
+              value:
+                type: 'urn:tms:error:ops-007'
+                title: 'Conflict'
+                status: 409
+                detail: 'Se detectó un servicio idéntico creado hace menos de 30 segundos'
+                instance: '/api/v1/services'
+                code: 'OPS-007'
+                traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
             duplicateRuc:
               summary: RUC duplicado al crear cliente
               value:
@@ -3253,3 +3319,96 @@ components:
         totalPEN:   { type: number }
         totalUSD:   { type: number }
         totalCount: { type: number }
+
+    # -------- Operations: servicios de transporte ------------------------------
+    ServiceStatus:
+      type: string
+      enum: [PENDING_ASSIGNMENT, PENDING_START, IN_PROGRESS, COMPLETED, CANCELLED, DELETED]
+      description: |
+        Ciclo de vida del servicio:
+        `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`;
+        `CANCELLED` desde cualquiera de los tres no terminales; `DELETED` solo desde
+        los dos pendientes. El alta siempre nace en `PENDING_ASSIGNMENT`; las
+        transiciones llegan con el endpoint de estado.
+
+    TripScope:
+      type: string
+      enum: [LOCAL, PROVINCIA]
+      description: |
+        Ámbito del viaje. Dominio cerrado sin catálogo administrable: viaja como enum
+        y la base de datos lo fija con una restricción, igual que el estado. No hay
+        endpoint de ámbitos — el selector de la interfaz sale de este enum.
+
+    ServiceEventType:
+      type: string
+      enum: [CREATED, ASSIGNMENT, STATUS_CHANGE, FIELD_EDIT, NOTE]
+      description: |
+        Tipo de la entrada de bitácora, para que la interfaz la muestre con su
+        etiqueta sin interpretar el texto.
+
+    ServiceEventResponse:
+      type: object
+      description: Entrada de la bitácora del servicio (una fila por acción).
+      required: [id, eventType, note, createdBy, createdAt]
+      properties:
+        id:        { type: integer, format: int64 }
+        eventType: { $ref: '#/components/schemas/ServiceEventType' }
+        note:      { type: string }
+        createdBy: { $ref: '#/components/schemas/UserRef' }
+        createdAt: { type: string, format: date-time }
+
+    ServiceCreateRequest:
+      type: object
+      required: [clientId, tripScope, tentativeDate, origin, destination, cargoTypeId, weightKg, price, currencyId]
+      properties:
+        clientId:      { type: integer }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo)' }
+        origin:        { type: string, minLength: 1, maxLength: 255 }
+        destination:   { type: string, minLength: 1, maxLength: 255 }
+        cargoTypeId:   { type: integer }
+        weightKg:      { type: number, format: double, exclusiveMinimum: 0 }
+        lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        price:         { type: number, format: double, exclusiveMinimum: 0, description: 'Mayor que cero: un viaje siempre tiene precio' }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+
+    ServiceDetailResponse:
+      type: object
+      description: |
+        Detalle del servicio con su bitácora. Los recursos asignados (conductor,
+        tracto, carreta), las fechas reales de inicio y fin y los refuerzos NO están
+        acá todavía: llegan con los endpoints que los producen (asignación,
+        transiciones de estado y recursos adicionales). Un servicio recién creado no
+        tiene ninguno.
+
+        Divergencia conocida con el contrato de diseño: allá `additionalResources`
+        es obligatorio (lista vacía cuando no hay refuerzos) y acá todavía no viaja,
+        porque el endpoint que los produce no existe. Se suma con él.
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, cargoType, weightKg, price, currencyCode, status, events, createdBy, createdAt, updatedAt]
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string, example: 'SRV-0042' }
+        client:        { $ref: '#/components/schemas/ClientRef' }
+        origin:        { type: string, maxLength: 255 }
+        destination:   { type: string, maxLength: 255 }
+        tentativeDate: { type: string, format: date }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        cargoType:     { $ref: '#/components/schemas/CargoTypeRef' }
+        weightKg:      { type: number, format: double }
+        lengthM:       { type: [number, 'null'], format: double }
+        widthM:        { type: [number, 'null'], format: double }
+        heightM:       { type: [number, 'null'], format: double }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+        price:         { type: number, format: double }
+        currencyCode:  { type: string, enum: [PEN, USD] }
+        status:        { $ref: '#/components/schemas/ServiceStatus' }
+        events:
+          type: array
+          description: Bitácora en orden cronológico ascendente
+          items: { $ref: '#/components/schemas/ServiceEventResponse' }
+        createdBy:     { $ref: '#/components/schemas/UserRef' }
+        createdAt:     { type: string, format: date-time }
+        updatedAt:     { type: string, format: date-time, description: 'Fuente de la versión; usar el header ETag opaco en If-Match, NO este valor' }
