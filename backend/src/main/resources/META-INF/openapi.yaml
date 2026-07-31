@@ -1724,7 +1724,14 @@ paths:
         (RN-WH9). Sin paginar (flota chica). `id` es el id de la tabla del SUBTIPO:
         la direccion de una unidad es el par `(kind, id)`. `kind` omitido = los
         tres subtipos.
-      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+
+        Lo consumen los dos modulos: almacen elige la unidad destino del retiro
+        (los tres subtipos) y operaciones elige tracto y carreta al asignar un
+        viaje (`?kind=TRACTOR` / `?kind=TRAILER`), por eso la respuesta incluye
+        `status` (disponibilidad). Las escoltas no participan de la asignacion de
+        viajes: su `status` viaja en null. Ademas de quienes asignan recursos,
+        `sales` puede consultarlos: registra y edita servicios.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper, dispatcher, sales]
       parameters:
         - { name: kind, in: query, schema: { $ref: '#/components/schemas/FleetUnitKind' } }
         - { name: isActive, in: query, schema: { type: boolean } }
@@ -1736,6 +1743,34 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/FleetUnitResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /drivers:
+    get:
+      tags: [SharedCatalogs]
+      operationId: listDrivers
+      summary: Listar conductores (combobox de asignacion del viaje)
+      description: |
+        Catalogo compartido `public.drivers`: quien puede conducir, con su licencia
+        y su disponibilidad. El nombre sale del trabajador asociado, y el `id` que
+        devuelve es el que guarda la asignacion del servicio. Solo lectura desde
+        v2, sin creacion al vuelo: el alta de conductores pertenece a la futura
+        gestion de flota y personal. Sin paginar: plantilla chica. Ademas de
+        quienes asignan recursos, `sales` puede consultarlos: registra y edita
+        servicios.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher, sales]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Conductores con su disponibilidad
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DriverResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3072,7 +3107,43 @@ components:
           properties:
             brand:    { type: [string, 'null'], maxLength: 50 }
             model:    { type: [string, 'null'], maxLength: 50 }
+            status:
+              # Mismo dominio que FleetResourceStatus, inline y admitiendo null: el parser de
+              # la spec runtime no soporta el `type: 'null'` suelto que usa el contrato.
+              type: [string, 'null']
+              enum: [AVAILABLE, MAINTENANCE, NOT_AVAILABLE, null]
+              description: 'null en las escoltas: no participan de la asignacion de viajes.'
             isActive: { type: boolean }
+
+    FleetResourceStatus:
+      type: string
+      enum: [AVAILABLE, MAINTENANCE, NOT_AVAILABLE]
+      description: |
+        Disponibilidad del recurso (unidad de flota o conductor), en mayusculas
+        como el resto de los enums de la API. Donde el recurso puede no tenerla
+        (las escoltas), la propiedad se declara admitiendo null.
+
+    DriverRef:
+      type: object
+      description: |
+        Referencia minima a un conductor (public.drivers). El id es el que guarda la
+        asignacion del servicio; el nombre sale del trabajador asociado.
+      required: [id, fullName]
+      properties:
+        id:       { type: integer }
+        fullName: { type: string, example: 'Juan Pérez Huamán' }
+
+    DriverResponse:
+      allOf:
+        - $ref: '#/components/schemas/DriverRef'
+        - type: object
+          required: [licenseNumber, status, isActive]
+          properties:
+            licenseNumber:   { type: string }
+            licenseCategory: { type: [string, 'null'] }
+            phone:           { type: [string, 'null'], pattern: '^\d{9}$' }
+            status:          { $ref: '#/components/schemas/FleetResourceStatus' }
+            isActive:        { type: boolean }
 
     WarehouseWithdrawalRequest:
       type: object
