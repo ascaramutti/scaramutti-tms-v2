@@ -508,7 +508,7 @@ class QuotationResourceTest {
         .then()
             .statusCode(201)
             // Location apunta al recurso recien creado.
-            .header("Location", matchesRegex(".*/api/v1/quotations/\\d+"))
+            .header("Location", matchesRegex("https?://[^/]+/api/v1/quotations/\\d+"))
             // ETag = "\"<updatedAt>\"" — source para optimistic locking en futuros PUT.
             .header("ETag", notNullValue())
             .header("ETag", matchesRegex("\".+\""));

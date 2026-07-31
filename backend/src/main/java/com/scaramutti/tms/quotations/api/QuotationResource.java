@@ -116,7 +116,7 @@ public class QuotationResource {
         QuotationResponse quotation = createQuotationService.createQuotation(
             resourceMapper.toSaveQuotationCommand(quotationRequest)
         );
-        return Response.created(URI.create("/api/v1/quotations/" + quotation.id()))
+        return Response.created(URI.create("quotations/" + quotation.id()))
             .header("ETag", QuotationEtag.of(quotation.updatedAt()))
             .entity(quotation)
             .build();

@@ -76,7 +76,7 @@ class ServicesResourceTest {
         .then()
             .statusCode(201)
             .header("ETag", notNullValue())
-            .header("Location", containsString("/api/v1/services/"))
+            .header("Location", matchesPattern("https?://[^/]+/api/v1/services/\\d+"))
             .body("id", notNullValue())
             // El código lo deriva el backend del id: SRV- + al menos 4 dígitos.
             .body("code", matchesPattern("SRV-\\d{4,}"))

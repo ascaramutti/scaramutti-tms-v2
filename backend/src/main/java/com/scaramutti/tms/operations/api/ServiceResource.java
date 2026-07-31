@@ -37,7 +37,7 @@ public class ServiceResource {
         ServiceDetailResponse response = createServiceService.createService(
             serviceResourceMapper.toCreateServiceCommand(serviceCreateRequest)
         );
-        return Response.created(URI.create("/api/v1/services/" + response.id()))
+        return Response.created(URI.create("services/" + response.id()))
             .header("ETag", Etag.of(response.updatedAt()))
             .entity(response)
             .build();
