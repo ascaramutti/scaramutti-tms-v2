@@ -22,6 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * pasar, los dominios de los tipos de evento y de cambio, y la disyuncion de
  * la asignacion de refuerzo.
  *
+ * V008 suma un valor al dominio del estado (DELETED), asi que el CHECK que lo
+ * cierra se prueba en el mismo lugar.
+ *
  * Hermetico: los FK de clients/cargo_types (tablas de v1 que ningun seeder
  * llena) se siembran dentro de la misma transaccion y todo se revierte al
  * final, asi corre igual en una DB virgen (CI) que en la dev-DB compartida.
@@ -55,6 +58,33 @@ class OperationsSchemaMigrationTest {
             insertService(c, f, CODE_PREFIX + "9001", "LOCAL");
             assertEquals("PENDING_ASSIGNMENT", queryString(c,
                 "SELECT status FROM operaciones.services WHERE code = ?", CODE_PREFIX + "9001"));
+        });
+    }
+
+    /**
+     * DELETED (el registro que nunca debio existir, distinto de la cancelacion de
+     * un viaje real) entra al dominio del estado. Que la transicion solo salga de
+     * los dos estados pendientes lo valida el backend: la DB solo abre el valor.
+     */
+    @Test
+    void statusCheck_acceptsDeleted() throws SQLException {
+        inRolledBackTransaction(c -> {
+            Fixtures f = seedFixtures(c);
+            long serviceId = insertService(c, f, CODE_PREFIX + "9009", "LOCAL");
+            execute(c, "UPDATE operaciones.services SET status = ? WHERE id = ?", "DELETED", serviceId);
+            assertEquals("DELETED", queryString(c,
+                "SELECT status FROM operaciones.services WHERE id = ?", serviceId));
+        });
+    }
+
+    /** El valor invalido entra en el VARCHAR(30): lo tiene que rechazar el CHECK, no el tipo. */
+    @Test
+    void statusCheck_rejectsValueOutsideTheClosedDomain() throws SQLException {
+        inRolledBackTransaction(c -> {
+            Fixtures f = seedFixtures(c);
+            long serviceId = insertService(c, f, CODE_PREFIX + "9010", "LOCAL");
+            assertThrows(SQLException.class, () -> execute(c,
+                "UPDATE operaciones.services SET status = ? WHERE id = ?", "ARCHIVED", serviceId));
         });
     }
 
