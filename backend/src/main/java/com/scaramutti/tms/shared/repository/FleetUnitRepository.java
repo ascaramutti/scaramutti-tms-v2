@@ -24,6 +24,11 @@ import java.util.Map;
  * que su rama emite {@code NULL::varchar}. El filtro {@code kind} incluye solo la(s) rama(s)
  * pedida(s) (omitido = las tres); {@code isActive} filtra por subtipo. Orden {@code kind},
  * {@code plate} ASC (el frontend reordena para presentacion). Read-only.
+ *
+ * <p>La disponibilidad sale del catalogo {@code public.resource_statuses}, unido DENTRO de
+ * cada rama: una sola consulta para todo el listado, sin una query por unidad. Las escoltas
+ * no participan de la asignacion de viajes y su rama emite el estado en {@code NULL}, aunque
+ * la tabla tenga la columna.
  */
 @ApplicationScoped
 public class FleetUnitRepository {
@@ -35,22 +40,28 @@ public class FleetUnitRepository {
         Map<String, Object> params = new LinkedHashMap<>();
         String activeFilter = "";
         if (isActive != null) {
-            activeFilter = " WHERE is_active = :isActive";
+            activeFilter = " WHERE unit.is_active = :isActive";
             params.put("isActive", isActive);
         }
+        // Alias uniforme (unit) en las tres ramas: el filtro de activas se arma una vez y el
+        // JOIN del catalogo de estados no vuelve ambiguo el is_active.
+        String statusJoin = " JOIN public.resource_statuses status ON status.id = unit.status_id";
 
         List<String> branches = new ArrayList<>();
         if (kind == null || kind == FleetUnitKind.TRACTOR) {
-            branches.add("SELECT 'TRACTOR' AS kind, id, plate, brand, model, is_active "
-                + "FROM public.tractors" + activeFilter);
+            branches.add("SELECT 'TRACTOR' AS kind, unit.id, unit.plate, unit.brand, unit.model, "
+                + "status.name AS status_name, unit.is_active "
+                + "FROM public.tractors unit" + statusJoin + activeFilter);
         }
         if (kind == null || kind == FleetUnitKind.TRAILER) {
-            branches.add("SELECT 'TRAILER' AS kind, id, plate, NULL::varchar AS brand, NULL::varchar AS model, is_active "
-                + "FROM public.trailers" + activeFilter);
+            branches.add("SELECT 'TRAILER' AS kind, unit.id, unit.plate, NULL::varchar AS brand, "
+                + "NULL::varchar AS model, status.name AS status_name, unit.is_active "
+                + "FROM public.trailers unit" + statusJoin + activeFilter);
         }
         if (kind == null || kind == FleetUnitKind.ESCORT) {
-            branches.add("SELECT 'ESCORT' AS kind, id, plate, brand, model, is_active "
-                + "FROM public.escort_vehicles" + activeFilter);
+            branches.add("SELECT 'ESCORT' AS kind, unit.id, unit.plate, unit.brand, unit.model, "
+                + "NULL::varchar AS status_name, unit.is_active "
+                + "FROM public.escort_vehicles unit" + activeFilter);
         }
 
         String sql = "SELECT * FROM ( " + String.join(" UNION ALL ", branches)
@@ -68,17 +79,23 @@ public class FleetUnitRepository {
                 (String) t.get(2),
                 (String) t.get(3),
                 (String) t.get(4),
-                (Boolean) t.get(5)))
+                (String) t.get(5),
+                (Boolean) t.get(6)))
             .toList();
     }
 
-    /** Proyeccion de una fila de la union; {@code kind} viaja como String (literal de cada rama). */
+    /**
+     * Proyeccion de una fila de la union; {@code kind} viaja como String (literal de cada rama)
+     * y {@code statusName} como el nombre crudo del catalogo (null en las escoltas). Los dos
+     * los traduce a enum de dominio el mapper.
+     */
     public record FleetUnitRow(
         String kind,
         Integer id,
         String plate,
         String brand,
         String model,
+        String statusName,
         Boolean isActive
     ) {}
 }

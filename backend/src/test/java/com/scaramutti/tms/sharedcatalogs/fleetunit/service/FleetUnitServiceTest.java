@@ -5,6 +5,7 @@ import com.scaramutti.tms.shared.repository.FleetUnitRepository;
 import com.scaramutti.tms.shared.repository.FleetUnitRepository.FleetUnitRow;
 import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitResponse;
 import com.scaramutti.tms.sharedcatalogs.fleetunit.service.cmd.ListFleetUnitsQuery;
+import com.scaramutti.tms.sharedcatalogs.model.FleetResourceStatus;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,6 +19,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -42,7 +44,7 @@ class FleetUnitServiceTest {
     @Test
     void listFleetUnits_delegatesFilterAndMapsKindToEnum() {
         when(fleetUnitRepository.search(FleetUnitKind.TRACTOR, true))
-            .thenReturn(List.of(new FleetUnitRow("TRACTOR", 5, "ABC123", "Volvo", "FH", true)));
+            .thenReturn(List.of(new FleetUnitRow("TRACTOR", 5, "ABC123", "Volvo", "FH", "available", true)));
 
         List<FleetUnitResponse> result =
             fleetUnitService.listFleetUnits(new ListFleetUnitsQuery(FleetUnitKind.TRACTOR, true));
@@ -55,13 +57,14 @@ class FleetUnitServiceTest {
         assertEquals("ABC123", r.plate());
         assertEquals("Volvo", r.brand());
         assertEquals("FH", r.model());
+        assertEquals(FleetResourceStatus.AVAILABLE, r.status());
         assertEquals(true, r.isActive());
     }
 
     @Test
     void listFleetUnits_trailerRowMapsBrandModelNull() {
         when(fleetUnitRepository.search(null, null))
-            .thenReturn(List.of(new FleetUnitRow("TRAILER", 9, "XYZ789", null, null, true)));
+            .thenReturn(List.of(new FleetUnitRow("TRAILER", 9, "XYZ789", null, null, "not_available", true)));
 
         List<FleetUnitResponse> result =
             fleetUnitService.listFleetUnits(new ListFleetUnitsQuery(null, null));
@@ -70,6 +73,32 @@ class FleetUnitServiceTest {
         assertEquals(FleetUnitKind.TRAILER, r.kind());
         assertNull(r.brand());
         assertNull(r.model());
+        assertEquals(FleetResourceStatus.NOT_AVAILABLE, r.status());
+    }
+
+    /** La escolta llega del repo sin estado (su rama de la union lo emite en NULL). */
+    @Test
+    void listFleetUnits_escortRowMapsStatusNull() {
+        when(fleetUnitRepository.search(FleetUnitKind.ESCORT, null))
+            .thenReturn(List.of(new FleetUnitRow("ESCORT", 3, "QWE456", "Toyota", "Hilux", null, true)));
+
+        List<FleetUnitResponse> result =
+            fleetUnitService.listFleetUnits(new ListFleetUnitsQuery(FleetUnitKind.ESCORT, null));
+
+        assertNull(result.get(0).status());
+    }
+
+    /**
+     * Un estado que no esta en el dominio de la API (alguien agrego una fila al catalogo de v1)
+     * revienta: servir la unidad sin estado la haria pasar por "sin dato" en la asignacion.
+     */
+    @Test
+    void listFleetUnits_statusOutsideTheApiDomain_fails() {
+        when(fleetUnitRepository.search(null, null))
+            .thenReturn(List.of(new FleetUnitRow("TRACTOR", 5, "ABC123", "Volvo", "FH", "en_ruta", true)));
+
+        assertThrows(IllegalStateException.class,
+            () -> fleetUnitService.listFleetUnits(new ListFleetUnitsQuery(null, null)));
     }
 
     @Test
