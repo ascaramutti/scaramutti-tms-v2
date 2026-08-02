@@ -3,15 +3,19 @@ package com.scaramutti.tms.operations.mapper;
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
 import com.scaramutti.tms.operations.dto.ServiceEventResponse;
+import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.dto.embedded.ServiceCargoTypeSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceClientSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceUserSummary;
+import com.scaramutti.tms.operations.model.ServiceStatus;
+import com.scaramutti.tms.operations.model.TripScope;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
 import com.scaramutti.tms.shared.entity.CargoType;
 import com.scaramutti.tms.shared.entity.Client;
 import com.scaramutti.tms.shared.entity.Service;
 import com.scaramutti.tms.shared.entity.ServiceEvent;
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
+import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceListRow;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -70,6 +74,28 @@ public interface ServiceServiceMapper {
         Service service, ServiceClientSummary client, ServiceCargoTypeSummary cargoType,
         String currencyCode, List<ServiceEventResponse> events, ServiceUserSummary createdBy
     );
+
+    /**
+     * Fila del listado a respuesta. {@code includePrices} decide si el precio y su moneda viajan:
+     * en false quedan en null y la anotacion de inclusion del DTO los deja AFUERA del JSON, que
+     * es lo que pide el contrato (ausentes, no nulos).
+     */
+    default ServiceSummaryResponse toServiceSummaryResponse(ServiceListRow row, boolean includePrices) {
+        return new ServiceSummaryResponse(
+            row.id(),
+            row.code(),
+            new ServiceClientSummary(row.clientId(), row.clientName(), row.clientRuc(),
+                row.clientPhone(), row.clientContactName()),
+            row.origin(),
+            row.destination(),
+            row.tentativeDate(),
+            TripScope.valueOf(row.tripScope()),
+            ServiceStatus.valueOf(row.status()),
+            includePrices ? row.price() : null,
+            includePrices ? row.currencyCode() : null,
+            row.createdAt()
+        );
+    }
 
     ServiceClientSummary toServiceClientSummary(Client client);
 
