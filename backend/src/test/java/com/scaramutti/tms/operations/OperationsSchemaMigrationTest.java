@@ -3,6 +3,7 @@ package com.scaramutti.tms.operations;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -149,6 +150,32 @@ class OperationsSchemaMigrationTest {
         });
     }
 
+    /**
+     * Un viaje siempre tiene precio: el cero lo rechaza la BASE, no solo la validacion del
+     * backend. Es lo que agrega V009 — el CHECK original lo aceptaba.
+     */
+    @Test
+    void priceCheck_rejectsZero() throws SQLException {
+        inRolledBackTransaction(c -> {
+            Fixtures f = seedFixtures(c);
+            insertService(c, f, CODE_PREFIX + "9011", "LOCAL", "0.01");
+            assertCheckViolation(() -> insertService(c, f, CODE_PREFIX + "9012", "LOCAL", "0"));
+        });
+    }
+
+    /**
+     * El precio negativo ya lo rechazaba el CHECK original; se fija para que endurecerlo no lo
+     * haya aflojado. Va en su PROPIA transaccion: un INSERT rechazado la aborta, y cualquier
+     * sentencia posterior fallaria por eso y no por el CHECK, dando un verde falso.
+     */
+    @Test
+    void priceCheck_rejectsNegative() throws SQLException {
+        inRolledBackTransaction(c -> {
+            Fixtures f = seedFixtures(c);
+            assertCheckViolation(() -> insertService(c, f, CODE_PREFIX + "9013", "LOCAL", "-1"));
+        });
+    }
+
     /** Un refuerzo sin ninguna unidad no es un refuerzo. */
     @Test
     void assignmentCheck_requiresAtLeastOneUnit() throws SQLException {
@@ -180,12 +207,17 @@ class OperationsSchemaMigrationTest {
     }
 
     private long insertService(Connection c, Fixtures f, String code, String tripScope) throws SQLException {
+        return insertService(c, f, code, tripScope, "500");
+    }
+
+    private long insertService(Connection c, Fixtures f, String code, String tripScope, String price)
+            throws SQLException {
         return queryLong(c,
             "INSERT INTO operaciones.services (code, client_id, origin, destination, tentative_date, "
                 + "trip_scope, cargo_type_id, weight, price, currency_id, created_by, updated_by) "
-                + "VALUES (?, ?, 'Lima', 'Arequipa', DATE '2026-07-29', ?, ?, 1000, 500, ?, ?, ?) "
+                + "VALUES (?, ?, 'Lima', 'Arequipa', DATE '2026-07-29', ?, ?, 1000, CAST(? AS NUMERIC), ?, ?, ?) "
                 + "RETURNING id",
-            code, f.clientId(), tripScope, f.cargoTypeId(), f.currencyId(), f.userId(), f.userId());
+            code, f.clientId(), tripScope, f.cargoTypeId(), price, f.currencyId(), f.userId(), f.userId());
     }
 
     private void insertEvent(Connection c, long serviceId, String eventType, int userId) throws SQLException {
@@ -219,6 +251,17 @@ class OperationsSchemaMigrationTest {
                 c.rollback();
             }
         }
+    }
+
+    /**
+     * Asevera que a la sentencia la rechaza un CHECK de la base (SQLSTATE 23514) y no cualquier
+     * otro error: una transaccion ya abortada tambien lanza SQLException, asi que sin mirar el
+     * codigo una asercion asi puede pasar sin probar nada.
+     */
+    private void assertCheckViolation(Executable statement) {
+        SQLException failure = assertThrows(SQLException.class, statement);
+        assertEquals("23514", failure.getSQLState(),
+            "se esperaba una violacion de CHECK, llego: " + failure.getMessage());
     }
 
     private void execute(Connection c, String sql, Object... params) throws SQLException {
