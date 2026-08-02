@@ -355,7 +355,7 @@ class ServicesResourceTest {
             .body("code", equalTo("OPS-007"));
     }
 
-    /** Un viaje siempre tiene precio: el cero se rechaza, como en el sistema anterior. */
+    /** Un viaje siempre tiene precio: el alta rechaza el cero. */
     @Test
     void create_withZeroPrice_returns400() {
         Map<String, Object> payload = validPayload();

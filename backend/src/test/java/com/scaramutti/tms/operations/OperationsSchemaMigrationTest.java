@@ -3,6 +3,7 @@ package com.scaramutti.tms.operations;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -54,8 +55,8 @@ class OperationsSchemaMigrationTest {
     @Test
     void service_defaultsToPendingAssignment() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            insertService(c, f, CODE_PREFIX + "9001", "LOCAL");
+            Fixtures fixtures = seedFixtures(c);
+            insertService(c, fixtures, CODE_PREFIX + "9001", "LOCAL");
             assertEquals("PENDING_ASSIGNMENT", queryString(c,
                 "SELECT status FROM operaciones.services WHERE code = ?", CODE_PREFIX + "9001"));
         });
@@ -69,8 +70,8 @@ class OperationsSchemaMigrationTest {
     @Test
     void statusCheck_acceptsDeleted() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            long serviceId = insertService(c, f, CODE_PREFIX + "9009", "LOCAL");
+            Fixtures fixtures = seedFixtures(c);
+            long serviceId = insertService(c, fixtures, CODE_PREFIX + "9009", "LOCAL");
             execute(c, "UPDATE operaciones.services SET status = ? WHERE id = ?", "DELETED", serviceId);
             assertEquals("DELETED", queryString(c,
                 "SELECT status FROM operaciones.services WHERE id = ?", serviceId));
@@ -81,9 +82,9 @@ class OperationsSchemaMigrationTest {
     @Test
     void statusCheck_rejectsValueOutsideTheClosedDomain() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            long serviceId = insertService(c, f, CODE_PREFIX + "9010", "LOCAL");
-            assertThrows(SQLException.class, () -> execute(c,
+            Fixtures fixtures = seedFixtures(c);
+            long serviceId = insertService(c, fixtures, CODE_PREFIX + "9010", "LOCAL");
+            assertConstraintViolation(CHECK_VIOLATION, () -> execute(c,
                 "UPDATE operaciones.services SET status = ? WHERE id = ?", "ARCHIVED", serviceId));
         });
     }
@@ -97,10 +98,10 @@ class OperationsSchemaMigrationTest {
     @Test
     void tripScopeCheck_rejectsValueOutsideTheClosedDomain() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            insertService(c, f, CODE_PREFIX + "9002", "PROVINCIA");
-            assertThrows(SQLException.class,
-                () -> insertService(c, f, CODE_PREFIX + "9003", "REGIONAL"));
+            Fixtures fixtures = seedFixtures(c);
+            insertService(c, fixtures, CODE_PREFIX + "9002", "PROVINCIA");
+            assertConstraintViolation(CHECK_VIOLATION,
+                () -> insertService(c, fixtures, CODE_PREFIX + "9003", "REGIONAL"));
         });
     }
 
@@ -108,10 +109,10 @@ class OperationsSchemaMigrationTest {
     @Test
     void serviceCodeUniqueIndex_isCaseInsensitive() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            insertService(c, f, CODE_PREFIX + "9004", "LOCAL");
-            assertThrows(SQLException.class,
-                () -> insertService(c, f, CODE_PREFIX.toLowerCase() + "9004", "LOCAL"));
+            Fixtures fixtures = seedFixtures(c);
+            insertService(c, fixtures, CODE_PREFIX + "9004", "LOCAL");
+            assertConstraintViolation(UNIQUE_VIOLATION,
+                () -> insertService(c, fixtures, CODE_PREFIX.toLowerCase() + "9004", "LOCAL"));
         });
     }
 
@@ -119,9 +120,9 @@ class OperationsSchemaMigrationTest {
     @Test
     void servicesTimesCheck_rejectsEndBeforeStart() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            long serviceId = insertService(c, f, CODE_PREFIX + "9005", "LOCAL");
-            assertThrows(SQLException.class, () -> execute(c,
+            Fixtures fixtures = seedFixtures(c);
+            long serviceId = insertService(c, fixtures, CODE_PREFIX + "9005", "LOCAL");
+            assertConstraintViolation(CHECK_VIOLATION, () -> execute(c,
                 "UPDATE operaciones.services SET start_date_time = ?::timestamptz, "
                     + "end_date_time = ?::timestamptz WHERE id = ?",
                 "2026-07-29T10:00:00Z", "2026-07-29T09:00:00Z", serviceId));
@@ -131,10 +132,11 @@ class OperationsSchemaMigrationTest {
     @Test
     void serviceEventsCheck_rejectsUnknownEventType() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            long serviceId = insertService(c, f, CODE_PREFIX + "9006", "LOCAL");
-            insertEvent(c, serviceId, "STATUS_CHANGE", f.userId());
-            assertThrows(SQLException.class, () -> insertEvent(c, serviceId, "DELIVERED", f.userId()));
+            Fixtures fixtures = seedFixtures(c);
+            long serviceId = insertService(c, fixtures, CODE_PREFIX + "9006", "LOCAL");
+            insertEvent(c, serviceId, "STATUS_CHANGE", fixtures.userId());
+            assertConstraintViolation(CHECK_VIOLATION,
+                () -> insertEvent(c, serviceId, "DELIVERED", fixtures.userId()));
         });
     }
 
@@ -142,10 +144,39 @@ class OperationsSchemaMigrationTest {
     @Test
     void auditChangeTypeCheck_acceptsHistoricAdminUpdateAndRejectsUnknown() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            long serviceId = insertService(c, f, CODE_PREFIX + "9007", "LOCAL");
-            insertAuditLog(c, serviceId, "ADMIN_UPDATE", f.userId());
-            assertThrows(SQLException.class, () -> insertAuditLog(c, serviceId, "DELETED", f.userId()));
+            Fixtures fixtures = seedFixtures(c);
+            long serviceId = insertService(c, fixtures, CODE_PREFIX + "9007", "LOCAL");
+            insertAuditLog(c, serviceId, "ADMIN_UPDATE", fixtures.userId());
+            assertConstraintViolation(CHECK_VIOLATION,
+                () -> insertAuditLog(c, serviceId, "DELETED", fixtures.userId()));
+        });
+    }
+
+    /**
+     * Un viaje siempre tiene precio: el cero lo rechaza la BASE, no solo la validacion del
+     * backend. Es lo que agrega V009 — el CHECK original lo aceptaba.
+     */
+    @Test
+    void priceCheck_rejectsZero() throws SQLException {
+        inRolledBackTransaction(c -> {
+            Fixtures fixtures = seedFixtures(c);
+            insertService(c, fixtures, CODE_PREFIX + "9011", "LOCAL", "0.01");
+            assertConstraintViolation(CHECK_VIOLATION,
+                () -> insertService(c, fixtures, CODE_PREFIX + "9012", "LOCAL", "0"));
+        });
+    }
+
+    /**
+     * El precio negativo ya lo rechazaba el CHECK original; se fija para que endurecerlo no lo
+     * haya aflojado. Va en su PROPIA transaccion: un INSERT rechazado la aborta, y cualquier
+     * sentencia posterior fallaria por eso y no por el CHECK, dando un verde falso.
+     */
+    @Test
+    void priceCheck_rejectsNegative() throws SQLException {
+        inRolledBackTransaction(c -> {
+            Fixtures fixtures = seedFixtures(c);
+            assertConstraintViolation(CHECK_VIOLATION,
+                () -> insertService(c, fixtures, CODE_PREFIX + "9013", "LOCAL", "-1"));
         });
     }
 
@@ -153,12 +184,12 @@ class OperationsSchemaMigrationTest {
     @Test
     void assignmentCheck_requiresAtLeastOneUnit() throws SQLException {
         inRolledBackTransaction(c -> {
-            Fixtures f = seedFixtures(c);
-            long serviceId = insertService(c, f, CODE_PREFIX + "9008", "LOCAL");
-            assertThrows(SQLException.class, () -> execute(c,
+            Fixtures fixtures = seedFixtures(c);
+            long serviceId = insertService(c, fixtures, CODE_PREFIX + "9008", "LOCAL");
+            assertConstraintViolation(CHECK_VIOLATION, () -> execute(c,
                 "INSERT INTO operaciones.service_assignments (service_id, reason, assigned_by) "
                     + "VALUES (?, ?, ?)",
-                serviceId, "Refuerzo sin unidad", f.userId()));
+                serviceId, "Refuerzo sin unidad", fixtures.userId()));
         });
     }
 
@@ -179,13 +210,18 @@ class OperationsSchemaMigrationTest {
         return new Fixtures(clientId, cargoTypeId, currencyId, userId);
     }
 
-    private long insertService(Connection c, Fixtures f, String code, String tripScope) throws SQLException {
+    private long insertService(Connection c, Fixtures fixtures, String code, String tripScope) throws SQLException {
+        return insertService(c, fixtures, code, tripScope, "500");
+    }
+
+    private long insertService(Connection c, Fixtures fixtures, String code, String tripScope, String price)
+            throws SQLException {
         return queryLong(c,
             "INSERT INTO operaciones.services (code, client_id, origin, destination, tentative_date, "
                 + "trip_scope, cargo_type_id, weight, price, currency_id, created_by, updated_by) "
-                + "VALUES (?, ?, 'Lima', 'Arequipa', DATE '2026-07-29', ?, ?, 1000, 500, ?, ?, ?) "
+                + "VALUES (?, ?, 'Lima', 'Arequipa', DATE '2026-07-29', ?, ?, 1000, CAST(? AS NUMERIC), ?, ?, ?) "
                 + "RETURNING id",
-            code, f.clientId(), tripScope, f.cargoTypeId(), f.currencyId(), f.userId(), f.userId());
+            code, fixtures.clientId(), tripScope, fixtures.cargoTypeId(), price, fixtures.currencyId(), fixtures.userId(), fixtures.userId());
     }
 
     private void insertEvent(Connection c, long serviceId, String eventType, int userId) throws SQLException {
@@ -219,6 +255,24 @@ class OperationsSchemaMigrationTest {
                 c.rollback();
             }
         }
+    }
+
+    /** Violacion de CHECK. */
+    private static final String CHECK_VIOLATION = "23514";
+
+    /** Violacion de restriccion de unicidad (indice UNIQUE). */
+    private static final String UNIQUE_VIOLATION = "23505";
+
+    /**
+     * Asevera que a la sentencia la rechaza la restriccion esperada, mirando el CODIGO de error
+     * y no solo el tipo de excepcion. Sin esto una asercion puede pasar sin probar nada: un
+     * error de tipo, un fallo de FK o una transaccion ya abortada por una sentencia anterior
+     * lanzan SQLException igual, diga lo que diga la restriccion que el test dice cubrir.
+     */
+    private void assertConstraintViolation(String expectedSqlState, Executable statement) {
+        SQLException failure = assertThrows(SQLException.class, statement);
+        assertEquals(expectedSqlState, failure.getSQLState(),
+            "se esperaba la restriccion " + expectedSqlState + ", llego: " + failure.getMessage());
     }
 
     private void execute(Connection c, String sql, Object... params) throws SQLException {
