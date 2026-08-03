@@ -95,6 +95,30 @@ public interface ServiceResourceMapper {
     }
 
     /**
+     * El id del viaje, de texto a numero. Se recibe como texto por el mismo motivo que los
+     * filtros: declarado con su tipo, un id que no parsea termina en un 404 SIN CUERPO del
+     * framework, indistinguible del 404 legitimo de "ese viaje no existe" y sin decir por que.
+     *
+     * <p>Un id valido pero inexistente sigue siendo 404: eso lo resuelve la busqueda, no esto.
+     */
+    default long toServiceId(String id) {
+        // Se valida el valor CRUDO, sin recortar: el recorte de Java se come todo lo que este por
+        // debajo del espacio, con lo cual "/services/1", "/services/ 1" y hasta un id con un NUL
+        // pegado serian la misma direccion. El endpoint hermano ya rechaza los controles en la
+        // busqueda; el mismo criterio vale aca.
+        if (id == null || !ASCII_INTEGER.matcher(id).matches()) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "El id del servicio tiene que ser un número entero");
+        }
+        try {
+            return Long.parseLong(id);
+        } catch (NumberFormatException e) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "El id del servicio está fuera de rango");
+        }
+    }
+
+    /**
      * Normaliza el termino de busqueda y RECIEN AHI lo mide, para que el rechazo salga con el
      * mensaje que corresponde: medido en crudo, un termino de una letra con espacios de relleno
      * tambien termina en 400, pero en el de "ninguna palabra util", que describe otra regla.

@@ -1874,7 +1874,7 @@ paths:
           description: Servicio creado
           headers:
             Location: { schema: { type: string }, description: URL del recurso creado }
-            ETag: { schema: { type: string }, description: 'Versión opaca del recurso (usarla en el If-Match posterior)' }
+            ETag: { schema: { type: string }, description: 'Versión del recurso; reenviarla tal cual en el If-Match, comillas incluidas' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -1883,7 +1883,47 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /services/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+
+    get:
+      tags: [Operations]
+      operationId: getService
+      summary: Detalle del servicio
+      description: |
+        Incluye la bitácora (`events`) en orden cronológico ascendente. Devuelve el
+        header `ETag`, que es la versión del recurso y es lo que hay que mandar en el
+        `If-Match` de la edición y de las transiciones de estado. Reenviarlo TAL CUAL,
+        copiado del header: las comillas son parte del valor, y reconstruirlo a mano
+        desde el cuerpo es la forma habitual de terminar con un 412 inexplicable.
+
+        Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` (ausentes, no
+        null), igual que en el listado: opera los viajes, no ve lo que se cobra por ellos.
+
+        Los recursos adicionales todavía no viajan: los produce el endpoint que los
+        asigna, que no existe.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      responses:
+        '200':
+          description: Detalle del servicio
+          headers:
+            ETag:
+              description: 'Versión del recurso; reenviarla tal cual en el `If-Match`, comillas incluidas'
+              schema: { type: string }
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 # =============================================================================
+
 components:
 # =============================================================================
 
@@ -2090,6 +2130,16 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            serviceNotFound:
+              summary: Servicio de transporte inexistente
+              value:
+                type: 'urn:tms:error:ops-005'
+                title: 'Resource not found'
+                status: 404
+                detail: 'El servicio indicado no existe'
+                instance: '/api/v1/services/999'
+                code: 'OPS-005'
+                traceId: '9f2c1e4a-3b7d-4c2e-9a1f-6d5b8c3e7a12'
             quotationNotFound:
               summary: Cotización inexistente
               value:
@@ -3439,7 +3489,7 @@ components:
         Divergencia conocida con el contrato de diseño: allá `additionalResources`
         es obligatorio (lista vacía cuando no hay refuerzos) y acá todavía no viaja,
         porque el endpoint que los produce no existe. Se suma con él.
-      required: [id, code, client, origin, destination, tentativeDate, tripScope, cargoType, weightKg, price, currencyCode, status, events, createdBy, createdAt, updatedAt]
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, cargoType, weightKg, status, events, createdBy, createdAt, updatedAt]
       properties:
         id:            { type: integer, format: int64 }
         code:          { type: string, example: 'SRV-0042' }
@@ -3454,8 +3504,8 @@ components:
         widthM:        { type: [number, 'null'], format: double }
         heightM:       { type: [number, 'null'], format: double }
         observations:  { type: [string, 'null'], maxLength: 500 }
-        price:         { type: number, format: double }
-        currencyCode:  { type: string, pattern: '^[A-Z]{3}$' }
+        price:         { type: number, format: double, description: 'Ausente para el rol de despacho' }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol de despacho' }
         status:        { $ref: '#/components/schemas/ServiceStatus' }
         events:
           type: array
@@ -3463,7 +3513,7 @@ components:
           items: { $ref: '#/components/schemas/ServiceEventResponse' }
         createdBy:     { $ref: '#/components/schemas/UserRef' }
         createdAt:     { type: string, format: date-time }
-        updatedAt:     { type: string, format: date-time, description: 'Fuente de la versión; usar el header ETag opaco en If-Match, NO este valor' }
+        updatedAt:     { type: string, format: date-time, description: 'Ultima actualizacion. Para el If-Match reenviar el header ETag tal cual, NO este valor' }
 
     ServiceSummaryResponse:
       type: object

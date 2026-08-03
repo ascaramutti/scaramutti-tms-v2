@@ -86,6 +86,7 @@ public class CreateServiceService {
             service,
             serviceServiceMapper.toServiceClientSummary(client),
             serviceServiceMapper.toServiceCargoTypeSummary(cargoType),
+            service.price,
             currency.code,
             List.of(serviceServiceMapper.toServiceEventResponse(event, author)),
             author

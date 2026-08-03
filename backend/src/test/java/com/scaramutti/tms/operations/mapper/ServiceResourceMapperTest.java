@@ -38,6 +38,54 @@ class ServiceResourceMapperTest {
     /** Alias local para no arrastrar el de JUnit en cada firma. */
     private interface Executable extends org.junit.jupiter.api.function.Executable { }
 
+    // ---------- Id del viaje ----------------------------------------------------
+
+    @Test
+    void toServiceId_readsThePlainInteger() {
+        assertEquals(42L, mapper.toServiceId("42"));
+    }
+
+    /**
+     * El id NO se recorta: recortando, un id con espacios o con un carácter de control pegado
+     * sería la misma dirección que el limpio. (Los ceros a la izquierda sí siguen aliasando, como
+     * en el resto de los filtros del módulo: eso es otra decisión y no la toma este parseo.)
+     */
+    @Test
+    void toServiceId_withPaddingOrControlCharacters_isRejected() {
+        assertTrue(messageOf(() -> mapper.toServiceId(" 42")).contains("número entero"));
+        assertTrue(messageOf(() -> mapper.toServiceId("42 ")).contains("número entero"));
+        assertTrue(messageOf(() -> mapper.toServiceId("42\u0000")).contains("número entero"));
+        assertTrue(messageOf(() -> mapper.toServiceId("4\t2")).contains("número entero"));
+    }
+
+    /**
+     * El id se recibe como texto para poder contestar un 400 CON CUERPO: declarado con su tipo, un
+     * valor que no parsea da el 404 vacío del framework, que se confunde con el 404 legítimo de
+     * "ese viaje no existe".
+     */
+    @Test
+    void toServiceId_withSomethingThatIsNotAnInteger_saysSo() {
+        assertTrue(messageOf(() -> mapper.toServiceId("abc")).contains("número entero"));
+        assertTrue(messageOf(() -> mapper.toServiceId("1.5")).contains("número entero"));
+        assertTrue(messageOf(() -> mapper.toServiceId("")).contains("número entero"));
+        assertTrue(messageOf(() -> mapper.toServiceId(null)).contains("número entero"));
+        // cifras de otro alfabeto: un 12 árabigo no es un 12
+        assertTrue(messageOf(() -> mapper.toServiceId("١٢")).contains("número entero"));
+    }
+
+    /** Un número bien escrito pero más grande que el tipo tiene su propio mensaje. */
+    @Test
+    void toServiceId_withANumberTooBig_saysSo() {
+        assertTrue(messageOf(() -> mapper.toServiceId("9999999999999999999999"))
+            .contains("fuera de rango"));
+    }
+
+    /** El borde del tipo ENTRA: es un id válido, aunque no exista. */
+    @Test
+    void toServiceId_withTheLargestPossibleId_isAccepted() {
+        assertEquals(Long.MAX_VALUE, mapper.toServiceId(String.valueOf(Long.MAX_VALUE)));
+    }
+
     // ---------- Término de búsqueda -------------------------------------------
 
     @Test

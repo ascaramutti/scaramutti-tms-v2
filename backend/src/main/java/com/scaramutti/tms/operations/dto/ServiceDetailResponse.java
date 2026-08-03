@@ -1,5 +1,7 @@
 package com.scaramutti.tms.operations.dto;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+
 import com.scaramutti.tms.operations.dto.embedded.ServiceCargoTypeSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceClientSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceUserSummary;
@@ -51,9 +53,12 @@ public record ServiceDetailResponse(
 
     @Schema(nullable = true) String observations,
 
+    @Schema(description = "Ausente para el rol de despacho")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     BigDecimal price,
 
-    @Schema(description = "Codigo de la moneda del precio", example = "PEN")
+    @Schema(description = "Ausente para el rol de despacho", example = "PEN")
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     String currencyCode,
 
     ServiceStatus status,
@@ -65,6 +70,6 @@ public record ServiceDetailResponse(
 
     OffsetDateTime createdAt,
 
-    @Schema(description = "Fuente de la version; usar el header ETag opaco en If-Match, NO este valor")
+    @Schema(description = "Ultima actualizacion. Para el If-Match reenviar el header ETag tal cual, no este valor")
     OffsetDateTime updatedAt
 ) {}

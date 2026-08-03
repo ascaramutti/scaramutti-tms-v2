@@ -19,6 +19,7 @@ import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceListRow;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 /**
@@ -63,7 +64,7 @@ public interface ServiceServiceMapper {
     @Mapping(target = "widthM",        source = "service.width")
     @Mapping(target = "heightM",       source = "service.height")
     @Mapping(target = "observations",  source = "service.observations")
-    @Mapping(target = "price",         source = "service.price")
+    @Mapping(target = "price",         source = "price")
     @Mapping(target = "currencyCode",  source = "currencyCode")
     @Mapping(target = "status",        source = "service.status")
     @Mapping(target = "events",        source = "events")
@@ -72,7 +73,8 @@ public interface ServiceServiceMapper {
     @Mapping(target = "updatedAt",     source = "service.updatedAt")
     ServiceDetailResponse toServiceDetailResponse(
         Service service, ServiceClientSummary client, ServiceCargoTypeSummary cargoType,
-        String currencyCode, List<ServiceEventResponse> events, ServiceUserSummary createdBy
+        BigDecimal price, String currencyCode, List<ServiceEventResponse> events,
+        ServiceUserSummary createdBy
     );
 
     /**
