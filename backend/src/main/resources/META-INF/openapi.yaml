@@ -1779,6 +1779,58 @@ paths:
 
   # ----- Operations: servicios de transporte (schema operaciones) -------------
   /services:
+    get:
+      tags: [Operations]
+      operationId: listServices
+      summary: Listar servicios con filtros
+      description: |
+        Búsqueda `q` de 3 caracteres o más sobre código, cliente (nombre/RUC), origen
+        y destino, **multi-palabra**: `q` se tokeniza por espacios y cada palabra debe
+        matchear en algún campo ("IPH piura" encuentra al cliente IPH con destino
+        Piura). Los filtros se combinan entre sí. Orden fijo por fecha de creación
+        descendente: no hay parámetro de ordenamiento.
+
+        Las palabras de menos de 3 caracteres se descartan del término (no acotan la
+        búsqueda y sí multiplican su costo); si ninguna palabra llega a 3, la respuesta
+        es 400. El término admite hasta 200 caracteres y hasta 8 palabras de 3 caracteres o más.
+
+        Los servicios eliminados (`DELETED`) NO aparecen salvo pedirlos explícitamente
+        con `status=DELETED`.
+
+        Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` de cada fila
+        (ausentes, no null): opera los viajes, no ve lo que se cobra por ellos.
+
+        Un `status` que no exista responde 400 `COM-001` con el detalle.
+
+        Un filtro enviado VACÍO (`?clientId=`, como lo serializa un formulario con el
+        campo sin elegir) se trata como OMITIDO, no como error.
+
+        Las fechas se admiten entre 1900-01-01 y 2999-12-31, y el término de búsqueda
+        no admite caracteres de control, salvo los que separan palabras (salto de línea,
+        tabulación): fuera de eso la respuesta es 400.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ServiceStatus' } }
+        - { name: clientId, in: query, description: Filtra por cliente exacto, schema: { type: integer } }
+        - { name: dateFrom, in: query, description: Fecha tentativa desde (inclusive), schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: Fecha tentativa hasta (inclusive), schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de servicios
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfServiceSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
     post:
       tags: [Operations]
       operationId: createService
@@ -3403,7 +3455,7 @@ components:
         heightM:       { type: [number, 'null'], format: double }
         observations:  { type: [string, 'null'], maxLength: 500 }
         price:         { type: number, format: double }
-        currencyCode:  { type: string, enum: [PEN, USD] }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$' }
         status:        { $ref: '#/components/schemas/ServiceStatus' }
         events:
           type: array
@@ -3412,3 +3464,37 @@ components:
         createdBy:     { $ref: '#/components/schemas/UserRef' }
         createdAt:     { type: string, format: date-time }
         updatedAt:     { type: string, format: date-time, description: 'Fuente de la versión; usar el header ETag opaco en If-Match, NO este valor' }
+
+    ServiceSummaryResponse:
+      type: object
+      description: |
+        Fila del listado. `price` y `currencyCode` están AUSENTES (no en null) para el
+        rol `dispatcher`. Origen y destino viajan separados porque la tabla los muestra
+        en dos líneas.
+
+        Divergencia conocida con el contrato de diseño: allá la fila puede traer el
+        conductor y el tracto asignados, y acá todavía no, porque el endpoint que los
+        asigna no existe. Se suman con él.
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, createdAt]
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string, example: 'SRV-0042' }
+        client:        { $ref: '#/components/schemas/ClientRef' }
+        origin:        { type: string, maxLength: 255 }
+        destination:   { type: string, maxLength: 255 }
+        tentativeDate: { type: string, format: date }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        status:        { $ref: '#/components/schemas/ServiceStatus' }
+        price:         { type: number, format: double, description: 'Ausente para el rol dispatcher' }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol dispatcher' }
+        createdAt:     { type: string, format: date-time }
+
+    PageOfServiceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/ServiceSummaryResponse' }

@@ -5,6 +5,9 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.jwt.JsonWebToken;
 
+import java.util.Collection;
+import java.util.Objects;
+
 /**
  * Provider del contexto de seguridad del request actual.
  * Expone datos del JWT autenticado de forma tipada (sin que cada Resource
@@ -17,6 +20,22 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 public class CurrentUser {
 
     @Inject JsonWebToken jsonWebToken;
+
+    /**
+     * Indica si el usuario autenticado tiene alguno de los roles dados. Lo usan las reglas de
+     * negocio que cambian la RESPUESTA segun quien pregunta (por ejemplo, que precios ve cada
+     * rol), no el acceso al endpoint: eso lo resuelve {@code @RolesAllowed} antes de llegar aca.
+     *
+     * <p>Deniega por defecto: sin token o sin claim de roles devuelve {@code false} en vez de
+     * romper, para que la falta de datos nunca se lea como un si. Que un rol nuevo NO herede
+     * permisos por accidente lo da la lista positiva de quien llama, no este metodo.
+     */
+    public boolean hasAnyRole(Collection<String> roles) {
+        if (jsonWebToken == null || jsonWebToken.getGroups() == null) {
+            return false;
+        }
+        return jsonWebToken.getGroups().stream().filter(Objects::nonNull).anyMatch(roles::contains);
+    }
 
     /**
      * Devuelve el ID del usuario autenticado. Lanza si no hay token valido.

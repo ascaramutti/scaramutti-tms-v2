@@ -2178,6 +2178,20 @@ paths:
         de ordenamiento. Los servicios eliminados (`DELETED`) NO aparecen salvo
         pedirlos explícitamente con `status=DELETED`.
 
+        Las palabras de menos de 3 caracteres se descartan del término (no acotan
+        la búsqueda y sí multiplican su costo); si ninguna palabra llega a 3, la
+        respuesta es 400. El término admite hasta 200 caracteres y hasta 8
+        palabras de 3 caracteres o más.
+
+        Un `status` que no exista responde 400 `COM-001` con el detalle.
+
+        Un filtro enviado VACÍO (`?clientId=`, como lo serializa un formulario con el
+        campo sin elegir) se trata como OMITIDO, no como error.
+
+        Las fechas se admiten entre 1900-01-01 y 2999-12-31, y el término de búsqueda
+        no admite caracteres de control, salvo los que separan palabras (salto de línea,
+        tabulación): fuera de eso la respuesta es 400.
+
         RN-OP8 — al rol `dispatcher` el servidor le OMITE `price` y
         `currencyCode` de cada fila (ausentes, no null).
       x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
@@ -2192,6 +2206,10 @@ paths:
       responses:
         '200':
           description: Página de servicios
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PageOfServiceSummary' }
@@ -4219,7 +4237,7 @@ components:
         driver:        { $ref: '#/components/schemas/DriverRef' }
         tractor:       { $ref: '#/components/schemas/FleetUnitRef' }
         price:         { type: number, format: double, description: 'Ausente para dispatcher (RN-OP8)' }
-        currencyCode:  { type: string, enum: [PEN, USD], description: 'Ausente para dispatcher (RN-OP8)' }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para dispatcher (RN-OP8)' }
         createdAt:     { type: string, format: date-time }
 
     PageOfServiceSummary:
@@ -4418,7 +4436,7 @@ components:
       description: Una fila por moneda, sin conversión (mismo criterio que el reporte de almacén).
       required: [currencyCode, totalServices, totalRevenue]
       properties:
-        currencyCode:  { type: string, enum: [PEN, USD] }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$' }
         totalServices: { type: integer }
         totalRevenue:  { type: number, format: double }
 

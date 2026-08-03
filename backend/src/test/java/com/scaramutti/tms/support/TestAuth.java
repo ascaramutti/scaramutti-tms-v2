@@ -47,6 +47,17 @@ public final class TestAuth {
             .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
     }
 
+    /**
+     * Access token con VARIOS roles. Hoy ningún usuario real los tiene (la tabla los limita a
+     * uno), pero las reglas escritas como veto —"este rol NUNCA ve X"— solo se pueden verificar
+     * con un token así: con un rol por token, un veto y una lista positiva se comportan igual.
+     */
+    public static String fabricateAccessTokenWithRoles(String username, Set<String> roles) {
+        Instant now = Instant.now();
+        return Jwt.subject("999").upn(username).groups(roles).claim("typ", "access")
+            .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
+    }
+
     /** Access token fabricado anclado a un {@code userId} real (subject = userId). */
     public static String fabricateTokenForUser(int userId, String username, String role) {
         Instant now = Instant.now();

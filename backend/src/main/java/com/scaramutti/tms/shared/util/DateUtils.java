@@ -43,6 +43,19 @@ public final class DateUtils {
     }
 
     /**
+     * Hermano de {@link #toOffsetDateTime(Object)} para las columnas {@code DATE}: segun la
+     * version de Hibernate y del driver, una fecha de una query nativa llega como
+     * {@code java.sql.Date} o como {@code LocalDate}. Castear a una sola de las dos convierte un
+     * cambio de version en un 500.
+     */
+    public static java.time.LocalDate toLocalDate(Object value) {
+        if (value instanceof java.time.LocalDate localDate) return localDate;
+        if (value instanceof java.sql.Date sqlDate) return sqlDate.toLocalDate();
+        throw new IllegalStateException("Unexpected date type: "
+            + (value == null ? "null" : value.getClass().getName()));
+    }
+
+    /**
      * Inicio del dia (00:00) de una fecha en zona Lima, como {@link OffsetDateTime} para
      * comparar contra columnas {@code timestamptz}. Es el borde INCLUSIVO inferior de un
      * filtro por dia/rango en hora de negocio. Fuente unica del patron: los filtros de
