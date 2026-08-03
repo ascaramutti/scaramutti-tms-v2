@@ -10,6 +10,10 @@ import com.scaramutti.tms.shared.exception.ApiError;
  */
 public enum OperationsError implements ApiError {
 
+    /** El viaje pedido no existe. Espejo de los 404 de cotizaciones y almacen. */
+    SERVICE_NOT_FOUND("OPS-005", 404, "Resource not found",
+        "El servicio indicado no existe"),
+
     /**
      * Alta repetida en cuestion de segundos (doble-click o reintento del navegador): mismo
      * usuario, mismo cliente y misma ruta dentro de la ventana configurada. NO es una

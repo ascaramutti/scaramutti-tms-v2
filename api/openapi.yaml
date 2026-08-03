@@ -2261,7 +2261,7 @@ paths:
           description: Servicio creado
           headers:
             Location: { schema: { type: string }, description: URL del recurso creado }
-            ETag: { schema: { type: string }, description: 'Versión opaca del recurso (usarla en el If-Match posterior)' }
+            ETag: { schema: { type: string }, description: 'Versión del recurso; reenviarla tal cual en el If-Match, comillas incluidas' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -2344,10 +2344,12 @@ paths:
         '200':
           description: Detalle completo
           headers:
-            ETag: { schema: { type: string }, description: 'Versión opaca del recurso (usarla en el If-Match)' }
+            ETag: { schema: { type: string }, description: 'Versión del recurso; reenviarla tal cual en el If-Match, comillas incluidas' }
+            Cache-Control: { schema: { type: string }, description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -2390,7 +2392,7 @@ paths:
         '200':
           description: Servicio actualizado (o sin cambios)
           headers:
-            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+            ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -2430,7 +2432,7 @@ paths:
         '200':
           description: Recursos asignados; el servicio queda pendiente de inicio
           headers:
-            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+            ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -2514,7 +2516,7 @@ paths:
         '200':
           description: Estado actualizado
           headers:
-            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+            ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -2563,7 +2565,7 @@ paths:
         '200':
           description: Recursos agregados
           headers:
-            ETag: { schema: { type: string }, description: Nueva versión opaca del recurso }
+            ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }

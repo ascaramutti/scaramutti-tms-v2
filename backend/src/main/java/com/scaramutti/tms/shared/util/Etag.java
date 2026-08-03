@@ -6,7 +6,9 @@ import java.time.OffsetDateTime;
 
 /**
  * Formato único del ETag / optimistic locking del proyecto: el {@code updatedAt} (la
- * "versión" del recurso) entre comillas dobles, weak/opaco. Fuente de verdad
+ * "versión" del recurso) entre comillas dobles. NO es opaco ni weak: es el valor
+ * de esa fecha, asi que el cliente puede reconstruirlo, pero debe reenviar el header
+ * TAL CUAL (las comillas son parte del valor). Fuente de verdad
  * compartida por todos los recursos versionados: si cambia el formato, cambia acá y en
  * todos los lados a la vez.
  *
