@@ -1,9 +1,11 @@
 package com.scaramutti.tms.operations.mapper;
 
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
+import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
 import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
+import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
 import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.MultiWordSearch;
@@ -12,6 +14,8 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.regex.Pattern;
 import java.util.Arrays;
@@ -32,6 +36,92 @@ public interface ServiceResourceMapper {
     @Mapping(target = "destination", source = "destination", qualifiedByName = "trimToNull")
     @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")
     CreateServiceCommand toCreateServiceCommand(ServiceCreateRequest serviceCreateRequest);
+
+    /**
+     * Edicion. El command se arma a mano en vez de mapearse campo a campo: son quince argumentos
+     * de tres origenes distintos (la ruta, un header y el cuerpo) mas las guardas de entrada en el
+     * medio, y escrito asi se lee de corrido.
+     *
+     * <p>Las fechas reales NO se normalizan a UTC aca: eso lo hace el service, que es quien sabe
+     * si la fecha se aplica o se descarta por "sin cambio".
+     */
+    default UpdateServiceCommand toUpdateServiceCommand(
+            long serviceId, String ifMatch, ServiceUpdateRequest request) {
+        requireDateWithinBusinessWindow(request.tentativeDate(), "La fecha tentativa");
+        requireDateTimeWithinBusinessWindow(request.startDateTime(), "La fecha de inicio real");
+        requireDateTimeWithinBusinessWindow(request.endDateTime(), "La fecha de fin real");
+        requireStorableText(request.origin(), "El origen");
+        requireStorableText(request.destination(), "El destino");
+        requireStorableText(request.observations(), "Las observaciones");
+        requireStorableText(request.justification(), "La justificación");
+        return new UpdateServiceCommand(
+            serviceId,
+            ifMatch,
+            request.tentativeDate(),
+            StringUtils.trimToNull(request.origin()),
+            StringUtils.trimToNull(request.destination()),
+            request.weightKg(),
+            request.lengthM(),
+            request.widthM(),
+            request.heightM(),
+            request.price(),
+            request.currencyId(),
+            StringUtils.trimToNull(request.observations()),
+            request.startDateTime(),
+            request.endDateTime(),
+            requireJustification(request.justification()));
+    }
+
+    /**
+     * PostgreSQL no admite el byte NUL dentro de un texto: llega hasta el motor y revienta la
+     * sentencia con un 500 donde el contrato promete un 400. Sobrevive a todo lo demas —no lo
+     * saca el recorte, no lo tapa el minimo de largo y para Java es un caracter mas—, asi que se
+     * rechaza explicitamente.
+     *
+     * <p>En un texto MULTILINEA (observaciones, justificacion) se rechaza solo el NUL: un salto de
+     * linea o una tabulacion ahi son legitimos y la columna los guarda sin problema.
+     */
+    private static void requireStorableText(String value, String what) {
+        if (value != null && value.indexOf('\0') >= 0) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                what + " tiene caracteres que no se pueden guardar");
+        }
+    }
+
+    /**
+     * Un texto de UNA LINEA (el origen, el destino) rechaza ademas cualquier caracter de control.
+     *
+     * <p>No es cosmetico: esos dos campos se vuelcan al log de la aplicacion —la guarda anti
+     * doble-click del ALTA los registra— y el formato del log es una linea por evento. Un salto de
+     * linea en el medio del origen deja escrita una linea entera con el formato del servidor,
+     * inventando un evento que nunca ocurrio. Es el mismo defecto que la bitacora cierra
+     * aplastando los saltos, entrando por la otra puerta. La edicion aplica la misma regla por
+     * consistencia: es el mismo campo y el mismo dato, y dos varas para el mismo texto segun por
+     * donde entre es como estas reglas se pudren.
+     *
+     * <p>Se mide sobre el texto YA RECORTADO: al log llega el recortado, asi que un salto al final
+     * —lo que deja pegar desde una planilla— no inventa ninguna linea, y rechazarlo seria endurecer
+     * mas de lo que el motivo pide (y de forma asimetrica con el espacio, que si se tolera).
+     * Un nombre de lugar no tiene saltos ni tabulaciones en el medio, asi que la regla no le quita
+     * nada a nadie.
+     */
+
+    /**
+     * La justificacion se mide DESPUES de recortarla. El minimo declarativo cuenta el texto CRUDO,
+     * asi que un texto corto rellenado con espacios hasta llegar al largo pedido lo pasa entero
+     * ({@code "corta     "} son diez caracteres y cinco de contenido) y dejaria la bitacora con
+     * una justificacion que no justifica nada. El texto de PUROS espacios lo tapa antes la
+     * anotacion de "no en blanco"; el rellenado, no.
+     */
+    private static String requireJustification(String justification) {
+        String normalized = StringUtils.trimToNull(justification);
+        if (normalized == null || normalized.length() < ServiceUpdateRequest.MIN_JUSTIFICATION_LENGTH) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "La justificación necesita al menos " + ServiceUpdateRequest.MIN_JUSTIFICATION_LENGTH
+                    + " caracteres");
+        }
+        return normalized;
+    }
 
     // ---------- Termino de busqueda --------------------------------------------
 
@@ -56,15 +146,16 @@ public interface ServiceResourceMapper {
     // ---------- Fechas ----------------------------------------------------------
 
     /**
-     * Ventana de fechas admisible en los filtros. El formato ISO acepta años de hasta nueve
-     * cifras y la columna {@code date} de PostgreSQL no: una fecha por fuera de su rango llega
-     * hasta el motor y revienta la consulta con un 500. Los bordes son de NEGOCIO, no del motor
-     * (el tope real esta miles de años mas arriba): ninguna fecha util de un viaje cae fuera de
-     * esto, asi que un valor asi siempre es un error de quien llama.
+     * Ventana admisible de CUALQUIER fecha del viaje, venga por filtro o por cuerpo. El formato
+     * ISO acepta años de hasta nueve cifras y las columnas de fecha de PostgreSQL no: un valor
+     * por fuera de su rango llega hasta el motor y revienta con un 500 donde el contrato promete
+     * un 400. Los bordes son de NEGOCIO, no del motor (el tope real esta miles de años mas
+     * arriba): ninguna fecha util de un viaje cae fuera de esto, asi que un valor asi siempre es
+     * un error de quien llama.
      */
-    LocalDate MIN_FILTER_DATE = LocalDate.of(1900, 1, 1);
+    LocalDate MIN_BUSINESS_DATE = LocalDate.of(1900, 1, 1);
 
-    LocalDate MAX_FILTER_DATE = LocalDate.of(2999, 12, 31);
+    LocalDate MAX_BUSINESS_DATE = LocalDate.of(2999, 12, 31);
 
     // ---------- Otros -----------------------------------------------------------
 
@@ -219,12 +310,49 @@ public interface ServiceResourceMapper {
             throw CommonError.VALIDATION_FAILED.toException(
                 "El filtro " + field + " tiene que ser una fecha con formato AAAA-MM-DD");
         }
-        if (parsed.isBefore(MIN_FILTER_DATE) || parsed.isAfter(MAX_FILTER_DATE)) {
+        if (parsed.isBefore(MIN_BUSINESS_DATE) || parsed.isAfter(MAX_BUSINESS_DATE)) {
             throw CommonError.VALIDATION_FAILED.toException(
                 "El filtro " + field + " tiene que estar entre "
-                    + MIN_FILTER_DATE + " y " + MAX_FILTER_DATE);
+                    + MIN_BUSINESS_DATE + " y " + MAX_BUSINESS_DATE);
         }
         return parsed;
+    }
+
+    /**
+     * Misma ventana que los filtros, aplicada a una fecha que llega YA TIPADA en el cuerpo. El
+     * tipado no protege de nada acá: el lector de JSON acepta el año de nueve cifras del formato
+     * ISO y lo entrega como una fecha perfectamente valida para Java, que recien revienta contra
+     * la columna.
+     */
+    private static void requireDateWithinBusinessWindow(LocalDate date, String what) {
+        if (date == null) {
+            return;
+        }
+        if (date.isBefore(MIN_BUSINESS_DATE) || date.isAfter(MAX_BUSINESS_DATE)) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                what + " tiene que estar entre " + MIN_BUSINESS_DATE + " y " + MAX_BUSINESS_DATE);
+        }
+    }
+
+    /**
+     * Hermano del anterior para las marcas de tiempo. Se mide DOS veces, y las dos hacen falta.
+     *
+     * <p>Primero tal como vino: convertir de huso una marca pegada al tope del tipo lo desborda y
+     * revienta con un error de fecha que nadie mapea, o sea un 500 justo en la clase de entrada
+     * que esta ventana existe para atajar. Midiendo antes, esos valores nunca llegan a
+     * convertirse.
+     *
+     * <p>Y despues en UTC, que es el huso en el que la marca se va a GUARDAR: las 23:00 del ultimo
+     * dia de la ventana escritas con catorce horas de atraso caen, en UTC, en el primer dia de
+     * afuera. El chequeo y el valor que protege tienen que mirar el mismo marco.
+     */
+    private static void requireDateTimeWithinBusinessWindow(OffsetDateTime dateTime, String what) {
+        if (dateTime == null) {
+            return;
+        }
+        requireDateWithinBusinessWindow(dateTime.toLocalDate(), what);
+        requireDateWithinBusinessWindow(
+            dateTime.withOffsetSameInstant(ZoneOffset.UTC).toLocalDate(), what);
     }
 
     /** Entero de paginacion: ausente o vacio toma el valor por defecto; fuera de rango es 400. */

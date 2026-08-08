@@ -1813,8 +1813,8 @@ paths:
         - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/ServiceStatus' } }
         - { name: clientId, in: query, description: Filtra por cliente exacto, schema: { type: integer } }
-        - { name: dateFrom, in: query, description: Fecha tentativa desde (inclusive), schema: { type: string, format: date } }
-        - { name: dateTo, in: query, description: Fecha tentativa hasta (inclusive), schema: { type: string, format: date } }
+        - { name: dateFrom, in: query, description: 'Fecha tentativa desde (inclusive). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: 'Fecha tentativa hasta (inclusive). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400', schema: { type: string, format: date } }
         - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
       responses:
@@ -1823,6 +1823,9 @@ paths:
           headers:
             Cache-Control:
               description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
               schema: { type: string }
           content:
             application/json:
@@ -1845,6 +1848,11 @@ paths:
         avisa, el servidor no bloquea. Cliente, tipo de carga o moneda inexistentes
         o inactivos → 400 `COM-001`. El alta escribe la primera línea de la bitácora
         y su registro de auditoría.
+
+        Registrar exige poder VER los importes: el cuerpo obliga a mandar el precio, así que a un
+        usuario con el rol de despacho (aunque sume otro que sí registra) se le contesta 403
+        `COM-003` en vez de dejarlo escribir a ciegas un valor que no puede leer. Es el mismo veto
+        que aplica la edición.
 
         Contra el doble-click: un alta con el mismo cliente, la misma ruta y el mismo
         usuario dentro de los 30 segundos previos responde 409 `OPS-007`. No es una
@@ -1875,6 +1883,8 @@ paths:
           headers:
             Location: { schema: { type: string }, description: URL del recurso creado }
             ETag: { schema: { type: string }, description: 'Versión del recurso; reenviarla tal cual en el If-Match, comillas incluidas' }
+            Cache-Control: { schema: { type: string }, description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta' }
+            Vary: { schema: { type: string }, description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -1914,6 +1924,9 @@ paths:
             Cache-Control:
               description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
               schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -1921,6 +1934,117 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+    put:
+      tags: [Operations]
+      operationId: updateService
+      summary: Editar servicio (justificación obligatoria)
+      description: |
+        Editables: origen, destino, fecha tentativa, peso, dimensiones, precio, moneda,
+        observaciones y las fechas reales de inicio y fin. El cliente, el ámbito del
+        viaje y el tipo de carga NO viajan en el cuerpo: son inmutables después del alta
+        (si se equivocaron, el viaje se crea de nuevo; si nunca debió existir, se
+        elimina).
+
+        Las fechas reales solo se CORRIGEN acá, no se fijan: cada una es editable
+        únicamente si el servicio YA LA TIENE; mandarla antes es un 400 `COM-001`. La
+        condición es tener la fecha, no estar en un estado: en la práctica el inicio
+        aparece al ponerse en ruta y el fin al completarse. Es MÁS ESTRICTA que la matriz
+        del sistema anterior: un viaje migrado SIN la fecha no se corrige por acá, porque
+        la transición que la fija ya ocurrió; ese saneo va en el script de cutover.
+        Ausente o en null = sin cambio, porque una fecha real no se borra. Al
+        corregirlas rige `fin >= inicio`. Cerrar el viaje sigue siendo la transición de
+        estado, no este endpoint.
+
+        ⚠️ Hoy ningún endpoint FIJA esas fechas: la transición de estado que lo hace
+        todavía no existe, así que un viaje nacido del alta las tiene siempre vacías y
+        estos dos campos le responden 400. La corrección queda operativa cuando llegue
+        ese endpoint, o para filas que ya vengan con fecha desde el sistema anterior.
+
+        La moneda inexistente es 400 siempre. La ACTIVA solo se exige si se la cambia (a diferencia del alta,
+        que la exige siempre): un viaje cuya moneda se dio de baja después se sigue
+        editando, porque retirar una moneda cierra su uso hacia adelante y no congela
+        lo ya emitido.
+
+        Un cuerpo sin cambios reales responde 200 y NO escribe nada: ni auditoría, ni
+        bitácora, ni la fecha de actualización (con lo cual el `ETag` tampoco se mueve).
+
+        El servicio cancelado o eliminado es inmutable → 409 `OPS-004`. El completado SÍ
+        se edita: es la corrección de datos de un viaje ya cerrado.
+        ⚠️ Lo mismo vale para el ESTADO: la transición que lo mueve tampoco existe todavía, así
+        que hoy todo viaje nacido en la aplicación está en `PENDING_ASSIGNMENT`. Ni el 409
+        `OPS-004` ni la corrección de un viaje ya completado son alcanzables hasta que llegue ese
+        endpoint, o para filas cargadas por el cutover.
+
+        Cada campo cambiado deja su fila en la auditoría, y la edición entera deja UNA
+        entrada de bitácora que enumera los cambios y cierra con la justificación.
+
+        En esa entrada el precio y la moneda se NOMBRAN pero no se muestran
+        (`Precio: (no se muestra)`), y un valor ausente —antes o después del cambio— se escribe `(vacío)`: la bitácora viaja dentro del detalle y al detalle
+        entra `dispatcher`, al que la regla del negocio le oculta siempre lo que se
+        cobra. Los valores quedan en la auditoría, que hoy no expone ningún endpoint.
+        La `justification` es texto libre y viaja entera (salvo por los saltos de línea, que
+        la bitácora muestra como `⏎` para que nadie pueda plantar ahí una línea con el
+        formato del servidor; el texto exacto queda en la auditoría). Quien la escribe puede
+        volcar ahí el importe y el despacho lo leería. Lo mismo con el valor ANTERIOR de
+        CUALQUIER texto libre (`observations`, `origin`, `destination`), que la bitácora
+        publica al editarlo: limpiar un dato sensible de uno de esos campos lo deja grabado
+        en la bitácora de forma PERMANENTE, porque ningún endpoint la edita ni la borra.
+        Riesgo ACEPTADO (decisión del dueño, 2026-08-07): el servidor no divulga los
+        importes que él guarda, pero no filtra lo que una persona escribe.
+
+        Editar exige además poder VER los importes: el cuerpo obliga a mandar el precio, así que
+        a un usuario con el rol de despacho (aunque sume otro que sí edita) se le contesta 403
+        `COM-003` en vez de dejarlo escribir a ciegas un valor que no puede leer.
+
+        El 403 del veto de precios se contesta antes que el 404 y después de los 400 de formato:
+        editar un servicio inexistente sin poder ver los importes devuelve 403, no 404.
+
+        Los 400 no caen todos en el mismo lugar: los de FORMATO del cuerpo (campos obligatorios,
+        largos, precisión, ventana de fechas, byte NUL, justificación) se contestan antes que
+        cualquier precondición del recurso, y los de NEGOCIO (moneda inactiva, fecha real que el
+        servicio no tiene, fin anterior al inicio) después del `If-Match`.
+
+        El 409 `OPS-004` se contesta ANTES que el 412: un `If-Match` viejo no tapa la razón
+        real. Es deliberado y sigue el criterio del módulo de almacén, donde el recurso anulado
+        también se contesta antes que la versión; cotizaciones, en cambio, verifica la versión
+        primero.
+
+        Concurrencia: `If-Match` con el `ETag` del detalle, copiado tal cual del header.
+        Ausente o sin coincidir → 412 `COM-004`. La fila se lee bajo lock, así que dos
+        ediciones simultáneas se serializan; si CUALQUIER sentencia de esa transacción se rinde por lock (la espera agotada, un
+        abrazo mortal, un fallo de serialización) → 409 `OPS-008`, transitorio: se resuelve reintentando (el `OPS-004`, en cambio, es
+        permanente).
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceUpdateRequest' }
+      responses:
+        '200':
+          description: Servicio actualizado (o sin cambios)
+          headers:
+            ETag:
+              description: 'Nueva versión del recurso; reenviarla tal cual en el próximo `If-Match`, comillas incluidas'
+              schema: { type: string }
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
 
 # =============================================================================
 
@@ -2053,6 +2177,26 @@ components:
                 instance: '/api/v1/services'
                 code: 'OPS-007'
                 traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
+            serviceNotEditable:
+              summary: Servicio cancelado o eliminado (inmutable)
+              value:
+                type: 'urn:tms:error:ops-004'
+                title: 'Conflict'
+                status: 409
+                detail: 'El servicio está cancelado o eliminado: ya no admite cambios'
+                instance: '/api/v1/services/42'
+                code: 'OPS-004'
+                traceId: '9a0b1c2d-3e4f-5a6b-7c8d-9e0f1a2b3c4d'
+            serviceLocked:
+              summary: Fila tomada por otra operación (conflicto transitorio)
+              value:
+                type: 'urn:tms:error:ops-008'
+                title: 'Conflict'
+                status: 409
+                detail: 'No se pudo completar la operación por un bloqueo temporal en la base de datos, reintente en unos segundos'
+                instance: '/api/v1/services/42'
+                code: 'OPS-008'
+                traceId: 'a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
             duplicateRuc:
               summary: RUC duplicado al crear cliente
               value:
@@ -3461,11 +3605,14 @@ components:
 
     ServiceCreateRequest:
       type: object
+      description: |
+        Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
+
       required: [clientId, tripScope, tentativeDate, origin, destination, cargoTypeId, weightKg, price, currencyId]
       properties:
         clientId:      { type: integer }
         tripScope:     { $ref: '#/components/schemas/TripScope' }
-        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo)' }
+        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo).' }
         origin:        { type: string, minLength: 1, maxLength: 255 }
         destination:   { type: string, minLength: 1, maxLength: 255 }
         cargoTypeId:   { type: integer }
@@ -3477,14 +3624,69 @@ components:
         currencyId:    { type: integer }
         observations:  { type: [string, 'null'], maxLength: 500 }
 
+    ServiceUpdateRequest:
+      type: object
+      description: |
+        Edición del servicio. El cliente, el ámbito del viaje y el tipo de carga NO
+        viajan: son inmutables después del alta. `justification` es obligatoria: 10
+        caracteres o más MEDIDOS SOBRE EL TEXTO RECORTADO (un texto corto rellenado con
+        espacios se rechaza). Un cuerpo sin cambios reales responde 200 sin escribir nada.
+
+        Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
+
+        Los campos opcionales NO se comportan todos igual frente a `null`: `lengthM`,
+        `widthM`, `heightM` y `observations` se asignan tal cual, así que mandarlos en
+        null (o ausentes) los VACÍA — un cuerpo parcial borra lo que no incluye. Las
+        fechas reales, en cambio, solo CORRIGEN un valor que el servicio ya tiene: ahí
+        ausente o null significa sin cambio, porque una fecha real no se borra.
+
+        Los textos libres no pueden contener el byte NUL (`\u0000`): la columna no lo admite y se rechaza con 400. Los saltos de línea y las tabulaciones sí son válidos.
+      required: [tentativeDate, origin, destination, weightKg, price, currencyId, justification]
+      properties:
+        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400 (el formato ISO admite años que la columna no).' }
+        origin:        { type: string, minLength: 1, maxLength: 255 }
+        destination:   { type: string, minLength: 1, maxLength: 255 }
+        weightKg:      { type: number, format: double, exclusiveMinimum: 0 }
+        lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        price:         { type: number, format: double, exclusiveMinimum: 0, description: 'Mayor que cero: un viaje siempre tiene precio' }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+        startDateTime:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Corrección del inicio real. Solo se admite si el servicio YA lo tiene: la
+            condición es tener la fecha, no estar en un estado (en la práctica aparece al
+            ponerse en ruta). Un viaje migrado SIN la fecha no se corrige por acá: ese saneo
+            va en el script de cutover. Ausente o null = sin cambio. Entre 1900 y 2999: fuera
+            de esa ventana es 400. ⚠️ Mientras no exista el endpoint de transiciones, ningún
+            viaje nacido en la aplicación tiene esta fecha, así que hoy este campo solo puede
+            responder 400.
+        endDateTime:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Corrección del fin real. Solo se admite si el servicio YA lo tiene (misma
+            condición que el inicio: la fecha, no el estado) y tiene que quedar posterior
+            o igual al inicio. Las mismas consecuencias que el inicio para un viaje migrado
+            sin la fecha. Ausente o null = sin cambio. Entre 1900 y 2999: fuera de esa ventana
+            es 400. ⚠️ Mientras no exista el endpoint de transiciones, ningún viaje nacido en
+            la aplicación tiene esta fecha, así que hoy este campo solo puede responder 400.
+        justification: { type: string, minLength: 10, maxLength: 500, pattern: '^\s*\S[\s\S]{8,}\S\s*$', description: 'El `minLength` cuenta el texto CRUDO; el patrón expresa el mínimo real, que es sobre el texto YA RECORTADO: sin él, un cliente generado aceptaría un texto corto rellenado con espacios que el servidor rechaza' }
+
     ServiceDetailResponse:
       type: object
       description: |
         Detalle del servicio con su bitácora. Los recursos asignados (conductor,
-        tracto, carreta), las fechas reales de inicio y fin y los refuerzos NO están
-        acá todavía: llegan con los endpoints que los producen (asignación,
-        transiciones de estado y recursos adicionales). Un servicio recién creado no
-        tiene ninguno.
+        tracto, carreta) y los refuerzos NO están acá todavía: llegan con los endpoints
+        que los producen (asignación y recursos adicionales). Un servicio recién creado
+        no tiene ninguno.
+
+        Las fechas reales de inicio y fin SÍ viajan: las fija la transición de estado,
+        pero la edición las corrige, y sin poder leerlas esa corrección sería imposible
+        de pedir y de confirmar.
 
         Divergencia conocida con el contrato de diseño: allá `additionalResources`
         es obligatorio (lista vacía cuando no hay refuerzos) y acá todavía no viaja,
@@ -3507,6 +3709,8 @@ components:
         price:         { type: number, format: double, description: 'Ausente para el rol de despacho' }
         currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol de despacho' }
         status:        { $ref: '#/components/schemas/ServiceStatus' }
+        startDateTime: { type: [string, 'null'], format: date-time, description: 'Inicio real. Lo fijará la transición de estado y la edición lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicación es siempre null' }
+        endDateTime:   { type: [string, 'null'], format: date-time, description: 'Fin real. Lo fijará la transición de estado y la edición lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicación es siempre null' }
         events:
           type: array
           description: Bitácora en orden cronológico ascendente
