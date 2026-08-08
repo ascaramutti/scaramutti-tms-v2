@@ -12,6 +12,8 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
@@ -421,6 +423,31 @@ class ServicesResourceTest {
             .statusCode(400)
             .contentType("application/problem+json")
             .body("code", equalTo("COM-001"));
+    }
+
+    /**
+     * El mismo byte NUL, por el camino del alta, en CADA texto libre. PostgreSQL no lo admite
+     * dentro de una cadena: sin rechazarlo antes, la inserción revienta con un 500 en vez del 400
+     * que promete el contrato. Va campo por campo porque cada uno tiene su propia llamada a la
+     * guarda, y una que falte no la delata ninguna de las otras.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"origin", "destination", "observations"})
+    void create_withANulCharacterInFreeText_returns400NotAServerError(String field) {
+        Map<String, Object> payload = validPayload();
+        payload.put(field, "Piura \u0000 con nul");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("detail", containsString("no se pueden guardar"));
     }
 
     /**

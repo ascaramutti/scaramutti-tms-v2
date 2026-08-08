@@ -4400,6 +4400,7 @@ components:
       description: |
         Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
 
+        Los textos libres no pueden contener el byte NUL (`\u0000`): la columna no lo admite y se rechaza con 400. Los saltos de línea y las tabulaciones sí son válidos.
       required: [clientId, tripScope, tentativeDate, origin, destination, cargoTypeId, weightKg, price, currencyId]
       properties:
         clientId:      { type: integer }

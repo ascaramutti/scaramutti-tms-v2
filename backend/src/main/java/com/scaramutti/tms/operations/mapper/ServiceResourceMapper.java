@@ -33,8 +33,8 @@ import java.util.List;
 public interface ServiceResourceMapper {
 
     /**
-     * Alta: valida la ventana de fechas ANTES de armar el command (el recorte lo hace el mapeo de
-     * abajo, no este metodo).
+     * Alta: valida el formato de los textos y la ventana de fechas ANTES de armar el command
+     * (el recorte lo hace el mapeo de abajo, no este metodo).
      *
      * <p>La ventana se chequea aca y no en el service porque es una regla del formato de entrada,
      * igual que en los filtros del listado: una fecha fuera de rango no es un caso de negocio que
@@ -42,6 +42,9 @@ public interface ServiceResourceMapper {
      */
     default CreateServiceCommand toCreateServiceCommand(ServiceCreateRequest serviceCreateRequest) {
         requireDateWithinBusinessWindow(serviceCreateRequest.tentativeDate(), "La fecha tentativa");
+        requireStorableText(serviceCreateRequest.origin(), "El origen");
+        requireStorableText(serviceCreateRequest.destination(), "El destino");
+        requireStorableText(serviceCreateRequest.observations(), "Las observaciones");
         return toCreateServiceCommandFields(serviceCreateRequest);
     }
 
