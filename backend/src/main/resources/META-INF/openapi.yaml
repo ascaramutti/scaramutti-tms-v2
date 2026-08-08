@@ -3602,7 +3602,7 @@ components:
       properties:
         clientId:      { type: integer }
         tripScope:     { $ref: '#/components/schemas/TripScope' }
-        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo).' }
+        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400 (el formato ISO admite años que la columna no).' }
         origin:        { type: string, minLength: 1, maxLength: 255 }
         destination:   { type: string, minLength: 1, maxLength: 255 }
         cargoTypeId:   { type: integer }

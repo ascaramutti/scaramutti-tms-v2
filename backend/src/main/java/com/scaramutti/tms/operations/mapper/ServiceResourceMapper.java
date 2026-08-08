@@ -32,10 +32,26 @@ import java.util.List;
 @Mapper(config = SharedMapperConfig.class, uses = StringUtils.class)
 public interface ServiceResourceMapper {
 
+    /**
+     * Alta: valida la ventana de fechas ANTES de armar el command.
+     *
+     * <p>La ventana se chequea aca y no en el service porque es una regla del formato de entrada,
+     * igual que en los filtros del listado: una fecha fuera de rango no es un caso de negocio que
+     * el service tenga que contemplar, es un valor que nunca debio entrar.
+     */
+    default CreateServiceCommand toCreateServiceCommand(ServiceCreateRequest serviceCreateRequest) {
+        requireDateWithinBusinessWindow(serviceCreateRequest.tentativeDate(), "La fecha tentativa");
+        return toCreateServiceCommandFields(serviceCreateRequest);
+    }
+
+    /**
+     * SOLO para el metodo de arriba: es el mapeo puro, sin la ventana de fechas. Queda visible
+     * porque MapStruct no genera metodos privados; llamarlo directo se saltea la validacion.
+     */
     @Mapping(target = "origin", source = "origin", qualifiedByName = "trimToNull")
     @Mapping(target = "destination", source = "destination", qualifiedByName = "trimToNull")
     @Mapping(target = "observations", source = "observations", qualifiedByName = "trimToNull")
-    CreateServiceCommand toCreateServiceCommand(ServiceCreateRequest serviceCreateRequest);
+    CreateServiceCommand toCreateServiceCommandFields(ServiceCreateRequest serviceCreateRequest);
 
     /**
      * Edicion. El command se arma a mano en vez de mapearse campo a campo: son quince argumentos
