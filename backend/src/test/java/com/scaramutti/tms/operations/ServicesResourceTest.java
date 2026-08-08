@@ -12,6 +12,7 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.ParameterizedTest;
 
@@ -79,6 +80,10 @@ class ServicesResourceTest {
         .then()
             .statusCode(201)
             .header("ETag", notNullValue())
+            // el cuerpo del 201 es el mismo detalle, con importes adentro: arrastra las mismas
+            // condiciones que el GET y el PUT
+            .header("Cache-Control", equalTo("no-store"))
+            .header("Vary", equalTo("Authorization"))
             .header("Location", matchesPattern("https?://[^/]+/api/v1/services/\\d+"))
             .body("id", notNullValue())
             // El código lo deriva el backend del id: SRV- + al menos 4 dígitos.
@@ -385,6 +390,48 @@ class ServicesResourceTest {
             .post("/services")
         .then()
             .statusCode(400);
+    }
+
+    /**
+     * El salto de línea en un texto de UNA línea, por el camino del ALTA, que es donde está el
+     * vector: la guarda anti doble-click registra el origen y el destino en el log de la
+     * aplicación, que escribe una línea por evento. Cualquier carácter de control sirve para
+     * inventar una, no solo el salto, así que se prueban varios.
+     */
+    @ParameterizedTest  // el control va por su código: escribirlo literal rompe el CSV
+    @CsvSource({"origin,10", "origin,13", "origin,9", "origin,27", "destination,10", "destination,13"})
+    void create_withAControlCharacterInASingleLineField_returns400(String field, int control) {
+        Map<String, Object> payload = validPayload();
+        payload.put(field, "Piura" + (char) control + "12:00:00 WARN  [x] (main) evento inventado");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("detail", containsString("saltos de línea"));
+    }
+
+    /** Pero el salto al FINAL es el artefacto de pegar desde una planilla: se recorta y entra. */
+    @Test
+    void create_withATrailingLineBreak_isAcceptedAndTrimmed() {
+        Map<String, Object> payload = validPayload();
+        payload.put("origin", "Piura\n");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(201)
+            .body("origin", equalTo("Piura"));
     }
 
     // ---------- Autorización --------------------------------------------------

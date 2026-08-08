@@ -42,15 +42,16 @@ public interface ServiceResourceMapper {
      */
     default CreateServiceCommand toCreateServiceCommand(ServiceCreateRequest serviceCreateRequest) {
         requireDateWithinBusinessWindow(serviceCreateRequest.tentativeDate(), "La fecha tentativa");
-        requireStorableText(serviceCreateRequest.origin(), "El origen");
-        requireStorableText(serviceCreateRequest.destination(), "El destino");
+        requireSingleLineText(StringUtils.trimToNull(serviceCreateRequest.origin()), "El origen");
+        requireSingleLineText(
+            StringUtils.trimToNull(serviceCreateRequest.destination()), "El destino");
         requireStorableText(serviceCreateRequest.observations(), "Las observaciones");
         return toCreateServiceCommandFields(serviceCreateRequest);
     }
 
     /**
-     * SOLO para el metodo de arriba: es el mapeo puro, sin ninguna de las guardas de arriba. Queda
-     * visible porque MapStruct no genera metodos privados; llamarlo directo se saltea la validacion.
+     * SOLO para el metodo de arriba: es el mapeo puro, sin ninguna de las guardas de arriba. Queda visible
+     * porque MapStruct no genera metodos privados; llamarlo directo se saltea la validacion.
      */
     @Mapping(target = "origin", source = "origin", qualifiedByName = "trimToNull")
     @Mapping(target = "destination", source = "destination", qualifiedByName = "trimToNull")
@@ -70,8 +71,8 @@ public interface ServiceResourceMapper {
         requireDateWithinBusinessWindow(request.tentativeDate(), "La fecha tentativa");
         requireDateTimeWithinBusinessWindow(request.startDateTime(), "La fecha de inicio real");
         requireDateTimeWithinBusinessWindow(request.endDateTime(), "La fecha de fin real");
-        requireStorableText(request.origin(), "El origen");
-        requireStorableText(request.destination(), "El destino");
+        requireSingleLineText(StringUtils.trimToNull(request.origin()), "El origen");
+        requireSingleLineText(StringUtils.trimToNull(request.destination()), "El destino");
         requireStorableText(request.observations(), "Las observaciones");
         requireStorableText(request.justification(), "La justificación");
         return new UpdateServiceCommand(
@@ -125,6 +126,22 @@ public interface ServiceResourceMapper {
      * Un nombre de lugar no tiene saltos ni tabulaciones en el medio, asi que la regla no le quita
      * nada a nadie.
      */
+    /**
+     * Control ISO, mas los dos separadores de linea de Unicode que quedan afuera de esa definicion
+     * y que el aplastado de la bitacora ({@code \R}) si trata como salto. Sin ellos, la guarda
+     * dejaria pasar dos caracteres que son literalmente lo que dice rechazar.
+     */
+    private static boolean isControlOrLineSeparator(int codePoint) {
+        return Character.isISOControl(codePoint) || codePoint == 0x2028 || codePoint == 0x2029;
+    }
+
+    private static void requireSingleLineText(String value, String what) {
+        requireStorableText(value, what);
+        if (value != null && value.chars().anyMatch(ServiceResourceMapper::isControlOrLineSeparator)) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                what + " no puede tener saltos de línea ni caracteres de control");
+        }
+    }
 
     /**
      * La justificacion se mide DESPUES de recortarla. El minimo declarativo cuenta el texto CRUDO,

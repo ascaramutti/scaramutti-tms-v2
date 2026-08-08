@@ -867,6 +867,26 @@ class ServiceUpdateResourceTest {
             .body("errors.field", hasItem(field));
     }
 
+    /**
+     * Un salto de línea en el origen o el destino no se guarda: esos dos campos se vuelcan crudos
+     * al log de la aplicación, que escribe una línea por evento, así que un salto deja escrita una
+     * línea entera con el formato del servidor inventando un evento que nunca ocurrió. Es el mismo
+     * defecto que la bitácora cierra aplastando los saltos, entrando por la otra puerta.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"origin", "destination"})
+    void update_withALineBreakInASingleLineField_returns400(String field) {
+        long id = createService();
+        Map<String, Object> payload = payloadOf(id);
+        payload.put(field, "Piura\n12:00:00 WARN  [co.sc.tm] (main) evento inventado");
+
+        update(id, payload)
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("detail", containsString("saltos de línea"));
+    }
+
     @Test
     void update_withoutIfMatch_returns412() {
         long id = createService();
