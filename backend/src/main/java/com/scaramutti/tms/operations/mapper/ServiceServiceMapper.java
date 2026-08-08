@@ -67,6 +67,8 @@ public interface ServiceServiceMapper {
     @Mapping(target = "price",         source = "price")
     @Mapping(target = "currencyCode",  source = "currencyCode")
     @Mapping(target = "status",        source = "service.status")
+    @Mapping(target = "startDateTime", source = "service.startDateTime")
+    @Mapping(target = "endDateTime",   source = "service.endDateTime")
     @Mapping(target = "events",        source = "events")
     @Mapping(target = "createdBy",     source = "createdBy")
     @Mapping(target = "createdAt",     source = "service.createdAt")

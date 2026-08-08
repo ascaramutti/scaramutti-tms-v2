@@ -48,6 +48,42 @@ public class OperationsTestData {
                 + "(SELECT id FROM public.clients WHERE name LIKE 'ZTEST%')").executeUpdate());
     }
 
+    /**
+     * Fuerza el estado de un servicio por SQL. Los estados los mueve el endpoint de transiciones,
+     * que todavia no existe, asi que todo test que necesite un viaje que no sea recien creado
+     * pasa por aca. Tercera copia identica entre clases de test: extraida al fixture.
+     *
+     * <p>No toca {@code updated_at} A PROPOSITO, y por eso NO sirve de molde para el script del
+     * cutover: los tests dependen de que el ETag no se mueva, pero una escritura de produccion que
+     * dejara la version quieta haria que un cliente con el ETag viejo siguiera pasando el
+     * If-Match. Ver el javadoc del gancho en la entity.
+     */
+    public void forceServiceStatus(long serviceId, String status) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE operaciones.services SET status = ?1 WHERE id = ?2")
+            .setParameter(1, status).setParameter(2, serviceId).executeUpdate());
+    }
+
+    /**
+     * Fuerza uno de los textos libres de un servicio por SQL, para fabricar el dato que el sistema
+     * anterior deja y el alta de v2 no: un texto con espacios de relleno. Misma advertencia que el
+     * de arriba.
+     *
+     * <p>La columna se interpola porque {@code UPDATE} no admite un parametro donde va un nombre
+     * de columna; el valor sigue yendo parametrizado y los nombres salen de un conjunto cerrado.
+     */
+    public void forceFreeText(long serviceId, String column, String value) {
+        if (!FREE_TEXT_COLUMNS.contains(column)) {
+            throw new IllegalArgumentException("columna de texto libre desconocida: " + column);
+        }
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE operaciones.services SET " + column + " = ?1 WHERE id = ?2")
+            .setParameter(1, value).setParameter(2, serviceId).executeUpdate());
+    }
+
+    private static final java.util.Set<String> FREE_TEXT_COLUMNS =
+        java.util.Set.of("origin", "destination", "observations");
+
     /** Conductor activo, disponible, sin categoría ni teléfono. */
     public int seedDriver(String firstName, String lastName) {
         return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true);
