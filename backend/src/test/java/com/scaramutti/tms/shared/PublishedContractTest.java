@@ -137,6 +137,26 @@ class PublishedContractTest {
             .body("paths.'/services'.get.operationId", equalTo("listServices"))
             .body("paths.'/services'.post.operationId", equalTo("createService"))
             .body("paths.'/services/{id}'.get.operationId", equalTo("getService"))
+            .body("paths.'/services/{id}'.put.operationId", equalTo("updateService"))
+            // las respuestas del PUT: sin esto el spec puede quedarse sin ninguna declarada y el
+            // cliente TypeScript deja de saber que existen el 409 y el 412
+            // A QUE respuesta apunta cada status, no solo que exista: apuntar el 409 al cuerpo
+            // del 404, o el 412 al de otro recurso, deja al cliente TypeScript tipando mal justo
+            // los casos que este endpoint estrena
+            .body("paths.'/services/{id}'.put.responses.'409'.$ref",
+                equalTo("#/components/responses/Conflict"))
+            .body("paths.'/services/{id}'.put.responses.'412'.$ref",
+                equalTo("#/components/responses/PreconditionFailed"))
+            .body("paths.'/services/{id}'.put.responses.'404'.$ref",
+                equalTo("#/components/responses/NotFound"))
+            .body("paths.'/services/{id}'.put.responses.'403'", notNullValue())
+            .body("paths.'/services/{id}'.put.responses.'200'.headers.ETag", notNullValue())
+            // los tres headers que la respuesta manda de verdad
+            .body("paths.'/services/{id}'.put.responses.'200'.headers.'Cache-Control'", notNullValue())
+            .body("paths.'/services/{id}'.put.responses.'200'.headers.Vary", notNullValue())
+            .body("paths.'/services/{id}'.get.responses.'200'.headers.Vary", notNullValue())
+            .body("paths.'/services'.get.responses.'200'.headers.Vary", notNullValue())
+            .body("components.schemas.ServiceUpdateRequest.properties.justification.minLength", equalTo(10))
             // una ruta sin operaciones es el sintoma exacto del bloque mal ubicado
             .body("paths.'/services'.put", nullValue())
             .body("paths.'/services/{id}'.post", nullValue());

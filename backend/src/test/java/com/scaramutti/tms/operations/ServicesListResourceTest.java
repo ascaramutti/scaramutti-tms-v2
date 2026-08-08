@@ -78,6 +78,8 @@ class ServicesListResourceTest {
             .statusCode(200)
             // El cuerpo depende del rol: ningún cache intermedio debe guardarlo.
             .header("Cache-Control", equalTo("no-store"))
+            // el cuerpo depende del rol: el `Vary` lo declara para cualquier cache intermedio
+            .header("Vary", equalTo("Authorization"))
             .body("page", equalTo(0))
             .body("size", equalTo(20))
             .body("content", notNullValue());

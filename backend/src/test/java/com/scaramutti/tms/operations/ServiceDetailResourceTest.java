@@ -133,7 +133,9 @@ class ServiceDetailResourceTest {
             .get("/services/" + id)
         .then()
             .statusCode(200)
-            .header("Cache-Control", equalTo("no-store"));
+            .header("Cache-Control", equalTo("no-store"))
+            // el mismo ETag identifica dos cuerpos distintos segun el rol: el `Vary` lo declara
+            .header("Vary", equalTo("Authorization"));
     }
 
     // ---------- Bitácora ---------------------------------------------------------
@@ -350,7 +352,7 @@ class ServiceDetailResourceTest {
     @Test
     void getService_whenDeleted_isStillVisibleByItsOwnLink() {
         long id = createService("Piura", "Lima");
-        forceStatus(id, "DELETED");
+        operationsFixtures.forceServiceStatus(id, "DELETED");
 
         given()
             .header("Authorization", "Bearer " + adminToken)
@@ -462,12 +464,6 @@ class ServiceDetailResourceTest {
         QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
                 "UPDATE operaciones.services SET updated_at = CAST(?1 AS timestamptz) WHERE id = ?2")
             .setParameter(1, instant).setParameter(2, serviceId).executeUpdate());
-    }
-
-    private void forceStatus(long serviceId, String status) {
-        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
-                "UPDATE operaciones.services SET status = ?1 WHERE id = ?2")
-            .setParameter(1, status).setParameter(2, serviceId).executeUpdate());
     }
 
     private int anyOtherUserId() {

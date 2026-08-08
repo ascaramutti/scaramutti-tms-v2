@@ -11,6 +11,7 @@ import com.scaramutti.tms.shared.repository.UserRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
 import java.util.concurrent.atomic.AtomicLong;
@@ -44,12 +45,46 @@ public class HermeticTestData {
     @Inject PaymentTermRepository paymentTermRepository;
     @Inject QuotationServiceTypeRepository quotationServiceTypeRepository;
     @Inject UserRepository userRepository;
+    @Inject EntityManager entityManager;
 
     // ---------- Resolver ids de catálogos SEMBRADOS por clave natural ----------
 
     public int currencyId(String code) {
         return currencyRepository.find("code", code).singleResultOptional()
             .orElseThrow(() -> new IllegalStateException("Moneda sembrada no encontrada: code=" + code)).id;
+    }
+
+    /**
+     * Moneda SINTÉTICA y descartable, ACTIVA, para los casos que necesitan darla de baja.
+     *
+     * <p>Se siembra POR CASO, no en el {@code @BeforeEach} de la clase: mientras existe es una
+     * moneda activa más en el catálogo que el wizard del sistema anterior lee en vivo, así que la
+     * ventana en la que alguien podría elegirla tiene que durar lo mínimo. Se borra con
+     * {@link #cleanupDisposableCurrency()}, que llama solo la clase que la sembró.
+     *
+     * <p>Existe porque `public.currencies` es un catálogo SEMBRADO que la base de dev comparte con
+     * el sistema anterior: apagar PEN o USD ahí, aunque sea por un instante, rompe el wizard de
+     * cotizaciones de v1 y media suite de v2 si la corrida se corta antes de restituirlas. Con una
+     * moneda propia, un corte no rompe nada de v1: deja una fila de más —ACTIVA, o sea
+     * seleccionable en su wizard hasta la próxima corrida, que la borra— en vez de dejar apagada
+     * una moneda que se usa de verdad.
+     *
+     * <p>Es DISTINTA de la `XTS` de {@code CurrenciesResourceTest} a propósito, aunque las dos
+     * sean sintéticas: aquella se siembra INACTIVA porque prueba el filtro de inactivas, y esta
+     * tiene que nacer ACTIVA porque se le crean servicios encima. Compartir la fila haría que cada
+     * suite dejara a la otra en el estado equivocado, y el orden de ejecución no está garantizado.
+     *
+     * <p>El estado se NORMALIZA al reusarla, no se hereda: si una corrida murió con la moneda
+     * apagada, la siguiente la encontraría inactiva y dos casos pasarían por el motivo equivocado
+     * (el que prueba el rechazo, porque ya venía apagada; y el que crea un servicio con ella,
+     * que fallaría en el alta con un mensaje que no menciona el residuo).
+     */
+    public int disposableCurrencyId() {
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager
+            .createNativeQuery("INSERT INTO public.currencies (code, name, symbol, is_active)"
+                    + " VALUES ('ZZT', 'ZTEST_ Moneda de prueba', 'Z', true)"
+                    + " ON CONFLICT (code) DO UPDATE SET is_active = true RETURNING id")
+            .getSingleResult()).intValue());
     }
 
     public int paymentTermId(String name) {
@@ -112,5 +147,22 @@ public class HermeticTestData {
             cargoTypeRepository.delete("name like ?1", PREFIX + "%");
             clientRepository.delete("name like ?1", PREFIX + "%");
         });
+    }
+
+    /**
+     * Borra la moneda descartable. Va APARTE de {@link #cleanup()} y tolerando el fallo: lo llama
+     * solo la clase que la siembra (las otras doce no tienen por qué pagar una transacción de
+     * más), y si un servicio de test todavía la referenciara, reventar acá se llevaría puesta la
+     * limpieza de clientes y tipos de carga. El peor caso tolerado es una fila huérfana, que la
+     * próxima corrida reutiliza normalizándole el estado.
+     */
+    public void cleanupDisposableCurrency() {
+        try {
+            QuarkusTransaction.requiringNew().run(() -> entityManager
+                .createNativeQuery("DELETE FROM public.currencies WHERE code = 'ZZT'")
+                .executeUpdate());
+        } catch (RuntimeException stillReferenced) {
+            // queda para la próxima corrida
+        }
     }
 }

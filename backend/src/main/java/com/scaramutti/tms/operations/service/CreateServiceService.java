@@ -60,9 +60,11 @@ public class CreateServiceService {
     @Inject UserLookup userLookup;
     @Inject CurrentUser currentUser;
     @Inject ServiceServiceMapper serviceServiceMapper;
+    @Inject ServicePriceVisibility servicePriceVisibility;
 
     @Transactional
     public ServiceDetailResponse createService(CreateServiceCommand command) {
+        servicePriceVisibility.requireCanSeePrices();
         Integer userId = currentUser.requireId();
 
         Client client = requireActiveClient(command.clientId());

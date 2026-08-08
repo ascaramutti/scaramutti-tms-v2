@@ -1,6 +1,7 @@
 package com.scaramutti.tms.operations.service;
 
 import com.scaramutti.tms.auth.security.CurrentUser;
+import com.scaramutti.tms.shared.exception.CommonError;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
@@ -36,5 +37,22 @@ public class ServicePriceVisibility {
     /** El veto manda sobre la lista positiva: primero se pregunta quien NO puede ver precios. */
     public boolean includePrices() {
         return !currentUser.hasAnyRole(PRICE_BLIND_ROLES) && currentUser.hasAnyRole(PRICE_ROLES);
+    }
+
+    /**
+     * A quien no puede VER los importes tampoco se le deja escribirlos, ni al registrar ni al
+     * editar. Los dos cuerpos EXIGEN el precio, asi que dejarlo pasar lo obligaria a mandar a
+     * ciegas un valor que no puede leer: cada operacion suya pisaria el importe con una
+     * adivinanza, y ademas podria adivinarlo por descarte mirando si la bitacora registro el
+     * cambio. Ignorar el precio del cuerpo seria peor: dejaria un endpoint que miente sobre lo
+     * que guardo.
+     *
+     * <p>Hace falta porque la lista de roles del endpoint es un O y esto es un VETO: el dia que
+     * un usuario tenga dos roles, uno que sume despacho y ventas entraria por la lista.
+     */
+    public void requireCanSeePrices() {
+        if (!includePrices()) {
+            throw CommonError.FORBIDDEN.toException();
+        }
     }
 }
