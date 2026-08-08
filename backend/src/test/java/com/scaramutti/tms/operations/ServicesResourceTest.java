@@ -402,6 +402,28 @@ class ServicesResourceTest {
     }
 
     /**
+     * El año de nueve cifras que admite el formato ISO no entra en la columna de fecha: el valor
+     * es válido para Java, así que el tipado no protege de nada y llega hasta el motor, que
+     * revienta la inserción con un 500 donde el contrato promete un 400.
+     */
+    @Test
+    void create_withOutOfRangeTentativeDate_returns400() {
+        Map<String, Object> payload = validPayload();
+        payload.put("tentativeDate", "+999999999-12-31");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"));
+    }
+
+    /**
      * Quien no puede VER los importes tampoco los escribe, tampoco al registrar. Es el mismo veto
      * que aplica la edición, y tiene que aplicarse acá por el mismo motivo: el cuerpo exige el
      * precio. Sin esta guarda, un usuario que sumara despacho y ventas entraría por la lista de

@@ -586,6 +586,26 @@ class ServiceResourceMapperTest {
 
     // ---------- Alta ---------------------------------------------------------------
 
+    /** La ventana de fechas es la misma en el alta: la columna que las recibe es la misma. */
+    @Test
+    void toCreateServiceCommand_withADateOutsideTheBusinessWindow_isRejected() {
+        assertTrue(messageOf(() -> mapper.toCreateServiceCommand(new ServiceCreateRequest(
+                1, TripScope.PROVINCIA, LocalDate.of(999_999_999, 12, 31), "Piura", "Lima", 1,
+                BigDecimal.TEN, null, null, null, BigDecimal.TEN, 1, null)))
+            .contains("fecha tentativa"));
+    }
+
+    @Test
+    void toCreateServiceCommand_trimsFreeTextAsBefore() {
+        CreateServiceCommand command = mapper.toCreateServiceCommand(new ServiceCreateRequest(
+            1, TripScope.PROVINCIA, LocalDate.now(), "  Piura  ", "  Lima  ", 1,
+            BigDecimal.TEN, null, null, null, BigDecimal.TEN, 1, "   "));
+
+        assertEquals("Piura", command.origin());
+        assertEquals("Lima", command.destination());
+        assertNull(command.observations());
+    }
+
     // ---------- Fábricas del cuerpo de edición ---------------------------------------
 
     private static final String VALID_JUSTIFICATION = "Corrección del punto de entrega";
