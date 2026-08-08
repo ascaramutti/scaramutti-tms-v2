@@ -424,6 +424,28 @@ class ServicesResourceTest {
     }
 
     /**
+     * El mismo byte NUL, por el camino del alta. PostgreSQL no lo admite dentro de un texto: sin
+     * rechazarlo antes, la inserción revienta con un 500 en vez del 400 que promete el contrato.
+     */
+    @Test
+    void create_withANulCharacterInFreeText_returns400NotAServerError() {
+        Map<String, Object> payload = validPayload();
+        payload.put("origin", "Piura \u0000 con nul");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("detail", containsString("no se pueden guardar"));
+    }
+
+    /**
      * Quien no puede VER los importes tampoco los escribe, tampoco al registrar. Es el mismo veto
      * que aplica la edición, y tiene que aplicarse acá por el mismo motivo: el cuerpo exige el
      * precio. Sin esta guarda, un usuario que sumara despacho y ventas entraría por la lista de

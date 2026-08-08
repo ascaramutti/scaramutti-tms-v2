@@ -606,8 +606,6 @@ class ServiceResourceMapperTest {
         assertNull(command.observations());
     }
 
-
-
     // ---------- Fábricas del cuerpo de edición ---------------------------------------
 
     private static final String VALID_JUSTIFICATION = "Corrección del punto de entrega";
