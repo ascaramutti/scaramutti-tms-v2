@@ -12,10 +12,14 @@ import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.ParameterizedTest;
 
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.allOf;
@@ -76,6 +80,10 @@ class ServicesResourceTest {
         .then()
             .statusCode(201)
             .header("ETag", notNullValue())
+            // el cuerpo del 201 es el mismo detalle, con importes adentro: arrastra las mismas
+            // condiciones que el GET y el PUT
+            .header("Cache-Control", equalTo("no-store"))
+            .header("Vary", equalTo("Authorization"))
             .header("Location", matchesPattern("https?://[^/]+/api/v1/services/\\d+"))
             .body("id", notNullValue())
             // El código lo deriva el backend del id: SRV- + al menos 4 dígitos.
@@ -384,6 +392,48 @@ class ServicesResourceTest {
             .statusCode(400);
     }
 
+    /**
+     * El salto de línea en un texto de UNA línea, por el camino del ALTA, que es donde está el
+     * vector: la guarda anti doble-click registra el origen y el destino en el log de la
+     * aplicación, que escribe una línea por evento. Cualquier carácter de control sirve para
+     * inventar una, no solo el salto, así que se prueban varios.
+     */
+    @ParameterizedTest  // el control va por su código: escribirlo literal rompe el CSV
+    @CsvSource({"origin,10", "origin,13", "origin,9", "origin,27", "destination,10", "destination,13"})
+    void create_withAControlCharacterInASingleLineField_returns400(String field, int control) {
+        Map<String, Object> payload = validPayload();
+        payload.put(field, "Piura" + (char) control + "12:00:00 WARN  [x] (main) evento inventado");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("detail", containsString("saltos de línea"));
+    }
+
+    /** Pero el salto al FINAL es el artefacto de pegar desde una planilla: se recorta y entra. */
+    @Test
+    void create_withATrailingLineBreak_isAcceptedAndTrimmed() {
+        Map<String, Object> payload = validPayload();
+        payload.put("origin", "Piura\n");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(201)
+            .body("origin", equalTo("Piura"));
+    }
+
     // ---------- Autorización --------------------------------------------------
 
     /** El despacho opera viajes ajenos, no los registra (misma regla que el sistema anterior). */
@@ -397,6 +447,75 @@ class ServicesResourceTest {
             .post("/services")
         .then()
             .statusCode(403)
+            .body("code", equalTo("COM-003"));
+    }
+
+    /**
+     * El año de nueve cifras que admite el formato ISO no entra en la columna de fecha: el valor
+     * es válido para Java, así que el tipado no protege de nada y llega hasta el motor, que
+     * revienta la inserción con un 500 donde el contrato promete un 400.
+     */
+    @Test
+    void create_withOutOfRangeTentativeDate_returns400() {
+        Map<String, Object> payload = validPayload();
+        payload.put("tentativeDate", "+999999999-12-31");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"));
+    }
+
+    /**
+     * El mismo byte NUL, por el camino del alta, en CADA texto libre. PostgreSQL no lo admite
+     * dentro de una cadena: sin rechazarlo antes, la inserción revienta con un 500 en vez del 400
+     * que promete el contrato. Va campo por campo porque cada uno tiene su propia llamada a la
+     * guarda, y una que falte no la delata ninguna de las otras.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"origin", "destination", "observations"})
+    void create_withANulCharacterInFreeText_returns400NotAServerError(String field) {
+        Map<String, Object> payload = validPayload();
+        payload.put(field, "Piura \u0000 con nul");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("detail", containsString("no se pueden guardar"));
+    }
+
+    /**
+     * Quien no puede VER los importes tampoco los escribe, tampoco al registrar. Es el mismo veto
+     * que aplica la edición, y tiene que aplicarse acá por el mismo motivo: el cuerpo exige el
+     * precio. Sin esta guarda, un usuario que sumara despacho y ventas entraría por la lista de
+     * roles y dejaría grabado un importe que después no puede leer (el detalle y el listado se lo
+     * ocultan) ni corregir (la edición le contesta 403), o sea un viaje sin remedio por API.
+     */
+    @Test
+    void create_asDualRoleBlindToPrices_returns403() {
+        given()
+            .header("Authorization", "Bearer "
+                + TestAuth.fabricateAccessTokenWithRoles("zdual", Set.of("dispatcher", "sales")))
+            .contentType(ContentType.JSON)
+            .body(validPayload())
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(403)
+            .contentType("application/problem+json")
             .body("code", equalTo("COM-003"));
     }
 

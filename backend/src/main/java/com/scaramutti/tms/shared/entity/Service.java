@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
@@ -130,5 +131,27 @@ public class Service {
         if (updatedAt == null) {
             updatedAt = createdAt;
         }
+    }
+
+    /**
+     * Mueve la version cuando la fila se modifica A TRAVES DE LA ENTITY, como el resto de las
+     * entities versionadas de la casa. No alcanza con que el servicio que edita la asigne a mano:
+     * los endpoints que vienen (asignar recursos, cambiar de estado) mutan esta misma entity, y el
+     * que se olvide del bump dejaria la version congelada — un cliente con el ETag ANTERIOR
+     * pasaria el {@code If-Match} y pisaria el cambio con un 200 limpio.
+     *
+     * <p>⚠️ NO cubre los UPDATE masivos por consulta (JPQL o nativa): ese gancho no corre ahi. La
+     * casa ya tiene una forma asi (el job de vencimiento de cotizaciones, que a proposito no toca
+     * su {@code updated_at}). Todo UPDATE masivo sobre esta tabla tiene que setear
+     * {@code updated_at} EN LA MISMA SENTENCIA, o la version queda congelada y el
+     * {@code If-Match} deja de proteger. No resolverlo con un trigger: pisaria el valor que la
+     * aplicacion ya mando en el volcado, y el ETag que devolvio la respuesta dejaria de coincidir
+     * con lo confirmado.
+     *
+     * <p>Tampoco mueve {@code updated_by}: esa la sigue asignando quien edita.
+     */
+    @PreUpdate
+    public void onUpdate() {
+        updatedAt = DateUtils.nowUtcMicros();
     }
 }

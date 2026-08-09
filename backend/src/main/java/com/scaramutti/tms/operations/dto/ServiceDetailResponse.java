@@ -18,10 +18,9 @@ import java.util.List;
  * Detalle del servicio de transporte con su bitacora. Origen y destino viajan separados porque
  * la tabla del listado los muestra en dos lineas.
  *
- * <p>Los recursos asignados (conductor, tracto, carreta), las fechas reales de inicio y fin y
- * los refuerzos NO estan en esta respuesta todavia: llegan con los endpoints que los producen
- * (asignacion, transiciones de estado y recursos adicionales). Un servicio recien creado no
- * tiene ninguno.
+ * <p>Los recursos asignados (conductor, tracto, carreta) y los refuerzos NO estan en esta
+ * respuesta todavia: llegan con los endpoints que los producen (asignacion y recursos
+ * adicionales). Un servicio recien creado no tiene ninguno.
  */
 public record ServiceDetailResponse(
 
@@ -62,6 +61,18 @@ public record ServiceDetailResponse(
     String currencyCode,
 
     ServiceStatus status,
+
+    /*
+     * Las fechas reales viajan aca porque la EDICION las corrige: sin poder leerlas, el formulario
+     * no puede mostrarlas ni precargarlas, y la precondicion del PUT ("solo se corrige la que ya
+     * existe") seria inobservable para quien llama. Las FIJA la transicion de estado; este detalle
+     * solo las muestra.
+     */
+    @Schema(nullable = true, description = "Inicio real del viaje; lo fijara la transicion de estado y la edicion lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicacion es siempre null")
+    OffsetDateTime startDateTime,
+
+    @Schema(nullable = true, description = "Fin real del viaje; lo fijara la transicion de estado y la edicion lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicacion es siempre null")
+    OffsetDateTime endDateTime,
 
     @Schema(description = "Bitacora en orden cronologico ascendente")
     List<ServiceEventResponse> events,
