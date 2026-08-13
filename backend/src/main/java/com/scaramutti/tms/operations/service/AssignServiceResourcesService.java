@@ -8,6 +8,7 @@ import com.scaramutti.tms.operations.model.ServiceAuditChangeType;
 import com.scaramutti.tms.operations.model.ServiceEventType;
 import com.scaramutti.tms.operations.model.ServiceResourceKind;
 import com.scaramutti.tms.operations.model.ServiceStatus;
+import com.scaramutti.tms.operations.model.ServiceStatusLabels;
 import com.scaramutti.tms.operations.service.cmd.AssignServiceResourcesCommand;
 import com.scaramutti.tms.shared.entity.Driver;
 import com.scaramutti.tms.shared.entity.Service;
@@ -293,16 +294,12 @@ public class AssignServiceResourcesService {
     }
 
     /**
-     * El estado, como lo nombra el negocio. Solo los dos que pueden retener un recurso: los otros
-     * cuatro no llegan nunca a este mensaje, y ponerlos seria prometer un texto para un caso
-     * imposible.
+     * El estado, como lo nombra el negocio. Los seis viven en una tabla compartida: acá solo
+     * llegan los dos que pueden retener un recurso, pero el mismo estado tiene que llamarse igual
+     * en toda la aplicación, y con una copia por servicio eso dura hasta que alguien retoque una.
      */
     private String statusLabel(ServiceStatus status) {
-        return switch (status) {
-            case PENDING_START -> "pendiente de inicio";
-            case IN_PROGRESS -> "en ruta";
-            default -> status.name();
-        };
+        return ServiceStatusLabels.of(status);
     }
 
     // ---------- Escritura ------------------------------------------------------
