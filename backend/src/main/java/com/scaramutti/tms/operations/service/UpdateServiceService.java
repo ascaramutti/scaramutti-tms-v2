@@ -16,7 +16,6 @@ import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.ServiceAuditLogRepository;
 import com.scaramutti.tms.shared.repository.ServiceEventRepository;
 import com.scaramutti.tms.shared.repository.ServiceRepository;
-import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.shared.util.Etag;
 import com.scaramutti.tms.shared.util.StringUtils;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -27,7 +26,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -59,10 +57,6 @@ public class UpdateServiceService {
 
     /** Como se muestra en la bitacora un valor que no todos los roles pueden ver. */
     private static final String HIDDEN_VALUE_LABEL = "(no se muestra)";
-
-    /** Formato de las marcas de tiempo en la bitacora, en hora de Peru y como se lee en es-PE. */
-    private static final DateTimeFormatter LIMA_FORMAT =
-        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 
     @Inject ServiceRepository serviceRepository;
     @Inject ServiceEventRepository serviceEventRepository;
@@ -344,8 +338,9 @@ public class UpdateServiceService {
             // arriba evita y que aca volveria a entrar por el texto. Ningun test puede fijarlo
             // (hoy el driver ya devuelve UTC y las dos formas coinciden, verificado mutando la
             // linea); esta escrito asi para que el rastro no dependa de ese comportamiento.
-            changes.add(new FieldChange(name, label, asUtcText(oldValue), asUtcText(newValue),
-                logLine(label, asLimaText(oldValue), asLimaText(newValue))));
+            changes.add(new FieldChange(name, label,
+                ServiceLogText.asUtcText(oldValue), ServiceLogText.asUtcText(newValue),
+                logLine(label, ServiceLogText.asLimaText(oldValue), ServiceLogText.asLimaText(newValue))));
         }
     }
 
@@ -376,18 +371,8 @@ public class UpdateServiceService {
         return value == null ? null : value.toString();
     }
 
-    /** Texto canonico de una marca de tiempo: siempre en UTC, para que el rastro sea comparable. */
-    private String asUtcText(OffsetDateTime value) {
-        return value == null ? null : value.withOffsetSameInstant(ZoneOffset.UTC).toString();
-    }
-
     private java.time.Instant toInstant(OffsetDateTime value) {
         return value == null ? null : value.toInstant();
-    }
-
-    /** La misma marca, en hora de Peru, para que la lea una persona sin traducir el huso. */
-    private String asLimaText(OffsetDateTime value) {
-        return value == null ? null : value.atZoneSameInstant(DateUtils.LIMA).format(LIMA_FORMAT);
     }
 
     // ---------- Escritura ------------------------------------------------------

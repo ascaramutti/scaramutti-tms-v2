@@ -1,5 +1,11 @@
 package com.scaramutti.tms.operations.service;
 
+import com.scaramutti.tms.shared.util.DateUtils;
+
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
+
 /**
  * Como se escribe en la bitacora del viaje un texto que puso una persona.
  *
@@ -41,4 +47,33 @@ public final class ServiceLogText {
     public static String display(String value) {
         return value == null ? EMPTY_VALUE_LABEL : flattenLineBreaks(value);
     }
+
+    /**
+     * Como se GUARDA una marca de tiempo en la auditoria: siempre en UTC, que es el marco en el
+     * que la columna la almacena.
+     *
+     * <p>Vive aca y no en cada servicio porque las mismas dos columnas —el inicio y el fin reales—
+     * las escriben ya dos endpoints, la edicion y la transicion de estado. La auditoria existe para
+     * reconstruir el estado comparando el valor anterior con el nuevo, asi que si cada puerta
+     * canonicaliza distinto, dos filas que describen el MISMO instante dejan de ser comparables y
+     * el rastro pierde justamente lo que lo hace util.
+     */
+    public static String asUtcText(OffsetDateTime value) {
+        return value == null ? null : value.withOffsetSameInstant(ZoneOffset.UTC).toString();
+    }
+
+    /**
+     * La misma marca, en hora de Peru, para que una persona la lea sin traducir el huso.
+     *
+     * <p>La bitacora la lee gente y la auditoria la lee el sistema: por eso son dos formatos y no
+     * uno. En UTC la misma pantalla diria dos horas distintas para el mismo dato segun quien la
+     * mire, que es peor que no mostrarla.
+     */
+    public static String asLimaText(OffsetDateTime value) {
+        return value == null ? null : value.atZoneSameInstant(DateUtils.LIMA).format(LIMA_FORMAT);
+    }
+
+    /** Formato de las marcas de tiempo en la bitacora, en hora de Peru y como se lee en es-PE. */
+    private static final DateTimeFormatter LIMA_FORMAT =
+        DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
 }
