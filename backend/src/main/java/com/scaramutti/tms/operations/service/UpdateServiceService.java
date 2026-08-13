@@ -57,9 +57,6 @@ public class UpdateServiceService {
     private static final Set<ServiceStatus> IMMUTABLE_STATUSES =
         EnumSet.of(ServiceStatus.CANCELLED, ServiceStatus.DELETED);
 
-    /** Como se muestra en la bitacora un campo que estaba (o queda) sin valor. */
-    private static final String EMPTY_VALUE_LABEL = "(vacío)";
-
     /** Como se muestra en la bitacora un valor que no todos los roles pueden ver. */
     private static final String HIDDEN_VALUE_LABEL = "(no se muestra)";
 
@@ -354,7 +351,7 @@ public class UpdateServiceService {
 
     /** {@code Etiqueta: viejo → nuevo}; un valor ausente se nombra, porque "Alto (m): → 12" no se entiende. */
     private String logLine(String label, String oldDisplay, String newDisplay) {
-        return label + ": " + displayValue(oldDisplay) + " → " + displayValue(newDisplay);
+        return label + ": " + ServiceLogText.display(oldDisplay) + " → " + ServiceLogText.display(newDisplay);
     }
 
     /**
@@ -470,7 +467,7 @@ public class UpdateServiceService {
         for (FieldChange change : changes) {
             note.append(change.logLine()).append('\n');
         }
-        note.append("Justificación: ").append(displayValue(justification));
+        note.append("Justificación: ").append(ServiceLogText.display(justification));
 
         ServiceEvent event = new ServiceEvent();
         event.serviceId = service.id;
@@ -480,18 +477,4 @@ public class UpdateServiceService {
         serviceEventRepository.persist(event);
     }
 
-    /**
-     * Un valor tal como se muestra en la bitacora. Ademas de nombrar el vacio, aplasta los saltos
-     * de linea: la nota tiene UNA linea por campo, asi que un texto libre con saltos —que son
-     * legitimos y la columna los guarda— permitiria plantar lineas FALSAS con el mismo formato que
-     * las que escribe el servidor. Un "ok\nPrecio: 3200 → 300" en las observaciones se leeria en el
-     * detalle como si el sistema hubiera registrado ese cambio de precio, y la bitacora es
-     * justamente el rastro de rendicion de cuentas: nadie puede editarla ni borrarla despues.
-     *
-     * <p>El texto EXACTO no se pierde: queda en la columna del servicio y en la auditoria, que son
-     * el registro reconstruible. Aca solo se aplana lo que se muestra.
-     */
-    private String displayValue(String value) {
-        return value == null ? EMPTY_VALUE_LABEL : value.replaceAll("\\R", " ⏎ ");
-    }
 }
