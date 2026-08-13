@@ -144,7 +144,7 @@ class ServiceRowLockTest {
     }
 
     /**
-     * Y por arriba: quien espera por el lock retiene su conexión todo ese tiempo, así que un tope
+     * Y por arriba: quien espera por un lock retiene su conexión todo ese tiempo, así que un tope
      * que llegue a lo que el pool espera para ENTREGAR una conexión invierte el orden de las
      * rendiciones y deja sin conexiones a los otros módulos. Es la forma típica de "arreglar" un
      * 409 molesto subiendo el número.
@@ -160,11 +160,31 @@ class ServiceRowLockTest {
             "el mensaje tiene que nombrar la propiedad: " + e.getMessage());
     }
 
+    /**
+     * Lo que tiene que quedar por debajo de la espera del pool es el TOTAL ACUMULADO, no una
+     * espera suelta: el tope de PostgreSQL se aplica por INTENTO de lock, y la asignación de
+     * recursos puede acumular cuatro (la fila del viaje más los tres recursos).
+     *
+     * <p>Este valor pasaba la versión anterior de la guarda, que medía una sola espera. Con él
+     * configurado, una transacción podía retener su conexión más tiempo del que el pool tolera
+     * para entregar otra, que es exactamente lo que la guarda existe para impedir.
+     */
     @Test
-    void requireUsableLockTimeout_withAPositiveValue_returnsIt() {
-        rowLock.lockTimeoutSeconds = 4;
+    void requireUsableLockTimeout_whoseAccumulatedBudgetReachesThePoolWait_fails() {
+        rowLock.lockTimeoutSeconds = 2;   // 2s x 4 esperas = 8s, contra 5s del pool
         rowLock.poolAcquisitionTimeout = POOL_WAIT;
 
-        assertEquals(4, rowLock.requireUsableLockTimeout());
+        IllegalStateException e = assertThrows(IllegalStateException.class,
+            rowLock::requireUsableLockTimeout);
+        assertTrue(e.getMessage().contains("acumulado"),
+            "el mensaje tiene que explicar que la cuenta es acumulada: " + e.getMessage());
+    }
+
+    @Test
+    void requireUsableLockTimeout_withAValueThatFitsTheWholeBudget_returnsIt() {
+        rowLock.lockTimeoutSeconds = 1;   // 1s x 4 esperas = 4s, por debajo de los 5s del pool
+        rowLock.poolAcquisitionTimeout = POOL_WAIT;
+
+        assertEquals(1, rowLock.requireUsableLockTimeout());
     }
 }

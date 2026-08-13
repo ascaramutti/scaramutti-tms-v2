@@ -2,8 +2,10 @@ package com.scaramutti.tms.operations.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.scaramutti.tms.operations.dto.embedded.ServiceClientSummary;
+import com.scaramutti.tms.operations.dto.embedded.ServiceDriverSummary;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.model.TripScope;
+import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitRef;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -20,8 +22,10 @@ import java.time.OffsetDateTime;
  * en vez de desaparecer en silencio— hace que viajen AUSENTES del JSON, que es lo que declara
  * el contrato. Los demas campos siempre tienen valor.
  *
- * <p>Todavia no trae el conductor ni el tracto asignados: los pone el endpoint de asignacion,
- * que no existe, asi que hoy ningun servicio puede tenerlos.
+ * <p>{@code driver} y {@code tractor} SI viajan en null cuando el viaje todavia no los tiene, y
+ * eso es informacion, no un dato faltante: la tabla los muestra vacios y ese es justo el estado
+ * en el que el despacho busca los viajes. La carreta no esta aca: es opcional y la tabla no la
+ * muestra, asi que vive solo en el detalle.
  */
 public record ServiceSummaryResponse(
 
@@ -41,6 +45,12 @@ public record ServiceSummaryResponse(
     TripScope tripScope,
 
     ServiceStatus status,
+
+    @Schema(nullable = true, description = "Conductor asignado; null mientras el viaje esté pendiente de asignación")
+    ServiceDriverSummary driver,
+
+    @Schema(nullable = true, description = "Tracto asignado; null mientras el viaje esté pendiente de asignación")
+    FleetUnitRef tractor,
 
     @Schema(description = "Ausente para el rol de despacho")
     @JsonInclude(JsonInclude.Include.NON_NULL)

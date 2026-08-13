@@ -49,6 +49,27 @@ public record Problem(
      */
     public Problem {
         extensions = extensions == null ? Map.of() : Map.copyOf(extensions);
+        requireNoReservedKeys(extensions);
+    }
+
+    /** Los campos fijos del cuerpo, que una extension NO puede pisar. */
+    private static final java.util.Set<String> RESERVED_MEMBERS =
+        java.util.Set.of("type", "title", "status", "detail", "instance", "code", "traceId", "errors");
+
+    /**
+     * Una extension que se llame como un campo fijo produce un JSON con la clave DUPLICADA:
+     * Jackson escribe las dos y quien lea se queda con una cualquiera, que puede ser la del
+     * atacante. Hoy no es alcanzable —las dos unicas claves en uso son constantes del servidor—,
+     * pero esto es API compartida por todos los modulos y el proximo que la use no va a leer este
+     * archivo. Se cierra el MECANISMO, no el caso.
+     */
+    private static void requireNoReservedKeys(Map<String, Object> extensions) {
+        for (String key : extensions.keySet()) {
+            if (RESERVED_MEMBERS.contains(key)) {
+                throw new IllegalArgumentException(
+                    "un miembro de extension no puede llamarse como un campo fijo del cuerpo: " + key);
+            }
+        }
     }
 
     /**

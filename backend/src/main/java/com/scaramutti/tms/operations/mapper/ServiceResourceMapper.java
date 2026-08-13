@@ -1,8 +1,10 @@
 package com.scaramutti.tms.operations.mapper;
 
+import com.scaramutti.tms.operations.dto.ServiceAssignResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.model.ServiceStatus;
+import com.scaramutti.tms.operations.service.cmd.AssignServiceResourcesCommand;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
 import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
 import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
@@ -10,6 +12,7 @@ import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.MultiWordSearch;
 import com.scaramutti.tms.shared.util.StringUtils;
+import org.mapstruct.BeforeMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -92,6 +95,36 @@ public interface ServiceResourceMapper {
             request.endDateTime(),
             requireJustification(request.justification()));
     }
+
+    /**
+     * Guarda de entrada de la asignacion. Corre ANTES del mapeo de abajo porque MapStruct invoca
+     * los metodos {@code @BeforeMapping} que aceptan el tipo de origen al entrar al metodo
+     * generado. Escrita asi y no dentro de un metodo a mano, la validacion no se puede saltear:
+     * no queda ningun mapeo publico "puro" al que llamar de costado.
+     *
+     * <p>La nota es MULTILINEA (como las observaciones y la justificacion): solo se le rechaza el
+     * byte NUL. Un salto de linea es legitimo y la bitacora lo aplasta al escribirlo, asi que no
+     * puede plantar lineas falsas.
+     */
+    @BeforeMapping
+    default void requireStorableAssignmentNote(
+            ServiceAssignResourcesRequest serviceAssignResourcesRequest) {
+        requireStorableText(serviceAssignResourcesRequest.note(), "La nota");
+    }
+
+    /**
+     * Asignacion de recursos. El id sale de la ruta y el resto del cuerpo; los tres ids de recurso
+     * se mapean por nombre.
+     *
+     * <p>{@code force} ausente o null se resuelve a false ACA —MapStruct arranca el primitivo en
+     * false y solo asigna si el {@code Boolean} vino— para que de la capa de negocio hacia abajo
+     * "no forzar" tenga una sola representacion.
+     */
+    @Mapping(target = "serviceId", source = "serviceId")
+    @Mapping(target = "note", source = "serviceAssignResourcesRequest.note",
+        qualifiedByName = "trimToNull")
+    AssignServiceResourcesCommand toAssignServiceResourcesCommand(
+        long serviceId, ServiceAssignResourcesRequest serviceAssignResourcesRequest);
 
     /**
      * PostgreSQL no admite el byte NUL dentro de un texto: llega hasta el motor y revienta la

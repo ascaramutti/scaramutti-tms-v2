@@ -85,6 +85,73 @@ public class OperationsTestData {
     private static final java.util.Set<String> FREE_TEXT_COLUMNS =
         java.util.Set.of("origin", "destination", "observations");
 
+    /**
+     * Tracto de operaciones, con placa propia de la corrida ({@code ZO00xx}). La placa la genera
+     * el fixture y no el test: {@code public.tractors.plate} es UNIQUE y esta suite necesita
+     * varias unidades por caso (el conflicto exige un recurso ocupado y otro libre), así que con
+     * placas literales se chocarían entre sí.
+     */
+    public int seedTractor() {
+        return seedTractor(true, WarehouseTestData.STATUS_AVAILABLE);
+    }
+
+    public int seedTractor(boolean isActive, String statusName) {
+        return warehouseFixtures.seedTractor(nextOperationsPlate(), isActive, null, null, statusName);
+    }
+
+    /** Carreta de operaciones, con placa propia de la corrida. Mismo motivo que el de arriba. */
+    public int seedTrailer() {
+        return seedTrailer(true, WarehouseTestData.STATUS_AVAILABLE);
+    }
+
+    public int seedTrailer(boolean isActive, String statusName) {
+        return warehouseFixtures.seedTrailer(nextOperationsPlate(), isActive, statusName);
+    }
+
+    /**
+     * Unidad con una placa DICTADA por el test, para fabricar el dato que el sistema anterior sí
+     * puede escribir y el alta de v2 no: una placa con un salto de línea adentro. La columna es
+     * {@code VARCHAR} sin restricción de formato, así que la base lo admite; la limpieza los
+     * alcanza igual porque se borran por el id sembrado.
+     */
+    public int seedTractorWithPlate(String plate) {
+        return warehouseFixtures.seedTractor(plate, true, null, null, WarehouseTestData.STATUS_AVAILABLE);
+    }
+
+    public int seedTrailerWithPlate(String plate) {
+        return warehouseFixtures.seedTrailer(plate, true, WarehouseTestData.STATUS_AVAILABLE);
+    }
+
+    /**
+     * Placa reservada de operaciones: {@code ZO} + cuatro dígitos. El contador es de proceso, así
+     * que dos casos de la misma corrida nunca piden la misma.
+     */
+    private String nextOperationsPlate() {
+        return String.format("ZO%04d", SEQ.incrementAndGet() % 10000);
+    }
+
+    /**
+     * Recurso de REFUERZO de un viaje ({@code operaciones.service_assignments}), por SQL.
+     *
+     * <p>Es el fixture que hace verificable la segunda fuente del conflicto: el endpoint que crea
+     * refuerzos todavía no existe, así que sin esto no hay forma de fabricar un viaje que retenga
+     * un recurso SOLO como refuerzo, que es justamente el caso que el sistema anterior no miraba.
+     *
+     * <p>{@code assigned_by} sale del creador del viaje: la columna es NOT NULL y cualquier
+     * usuario sirve, pero tomarlo del propio viaje evita sembrar uno aparte.
+     */
+    public long seedAdditionalAssignment(long serviceId, Integer driverId, Integer tractorId,
+            Integer trailerId, String reason) {
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
+            "INSERT INTO operaciones.service_assignments "
+                + "(service_id, driver_id, tractor_id, trailer_id, reason, assigned_by) "
+                + "SELECT ?1, ?2, ?3, ?4, ?5, s.created_by FROM operaciones.services s WHERE s.id = ?1 "
+                + "RETURNING id")
+            .setParameter(1, serviceId).setParameter(2, driverId).setParameter(3, tractorId)
+            .setParameter(4, trailerId).setParameter(5, reason)
+            .getSingleResult()).longValue());
+    }
+
     /** Conductor activo, disponible, sin categoría ni teléfono. */
     public int seedDriver(String firstName, String lastName) {
         return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true);

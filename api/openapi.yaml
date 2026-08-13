@@ -2439,11 +2439,11 @@ paths:
 
         El servicio cancelado o eliminado es inmutable → 409 `OPS-004`. El
         completado SÍ se edita (corrección de datos).
-        ⚠️ Lo mismo vale para el ESTADO: la transición que lo mueve tampoco
-        existe todavía, así que hoy todo viaje nacido en la aplicación está en
-        `PENDING_ASSIGNMENT`. Ni este 409 ni la corrección de un viaje ya
-        completado son alcanzables hasta que llegue ese endpoint, o para filas
-        cargadas por el cutover. El `OPS-004` se contesta
+        ⚠️ Del ESTADO solo se sale hacia adelante por ahora: asignar recursos
+        mueve el viaje a `PENDING_START`, pero las transiciones que siguen
+        llegan con su endpoint. Ni este 409 ni la corrección de un viaje ya
+        completado son alcanzables hasta entonces, o para filas cargadas por el
+        cutover. El `OPS-004` se contesta
         ANTES que el 412, para que un `If-Match` viejo no tape la razón real: es
         deliberado y sigue el criterio de almacén, donde el recurso anulado también
         se contesta antes que la versión; cotizaciones verifica la versión primero. Concurrencia: `If-Match`
@@ -2484,15 +2484,45 @@ paths:
       summary: Asignar recursos principales (el servicio pasa a pendiente de inicio)
       description: |
         RN-OP2 — conductor y tracto obligatorios, carreta opcional; solo desde
-        `PENDING_ASSIGNMENT`. Otro estado → 409 `OPS-006`.
+        `PENDING_ASSIGNMENT`, y al asignar el servicio pasa a `PENDING_START`.
+
+        El estado que no admite la acción se parte en dos códigos, igual que en
+        la edición: `PENDING_START`, `IN_PROGRESS` y `COMPLETED` responden 409
+        `OPS-006` (el estado no admite ESTA acción, que no es un cambio de
+        estado), y los dos terminales inmutables, `CANCELLED` y `DELETED`,
+        responden 409 `OPS-004`, el mismo código con el que los rechaza el PUT.
 
         RN-OP3 — si un recurso ya participa de OTRO servicio activo, sea como
         recurso principal o como refuerzo (se revisan AMBAS fuentes; el sistema
         anterior solo miraba los principales acá), responde 409
-        `OPS-002` con `forcible: true` y el detalle en `conflicts`. Reintentar con
+        `OPS-002` con `forcible: true` y el detalle en `conflicts`. El texto del
+        error nombra al primero y cuenta cuántos RECURSOS distintos quedan en
+        conflicto; la lista completa viaja en `conflicts`. Reintentar con
         `force: true` lo asigna igual y deja constancia en la bitácora y en la
         auditoría (así trabajaba el sistema anterior: el conflicto avisa, no
-        prohíbe).
+        prohíbe). Mandar `force: true` sin que haya conflicto asigna normal y NO
+        deja registrado que se forzara nada.
+
+        Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+        disponibilidad NO se valida: un tracto en mantenimiento se puede asignar
+        igual, porque esa es una decisión operativa y el catálogo de estados
+        existe para ordenar la lista de la pantalla, no para prohibir.
+
+        Los 400 no caen todos en el mismo lugar, igual que en la edición: los de FORMATO del
+        cuerpo (obligatorios, tope de la nota, byte NUL, ids no positivos) se contestan ANTES que
+        cualquier precondición del recurso, así que un id de viaje inexistente con un cuerpo
+        inválido responde 400 y no 404. Los de NEGOCIO (recurso inexistente o dado de baja) se
+        contestan DESPUÉS del 404 y del 409 del estado.
+
+        Sin `If-Match`: acá la protección es el estado, no la versión (solo se
+        asigna desde un único estado, que la propia operación abandona). La fila
+        se lee bajo lock y los recursos pedidos se serializan entre sí, así que
+        dos asignaciones simultáneas no pueden colarse sin ver el conflicto; si
+        CUALQUIER sentencia de esa transacción se rinde por lock → 409
+        `OPS-008`, TRANSITORIO, se resuelve reintentando.
+
+        La respuesta trae el servicio ya con sus recursos: `driver`, `tractor` y
+        `trailer` viajan en el detalle desde este endpoint.
       x-required-roles: [admin, general_manager, operations_manager, dispatcher]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
@@ -2507,6 +2537,8 @@ paths:
           description: Recursos asignados; el servicio queda pendiente de inicio
           headers:
             ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
+            Cache-Control: { schema: { type: string }, description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta' }
+            Vary: { schema: { type: string }, description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -2515,7 +2547,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: '`OPS-006` (el estado no admite la acción) u `OPS-002` (conflicto forzable)'
+          description: '`OPS-002` (conflicto forzable), `OPS-006` (el estado no admite la acción), `OPS-004` (cancelado o eliminado) u `OPS-008` (conflicto de lock, transitorio)'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
@@ -4316,11 +4348,12 @@ components:
       type: object
       description: |
         Fila del listado. `price` y `currencyCode` están AUSENTES (no en null)
-        para el rol `dispatcher`, RN-OP8. `driver` y `tractor` también pueden
-        estar ausentes, pero por otra razón: el servicio todavía no tiene
-        recursos asignados (los tiene recién desde `PENDING_START`). Origen y
-        destino viajan separados porque la tabla los muestra en dos líneas.
-      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, createdAt]
+        para el rol `dispatcher`, RN-OP8. `driver` y `tractor`, en cambio, viajan
+        SIEMPRE y valen `null` mientras el servicio no tenga recursos asignados
+        (los tiene recién desde `PENDING_START`): la celda vacía es información, y
+        por eso la clave está presente. Origen y destino viajan separados porque
+        la tabla los muestra en dos líneas.
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, driver, tractor, createdAt]
       properties:
         id:            { type: integer, format: int64 }
         code:          { type: string, example: 'SRV-0042' }
@@ -4330,8 +4363,8 @@ components:
         tentativeDate: { type: string, format: date }
         tripScope:     { $ref: '#/components/schemas/TripScope' }
         status:        { $ref: '#/components/schemas/ServiceStatus' }
-        driver:        { $ref: '#/components/schemas/DriverRef' }
-        tractor:       { $ref: '#/components/schemas/FleetUnitRef' }
+        driver:        { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
+        tractor:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         price:         { type: number, format: double, description: 'Ausente para dispatcher (RN-OP8)' }
         currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para dispatcher (RN-OP8)' }
         createdAt:     { type: string, format: date-time }
@@ -4374,7 +4407,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/ServiceSummaryResponse'
         - type: object
-          required: [cargoType, weightKg, additionalResources, events, createdBy, updatedAt]
+          required: [cargoType, weightKg, trailer, additionalResources, events, createdBy, updatedAt]
           properties:
             cargoType:     { $ref: '#/components/schemas/CargoTypeRef' }
             weightKg:      { type: number, format: double }
@@ -4382,7 +4415,7 @@ components:
             widthM:        { type: [number, 'null'], format: double }
             heightM:       { type: [number, 'null'], format: double }
             observations:  { type: [string, 'null'], maxLength: 500 }
-            trailer:       { $ref: '#/components/schemas/FleetUnitRef' }
+            trailer:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
             startDateTime: { type: [string, 'null'], format: date-time, description: 'Inicio real. Lo fijará la transición de estado y la edición lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicación es siempre null' }
             endDateTime:   { type: [string, 'null'], format: date-time, description: 'Fin real. Lo fijará la transición de estado y la edición lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicación es siempre null' }
             additionalResources:
@@ -4453,14 +4486,24 @@ components:
 
     AssignResourcesRequest:
       type: object
-      description: RN-OP2 — conductor y tracto obligatorios, carreta opcional.
+      description: |
+        RN-OP2 — conductor y tracto obligatorios, carreta opcional.
+
+        La nota es libre y opcional (no tiene mínimo, a diferencia de la justificación de la
+        edición). Entra en la bitácora y se anexa a la descripción de las filas de auditoría. Una
+        nota en blanco se trata como ausente. Sus saltos de línea se APLASTAN al escribirla en la
+        bitácora (se ven como `⏎`), porque cada entrada tiene una línea por dato y un salto
+        permitiría plantar una línea falsa con el formato del servidor. No puede contener el byte
+        NUL (`\u0000`), que la columna no admite y se rechaza con 400.
+
+        `force` ausente equivale a `false`.
       required: [driverId, tractorId]
       properties:
-        driverId:  { type: integer }
-        tractorId: { type: integer }
-        trailerId: { type: [integer, 'null'] }
+        driverId:  { type: integer, minimum: 1 }
+        tractorId: { type: integer, minimum: 1 }
+        trailerId: { type: [integer, 'null'], minimum: 1 }
         note:      { type: [string, 'null'], maxLength: 500 }
-        force:     { type: boolean, default: false, description: 'true = asigna pese al conflicto OPS-002; queda registrado en la bitácora' }
+        force:     { type: boolean, default: false, description: 'true = asigna pese al conflicto OPS-002; queda registrado en la bitácora y en la auditoría' }
 
     ChangeStatusRequest:
       type: object

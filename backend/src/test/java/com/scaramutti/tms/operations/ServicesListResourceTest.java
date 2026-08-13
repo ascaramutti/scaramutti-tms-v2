@@ -3,6 +3,7 @@ package com.scaramutti.tms.operations;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -30,6 +31,7 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -43,6 +45,7 @@ class ServicesListResourceTest {
 
     @Inject HermeticTestData fixtures;
     @Inject OperationsTestData operationsFixtures;
+    @Inject WarehouseTestData warehouseFixtures;
     @Inject EntityManager entityManager;
 
     private int clientId;
@@ -63,6 +66,11 @@ class ServicesListResourceTest {
     @AfterEach
     void cleanup() {
         operationsFixtures.deleteTestServices();
+        QuarkusTransaction.requiringNew().run(() -> {
+            operationsFixtures.deleteTestDrivers();
+            warehouseFixtures.deleteTestFleet();
+            warehouseFixtures.deleteTestWorkers();
+        });
         fixtures.cleanup();
     }
 
@@ -762,12 +770,140 @@ class ServicesListResourceTest {
     // ---------- Helpers ---------------------------------------------------------
 
     /** Crea un servicio por el endpoint real y devuelve su código. */
+    // ---------- Recursos asignados en la fila -----------------------------------
+
+    /**
+     * El conductor y el tracto de la fila salen de tres uniones externas y se leen por POSICION
+     * de la consulta. Sin un caso que los mire de punta a punta, intercambiar dos posiciones
+     * —servir el id del tracto como id del conductor— no rompe nada: el test del mapper arma la
+     * fila a mano, asi que prueba el mapeo pero nunca el SQL.
+     *
+     * <p>Por eso los valores se afirman EXACTOS y con etiquetas distintas entre si.
+     */
+    @Test
+    void list_showsTheAssignedDriverAndTractor() {
+        long assignedId = createServiceReturningId("Piura", "Lima");
+        int driverId = operationsFixtures.seedDriver("ZTEST Ana", "Quispe");
+        int tractorId = operationsFixtures.seedTractor();
+        int trailerId = operationsFixtures.seedTrailer();
+        assignResources(assignedId, driverId, tractorId, trailerId);
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+        .when()
+            .get("/services?clientId=" + clientId)
+        .then()
+            .statusCode(200)
+            .body("content", hasSize(1))
+            .body("content[0].driver.id", equalTo(driverId))
+            .body("content[0].driver.fullName", equalTo("ZTEST Ana Quispe"))
+            .body("content[0].tractor.kind", equalTo("TRACTOR"))
+            .body("content[0].tractor.id", equalTo(tractorId))
+            .body("content[0].tractor.plate", equalTo(plateOf("tractors", tractorId)))
+            // la carreta NO viaja en la fila: es opcional y la tabla no la muestra
+            .body("content[0]", not(hasKey("trailer")));
+    }
+
+    /**
+     * Y el gemelo: un viaje sin asignar los trae en null. Es informacion, no un dato faltante —
+     * la tabla los muestra vacios, y ese es justo el estado en el que el despacho busca viajes.
+     */
+    @Test
+    void list_withoutAssignedResources_showsThemAsNull() {
+        createService("Sullana", "Trujillo");
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+        .when()
+            .get("/services?clientId=" + clientId)
+        .then()
+            .statusCode(200)
+            .body("content", hasSize(1))
+            // las CLAVES viajan: `nullValue()` por si solo pasa igual si el campo esta ausente,
+            // que es justo lo contrario de lo que el DTO y el contrato prometen
+            .body("content[0]", hasKey("driver"))
+            .body("content[0]", hasKey("tractor"))
+            .body("content[0].driver", nullValue())
+            .body("content[0].tractor", nullValue());
+    }
+
+    /**
+     * Las uniones de los recursos son EXTERNAS y solo las lleva la pagina, no el total. Este caso
+     * fija las dos mitades de esa decision: que un viaje sin recursos no desaparezca del listado,
+     * y que el total siga contando lo mismo que la pagina devuelve.
+     */
+    @Test
+    void list_countsTheSameWithAndWithoutAssignedResources() {
+        long assignedId = createServiceReturningId("Piura", "Lima");
+        createService("Sullana", "Trujillo");
+        assignResources(assignedId, operationsFixtures.seedDriver("ZTEST Luis", "Ramos"),
+            operationsFixtures.seedTractor(), null);
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+        .when()
+            .get("/services?clientId=" + clientId)
+        .then()
+            .statusCode(200)
+            .body("content", hasSize(2))
+            .body("totalElements", equalTo(2));
+    }
+
     private String createService(String origin, String destination) {
         return createService(origin, destination, LocalDate.now().plusDays(3));
     }
 
     private String createService(String origin, String destination, LocalDate tentativeDate) {
         return createServiceForClient(clientId, origin, destination, tentativeDate);
+    }
+
+    /** Igual que {@link #createService}, pero devuelve el id: la asignacion lo necesita. */
+    private long createServiceReturningId(String origin, String destination) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("clientId", clientId);
+        payload.put("tripScope", "PROVINCIA");
+        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("origin", origin);
+        payload.put("destination", destination);
+        payload.put("cargoTypeId", cargoTypeId);
+        payload.put("weightKg", 12000);
+        payload.put("price", 3200);
+        payload.put("currencyId", currencyId);
+
+        return given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services")
+        .then()
+            .statusCode(201)
+            .extract().jsonPath().getLong("id");
+    }
+
+    /** Asigna por el ENDPOINT y no por SQL: asi la fila del listado sale de lo que el sistema produce. */
+    private void assignResources(long serviceId, int driverId, int tractorId, Integer trailerId) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("driverId", driverId);
+        payload.put("tractorId", tractorId);
+        if (trailerId != null) {
+            payload.put("trailerId", trailerId);
+        }
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services/" + serviceId + "/assignment")
+        .then()
+            .statusCode(200);
+    }
+
+    private String plateOf(String table, int unitId) {
+        return (String) entityManager.createNativeQuery(
+                "SELECT plate FROM public." + table + " WHERE id = ?1")
+            .setParameter(1, unitId).getSingleResult();
     }
 
     private String createServiceForClient(int client, String origin, String destination) {

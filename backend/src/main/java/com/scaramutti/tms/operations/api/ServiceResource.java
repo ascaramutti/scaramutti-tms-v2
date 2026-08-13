@@ -1,10 +1,12 @@
 package com.scaramutti.tms.operations.api;
 
+import com.scaramutti.tms.operations.dto.ServiceAssignResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.mapper.ServiceResourceMapper;
+import com.scaramutti.tms.operations.service.AssignServiceResourcesService;
 import com.scaramutti.tms.operations.service.CreateServiceService;
 import com.scaramutti.tms.operations.service.GetServiceService;
 import com.scaramutti.tms.operations.service.ListServicesService;
@@ -34,6 +36,7 @@ import java.net.URI;
 @Produces(MediaType.APPLICATION_JSON)
 public class ServiceResource {
 
+    @Inject AssignServiceResourcesService assignServiceResourcesService;
     @Inject CreateServiceService createServiceService;
     @Inject GetServiceService getServiceService;
     @Inject ListServicesService listServicesService;
@@ -111,6 +114,40 @@ public class ServiceResource {
         // depende de QUIEN pregunta y no debe guardarse en ningun cache intermedio. El `Vary`
         // lo deja explicito: el ETag no distingue el rol, asi que si algun dia alguien saca el
         // `no-store` por rendimiento, la misma version identificaria dos cuerpos distintos.
+        return Response.ok(response)
+            .header("ETag", Etag.of(response.updatedAt()))
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .build();
+    }
+
+    /**
+     * Asignar recursos SI es del despacho: es la operacion del viaje, no su registro. Por eso la
+     * lista de roles no es la del alta ni la de la edicion.
+     *
+     * <p>No lleva {@code If-Match}: la protección acá es el estado. Solo se asigna desde
+     * "pendiente de asignación", y la propia operación abandona ese estado, así que un segundo
+     * intento sobre una versión vieja se rechaza por el estado antes de tocar nada.
+     *
+     * <p><b>Precondición de esta lista de roles:</b> tiene que ser un subconjunto de la del
+     * detalle. El cuerpo del conflicto nombra el código y el estado de OTRO viaje, y hoy eso no
+     * filtra nada porque cualquiera que pueda asignar ya puede leer ese viaje entero por la
+     * puerta de adelante. Un rol que solo asigne convertiría ese 409 en un canal de lectura.
+     */
+    @POST
+    @Path("/{id}/assignment")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
+    public Response assignServiceResources(
+        @PathParam("id") String id,
+        @Valid @NotNull ServiceAssignResourcesRequest serviceAssignResourcesRequest
+    ) {
+        ServiceDetailResponse response = assignServiceResourcesService.assignServiceResources(
+            serviceResourceMapper.toAssignServiceResourcesCommand(
+                serviceResourceMapper.toServiceId(id), serviceAssignResourcesRequest)
+        );
+        // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
+        // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
         return Response.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")

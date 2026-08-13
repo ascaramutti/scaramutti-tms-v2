@@ -3,6 +3,8 @@ package com.scaramutti.tms.shared.exception;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -10,6 +12,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -39,7 +42,7 @@ class ProblemSerializationTest {
         assertEquals("OPS-005", body.get("code").asText());
         assertEquals(404, body.get("status").asInt());
         // ni la clave del componente ignorado ni ninguna otra de mas: el cuerpo sin extensiones
-        // tiene exactamente los seis campos no nulos que ya servia antes
+        // tiene exactamente los mismos campos no nulos que ya servia antes
         assertFalse(body.has("extensions"), "el componente no debe viajar como propiedad");
         assertFalse(body.has("extensionMembers"), "el accesor del aplanado tampoco es una propiedad");
         assertFalse(body.has("errors"), "un campo nulo no se emite (NON_NULL)");
@@ -75,6 +78,29 @@ class ProblemSerializationTest {
             Problem.of(400, "t", "d", "COM-001", "/x").extensions());
         assertEquals(Map.of(),
             Problem.withErrors(400, "t", "d", "COM-001", "/x", List.of()).extensions());
+    }
+
+    /**
+     * Una extension NO puede llamarse como un campo fijo. Sin esta guarda el JSON sale con la
+     * clave DUPLICADA —Jackson escribe las dos— y quien lea se queda con una cualquiera, que
+     * puede ser la del atacante. Hoy no es alcanzable porque las unicas claves en uso son
+     * constantes del servidor, pero esto es API compartida por todos los modulos.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"type", "title", "status", "detail", "instance", "code", "traceId", "errors"})
+    void problemWithAnExtensionNamedLikeAFixedField_isRejected(String reservedKey) {
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () ->
+            Problem.withExtensions(409, "t", "d", "OPS-002", "/x", Map.of(reservedKey, "pisado")));
+
+        assertTrue(failure.getMessage().contains(reservedKey), failure.getMessage());
+    }
+
+    /** Y las claves que NO chocan siguen entrando sin ruido. */
+    @Test
+    void problemWithANonReservedExtension_isAccepted() {
+        assertEquals(Map.of("forcible", true),
+            Problem.withExtensions(409, "t", "d", "OPS-002", "/x", Map.of("forcible", true))
+                .extensions());
     }
 
     /** El cuerpo ya armado no se puede mutar por la referencia con la que se construyo. */

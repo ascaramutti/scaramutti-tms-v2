@@ -1,0 +1,85 @@
+package com.scaramutti.tms.operations.api;
+
+import jakarta.annotation.security.RolesAllowed;
+import org.junit.jupiter.api.Test;
+
+import java.lang.reflect.Method;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+/**
+ * La relacion entre las listas de roles del recurso, verificada por reflexion.
+ *
+ * <p>Existe por un invariante de SEGURIDAD que hasta ahora vivia solo en prosa: el cuerpo del
+ * conflicto de asignacion nombra el codigo y el estado de OTRO viaje, y eso no filtra nada
+ * unicamente porque cualquiera que pueda asignar ya puede leer ese viaje entero por la puerta de
+ * adelante. Sumar un rol a la asignacion sin sumarlo al detalle convierte ese 409 en un canal de
+ * lectura, y ningun test de los que enumeran roles lo notaria: cada uno afirma SU lista, no la
+ * relacion entre las dos.
+ */
+class ServiceResourceRolesTest {
+
+    @Test
+    void assignmentRoles_areASubsetOfTheDetailRoles() {
+        Set<String> assignment = rolesOf("assignServiceResources");
+        Set<String> detail = rolesOf("getService");
+
+        assertTrue(detail.containsAll(assignment),
+            "quien puede asignar tiene que poder leer el detalle, porque el cuerpo del conflicto "
+                + "nombra otro viaje. Sobran en la asignacion: "
+                + assignment.stream().filter(role -> !detail.contains(role)).collect(Collectors.toSet()));
+    }
+
+    /** Y lo mismo para el listado, que es la otra puerta por la que se lee un viaje ajeno. */
+    @Test
+    void assignmentRoles_areASubsetOfTheListRoles() {
+        Set<String> assignment = rolesOf("assignServiceResources");
+        Set<String> list = rolesOf("listServices");
+
+        assertTrue(list.containsAll(assignment),
+            "sobran en la asignacion: "
+                + assignment.stream().filter(role -> !list.contains(role)).collect(Collectors.toSet()));
+    }
+
+    /**
+     * El item del conflicto lleva un TERCER dato además del código y el estado: el nombre del
+     * conductor o la placa de la unidad. Eso sale de los catálogos compartidos, que mantiene otro
+     * módulo. Si una limpieza de ese lado recorta su lista de roles, la asignación queda como el
+     * único camino por el que un rol lee placas, y nada se pondría rojo.
+     */
+    @Test
+    void assignmentRoles_areASubsetOfTheSharedCatalogRoles() {
+        Set<String> assignment = rolesOf(ServiceResource.class, "assignServiceResources");
+        Set<String> drivers = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.driver.api.DriverResource.class, "listDrivers");
+        Set<String> fleetUnits = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.fleetunit.api.FleetUnitResource.class, "listFleetUnits");
+
+        assertTrue(drivers.containsAll(assignment),
+            "quien asigna tiene que poder leer el catalogo de conductores; sobran: "
+                + assignment.stream().filter(role -> !drivers.contains(role)).collect(Collectors.toSet()));
+        assertTrue(fleetUnits.containsAll(assignment),
+            "quien asigna tiene que poder leer el catalogo de flota; sobran: "
+                + assignment.stream().filter(role -> !fleetUnits.contains(role)).collect(Collectors.toSet()));
+    }
+
+    private Set<String> rolesOf(String methodName) {
+        return rolesOf(ServiceResource.class, methodName);
+    }
+
+    private Set<String> rolesOf(Class<?> resourceClass, String methodName) {
+        Method method = Arrays.stream(resourceClass.getDeclaredMethods())
+            .filter(candidate -> candidate.getName().equals(methodName))
+            .findFirst()
+            .orElseThrow(() -> new AssertionError(
+                "no existe el metodo " + methodName + " en " + resourceClass.getSimpleName()));
+        RolesAllowed rolesAllowed = method.getAnnotation(RolesAllowed.class);
+        if (rolesAllowed == null) {
+            throw new AssertionError(methodName + " no declara @RolesAllowed");
+        }
+        return Set.of(rolesAllowed.value());
+    }
+}

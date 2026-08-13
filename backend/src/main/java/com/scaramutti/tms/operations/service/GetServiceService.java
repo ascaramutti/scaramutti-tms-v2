@@ -18,6 +18,8 @@ import com.scaramutti.tms.shared.repository.ClientRepository;
 import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.ServiceEventRepository;
 import com.scaramutti.tms.shared.repository.ServiceRepository;
+import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceAssignedResourcesRow;
+import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -74,6 +76,9 @@ public class GetServiceService {
 
         Currency currency = requireCurrency(service);
         boolean includePrices = servicePriceVisibility.includePrices();
+        // Los tres recursos en UNA consulta con uniones externas, en vez de tres lecturas por
+        // clave: los tres cuelgan de la misma fila y ninguno es obligatorio.
+        ServiceAssignedResourcesRow resources = serviceRepository.findAssignedResources(serviceId);
 
         return serviceServiceMapper.toServiceDetailResponse(
             service,
@@ -81,6 +86,12 @@ public class GetServiceService {
             serviceServiceMapper.toServiceCargoTypeSummary(requireCargoType(service)),
             includePrices ? service.price : null,
             includePrices ? currency.code : null,
+            serviceServiceMapper.toServiceDriverSummary(
+                resources.driverId(), resources.driverFullName()),
+            serviceServiceMapper.toFleetUnitRef(
+                FleetUnitKind.TRACTOR, resources.tractorId(), resources.tractorPlate()),
+            serviceServiceMapper.toFleetUnitRef(
+                FleetUnitKind.TRAILER, resources.trailerId(), resources.trailerPlate()),
             toEventResponses(events, authorsById),
             summaryOf(service.createdBy, authorsById));
     }

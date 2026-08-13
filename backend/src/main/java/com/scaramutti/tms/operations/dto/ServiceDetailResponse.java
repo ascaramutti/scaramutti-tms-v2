@@ -4,9 +4,11 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 
 import com.scaramutti.tms.operations.dto.embedded.ServiceCargoTypeSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceClientSummary;
+import com.scaramutti.tms.operations.dto.embedded.ServiceDriverSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceUserSummary;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.model.TripScope;
+import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitRef;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -18,9 +20,10 @@ import java.util.List;
  * Detalle del servicio de transporte con su bitacora. Origen y destino viajan separados porque
  * la tabla del listado los muestra en dos lineas.
  *
- * <p>Los recursos asignados (conductor, tracto, carreta) y los refuerzos NO estan en esta
- * respuesta todavia: llegan con los endpoints que los producen (asignacion y recursos
- * adicionales). Un servicio recien creado no tiene ninguno.
+ * <p>Los recursos asignados (conductor, tracto, carreta) viajan desde que existe el endpoint que
+ * los asigna: son null mientras el viaje este pendiente de asignacion, y la carreta puede seguir
+ * en null despues, porque es opcional. Los REFUERZOS todavia no estan: llegan con el endpoint que
+ * los produce.
  */
 public record ServiceDetailResponse(
 
@@ -61,6 +64,15 @@ public record ServiceDetailResponse(
     String currencyCode,
 
     ServiceStatus status,
+
+    @Schema(nullable = true, description = "Conductor asignado; null mientras el viaje esté pendiente de asignación")
+    ServiceDriverSummary driver,
+
+    @Schema(nullable = true, description = "Tracto asignado; null mientras el viaje esté pendiente de asignación")
+    FleetUnitRef tractor,
+
+    @Schema(nullable = true, description = "Carreta asignada; puede seguir en null después de asignar, porque es opcional")
+    FleetUnitRef trailer,
 
     /*
      * Las fechas reales viajan aca porque la EDICION las corrige: sin poder leerlas, el formulario
