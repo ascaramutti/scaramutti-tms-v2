@@ -2,6 +2,7 @@ package com.scaramutti.tms.warehouse.withdrawal.dto;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
+import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitRef;
 import com.scaramutti.tms.warehouse.model.WarehouseRecordStatus;
 import com.scaramutti.tms.warehouse.product.dto.WarehouseProductSummary;
 import com.scaramutti.tms.warehouse.purchaseinvoice.dto.WarehouseEditTrace;
