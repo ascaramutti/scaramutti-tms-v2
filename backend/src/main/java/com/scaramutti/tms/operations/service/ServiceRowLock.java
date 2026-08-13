@@ -175,23 +175,48 @@ public class ServiceRowLock {
     }
 
     /**
+     * Cuantas esperas por locks que TOMA ESTE MODULO puede acumular una transaccion. El tope de
+     * PostgreSQL se aplica POR INTENTO, no por transaccion, asi que el tiempo que una request
+     * puede retener su conexion crece con la cantidad de intentos.
+     *
+     * <p>Hoy el peor caso es la asignacion de recursos: la fila del viaje mas los tres recursos
+     * (conductor, tracto y carreta). La edicion usa una sola, pero la banda se calcula con el peor
+     * caso porque el pool es UNO y lo comparten todos.
+     *
+     * <p><b>NO cuenta los chequeos de integridad referencial.</b> El volcado toca cuatro claves
+     * foraneas del viaje y una por cada fila de rastro, y cada uno toma su lock de clave
+     * compartida bajo el mismo tope. En la practica no esperan —nadie bloquea esos catalogos
+     * desde v2—, y la holgura que queda entre el total contado y la espera del pool es la que los
+     * absorbe. Si algun dia hay que contarlos, subir esta constante obliga a subir tambien la
+     * espera del pool.
+     */
+    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 4;
+
+    /**
      * El tope tiene una BANDA valida, no solo un piso.
      *
      * <p>Por abajo: PostgreSQL lee {@code lock_timeout = 0} como "sin tope", que es exactamente la
      * espera infinita que esta propiedad existe para evitar; en cero se desactivaria en silencio.
      *
-     * <p>Por arriba: quien espera por el lock retiene su conexion todo ese tiempo, asi que un tope
-     * mayor o igual al que el pool espera para ENTREGAR una conexion invierte el orden de las
-     * rendiciones — los otros modulos se quedarian sin conexiones antes de que los que esperan se
-     * rindan. Es la forma tipica de "arreglar" un 409 molesto subiendo el numero.
+     * <p>Por arriba: quien espera por un lock retiene su conexion todo ese tiempo, asi que el
+     * TOTAL acumulado de las esperas de una transaccion tiene que quedar por debajo de lo que el
+     * pool espera para ENTREGAR una conexion. Si no, se invierte el orden de las rendiciones y los
+     * otros modulos se quedan sin conexiones antes de que los que esperan se rindan.
+     *
+     * <p>Se multiplica por el peor caso y no se mide una sola espera: cuando este modulo tenia un
+     * unico lock por transaccion las dos cuentas coincidian, y al sumar los locks por recurso la
+     * version vieja habria seguido dando por buena una configuracion que ya no lo era.
      */
     int requireUsableLockTimeout() {
-        if (lockTimeoutSeconds <= 0 || lockTimeoutSeconds >= poolAcquisitionTimeout.toSeconds()) {
+        long budget = (long) lockTimeoutSeconds * MAX_LOCK_WAITS_PER_TRANSACTION;
+        if (lockTimeoutSeconds <= 0 || budget >= poolAcquisitionTimeout.toSeconds()) {
             throw new IllegalStateException(
-                "app.operations.edit-lock-timeout-seconds tiene que ser mayor que cero y menor "
-                    + "que la espera del pool (" + poolAcquisitionTimeout + ") (0 desactiva el tope en "
-                    + "PostgreSQL, y desde la espera del pool para arriba se queda con la conexion "
-                    + "mas tiempo del que el pool tolera); valor configurado: " + lockTimeoutSeconds);
+                "app.operations.edit-lock-timeout-seconds tiene que ser mayor que cero, y su total "
+                    + "acumulado (" + lockTimeoutSeconds + "s x " + MAX_LOCK_WAITS_PER_TRANSACTION
+                    + " esperas = " + budget + "s) tiene que quedar por debajo de la espera del pool ("
+                    + poolAcquisitionTimeout + "): en cero PostgreSQL desactiva el tope, y por arriba "
+                    + "la transaccion se queda con la conexion mas tiempo del que el pool tolera. "
+                    + "Valor configurado: " + lockTimeoutSeconds);
         }
         return lockTimeoutSeconds;
     }
@@ -214,7 +239,7 @@ public class ServiceRowLock {
                 // El tope rige TODA la transaccion, asi que el conflicto puede haber sido con
                 // otra fila (la moneda o el usuario que el volcado referencia). Por eso el log
                 // habla de la transaccion y arrastra el mensaje del motor, que nombra la relacion.
-                LOG.warnf("Conflicto de lock (%s) en la transaccion que edita el servicio id=%d "
+                LOG.warnf("Conflicto de lock (%s) en la transaccion que escribe el servicio id=%d "
                         + "con un tope de %ds: %s",
                     sqlException.getSQLState(), serviceId, lockTimeoutSeconds,
                     sqlException.getMessage());

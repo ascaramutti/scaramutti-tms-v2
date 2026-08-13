@@ -90,6 +90,11 @@ public class CreateServiceService {
             serviceServiceMapper.toServiceCargoTypeSummary(cargoType),
             service.price,
             currency.code,
+            // Un viaje recien creado nace pendiente de asignacion, o sea sin ningun recurso: no
+            // hay nada que consultar. Los pone el endpoint que los asigna.
+            null,
+            null,
+            null,
             List.of(serviceServiceMapper.toServiceEventResponse(event, author)),
             author
         );

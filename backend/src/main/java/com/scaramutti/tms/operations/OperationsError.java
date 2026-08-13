@@ -11,6 +11,20 @@ import com.scaramutti.tms.shared.exception.ApiError;
 public enum OperationsError implements ApiError {
 
     /**
+     * Un recurso pedido ya participa de OTRO viaje activo, como recurso principal o como
+     * refuerzo. Es FORZABLE: el conflicto avisa, no prohibe, porque asi trabajaba el sistema
+     * anterior y porque la decision de mandar igual una unidad ocupada es operativa, no del
+     * software. Reintentar con {@code force} la asigna y deja constancia.
+     *
+     * <p>Lleva codigo propio y no comparte el de los conflictos de estado justamente por eso:
+     * es el UNICO 409 del modulo que el cliente puede resolver reintentando la MISMA operacion
+     * con un campo mas, y la interfaz necesita distinguirlo para ofrecer "Forzar asignacion".
+     * El cuerpo agrega {@code forcible} y {@code conflicts} como miembros de extension.
+     */
+    RESOURCE_CONFLICT("OPS-002", 409, "Resource conflict",
+        "El recurso ya está asignado a otro servicio activo"),
+
+    /**
      * El viaje esta cancelado o eliminado: los dos estados terminales son INMUTABLES. El
      * completado si se toca (corregir los datos de un viaje ya cerrado es legitimo), asi que este
      * error no habla del final del ciclo sino de sus dos salidas.
@@ -25,6 +39,23 @@ public enum OperationsError implements ApiError {
     /** El viaje pedido no existe. Espejo de los 404 de cotizaciones y almacen. */
     SERVICE_NOT_FOUND("OPS-005", 404, "Resource not found",
         "El servicio indicado no existe"),
+
+    /**
+     * El estado actual del viaje no admite la accion pedida.
+     *
+     * <p>Es el tercero de los tres 409 de estado y hay que leerlo por descarte: OPS-001 rechaza
+     * una TRANSICION invalida (pedir un estado al que no se puede ir desde el actual), OPS-004
+     * rechaza los dos terminales inmutables, y este rechaza una accion que NO es un cambio de
+     * estado pero que solo tiene sentido desde uno concreto — asignar recursos solo se puede
+     * cuando el viaje todavia no los tiene.
+     *
+     * <p>El mensaje no nombra ni la accion ni el estado que haria falta: el contrato le asigna
+     * este mismo codigo a los recursos de refuerzo, que exigen el estado CONTRARIO (el viaje ya
+     * en ruta), asi que cualquier texto que prometa "solo desde pendiente de asignacion"
+     * mentiria en la mitad de los casos.
+     */
+    ACTION_NOT_ALLOWED_FOR_STATUS("OPS-006", 409, "Conflict",
+        "El estado del servicio no admite esta acción"),
 
     /**
      * Alta repetida en cuestion de segundos (doble-click o reintento del navegador): mismo

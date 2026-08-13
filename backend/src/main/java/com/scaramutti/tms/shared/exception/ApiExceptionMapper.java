@@ -15,12 +15,15 @@ public class ApiExceptionMapper implements ExceptionMapper<ApiException> {
 
     @Override
     public Response toResponse(ApiException ex) {
-        Problem problem = Problem.of(
+        // Siempre por la variante con extensiones: sin ellas el mapa viene vacio y el cuerpo sale
+        // identico al de antes, asi que no hay dos caminos que puedan divergir con el tiempo.
+        Problem problem = Problem.withExtensions(
             ex.status(),
             ex.title(),
             ex.getMessage(),
             ex.code(),
-            uriInfo != null ? uriInfo.getPath() : null
+            uriInfo != null ? uriInfo.getPath() : null,
+            ex.extensions()
         );
         return Response.status(ex.status())
             .type("application/problem+json")

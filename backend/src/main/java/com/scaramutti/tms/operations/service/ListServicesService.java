@@ -31,7 +31,7 @@ public class ListServicesService {
      * sola conexion, en vez de tomar y devolver dos.
      *
      * <p>OJO con lo que esto NO garantiza: con el aislamiento por defecto (READ COMMITTED) cada
-     * sentencia toma su propio snapshot, asi que un alta concurrente todavia puede hacer que el
+     * sentencia toma su propio snapshot, asi que un alta o una asignacion concurrentes todavia puede hacer que el
      * total no calce exactamente con la pagina servida. Cerrar esa ventana exigiria pedir
      * REPEATABLE READ, que es otra decision.
      */

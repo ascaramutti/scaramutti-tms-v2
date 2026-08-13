@@ -40,8 +40,10 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         Map<String, Object> params = new LinkedHashMap<>();
         String sql = "SELECT s.id, s.code, s.origin, s.destination, s.tentative_date, s.trip_scope, "
             + "s.status, s.price, cur.code AS currency_code, s.created_at, "
-            + "c.id AS client_id, c.name AS client_name, c.ruc, c.phone, c.contact_name "
-            + fromAndWhere(query, params)
+            + "c.id AS client_id, c.name AS client_name, c.ruc, c.phone, c.contact_name, "
+            + "s.driver_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
+            + "s.tractor_id, tra.plate AS tractor_plate "
+            + fromAndWhere(query, params, ASSIGNED_RESOURCE_JOINS)
             + " ORDER BY s.created_at DESC, s.id DESC LIMIT :pageSize OFFSET :pageOffset";
 
         Query nativeQuery = entityManager.createNativeQuery(sql, Tuple.class);
@@ -69,24 +71,51 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             (String) row.get(11),
             (String) row.get(12),
             (String) row.get(13),
-            (String) row.get(14)
+            (String) row.get(14),
+            toInteger(row.get(15)),
+            (String) row.get(16),
+            toInteger(row.get(17)),
+            (String) row.get(18)
         )).toList();
     }
+
+    /**
+     * Uniones para traer el conductor y el tracto ya asignados. Son EXTERNAS: un viaje pendiente
+     * de asignacion no tiene ninguno, y con uniones internas desapareceria del listado — que es
+     * justo el estado en el que mas se lo busca.
+     *
+     * <p>La carreta no viaja en la fila del listado: es opcional y la tabla no la muestra. Vive
+     * en el detalle.
+     */
+    private static final String ASSIGNED_RESOURCE_JOINS =
+        "LEFT JOIN public.drivers d ON d.id = s.driver_id "
+            + "LEFT JOIN public.workers w ON w.id = d.worker_id "
+            + "LEFT JOIN public.tractors tra ON tra.id = s.tractor_id ";
 
     /** Total de servicios que matchean los filtros. Reusa el MISMO FROM+WHERE que la pagina. */
     public long countSearch(ListServicesQuery query) {
         Map<String, Object> params = new LinkedHashMap<>();
-        Query nativeQuery = entityManager.createNativeQuery("SELECT COUNT(*) " + fromAndWhere(query, params));
+        // Sin las uniones de recursos: son externas y no cambian cuantas filas hay, asi que
+        // contarlas con ellas seria pagar tres uniones por un numero que no depende de ellas.
+        Query nativeQuery = entityManager.createNativeQuery("SELECT COUNT(*) " + fromAndWhere(query, params, ""));
         params.forEach(nativeQuery::setParameter);
         return ((Number) nativeQuery.getSingleResult()).longValue();
     }
 
     /**
-     * FROM + WHERE compartidos por la pagina y su total, para que no puedan divergir. El JOIN al
-     * cliente y a la moneda es INTERNO a proposito: las dos columnas son NOT NULL con FK, asi
-     * que no puede perder filas, y de paso una FK huerfana se notaria en vez de esconderse.
+     * FROM + WHERE compartidos por la pagina y su total, para que el filtro no pueda divergir. El
+     * JOIN al cliente y a la moneda es INTERNO a proposito: las dos columnas son NOT NULL con FK,
+     * asi que no puede perder filas, y de paso una FK huerfana se notaria en vez de esconderse.
+     *
+     * <p>{@code extraJoins} lo usa solo la pagina, para traer columnas que el total no necesita.
+     * <b>Cada union extra tiene que dar A LO SUMO UNA fila por servicio</b> (union externa contra
+     * una clave primaria o una columna unica). Ser externa evita PERDER filas; no evita
+     * MULTIPLICARLAS, y una union uno-a-muchos —los refuerzos de un viaje, por ejemplo— haria
+     * aparecer el mismo viaje varias veces en la pagina, comiendose los lugares del limite,
+     * mientras el total sigue contando viajes. La paginacion se desfasaria sin que nada falle.
+     * Un dato uno-a-muchos va por subconsulta agregada, no por union.
      */
-    private String fromAndWhere(ListServicesQuery query, Map<String, Object> params) {
+    private String fromAndWhere(ListServicesQuery query, Map<String, Object> params, String extraJoins) {
         List<String> conditions = new ArrayList<>();
         if (query.q() != null) {
             // OJO: este OR cruza columnas de services y de clients, y eso hace que Postgres
@@ -124,7 +153,8 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         String where = conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
         return "FROM operaciones.services s "
             + "JOIN public.clients c ON c.id = s.client_id "
-            + "JOIN public.currencies cur ON cur.id = s.currency_id"
+            + "JOIN public.currencies cur ON cur.id = s.currency_id "
+            + extraJoins
             + where;
     }
 
@@ -147,8 +177,70 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         String clientName,
         String clientRuc,
         String clientPhone,
-        String clientContactName
+        String clientContactName,
+        Integer driverId,
+        String driverFullName,
+        Integer tractorId,
+        String tractorPlate
     ) {}
+
+    /**
+     * Los recursos asignados de UN viaje, con el nombre del conductor y las placas ya resueltos.
+     *
+     * <p>Una sola consulta con tres uniones EXTERNAS: los tres son opcionales (un viaje pendiente
+     * de asignacion no tiene ninguno, y la carreta puede faltar siempre), asi que con uniones
+     * internas el viaje entero desapareceria de la respuesta por no tener recursos.
+     *
+     * <p>El nombre del conductor se arma con la MISMA expresion que el catalogo
+     * ({@code DriverRepository}): dos formas distintas de componer el nombre harian que la misma
+     * persona se llame distinto segun por donde se la mire.
+     */
+    public ServiceAssignedResourcesRow findAssignedResources(long serviceId) {
+        Query query = entityManager.createNativeQuery(
+            "SELECT s.driver_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
+                + "s.tractor_id, tra.plate AS tractor_plate, s.trailer_id, tri.plate AS trailer_plate "
+                + "FROM operaciones.services s "
+                + "LEFT JOIN public.drivers d ON d.id = s.driver_id "
+                + "LEFT JOIN public.workers w ON w.id = d.worker_id "
+                + "LEFT JOIN public.tractors tra ON tra.id = s.tractor_id "
+                + "LEFT JOIN public.trailers tri ON tri.id = s.trailer_id "
+                + "WHERE s.id = :serviceId", Tuple.class);
+        query.setParameter("serviceId", serviceId);
+
+        @SuppressWarnings("unchecked")
+        List<Tuple> rows = query.getResultList();
+        if (rows.isEmpty()) {
+            // La fila existe: quien llama ya la leyo. Solo puede faltar si alguien la borro en
+            // duro entre las dos lecturas, y ahi el viaje ya no tiene recursos que mostrar.
+            return ServiceAssignedResourcesRow.EMPTY;
+        }
+        Tuple row = rows.get(0);
+        return new ServiceAssignedResourcesRow(
+            toInteger(row.get(0)), (String) row.get(1),
+            toInteger(row.get(2)), (String) row.get(3),
+            toInteger(row.get(4)), (String) row.get(5));
+    }
+
+    /**
+     * Los recursos asignados de un viaje. Los ids pueden ser null (el viaje todavia no los tiene,
+     * o no lleva carreta); cuando un id viene, su etiqueta viene con el.
+     */
+    public record ServiceAssignedResourcesRow(
+        Integer driverId,
+        String driverFullName,
+        Integer tractorId,
+        String tractorPlate,
+        Integer trailerId,
+        String trailerPlate
+    ) {
+        static final ServiceAssignedResourcesRow EMPTY =
+            new ServiceAssignedResourcesRow(null, null, null, null, null, null);
+    }
+
+    /** Las columnas de id llegan como {@code Number} de ancho variable segun el driver. */
+    private static Integer toInteger(Object value) {
+        return value == null ? null : ((Number) value).intValue();
+    }
 
     /**
      * Reserva el proximo id de la secuencia del BIGSERIAL. Se pide ANTES del INSERT porque el

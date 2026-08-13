@@ -58,6 +58,19 @@ public final class TestAuth {
             .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
     }
 
+    /**
+     * Varios roles Y un {@code userId} real. Hace falta para verificar un veto sobre un endpoint
+     * que ESCRIBE: el subject fijo de la variante de arriba no existe en {@code public.users}, y
+     * cualquier escritura que lo firme revienta contra la clave foránea con un 500 que no tiene
+     * nada que ver con la regla que el test quiere medir.
+     */
+    public static String fabricateAccessTokenWithRolesForUser(
+            int userId, String username, Set<String> roles) {
+        Instant now = Instant.now();
+        return Jwt.subject(String.valueOf(userId)).upn(username).groups(roles).claim("typ", "access")
+            .issuedAt(now).expiresAt(now.plusSeconds(3600)).sign();
+    }
+
     /** Access token fabricado anclado a un {@code userId} real (subject = userId). */
     public static String fabricateTokenForUser(int userId, String username, String role) {
         Instant now = Instant.now();

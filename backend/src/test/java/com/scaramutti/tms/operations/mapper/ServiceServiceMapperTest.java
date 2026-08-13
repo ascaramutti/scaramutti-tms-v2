@@ -4,6 +4,7 @@ import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.model.TripScope;
 import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceListRow;
+import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
 
@@ -32,7 +33,8 @@ class ServiceServiceMapperTest {
             42L, "SRV-0042", "Piura", "Lima",
             LocalDate.of(2026, 8, 20), "PROVINCIA", "PENDING_ASSIGNMENT",
             new BigDecimal("5800.00"), "PEN", OffsetDateTime.parse("2026-08-02T10:00:00Z"),
-            7, "IPH SAC", "20123456789", "987654321", "Maria Rojas"
+            7, "IPH SAC", "20123456789", "987654321", "Maria Rojas",
+            4, "Juan Pérez Huamán", 9, "ABC123"
         );
     }
 
@@ -71,6 +73,31 @@ class ServiceServiceMapperTest {
         assertEquals("20123456789", response.client().ruc());
         assertEquals("987654321", response.client().phone());
         assertEquals("Maria Rojas", response.client().contactName());
+        assertNotNull(response.driver());
+        assertEquals(4, response.driver().id());
+        assertEquals("Juan Pérez Huamán", response.driver().fullName());
+        assertNotNull(response.tractor());
+        assertEquals(FleetUnitKind.TRACTOR, response.tractor().kind());
+        assertEquals(9, response.tractor().id());
+        assertEquals("ABC123", response.tractor().plate());
+    }
+
+    /**
+     * Un viaje pendiente de asignacion no tiene recursos, y eso viaja como null y no como un
+     * objeto vacio: la tabla lo muestra en blanco.
+     */
+    @Test
+    void toServiceSummaryResponse_withoutAssignedResources_nullsThem() {
+        ServiceListRow unassigned = new ServiceListRow(
+            1L, "SRV-0001", "Lima", "Ica", LocalDate.of(2026, 1, 1), "LOCAL", "PENDING_ASSIGNMENT",
+            BigDecimal.ONE, "USD", OffsetDateTime.parse("2026-01-01T00:00:00Z"),
+            1, "Cliente", "20000000001", null, null,
+            null, null, null, null);
+
+        ServiceSummaryResponse response = mapper.toServiceSummaryResponse(unassigned, true);
+
+        assertNull(response.driver());
+        assertNull(response.tractor());
     }
 
     /** El estado y el ámbito llegan como texto de la columna y salen como enum. */
@@ -79,7 +106,8 @@ class ServiceServiceMapperTest {
         ServiceListRow deleted = new ServiceListRow(
             1L, "SRV-0001", "Lima", "Ica", LocalDate.of(2026, 1, 1), "LOCAL", "DELETED",
             BigDecimal.ONE, "USD", OffsetDateTime.parse("2026-01-01T00:00:00Z"),
-            1, "Cliente", "20000000001", null, null);
+            1, "Cliente", "20000000001", null, null,
+            null, null, null, null);
 
         ServiceSummaryResponse response = mapper.toServiceSummaryResponse(deleted, true);
 

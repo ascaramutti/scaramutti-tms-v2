@@ -99,7 +99,12 @@ class ServiceDetailResourceTest {
             .body("currencyCode", equalTo("PEN"))
             .body("createdBy.username", equalTo("admin"))
             .body("createdAt", notNullValue())
-            .body("updatedAt", notNullValue());
+            .body("updatedAt", notNullValue())
+            // los tres recursos: un viaje recién creado no tiene ninguno, y viajan en null
+            .body("$", hasKey("driver"))
+            .body("driver", nullValue())
+            .body("tractor", nullValue())
+            .body("trailer", nullValue());
     }
 
     /** Las medidas y las observaciones son opcionales: ausentes en el alta viajan en null. */

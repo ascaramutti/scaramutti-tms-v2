@@ -42,11 +42,14 @@ public class WarehouseTestData {
     public static final String PREFIX = "ZTEST_";
 
     /**
-     * Rango de placas que los tests reservan: {@code ZF00xx} (flota), {@code ZT0xxx} (retiros)
-     * y {@code ZR00xx} (reportes). Dos letras y cuatro dígitos, un formato que ninguna placa
-     * real puede tener (las peruanas son tres letras y tres dígitos).
+     * Rango de placas que los tests reservan: {@code ZF00xx} (flota), {@code ZT0xxx} (retiros),
+     * {@code ZR00xx} (reportes) y {@code ZO00xx} (operaciones). Dos letras y cuatro dígitos, un
+     * formato que ninguna placa real puede tener (las peruanas son tres letras y tres dígitos).
+     *
+     * <p>Cada suite usa su propia segunda letra para que el barrido de respaldo de una no pise
+     * las unidades que otra tiene vivas mientras corre.
      */
-    private static final String TEST_PLATE_PATTERN = "^Z[FTR][0-9]{4}$";
+    private static final String TEST_PLATE_PATTERN = "^Z[FTRO][0-9]{4}$";
 
     /** Nombres reales de {@code public.resource_statuses} (el catálogo de v1 tiene estas tres filas). */
     public static final String STATUS_AVAILABLE = "available";
@@ -355,6 +358,13 @@ public class WarehouseTestData {
     private void deleteFleetRows(String table, Set<Integer> seededIds) {
         entityManager.createNativeQuery("DELETE FROM " + table + " WHERE plate ~ ?1")
             .setParameter(1, TEST_PLATE_PATTERN).executeUpdate();
+        // Segundo barrido, para las placas que los tests fabrican CON caracteres de control: no
+        // matchean el patron de arriba (el salto no es un digito) y, si una corrida se aborta
+        // antes del @AfterEach, quedan para siempre en la base que se comparte con el sistema
+        // anterior y hacen reventar por unicidad a la corrida siguiente.
+        entityManager.createNativeQuery(
+                "DELETE FROM " + table + " WHERE plate ~ '^Z[FTRO]' AND plate ~ '[[:cntrl:]]'")
+            .executeUpdate();
         if (seededIds.isEmpty()) {
             return;
         }

@@ -6,6 +6,7 @@ import com.scaramutti.tms.operations.dto.ServiceEventResponse;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.dto.embedded.ServiceCargoTypeSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceClientSummary;
+import com.scaramutti.tms.operations.dto.embedded.ServiceDriverSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceUserSummary;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.model.TripScope;
@@ -16,6 +17,8 @@ import com.scaramutti.tms.shared.entity.Service;
 import com.scaramutti.tms.shared.entity.ServiceEvent;
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceListRow;
+import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitRef;
+import com.scaramutti.tms.warehouse.model.FleetUnitKind;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
@@ -67,6 +70,9 @@ public interface ServiceServiceMapper {
     @Mapping(target = "price",         source = "price")
     @Mapping(target = "currencyCode",  source = "currencyCode")
     @Mapping(target = "status",        source = "service.status")
+    @Mapping(target = "driver",        source = "driver")
+    @Mapping(target = "tractor",       source = "tractor")
+    @Mapping(target = "trailer",       source = "trailer")
     @Mapping(target = "startDateTime", source = "service.startDateTime")
     @Mapping(target = "endDateTime",   source = "service.endDateTime")
     @Mapping(target = "events",        source = "events")
@@ -75,9 +81,26 @@ public interface ServiceServiceMapper {
     @Mapping(target = "updatedAt",     source = "service.updatedAt")
     ServiceDetailResponse toServiceDetailResponse(
         Service service, ServiceClientSummary client, ServiceCargoTypeSummary cargoType,
-        BigDecimal price, String currencyCode, List<ServiceEventResponse> events,
+        BigDecimal price, String currencyCode, ServiceDriverSummary driver,
+        FleetUnitRef tractor, FleetUnitRef trailer, List<ServiceEventResponse> events,
         ServiceUserSummary createdBy
     );
+
+    /**
+     * Los recursos asignados de una fila, ya resueltos por consulta, a los tipos de la respuesta.
+     * Devuelven null cuando el viaje todavia no tiene ese recurso.
+     *
+     * <p>Se arman a mano y no por MapStruct porque cada uno sale de DOS columnas sueltas de una
+     * proyeccion plana, y la union de esas dos columnas —id sin etiqueta, o al reves— es
+     * justamente lo que hay que decidir en un solo lugar.
+     */
+    default ServiceDriverSummary toServiceDriverSummary(Integer driverId, String driverFullName) {
+        return driverId == null ? null : new ServiceDriverSummary(driverId, driverFullName);
+    }
+
+    default FleetUnitRef toFleetUnitRef(FleetUnitKind kind, Integer unitId, String plate) {
+        return unitId == null ? null : new FleetUnitRef(kind, unitId, plate);
+    }
 
     /**
      * Fila del listado a respuesta. {@code includePrices} decide si el precio y su moneda viajan:
@@ -95,6 +118,8 @@ public interface ServiceServiceMapper {
             row.tentativeDate(),
             TripScope.valueOf(row.tripScope()),
             ServiceStatus.valueOf(row.status()),
+            toServiceDriverSummary(row.driverId(), row.driverFullName()),
+            toFleetUnitRef(FleetUnitKind.TRACTOR, row.tractorId(), row.tractorPlate()),
             includePrices ? row.price() : null,
             includePrices ? row.currencyCode() : null,
             row.createdAt()
