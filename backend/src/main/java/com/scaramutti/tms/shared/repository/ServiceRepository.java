@@ -185,6 +185,19 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
     ) {}
 
     /**
+     * Cuantos recursos de REFUERZO tiene el viaje ({@code operaciones.service_assignments}).
+     *
+     * <p>Lo necesita la reapertura: un viaje en estado retenedor retiene tambien sus refuerzos —la
+     * consulta de conflictos de los OTROS viajes los cuenta— y volver a ponerlo ahi restablece esa
+     * retencion sobre recursos que hoy no se pueden validar de una sola pasada.
+     */
+    public long countAdditionalResources(long serviceId) {
+        return ((Number) entityManager.createNativeQuery(
+                "SELECT COUNT(*) FROM operaciones.service_assignments WHERE service_id = :serviceId")
+            .setParameter("serviceId", serviceId).getSingleResult()).longValue();
+    }
+
+    /**
      * Los recursos asignados de UN viaje, con el nombre del conductor y las placas ya resueltos.
      *
      * <p>Una sola consulta con tres uniones EXTERNAS: los tres son opcionales (un viaje pendiente

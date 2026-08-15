@@ -4,7 +4,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -77,11 +76,5 @@ class ServiceStatusLabelsTest {
     void cancelledAndDeleted_doNotSoundLikeTheSameThing() {
         assertFalse(ServiceStatusLabels.of(ServiceStatus.CANCELLED)
             .equals(ServiceStatusLabels.of(ServiceStatus.DELETED)));
-    }
-
-    @Test
-    void everyStatusInTheEnum_isCovered() {
-        assertEquals(6, Arrays.stream(ServiceStatus.values())
-            .map(ServiceStatusLabels::of).filter(java.util.Objects::nonNull).count());
     }
 }

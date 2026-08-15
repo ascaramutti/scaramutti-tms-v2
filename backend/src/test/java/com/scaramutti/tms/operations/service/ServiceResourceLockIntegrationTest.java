@@ -224,7 +224,55 @@ class ServiceResourceLockIntegrationTest {
                 .statusCode(200));
     }
 
+    /**
+     * La REAPERTURA es el segundo camino que toma estos locks, y entró sin la red que sí tiene la
+     * asignación. El envoltorio que traduce el conflicto vive AFUERA del lock de la fila
+     * (`runTranslatingLockConflicts` en `ChangeServiceStatusService`), y el único test de lock que
+     * hay para las transiciones choca contra la fila, cuyo conflicto lo traduce OTRO envoltorio,
+     * el de adentro de `findByIdForUpdate`. O sea: sin este caso, quitar el de afuera deja la suite
+     * entera en verde y una reapertura que pierda la carrera por el conductor sale 500 donde el
+     * contrato declara 409 `OPS-008`.
+     */
+    @Test
+    @Timeout(60)
+    void changeStatus_whenTheResourceLockIsHeldByAnotherTransaction_returns409() throws Exception {
+        long id = createService();
+        given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+            .body(assignmentPayload())
+        .when().post("/services/" + id + "/assignment").then().statusCode(200);
+        String etag = cancel(id);
+        String key = ServiceResourceLockKeys.of(ServiceResourceKind.DRIVER, driverId);
+
+        withResourceLockHeld(key, () ->
+            given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+                .header("If-Match", etag)
+                .body(Map.of("target", "REOPENED", "note", "El cliente retomó el embarque"))
+            .when().post("/services/" + id + "/status")
+            .then().statusCode(409)
+                .contentType("application/problem+json")
+                .body("code", equalTo("OPS-008")));
+
+        // soltado el lock, la MISMA reapertura pasa: eso es lo que la vuelve transitoria
+        given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+            .header("If-Match", etag)
+            .body(Map.of("target", "REOPENED", "note", "El cliente retomó el embarque"))
+        .when().post("/services/" + id + "/status")
+        .then().statusCode(200).body("status", equalTo("PENDING_START"));
+    }
+
     // ---------- Helpers ---------------------------------------------------------
+
+    /** Cancela el viaje y devuelve el ETag que quedó, que es el que la reapertura va a exigir. */
+    private String cancel(long id) {
+        String etag = given().header("Authorization", "Bearer " + adminToken)
+            .when().get("/services/" + id).then().statusCode(200).extract().header("ETag");
+        given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+            .header("If-Match", etag)
+            .body(Map.of("target", "CANCELLED", "note", "El cliente reprogramó el embarque"))
+        .when().post("/services/" + id + "/status").then().statusCode(200);
+        return given().header("Authorization", "Bearer " + adminToken)
+            .when().get("/services/" + id).then().statusCode(200).extract().header("ETag");
+    }
 
     private int resourceIdOf(String kind) {
         return switch (kind) {

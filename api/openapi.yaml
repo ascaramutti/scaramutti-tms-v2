@@ -2389,10 +2389,11 @@ paths:
         borra. Cerrar el viaje sigue siendo la transición de
         estado, no este endpoint.
 
-        ⚠️ Hoy ningún endpoint FIJA esas fechas: la transición de estado que lo hace
-        todavía no existe, así que un viaje nacido del alta las tiene siempre vacías y
-        estos dos campos le responden 400. La corrección queda operativa cuando llegue
-        ese endpoint, o para filas que ya vengan con fecha desde el sistema anterior.
+        ⚠️ Las fechas las FIJA la transición de estado (`POST /services/{id}/status`):
+        el inicio al pasar a "en ruta" y el fin al completar. Antes de eso un viaje
+        nacido del alta las tiene vacías y estos dos campos le responden 400, porque
+        acá se corrigen y no se fijan. También traen fecha las filas que ya vengan con
+        ella desde el sistema anterior.
 
         Al corregir rige RN-OP13: fin >= inicio (400 `COM-001`).
 
@@ -2439,11 +2440,10 @@ paths:
 
         El servicio cancelado o eliminado es inmutable → 409 `OPS-004`. El
         completado SÍ se edita (corrección de datos).
-        ⚠️ Del ESTADO solo se sale hacia adelante por ahora: asignar recursos
-        mueve el viaje a `PENDING_START`, pero las transiciones que siguen
-        llegan con su endpoint. Ni este 409 ni la corrección de un viaje ya
-        completado son alcanzables hasta entonces, o para filas cargadas por el
-        cutover. El `OPS-004` se contesta
+        El ESTADO no se toca por acá: lo mueve `POST /services/{id}/status`,
+        que además es el único que puede REABRIR un viaje cancelado o eliminado.
+        Un viaje que ya salió de esa forma es inmutable para este endpoint hasta
+        que lo reabran. El `OPS-004` se contesta
         ANTES que el 412, para que un `If-Match` viejo no tape la razón real: es
         deliberado y sigue el criterio de almacén, donde el recurso anulado también
         se contesta antes que la versión; cotizaciones verifica la versión primero. Concurrencia: `If-Match`
@@ -2451,7 +2451,9 @@ paths:
         se lee bajo lock, así que dos ediciones simultáneas se serializan; si CUALQUIER
         sentencia de esa transacción se rinde por lock (la espera agotada, un abrazo mortal, un
         fallo de serialización) → 409 `OPS-008`, que es TRANSITORIO y se
-        resuelve reintentando (a diferencia del `OPS-004`, que es permanente).
+        resuelve reintentando (el `OPS-004`, en cambio, no se destraba
+        reintentando: el viaje está cancelado o eliminado, y de ahí solo vuelve
+        con `POST /services/{id}/status` y `target: REOPENED`).
       x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - { name: If-Match, in: header, required: true, schema: { type: string } }
@@ -2489,7 +2491,7 @@ paths:
         El estado que no admite la acción se parte en dos códigos, igual que en
         la edición: `PENDING_START`, `IN_PROGRESS` y `COMPLETED` responden 409
         `OPS-006` (el estado no admite ESTA acción, que no es un cambio de
-        estado), y los dos terminales inmutables, `CANCELLED` y `DELETED`,
+        estado), y los dos estados que congelan la fila, `CANCELLED` y `DELETED`,
         responden 409 `OPS-004`, el mismo código con el que los rechaza el PUT.
 
         RN-OP3 — si un recurso ya participa de OTRO servicio activo, sea como
@@ -2570,11 +2572,13 @@ paths:
     post:
       tags: [Operations]
       operationId: changeServiceStatus
-      summary: Transicionar estado (iniciar / finalizar / cancelar / eliminar)
+      summary: Transicionar estado (iniciar / finalizar / cancelar / eliminar / reabrir)
       description: |
         RN-OP1 — transiciones válidas: pendiente de inicio → en ruta, en ruta →
         completado, cancelado desde los tres estados no terminales, y eliminado
-        SOLO desde los dos pendientes. El resto → 409 `OPS-001`. El paso de
+        SOLO desde los dos pendientes, mas la REAPERTURA, que es el unico arco
+        que sale de un terminal y va al estado que el rastro registre (ver mas
+        abajo). El resto → 409 `OPS-001`. El paso de
         pendiente de asignación a pendiente de inicio NO se pide acá: es efecto
         de asignar recursos.
 
@@ -2584,18 +2588,103 @@ paths:
         ruta o completado no se elimina: se cancela o se corrige. Nada se borra
         de la base de datos.
 
+        ⚠️ Un viaje con recursos de REFUERZO todavía no se reabre hacia un estado
+        que los retiene: sus adicionales también vuelven a quedar tomados y la
+        verificación de disponibilidad hoy solo alcanza a los tres principales.
+        Responde 409 `OPS-009` y **no es forzable**. Es un límite con fecha de
+        vencimiento: se levanta cuando exista el endpoint de recursos adicionales.
+        Reabrir hacia "pendiente de asignación" no lo tiene, porque ese estado no
+        retiene nada.
+
+        Cada transición que AVANZA exige los datos que la etapa anterior tenía
+        que haber dejado: iniciar pide conductor y tracto (la carreta es opcional, hay
+        carga que no la lleva) y finalizar pide la fecha de inicio. Falta alguno
+        → 409 `OPS-009`.
+
+        Esas dos son inalcanzables por esta API: a "pendiente de inicio" solo se
+        llega asignando, que exige conductor y tracto, y pasar a "en ruta"
+        SIEMPRE deja registrado el inicio (si `dateTime` no viene, se usa el
+        momento de la llamada). O sea que ahí un `OPS-009` significa que la fila
+        entró sin pasar por la aplicación —data migrada o escritura directa— y
+        el dato hay que sanearlo, no reintentarlo. Las otras dos causas del
+        mismo código nacen al reabrir (sin rastro de dónde venía, o con recursos
+        de refuerzo) y tampoco se reintentan.
+
+        `REOPENED` deshace una cancelación o una eliminación. No lleva estado
+        de destino: el servidor lo saca de la auditoría, así que un viaje
+        cancelado en ruta vuelve a en ruta y no a foja cero. Si no hay rastro
+        de dónde venía (viajes migrados del sistema anterior) responde 409
+        `OPS-009`, porque devolverlo a un estado por defecto lo pondría en uno
+        que quizás nunca tuvo. Un viaje completado NO se reabre: terminar no es
+        un error que haya que deshacer, y sus datos se corrigen editando. Es la
+        transición más acotada: solo `admin` y `general_manager`, y pide motivo
+        e `If-Match` igual que las dos que deshace.
+
+        El 403 del veto se resuelve ANTES de tocar la base, así que un rol vetado recibe el mismo
+        403 exista o no el viaje. Los 400 de forma del cuerpo corren todavía antes, en el mapeo del
+        pedido: un rol vetado que además manda un motivo corto recibe 400 y no 403. No filtra nada
+        —esos 400 solo miran el cuerpo— pero conviene saber el orden al construir la pantalla.
+
+        El motivo se mide DESPUÉS de recortar: diez espacios no son diez caracteres. Y ningún texto
+        libre puede llevar el byte NUL, que PostgreSQL no admite dentro de un texto: es 400, no 500.
+
+        Precedencia entre los rechazos: primero se resuelve el DESTINO (de ahí salen los `OPS-009`
+        de la reapertura), después el estado de la fila (`OPS-004`), después el arco (`OPS-001`) y
+        recién ahí la versión (412). O sea que un `If-Match` viejo sobre un viaje ya cancelado
+        recibe `OPS-004` y no 412: recargar no arregla que desde ese estado no se pueda llegar al
+        pedido. Los datos de la etapa anterior (`OPS-009`) se miran DESPUÉS del 412, porque ahí
+        recargar sí sirve.
+
+        Reabrir hacia un estado que RETIENE recursos (pendiente de inicio o en
+        ruta) vuelve a mirar conflictos: cancelar no limpia el conductor ni el
+        tracto, pero un viaje cancelado deja de retenerlos, así que en el medio
+        otro viaje se los puede haber llevado. Si eso pasó → 409 `OPS-002`
+        forzable, igual que al asignar, y al reabrir con `force` la bitácora
+        deja una línea por cada recurso que se pisó. Sin ese chequeo, dos viajes
+        activos terminarían compartiendo un conductor sin que nadie lo haya
+        decidido.
+
+        ⚠️ La `note` es texto libre y viaja entera a la bitácora (salvo por los saltos de línea,
+        que se muestran como `⏎` para que nadie pueda plantar ahí una línea con el formato del
+        servidor). Al cancelar, eliminar y reabrir es OBLIGATORIA, la escriben roles que SÍ ven
+        los importes, y la bitácora la lee todo el que pueda leer el detalle del viaje, incluido
+        el despacho, que no ve precios. Quien la escribe puede volcar ahí un importe y el despacho
+        lo leería, de forma PERMANENTE (ningún endpoint la edita ni la borra). Riesgo ACEPTADO
+        (decisión del dueño, 2026-08-07, la misma que rige para la `justification` del PUT): el
+        servidor no divulga los importes que él guarda, pero no filtra lo que una persona escribe.
+
+        La línea que deja el forzado nombra el CÓDIGO y el ESTADO del otro viaje con el que se
+        comparte el recurso, y también queda persistida. Hoy no filtra nada porque los cinco roles
+        que leen el detalle pueden pedir ese otro viaje de frente; el día que el detalle autorice
+        por fila, hay que filtrar también la bitácora, porque este canal sobrevive a la respuesta
+        y el del 409 no.
+
+        Cancelar y eliminar NO exigen esos datos previos: son las salidas, y
+        tienen que estar disponibles justamente para los viajes que quedaron a
+        medias. Lo que sí exigen es del PEDIDO, no del viaje: motivo de 10
+        caracteres o más e `If-Match` (RN-OP7). Junto con la reapertura son las transiciones más
+        exigentes en lo que la llamada tiene que traer, y las menos exigentes en
+        el estado del viaje.
+
         `dateTime` es opcional (por defecto, ahora) y solo aplica al iniciar o
-        finalizar; se ignora al cancelar o eliminar. RN-OP13 — al finalizar, la
-        fecha de fin no puede ser anterior a la de inicio (400 `COM-001`).
+        finalizar. Mandarlo al cancelar, eliminar o reabrir es 400 `COM-001`: esas
+        tres no fechan el viaje sino la decisión, y aceptar el dato para
+        descartarlo en silencio dejaría al cliente creyendo que guardó una marca
+        que nunca existió. RN-OP13 — al finalizar, la fecha de fin no puede ser
+        anterior a la de inicio (400 `COM-001`).
 
         RN-OP7 — cancelar y eliminar exigen motivo de 10 caracteres o más, no
         los puede hacer `dispatcher` (403: opera el viaje, no decide matarlo ni
         descartarlo) y piden `If-Match` con el ETag del detalle, porque son
         destructivos y el estado que el usuario vio en pantalla pudo haber
-        cambiado. `If-Match` ausente o sin coincidir → 412 `COM-004`, el mismo
-        comportamiento que en el resto de la API; la condicionalidad (solo se
-        exige en esos dos targets) no se puede declarar en el esquema, la valida
-        el servidor.
+        cambiado. Ahí `If-Match` ausente o sin coincidir → 412 `COM-004`.
+
+        Al iniciar y al finalizar el header es OPCIONAL, pero si viene se
+        EVALÚA: sin coincidir → 412. No se ignora. RFC 9110 §13.1.1 obliga a
+        evaluar toda precondición recibida, y descartarla le daría al cliente
+        una protección que cree tener y no tiene. La condicionalidad (obligatorio
+        en tres de los cinco targets) no se puede declarar en el esquema porque depende de
+        un campo del cuerpo: la valida el servidor.
 
         `sales` no participa de las transiciones: registra y edita el servicio,
         pero la operación del viaje es del despacho y la gerencia (misma regla
@@ -2606,7 +2695,7 @@ paths:
         - name: If-Match
           in: header
           required: false
-          description: 'Obligatorio cuando `target` es `CANCELLED` o `DELETED` (ausente o sin coincidir → 412 `COM-004`); se ignora en las demás transiciones.'
+          description: 'Obligatorio cuando `target` es `CANCELLED`, `DELETED` o `REOPENED` (ausente o sin coincidir → 412 `COM-004`). Al iniciar y al finalizar es opcional, pero si se envía se evalúa igual: sin coincidir → 412.'
           schema: { type: string }
       requestBody:
         required: true
@@ -2618,11 +2707,14 @@ paths:
               finish:  { summary: Finalizar, value: { target: 'COMPLETED', note: 'Descarga conforme, sin observaciones' } }
               cancel:  { summary: Cancelar,  value: { target: 'CANCELLED', note: 'El cliente reprogramó el embarque para agosto' } }
               delete:  { summary: Eliminar,  value: { target: 'DELETED', note: 'Registro duplicado por error de digitación' } }
+              reopen:  { summary: 'Reabrir (deshace cancelar o eliminar; pide motivo e If-Match)', value: { target: 'REOPENED', note: 'El cliente retomó el embarque que había reprogramado' } }
       responses:
         '200':
           description: Estado actualizado
           headers:
-            ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
+            ETag: { schema: { type: string }, description: 'Nueva versión del recurso; reenviarla tal cual (comillas incluidas) en el próximo If-Match' }
+            Cache-Control: { schema: { type: string }, description: '`no-store`: el cuerpo depende del rol que pregunta (al despacho le faltan los importes)' }
+            Vary: { schema: { type: string }, description: '`Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna caché puede reusar uno para otro usuario' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -2631,15 +2723,15 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: 'Transición inválida (`OPS-001`) o servicio ya cancelado o eliminado (`OPS-004`)'
+          description: 'Transición inválida (`OPS-001`), servicio ya cancelado o eliminado (`OPS-004`), recurso ya tomado por otro viaje al reabrir (`OPS-002`, forzable), viaje al que le faltan los datos de la etapa anterior (`OPS-009`: sin conductor y tracto al iniciar o al reabrir hacia un estado que los pide, sin fecha de inicio al cerrar, con un rastro que no dice de dónde venía al reabrir —o que apunta a un estado desconocido, o a uno del que no se vuelve—, o con recursos de refuerzo que todavía no se pueden verificar al reabrir), o conflicto transitorio de bloqueo (`OPS-008`: otra operación tiene el viaje tomado; se reintenta)'
           content:
             application/problem+json:
-              schema: { $ref: '#/components/schemas/Problem' }
+              schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
               example:
                 type: 'urn:tms:error:ops-001'
                 title: 'Invalid status transition'
                 status: 409
-                detail: 'No se puede pasar de "Completado" a "En ruta".'
+                detail: 'No se puede pasar de "completado" a "en ruta"'
                 instance: '/api/v1/services/118/status'
                 code: 'OPS-001'
                 traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
@@ -4323,10 +4415,12 @@ components:
         - `PENDING_START`: con recursos asignados, esperando salir.
         - `IN_PROGRESS`: en ruta.
         - `COMPLETED`: terminado (sigue siendo editable con justificación).
-        - `CANCELLED`: terminal e inmutable; viaje real que se abortó.
-        - `DELETED`: terminal e inmutable; registro que nunca debió existir
-          (error de digitación). Excluido por defecto del listado y de los
-          indicadores; se consulta solo con el filtro `status=DELETED`.
+        - `CANCELLED`: viaje real que se abortó. Terminal para el avance e inmutable
+          para toda escritura, con una excepción: se puede REABRIR, y ahí vuelve al
+          estado que tenía antes.
+        - `DELETED`: registro que nunca debió existir (error de digitación). Mismas
+          reglas que `CANCELLED`, incluida la reapertura. Excluido por defecto del
+          listado y de los indicadores; se consulta solo con el filtro `status=DELETED`.
 
     TripScope:
       type: string
@@ -4416,8 +4510,8 @@ components:
             heightM:       { type: [number, 'null'], format: double }
             observations:  { type: [string, 'null'], maxLength: 500 }
             trailer:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
-            startDateTime: { type: [string, 'null'], format: date-time, description: 'Inicio real. Lo fijará la transición de estado y la edición lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicación es siempre null' }
-            endDateTime:   { type: [string, 'null'], format: date-time, description: 'Fin real. Lo fijará la transición de estado y la edición lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicación es siempre null' }
+            startDateTime: { type: [string, 'null'], format: date-time, description: 'Inicio real. Lo fija la transición a "en ruta" y la edición lo corrige; null mientras el viaje no haya arrancado' }
+            endDateTime:   { type: [string, 'null'], format: date-time, description: 'Fin real. Lo fija la transición a "completado" y la edición lo corrige; null mientras el viaje no haya cerrado' }
             additionalResources:
               type: array
               items: { $ref: '#/components/schemas/ServiceAdditionalResourceResponse' }
@@ -4480,8 +4574,8 @@ components:
         price:         { type: number, format: double, exclusiveMinimum: 0, description: 'Mayor que cero: un viaje siempre tiene precio' }
         currencyId:    { type: integer }
         observations:  { type: [string, 'null'], maxLength: 500 }
-        startDateTime: { type: [string, 'null'], format: date-time, description: 'Corrección del inicio real. Solo se admite si el servicio YA lo tiene: la condición es tener la fecha, no estar en un estado (en la práctica aparece al ponerse en ruta). Esa condición por presencia es MÁS ESTRICTA que la matriz del sistema anterior: un viaje migrado sin la fecha no se corrige por acá, porque la transición que la fija ya ocurrió, y ese saneo va en el script de cutover. Ausente o en null = sin cambio: una fecha real no se borra. Entre 1900 y 2999: fuera de esa ventana es 400. ⚠️ Mientras no exista el endpoint de transiciones, ningún viaje nacido en la aplicación tiene esta fecha, así que hoy este campo solo puede responder 400.' }
-        endDateTime:   { type: [string, 'null'], format: date-time, description: 'Corrección del fin real. Misma condición que el inicio (tener la fecha, no estar en un estado) y las mismas consecuencias para un viaje migrado sin ella. Además tiene que quedar posterior o igual al inicio. Ausente o en null = sin cambio. Entre 1900 y 2999: fuera de esa ventana es 400. ⚠️ Mientras no exista el endpoint de transiciones, ningún viaje nacido en la aplicación tiene esta fecha, así que hoy este campo solo puede responder 400.' }
+        startDateTime: { type: [string, 'null'], format: date-time, description: 'Corrección del inicio real. Solo se admite si el servicio YA lo tiene: la condición es tener la fecha, no estar en un estado (en la práctica aparece al ponerse en ruta). Esa condición por presencia es MÁS ESTRICTA que la matriz del sistema anterior: un viaje migrado sin la fecha no se corrige por acá, porque la transición que la fija ya ocurrió, y ese saneo va en el script de cutover. Ausente o en null = sin cambio: una fecha real no se borra. Entre 1900 y 2999: fuera de esa ventana es 400. ⚠️ La fecha la fija la transición a "en ruta"; en un viaje que todavía no arrancó, este campo responde 400.' }
+        endDateTime:   { type: [string, 'null'], format: date-time, description: 'Corrección del fin real. Misma condición que el inicio (tener la fecha, no estar en un estado) y las mismas consecuencias para un viaje migrado sin ella. Además tiene que quedar posterior o igual al inicio. Ausente o en null = sin cambio. Entre 1900 y 2999: fuera de esa ventana es 400. ⚠️ La fecha la fija la transición a "completado"; en un viaje que todavía no cerró, este campo responde 400.' }
         justification: { type: string, minLength: 10, maxLength: 500, pattern: '^\s*\S[\s\S]{8,}\S\s*$', description: 'El `minLength` cuenta el texto CRUDO; el patrón expresa el mínimo real, que es sobre el texto YA RECORTADO: sin él, un cliente generado aceptaría un texto corto rellenado con espacios que el servidor rechaza' }
 
     AssignResourcesRequest:
@@ -4503,7 +4597,7 @@ components:
         tractorId: { type: integer, minimum: 1 }
         trailerId: { type: [integer, 'null'], minimum: 1 }
         note:      { type: [string, 'null'], maxLength: 500 }
-        force:     { type: boolean, default: false, description: 'true = asigna pese al conflicto OPS-002; queda registrado en la bitácora y en la auditoría' }
+        force:     { type: [boolean, 'null'], default: false, description: 'true = asigna pese al conflicto OPS-002; queda registrado en la bitácora y en la auditoría. Ausente, null y false son lo mismo' }
 
     ChangeStatusRequest:
       type: object
@@ -4511,15 +4605,20 @@ components:
       properties:
         target:
           type: string
-          enum: [IN_PROGRESS, COMPLETED, CANCELLED, DELETED]
+          enum: [IN_PROGRESS, COMPLETED, CANCELLED, DELETED, REOPENED]
+          description: 'Estado al que se quiere IR, no el actual. Los dos pendientes no se piden: a "pendiente de inicio" se llega asignando recursos. `REOPENED` no es un estado sino una ACCIÓN: deshace una cancelación o una eliminación y devuelve el viaje al estado que tenía antes, que el servidor saca del rastro de auditoría.'
         dateTime:
           type: [string, 'null']
           format: date-time
-          description: 'Inicio o fin real; por defecto, ahora. Solo aplica al iniciar o finalizar (se ignora al cancelar o eliminar). Al finalizar debe ser posterior o igual al inicio (RN-OP13).'
+          description: 'Inicio o fin real; ausente o null = ahora. Solo aplica al iniciar o finalizar: enviarlo al cancelar, eliminar o reabrir es 400 COM-001. Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400. Al finalizar debe ser posterior o igual al inicio, y al iniciar no puede quedar después de un fin ya registrado (RN-OP13).'
         note:
           type: [string, 'null']
           maxLength: 500
-          description: 'Opcional al iniciar o finalizar; OBLIGATORIA (10 caracteres o más) al cancelar o eliminar (RN-OP7).'
+          description: 'Opcional al iniciar o finalizar; OBLIGATORIA (10 caracteres o más) al cancelar, eliminar o reabrir (RN-OP7).'
+        force:
+          type: [boolean, 'null']
+          default: false
+          description: 'Solo al REABRIR: reabre pese al conflicto OPS-002 y lo deja registrado en la bitácora. Ausente, null y false son lo mismo (no forzar), para que un formulario que serializa el objeto entero siga andando. `true` en cualquiera de las otras cuatro transiciones es 400: ninguna moviliza recursos, y es la única bandera que autoriza pisar la reja de conflictos.'
 
     AddResourcesRequest:
       type: object
@@ -4613,7 +4712,9 @@ components:
         - type: object
           description: |
             Extensión del error para `OPS-002`: le dice a la interfaz que el
-            conflicto se puede forzar y qué recurso está ocupado.
+            conflicto se puede forzar y qué recurso está ocupado. Los dos campos
+            viajan SOLO en ese código; los otros 409 de este endpoint usan el
+            Problem pelado.
           properties:
             forcible: { type: boolean, description: 'true solo en OPS-002' }
             conflicts:

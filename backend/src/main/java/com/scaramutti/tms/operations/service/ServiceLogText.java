@@ -73,6 +73,25 @@ public final class ServiceLogText {
         return value == null ? null : value.atZoneSameInstant(DateUtils.LIMA).format(LIMA_FORMAT);
     }
 
+    /**
+     * Recorta el texto que un mensaje de error DEVUELVE al que lo mando: no hay por que reflejarlo
+     * entero. Vive aca desde que lo usan dos capas —el mapeo del pedido y la resolucion del destino
+     * de la reapertura, que refleja un valor traido de la base— y no un solo metodo privado.
+     *
+     * <p>El corte cuenta CARACTERES, no unidades de codigo: un emoji ocupa dos unidades y cortarlo
+     * al medio deja media pareja suelta, que ya no es texto valido (un lector estricto rechaza la
+     * respuesta y la interfaz muestra un rombo).
+     */
+    public static String abbreviate(String value) {
+        if (value == null || value.codePointCount(0, value.length()) <= MAX_ECHOED_CHARS) {
+            return value;
+        }
+        return value.substring(0, value.offsetByCodePoints(0, MAX_ECHOED_CHARS)) + "…";
+    }
+
+    /** Tope de caracteres del texto que se refleja en un mensaje de error. */
+    private static final int MAX_ECHOED_CHARS = 30;
+
     /** Formato de las marcas de tiempo en la bitacora, en hora de Peru y como se lee en es-PE. */
     private static final DateTimeFormatter LIMA_FORMAT =
         DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");

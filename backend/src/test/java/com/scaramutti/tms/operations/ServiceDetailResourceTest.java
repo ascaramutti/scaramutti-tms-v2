@@ -497,7 +497,7 @@ class ServiceDetailResourceTest {
 
     /**
      * Inserta una línea de bitácora por SQL: los eventos los producen las transiciones de estado
-     * y la edición, endpoints que todavía no existen, y estos tests necesitan una bitácora con
+     * y la edición, que son otros endpoints, y estos tests necesitan una bitácora con
      * más de una línea.
      */
     private long insertEvent(long serviceId, String eventType, String note, String instant) {

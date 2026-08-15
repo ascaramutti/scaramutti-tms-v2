@@ -2,9 +2,13 @@ package com.scaramutti.tms.operations.mapper;
 
 import com.scaramutti.tms.operations.dto.ServiceAssignResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
+import com.scaramutti.tms.operations.dto.ServiceStatusChangeRequest;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
+import com.scaramutti.tms.operations.service.ServiceLogText;
 import com.scaramutti.tms.operations.model.ServiceStatus;
+import com.scaramutti.tms.operations.model.ServiceStatusTransition;
 import com.scaramutti.tms.operations.service.cmd.AssignServiceResourcesCommand;
+import com.scaramutti.tms.operations.service.cmd.ChangeServiceStatusCommand;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
 import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
 import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
@@ -15,6 +19,7 @@ import com.scaramutti.tms.shared.util.StringUtils;
 import org.mapstruct.BeforeMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
+import org.mapstruct.Named;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
@@ -22,6 +27,7 @@ import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.regex.Pattern;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 import java.util.List;
 
 /**
@@ -97,6 +103,172 @@ public interface ServiceResourceMapper {
     }
 
     /**
+     * Transicion de estado. Se arma a mano por lo mismo que la edicion: los argumentos vienen de
+     * la ruta, de un header y del cuerpo, y hay tres guardas en el medio que dependen entre si
+     * (que se puede pedir, si la fecha aplica, si el motivo es obligatorio). Ninguna de las tres
+     * se puede declarar en el esquema: todas dependen del {@code target}, que es un dato del
+     * mismo cuerpo que estan validando.
+     */
+    default ChangeServiceStatusCommand toChangeServiceStatusCommand(
+            long serviceId, String ifMatch, ServiceStatusChangeRequest serviceStatusChangeRequest) {
+        ServiceStatusTransition transition = parseTransition(serviceStatusChangeRequest.target());
+        OffsetDateTime dateTime = parseDateTime(serviceStatusChangeRequest.dateTime());
+        requireDateTimeWithinBusinessWindow(dateTime, "La fecha de la transición");
+        requireDateTimeApplies(transition, dateTime);
+        requireStorableText(serviceStatusChangeRequest.note(), noteSubject(transition));
+        boolean force = parseForce(serviceStatusChangeRequest.force());
+        requireForceApplies(transition, force);
+        return new ChangeServiceStatusCommand(
+            serviceId,
+            ifMatch,
+            transition,
+            dateTime,
+            resolveNote(transition, serviceStatusChangeRequest.note()),
+            force);
+    }
+
+    /**
+     * El destino, de texto a la tabla de transiciones. Se recibe como texto por lo mismo que el id
+     * de ruta y los filtros del listado: un campo tipado que no parsea lo rechaza el lector de
+     * JSON antes de que corra una linea nuestra, y no hay ningun manejador de ese error, asi que
+     * la respuesta saldria con un cuerpo que no es el Problem que el contrato promete.
+     *
+     * <p>El mensaje enumera los valores validos. Un "no es valido" a secas obliga a ir a buscar el
+     * contrato para descubrir cual de las cinco palabras estaba mal escrita.
+     */
+    private static ServiceStatusTransition parseTransition(String target) {
+        String normalized = StringUtils.trimToNull(target);
+        if (normalized != null) {
+            try {
+                return ServiceStatusTransition.valueOf(normalized);
+            } catch (IllegalArgumentException ignored) {
+                // Cae al rechazo de abajo. El valor AUSENTE o en blanco no llega hasta aca: lo
+                // corta @NotBlank, que contesta el 400 con el arreglo `errors` en vez de este
+                // mensaje. Los dos son 400 COM-001 y esa diferencia de forma esta medida.
+            }
+        }
+        throw CommonError.VALIDATION_FAILED.toException(
+            "El estado pedido tiene que ser uno de: "
+                + Arrays.stream(ServiceStatusTransition.values())
+                    .map(Enum::name).collect(Collectors.joining(", ")));
+    }
+
+    /**
+     * La marca de tiempo, de texto a objeto. Mismo motivo que el destino y que el id de ruta, y
+     * este quedo MEDIDO: con el campo declarado como {@code OffsetDateTime}, un "ayer" sale con
+     * un 400 cuyo cuerpo no es el Problem que el contrato promete, con content-type comun y
+     * filtrando el nombre de la clase, la linea y la columna donde el parser se trabo.
+     */
+    private static OffsetDateTime parseDateTime(String value) {
+        String normalized = StringUtils.trimToNull(value);
+        if (normalized == null) {
+            return null;
+        }
+        try {
+            return OffsetDateTime.parse(normalized);
+        } catch (DateTimeParseException e) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "La fecha tiene que venir con formato AAAA-MM-DDTHH:MM:SSZ");
+        }
+    }
+
+    /**
+     * El indicador de forzado, de texto a booleano. Mismo motivo que el destino y la marca de
+     * tiempo: declarado como {@code Boolean}, un valor que no parsea lo rechaza el lector de JSON
+     * antes de que corra una linea nuestra, y la respuesta sale con un cuerpo que no es el Problem
+     * que el contrato promete, filtrando internos del parser.
+     *
+     * <p>La tecnica cubre los ESCALARES, que es de donde viene el trafico real: Jackson convierte
+     * un booleano o un numero JSON a texto y el valor llega hasta aca. Un objeto o un arreglo
+     * siguen cayendo en el lector, y eso se cierra de una vez para toda la API con un manejador de
+     * los errores de deserializacion, que este proyecto todavia no tiene. Hay un caso que fija
+     * donde termina la tecnica, para que el limite este medido y no solo escrito.
+     *
+     * <p>Ausente, null y cualquier forma de "false" significan lo mismo: NO forzar. El default
+     * tiene que ser ese y no "vino la clave": un formulario que serializa el objeto entero manda
+     * el campo siempre, y con el default invertido forzaria sin que nadie lo haya pedido.
+     */
+    @Named("parseForce")
+    static boolean parseForce(String value) {
+        String normalized = StringUtils.trimToNull(value);
+        if (normalized == null || "false".equalsIgnoreCase(normalized)) {
+            return false;
+        }
+        if ("true".equalsIgnoreCase(normalized)) {
+            return true;
+        }
+        throw CommonError.VALIDATION_FAILED.toException(
+            "El indicador de forzado tiene que ser true o false");
+    }
+
+    /**
+     * Solo la reapertura mira conflictos, asi que forzar en las otras cuatro es un 400 y no un dato
+     * que se descarte en silencio. Mismo criterio que la fecha que no aplica, y por el mismo
+     * motivo, aunque el argumento no sea identico: una fecha aceptada y descartada miente sobre lo
+     * que quedo GUARDADO, y esto no guarda nada. Lo que pesa aca es que es la unica bandera que
+     * autoriza pisar la reja de conflictos, o sea a poner dos viajes activos sobre el mismo
+     * conductor: "aceptado e ignorado" es el peor default posible para ese campo el dia que una
+     * segunda transicion se vuelva forzable.
+     *
+     * <p>Muerde solo sobre true. Ausente, null y false son "no forzar", que es lo que manda un
+     * formulario que serializa el objeto entero.
+     *
+     * <p>Reabrir hacia un estado que NO retiene recursos tampoco usa la bandera, pero eso no se
+     * puede decidir aca: el destino sale del rastro y todavia no se leyo. Ahi sigue siendo no-op.
+     */
+    private static void requireForceApplies(ServiceStatusTransition transition, boolean force) {
+        if (force && !transition.restoresPreviousStatus()) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "Forzar solo aplica al reabrir");
+        }
+    }
+
+    /**
+     * Cancelar, eliminar y reabrir no fechan nada, asi que mandarles una fecha es un 400 y no un
+     * dato que se descarte en silencio.
+     *
+     * <p>Aceptar un valor para ignorarlo deja un endpoint que miente sobre lo que guardo: el
+     * cliente recibe 200, cree que la marca quedo escrita y solo se entera releyendo el detalle.
+     * Es el mismo criterio con el que el modulo ya rechaza el precio que no puede ver quien lo
+     * manda, en vez de descartarlo.
+     *
+     * <p>Muerde sobre el VALOR y no sobre la presencia de la clave: un formulario que serializa el
+     * objeto entero manda {@code null} en los campos que no aplican y tiene que seguir andando.
+     */
+    private static void requireDateTimeApplies(
+            ServiceStatusTransition transition, OffsetDateTime dateTime) {
+        if (dateTime != null
+                && transition.dateColumn() == ServiceStatusTransition.DateColumn.NONE) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "La fecha solo aplica al iniciar o al finalizar");
+        }
+    }
+
+    /**
+     * El texto libre, recortado, y medido contra el minimo SOLO cuando la transicion lo exige.
+     *
+     * <p>El minimo se mide DESPUES del recorte por el mismo motivo que la justificacion de la
+     * edicion: {@code "corta     "} son diez caracteres y cinco de contenido. Un minimo que se
+     * cumple con espacios no es un minimo, es un campo obligatorio que se puede saltear.
+     */
+    private static String resolveNote(ServiceStatusTransition transition, String note) {
+        String normalized = StringUtils.trimToNull(note);
+        if (transition.requiresNote()
+                && (normalized == null
+                    || normalized.length() < ServiceStatusChangeRequest.MIN_NOTE_LENGTH)) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                noteSubject(transition) + " necesita al menos "
+                    + ServiceStatusChangeRequest.MIN_NOTE_LENGTH + " caracteres");
+        }
+        return normalized;
+    }
+
+    /** Como se NOMBRA el texto libre en los mensajes de error, segun lo que significa. */
+    private static String noteSubject(ServiceStatusTransition transition) {
+        return transition.requiresNote() ? "El motivo" : "La nota";
+    }
+
+    /**
      * Guarda de entrada de la asignacion. Corre ANTES del mapeo de abajo porque MapStruct invoca
      * los metodos {@code @BeforeMapping} que aceptan el tipo de origen al entrar al metodo
      * generado. Escrita asi y no dentro de un metodo a mano, la validacion no se puede saltear:
@@ -116,13 +288,17 @@ public interface ServiceResourceMapper {
      * Asignacion de recursos. El id sale de la ruta y el resto del cuerpo; los tres ids de recurso
      * se mapean por nombre.
      *
-     * <p>{@code force} ausente o null se resuelve a false ACA —MapStruct arranca el primitivo en
-     * false y solo asigna si el {@code Boolean} vino— para que de la capa de negocio hacia abajo
-     * "no forzar" tenga una sola representacion.
+     * <p>{@code force} llega como TEXTO y se resuelve con {@code parseForce}, igual que en la
+     * transicion: declarado como {@code Boolean}, un valor que no parsea lo rechaza el lector de
+     * JSON con un cuerpo que no es el Problem que el contrato promete. El mapeo es EXPLICITO
+     * porque MapStruct convierte texto a booleano por su cuenta, y esa conversion trata cualquier
+     * cosa que no sea "true" como false en silencio.
      */
     @Mapping(target = "serviceId", source = "serviceId")
     @Mapping(target = "note", source = "serviceAssignResourcesRequest.note",
         qualifiedByName = "trimToNull")
+    @Mapping(target = "force", source = "serviceAssignResourcesRequest.force",
+        qualifiedByName = "parseForce")
     AssignServiceResourcesCommand toAssignServiceResourcesCommand(
         long serviceId, ServiceAssignResourcesRequest serviceAssignResourcesRequest);
 
@@ -228,9 +404,6 @@ public interface ServiceResourceMapper {
     LocalDate MAX_BUSINESS_DATE = LocalDate.of(2999, 12, 31);
 
     // ---------- Otros -----------------------------------------------------------
-
-    /** Tope de caracteres del texto del usuario que se refleja en un mensaje de error. */
-    int MAX_ECHOED_CHARS = 30;
 
     /** Cifras arabigas: {@code Integer.valueOf} acepta las de cualquier alfabeto. */
     Pattern ASCII_INTEGER = Pattern.compile("-?[0-9]+");
@@ -345,7 +518,7 @@ public interface ServiceResourceMapper {
             return ServiceStatus.valueOf(normalized);
         } catch (IllegalArgumentException e) {
             throw CommonError.VALIDATION_FAILED.toException(
-                "El estado indicado no existe: " + abbreviate(normalized));
+                "El estado indicado no existe: " + ServiceLogText.abbreviate(normalized));
         }
     }
 
@@ -442,17 +615,4 @@ public interface ServiceResourceMapper {
         return parsed;
     }
 
-    /**
-     * Recorta el texto del usuario que se devuelve en el error: no hay por que reflejarlo entero.
-     *
-     * <p>El corte cuenta CARACTERES, no unidades de codigo: un emoji ocupa dos unidades y
-     * cortarlo al medio deja media pareja suelta, que ya no es texto valido (un lector estricto
-     * rechaza la respuesta y la interfaz muestra un rombo).
-     */
-    private static String abbreviate(String value) {
-        if (value.codePointCount(0, value.length()) <= MAX_ECHOED_CHARS) {
-            return value;
-        }
-        return value.substring(0, value.offsetByCodePoints(0, MAX_ECHOED_CHARS)) + "…";
-    }
 }

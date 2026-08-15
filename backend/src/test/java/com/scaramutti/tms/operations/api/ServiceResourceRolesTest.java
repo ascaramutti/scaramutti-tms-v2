@@ -1,6 +1,7 @@
 package com.scaramutti.tms.operations.api;
 
 import jakarta.annotation.security.RolesAllowed;
+import com.scaramutti.tms.operations.model.ServiceStatusChangeAuthorizationRoles;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Method;
@@ -8,6 +9,7 @@ import java.util.Arrays;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -31,6 +33,34 @@ class ServiceResourceRolesTest {
             "quien puede asignar tiene que poder leer el detalle, porque el cuerpo del conflicto "
                 + "nombra otro viaje. Sobran en la asignacion: "
                 + assignment.stream().filter(role -> !detail.contains(role)).collect(Collectors.toSet()));
+    }
+
+    /**
+     * La lista que deja entrar al endpoint y la que el veto usa como base son DOS literales en dos
+     * archivos, y el javadoc de la constante promete que son la misma. La deriva es fail-closed
+     * —un rol agregado solo a la anotación entra por la puerta y cae con 403 desde adentro— pero
+     * es silenciosa: el contrato y la anotación dirían que puede, y ningún otro test lo ve.
+     */
+    @Test
+    void theOperatingRolesConstant_matchesTheAnnotationItClaimsToMirror() {
+        assertEquals(ServiceStatusChangeAuthorizationRoles.OPERATING_ROLES,
+            rolesOf("changeServiceStatus"),
+            "la constante y el @RolesAllowed del endpoint dejaron de decir lo mismo");
+    }
+
+    /**
+     * Las transiciones devuelven el detalle COMPLETO, con su bitácora. Un rol que solo pudiera
+     * transicionar leería por esa respuesta un viaje que no puede pedir por la puerta de adelante.
+     */
+    @Test
+    void statusRoles_areASubsetOfTheDetailRoles() {
+        Set<String> status = rolesOf("changeServiceStatus");
+        Set<String> detail = rolesOf("getService");
+
+        assertTrue(detail.containsAll(status),
+            "quien puede transicionar tiene que poder leer el detalle: el 200 ES el detalle. "
+                + "Sobran en las transiciones: "
+                + status.stream().filter(role -> !detail.contains(role)).collect(Collectors.toSet()));
     }
 
     /** Y lo mismo para el listado, que es la otra puerta por la que se lee un viaje ajeno. */
@@ -64,6 +94,28 @@ class ServiceResourceRolesTest {
         assertTrue(fleetUnits.containsAll(assignment),
             "quien asigna tiene que poder leer el catalogo de flota; sobran: "
                 + assignment.stream().filter(role -> !fleetUnits.contains(role)).collect(Collectors.toSet()));
+    }
+
+    /**
+     * Y lo mismo para las transiciones, que producen el MISMO cuerpo de conflicto que la asignacion
+     * —nombre del conductor y placas, que salen de los catalogos compartidos— y ademas persisten
+     * esa placa en la bitacora, que sobrevive a la respuesta. Hoy las dos listas son identicas, asi
+     * que el caso de la asignacion cubre a este por transitividad; esa igualdad no la afirma nadie.
+     */
+    @Test
+    void statusRoles_areASubsetOfTheSharedCatalogRoles() {
+        Set<String> status = rolesOf(ServiceResource.class, "changeServiceStatus");
+        Set<String> drivers = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.driver.api.DriverResource.class, "listDrivers");
+        Set<String> fleetUnits = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.fleetunit.api.FleetUnitResource.class, "listFleetUnits");
+
+        assertTrue(drivers.containsAll(status),
+            "quien transiciona lee nombres de conductor por el conflicto; sobran: "
+                + status.stream().filter(role -> !drivers.contains(role)).collect(Collectors.toSet()));
+        assertTrue(fleetUnits.containsAll(status),
+            "y placas de flota; sobran: "
+                + status.stream().filter(role -> !fleetUnits.contains(role)).collect(Collectors.toSet()));
     }
 
     private Set<String> rolesOf(String methodName) {

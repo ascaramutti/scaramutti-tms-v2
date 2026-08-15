@@ -3,6 +3,7 @@ package com.scaramutti.tms.operations.dto;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
+import org.eclipse.microprofile.openapi.annotations.enums.SchemaType;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 /**
@@ -25,6 +26,7 @@ public record ServiceAssignResourcesRequest(
     @Schema(nullable = true, description = "Nota libre para la bitácora; sin mínimo, a diferencia de la justificación de la edición")
     @Size(max = 500) String note,
 
-    @Schema(description = "Asigna pese al conflicto OPS-002 y lo deja registrado; ausente equivale a false")
-    Boolean force
+    @Schema(type = SchemaType.BOOLEAN, nullable = true,
+        description = "Asigna pese al conflicto OPS-002 y lo deja registrado; ausente equivale a false")
+    String force
 ) {}

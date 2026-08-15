@@ -4,6 +4,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
+import java.time.OffsetDateTime;
 
 import java.util.List;
 import java.util.Set;
@@ -50,7 +51,7 @@ public class OperationsTestData {
 
     /**
      * Fuerza el estado de un servicio por SQL. Los estados los mueve el endpoint de transiciones,
-     * que todavia no existe, asi que todo test que necesite un viaje que no sea recien creado
+     * que es OTRO endpoint, asi que todo test que necesite un viaje que no sea recien creado
      * pasa por aca. Segunda clase que lo necesita: extraida al fixture (la variante por codigo del
      * listado no es identica y sigue en su clase).
      *
@@ -84,6 +85,42 @@ public class OperationsTestData {
 
     private static final java.util.Set<String> FREE_TEXT_COLUMNS =
         java.util.Set.of("origin", "destination", "observations");
+
+    /**
+     * Fuerza las fechas reales por SQL. Misma advertencia que los dos de arriba sobre
+     * {@code updated_at}.
+     *
+     * <p>Hace falta para fabricar la fila que la aplicacion NO produce: un viaje en ruta con su
+     * inicio ya puesto por el cutover del sistema anterior, o directamente SIN inicio. Sin esto,
+     * todo caso de "el fin no puede ser anterior al inicio" queda encadenado a que la transicion
+     * de inicio haya corrido antes, y un defecto que afecte a los dos caminos a la vez no lo ve
+     * nadie: el test lo estaria midiendo contra el mismo codigo que prueba.
+     */
+    public void forceServiceDates(long serviceId, OffsetDateTime start, OffsetDateTime end) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE operaciones.services SET start_date_time = ?1, end_date_time = ?2 "
+                    + "WHERE id = ?3")
+            .setParameter(1, start).setParameter(2, end).setParameter(3, serviceId).executeUpdate());
+    }
+
+    /**
+     * Fuerza los recursos principales de un viaje por SQL. Misma advertencia que los de arriba
+     * sobre {@code updated_at}.
+     *
+     * <p>Hace falta para dejar la fila como la deja la ASIGNACION sin encadenar ese endpoint: un
+     * viaje en "pendiente de inicio" siempre tiene conductor y tracto, porque es la asignacion la
+     * que lo lleva a ese estado. Un fixture que fuerce el estado y no los recursos fabrica una fila
+     * que la aplicacion no puede producir, y entonces los tests miden comportamiento sobre un
+     * estado inexistente.
+     */
+    public void forceServiceResources(long serviceId, Integer driverId, Integer tractorId,
+            Integer trailerId) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE operaciones.services SET driver_id = ?1, tractor_id = ?2, trailer_id = ?3 "
+                    + "WHERE id = ?4")
+            .setParameter(1, driverId).setParameter(2, tractorId).setParameter(3, trailerId)
+            .setParameter(4, serviceId).executeUpdate());
+    }
 
     /**
      * Tracto de operaciones, con placa propia de la corrida ({@code ZO00xx}). La placa la genera

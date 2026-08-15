@@ -56,10 +56,10 @@ public record ServiceUpdateRequest(
 
     @Schema(nullable = true) @Size(max = 500) String observations,
 
-    @Schema(nullable = true, description = "Correccion del inicio real; solo si el servicio YA lo tiene (la condicion es la fecha, no el estado). Ausente o en null = sin cambio. Mientras no exista el endpoint de transiciones, ningun viaje nacido en la aplicacion la tiene: hoy este campo solo puede responder 400")
+    @Schema(nullable = true, description = "Correccion del inicio real; solo si el servicio YA lo tiene (la condicion es la fecha, no el estado). Ausente o en null = sin cambio. La fecha la fija la transicion a \"en ruta\"; en un viaje que todavia no arranco, este campo responde 400")
     OffsetDateTime startDateTime,
 
-    @Schema(nullable = true, description = "Correccion del fin real; solo si el servicio YA lo tiene, y posterior o igual al inicio. Ausente o en null = sin cambio. Misma limitacion que el inicio: hoy solo puede responder 400")
+    @Schema(nullable = true, description = "Correccion del fin real; solo si el servicio YA lo tiene, y posterior o igual al inicio. Ausente o en null = sin cambio. La fecha la fija la transicion a \"completado\"; en un viaje que todavia no cerro, este campo responde 400")
     OffsetDateTime endDateTime,
 
     @Schema(description = "Por que se edita; queda en la bitacora y en cada linea de la auditoria")

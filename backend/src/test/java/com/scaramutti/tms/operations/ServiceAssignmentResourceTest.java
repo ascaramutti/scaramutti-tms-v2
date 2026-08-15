@@ -362,6 +362,31 @@ class ServiceAssignmentResourceTest {
     }
 
     /**
+     * Un `force` que no es booleano sale con el Problem que el contrato promete. Declarado como
+     * {@code Boolean}, lo rechazaba el lector de JSON antes de que corriera una linea nuestra, con
+     * un cuerpo sin `code` que filtraba la clase y la posicion donde el parser se trabo.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"maybe", "1"})
+    void assign_withAForceThatIsNotABoolean_returns400WithAProblemBody(String force) {
+        long id = createService("Piura", "Lima");
+        Map<String, Object> payload = assignmentPayload();
+        payload.put("force", force);
+
+        given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(payload)
+        .when()
+            .post("/services/" + id + "/assignment")
+        .then()
+            .statusCode(400)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-001"))
+            .body("detail", containsString("true o false"));
+    }
+
+    /**
      * Dos recursos ocupados por viajes DISTINTOS, que es el caso normal (el conductor en un viaje
      * y el tracto en otro). Con un solo retenedor, servir el codigo del primero para todos los
      * conflictos pasa desapercibido: la pantalla diria que el tracto está en el viaje del

@@ -80,10 +80,10 @@ public record ServiceDetailResponse(
      * existe") seria inobservable para quien llama. Las FIJA la transicion de estado; este detalle
      * solo las muestra.
      */
-    @Schema(nullable = true, description = "Inicio real del viaje; lo fijara la transicion de estado y la edicion lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicacion es siempre null")
+    @Schema(nullable = true, description = "Inicio real del viaje; lo fija la transicion a \"en ruta\" y la edicion lo corrige; null mientras el viaje no haya arrancado")
     OffsetDateTime startDateTime,
 
-    @Schema(nullable = true, description = "Fin real del viaje; lo fijara la transicion de estado y la edicion lo corrige; mientras ese endpoint no exista, en un viaje nacido en la aplicacion es siempre null")
+    @Schema(nullable = true, description = "Fin real del viaje; lo fija la transicion a \"completado\" y la edicion lo corrige; null mientras el viaje no haya cerrado")
     OffsetDateTime endDateTime,
 
     @Schema(description = "Bitacora en orden cronologico ascendente")

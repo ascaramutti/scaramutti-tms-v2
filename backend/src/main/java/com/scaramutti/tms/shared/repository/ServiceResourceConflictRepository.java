@@ -10,6 +10,7 @@ import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -35,8 +36,8 @@ public class ServiceResourceConflictRepository {
      * <p>El contrato declara este mismo par como dominio de {@code conflicts[].serviceStatus}, asi
      * que los dos tienen que moverse juntos.
      */
-    private static final Set<ServiceStatus> RESOURCE_HOLDING_STATUSES =
-        EnumSet.of(ServiceStatus.PENDING_START, ServiceStatus.IN_PROGRESS);
+    public static final Set<ServiceStatus> RESOURCE_HOLDING_STATUSES = Collections.unmodifiableSet(
+        EnumSet.of(ServiceStatus.PENDING_START, ServiceStatus.IN_PROGRESS));
 
     @Inject EntityManager entityManager;
 
@@ -156,9 +157,9 @@ public class ServiceResourceConflictRepository {
      *
      * <p><b>{@code excludedServiceId} hoy no es alcanzable, y se deja igual.</b> Medido con una
      * mutacion: quitando esa condicion, ningun test se pone rojo. La razon es que el filtro de
-     * estados ya la contiene — desde la asignacion solo se llama con el viaje en "pendiente de
-     * asignacion", que no es un estado que retenga recursos, asi que la fila propia nunca entra
-     * en el resultado. Se conserva porque el endpoint de refuerzos va a llamar a esta misma
+     * estados ya la contiene: los dos llamadores de hoy pasan un viaje que NO retiene recursos —la
+     * asignacion, con el viaje en "pendiente de asignacion", y la reapertura, con el viaje todavia
+     * cancelado o eliminado—, asi que la fila propia nunca entra en el resultado. Se conserva porque el endpoint de refuerzos va a llamar a esta misma
      * consulta con el viaje YA en ruta, y ahi si se encontraria a si mismo: el choque contra
      * OTRO viaje es el conflicto forzable, y el choque contra el PROPIO viaje es un error duro
      * distinto. Escrito aca para que no se lo lea como una condicion de mas y se lo borre.
