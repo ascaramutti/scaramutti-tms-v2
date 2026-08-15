@@ -15,7 +15,6 @@ import com.scaramutti.tms.shared.entity.ServiceAuditLog;
 import com.scaramutti.tms.shared.entity.ServiceEvent;
 import com.scaramutti.tms.shared.entity.Tractor;
 import com.scaramutti.tms.shared.entity.Trailer;
-import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.DriverRepository;
 import com.scaramutti.tms.shared.repository.ServiceAuditLogRepository;
 import com.scaramutti.tms.shared.repository.ServiceEventRepository;
@@ -163,18 +162,18 @@ public class AssignServiceResourcesService {
      */
     private AssignedResources resolveResources(AssignServiceResourcesCommand command) {
         Driver driver = driverRepository.findById(command.driverId());
-        requireActive(driver != null && Boolean.TRUE.equals(driver.isActive),
+        serviceResourceConflicts.requireActiveResource(driver != null && Boolean.TRUE.equals(driver.isActive),
             ServiceResourceKind.DRIVER);
         String driverName = driverRepository.findFullNameById(command.driverId());
 
         Tractor tractor = tractorRepository.findById(command.tractorId());
-        requireActive(tractor != null && Boolean.TRUE.equals(tractor.isActive),
+        serviceResourceConflicts.requireActiveResource(tractor != null && Boolean.TRUE.equals(tractor.isActive),
             ServiceResourceKind.TRACTOR);
 
         String trailerPlate = null;
         if (command.trailerId() != null) {
             Trailer trailer = trailerRepository.findById(command.trailerId());
-            requireActive(trailer != null && Boolean.TRUE.equals(trailer.isActive),
+            serviceResourceConflicts.requireActiveResource(trailer != null && Boolean.TRUE.equals(trailer.isActive),
                 ServiceResourceKind.TRAILER);
             trailerPlate = trailer.plate;
         }
@@ -183,19 +182,6 @@ public class AssignServiceResourcesService {
             command.driverId(), driverName,
             command.tractorId(), tractor.plate,
             command.trailerId(), trailerPlate);
-    }
-
-    /**
-     * El mensaje concuerda por genero, como el del conflicto: recibe el TIPO y no una etiqueta ya
-     * armada, para que la concordancia se decida en un solo lugar. Con la etiqueta suelta, "La
-     * carreta indicado no existe o esta inactivo" se cuela sin que nada falle.
-     */
-    private void requireActive(boolean usable, ServiceResourceKind kind) {
-        if (!usable) {
-            throw CommonError.VALIDATION_FAILED.toException(kind == ServiceResourceKind.TRAILER
-                ? serviceResourceConflicts.label(kind) + " indicada no existe o está inactiva"
-                : serviceResourceConflicts.label(kind) + " indicado no existe o está inactivo");
-        }
     }
 
     // ---------- Escritura ------------------------------------------------------
