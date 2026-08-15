@@ -8,6 +8,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -74,5 +75,38 @@ class DateUtilsTest {
     void toLocalDate_withUnexpectedType_throws() {
         assertThrows(IllegalStateException.class, () -> DateUtils.toLocalDate("no soy fecha"));
         assertThrows(IllegalStateException.class, () -> DateUtils.toLocalDate(null));
+    }
+
+    /**
+     * Las dos operaciones de {@code toStorableUtc} solo se pueden medir ACA. Por HTTP son
+     * invisibles: {@code timestamptz} preserva el instante escriba con el huso que escriba, y
+     * ningun test de endpoint manda precision sub-segundo. Sin estos dos casos, el metodo entero
+     * es indistinguible de {@code return value;}.
+     */
+    @Test
+    void toStorableUtc_normalizesTheOffsetToUtc() {
+        OffsetDateTime stored = DateUtils.toStorableUtc(
+            OffsetDateTime.parse("2026-07-10T00:12:00-05:00"));
+
+        assertEquals(ZoneOffset.UTC, stored.getOffset());
+        assertEquals("2026-07-10T05:12Z", stored.toString());
+    }
+
+    /**
+     * PostgreSQL guarda microsegundos y REDONDEA; Java trunca. Sin el truncado, una marca con
+     * nanos vuelve del GET distinta de la que devolvio el POST, y la auditoria afirma un valor que
+     * la columna nunca tuvo.
+     */
+    @Test
+    void toStorableUtc_truncatesToTheMicrosecondsThatTheColumnStores() {
+        OffsetDateTime stored = DateUtils.toStorableUtc(
+            OffsetDateTime.parse("2026-07-10T05:12:00.123456789Z"));
+
+        assertEquals(123456000, stored.getNano());
+    }
+
+    @Test
+    void toStorableUtc_keepsNullAsNull() {
+        assertNull(DateUtils.toStorableUtc(null));
     }
 }

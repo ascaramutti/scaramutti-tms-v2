@@ -4,11 +4,36 @@ import com.scaramutti.tms.shared.exception.ApiError;
 
 /**
  * Catalogo de errores del modulo Operaciones con codigos trazables (OPS-XXX). Los codigos se
- * agregan a medida que cada endpoint los necesita, tomando el numero que el contrato le reservo
- * (por eso el primero en implementarse no es OPS-001). Un codigo ya usado NO se recodifica:
- * cada caso nuevo toma el siguiente libre.
+ * agregan a medida que cada endpoint los necesita, tomando el numero que el contrato le reservo,
+ * asi que el orden en que aparecen aca no es el orden en que se implementaron. Un codigo ya usado
+ * NO se recodifica: cada caso nuevo toma el siguiente libre.
  */
 public enum OperationsError implements ApiError {
+
+    /**
+     * La transicion pedida no existe en la maquina de estados: el par origen→destino no figura en
+     * la tabla.
+     *
+     * <p>Habla del ARCO, no de la fila. Los dos terminales inmutables (cancelado y eliminado) los
+     * rechaza ANTES {@link #SERVICE_NOT_EDITABLE}, con lo cual a la maquina nunca se la pregunta
+     * por ellos y los dos codigos no se solapan, aunque para esos doce pares los dos serian
+     * ciertos. Sin esa precedencia declarada, el mismo caso contestaria un codigo u otro segun el
+     * orden de dos {@code if}.
+     *
+     * <p>La REAPERTURA es la excepcion, y por eso no rompe la regla: es la unica que ENTRA a un
+     * terminal en vez de salir de el, asi que no pasa por la guarda de inmutabilidad ni por la
+     * maquina. Tiene su propio rechazo con este mismo codigo —"solo se reabre un viaje cancelado o
+     * eliminado"— que si habla de un origen terminal.
+     *
+     * <p>Tampoco es {@link #ACTION_NOT_ALLOWED_FOR_STATUS}, que rechaza acciones que NO son
+     * cambios de estado (asignar recursos, sumar refuerzos). Se deja escrito porque los tres son
+     * 409 de estado y se confunden.
+     *
+     * <p>El detalle se sobrescribe por caso nombrando los dos estados en es-PE: el texto generico
+     * no le dice al usuario a donde SI podia ir.
+     */
+    INVALID_STATUS_TRANSITION("OPS-001", 409, "Invalid status transition",
+        "No se puede pasar al estado pedido desde el estado actual"),
 
     /**
      * Un recurso pedido ya participa de OTRO viaje activo, como recurso principal o como
@@ -69,11 +94,39 @@ public enum OperationsError implements ApiError {
     /**
      * No se pudo tomar la fila del viaje: la espera se agoto porque otra operacion la tiene, o el
      * motor corto un abrazo mortal. Los dos son conflictos TRANSITORIOS: quien llama reintenta y
-     * lo mas probable es que pase. Lleva codigo propio para que el cliente lo distinga del 409
-     * permanente de un viaje inmutable, que no tiene sentido reintentar.
+     * lo mas probable es que pase. Lleva codigo propio para que el cliente lo distinga del 409 de
+     * un viaje inmutable, que no se destraba reintentando sino reabriendo el viaje.
      */
     SERVICE_LOCKED("OPS-008", 409, "Conflict",
         "No se pudo completar la operación por un bloqueo temporal en la base de datos, reintente en unos segundos"),
+
+    /**
+     * A la fila le falta un dato que la transicion necesita. Son CUATRO casos: iniciar un viaje
+     * sin conductor y tracto, cerrar uno que no registra cuando arranco, reabrir uno cuyo rastro no
+     * dice de donde venia (o dice uno del que no se vuelve), y reabrir uno con recursos de refuerzo,
+     * cuya disponibilidad todavia no se puede verificar.
+     *
+     * <p>Los tres primeros NO pueden pasar por la aplicacion, y ese es el punto: a "pendiente de
+     * inicio" solo se llega asignando, pasar a "en ruta" siempre escribe el inicio (el que venga en
+     * el cuerpo, o el momento de la llamada), y toda salida deja su fila de rastro. Si esa guarda
+     * dispara, la fila entro SIN pasar por la aplicacion — el cutover del sistema anterior, o una
+     * escritura a mano. El cuarto es distinto: es un limite CONOCIDO de la reapertura, con fecha de
+     * vencimiento (se cae cuando exista el endpoint de refuerzos), y tampoco se reintenta.
+     *
+     * <p>Por eso el mensaje NO le pide nada al usuario. No puede arreglarlo: la edicion corrige las
+     * fechas reales que ya existen pero no las fija desde cero, asi que ofrecerle "corregi la fecha"
+     * seria mandarlo a una puerta cerrada. Lo que corresponde es sanear el dato, y eso es del
+     * script de migracion o de soporte.
+     *
+     * <p>Lleva codigo propio y no comparte el de los otros 409 de estado porque la interfaz tiene
+     * que poder distinguirlo: los demas son errores de lo que el usuario acaba de pedir, este es un
+     * problema de la fila que ya estaba ahi.
+     */
+    // El detalle por defecto es GENERICO a proposito: los cuatro sitios que lo lanzan lo pisan con
+    // el suyo, y dejar aca el texto de uno solo ("no registra cuando inicio") desinforma sobre el
+    // alcance del codigo a quien lo lea desde el catalogo.
+    SERVICE_DATA_INCOMPLETE("OPS-009", 409, "Conflict",
+        "Al viaje le falta un dato que esta transición necesita"),
     ;
 
     private final String code;

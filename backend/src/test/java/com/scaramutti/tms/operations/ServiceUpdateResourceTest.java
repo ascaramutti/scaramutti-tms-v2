@@ -2049,7 +2049,7 @@ class ServiceUpdateResourceTest {
     // ---------- Helpers de base -----------------------------------------------------
 
     /**
-     * Fija las fechas reales por SQL: las produce la transición de estado, que todavía no existe,
+     * Fija las fechas reales por SQL: las produce la transición de estado, que es otro endpoint,
      * y sin ellas no se puede probar la CORRECCIÓN de una fecha ya puesta.
      */
     private void forceRealDates(long serviceId, String start, String end) {

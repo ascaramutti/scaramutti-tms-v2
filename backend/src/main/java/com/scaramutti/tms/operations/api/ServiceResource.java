@@ -3,10 +3,12 @@ package com.scaramutti.tms.operations.api;
 import com.scaramutti.tms.operations.dto.ServiceAssignResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
+import com.scaramutti.tms.operations.dto.ServiceStatusChangeRequest;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.mapper.ServiceResourceMapper;
 import com.scaramutti.tms.operations.service.AssignServiceResourcesService;
+import com.scaramutti.tms.operations.service.ChangeServiceStatusService;
 import com.scaramutti.tms.operations.service.CreateServiceService;
 import com.scaramutti.tms.operations.service.GetServiceService;
 import com.scaramutti.tms.operations.service.ListServicesService;
@@ -37,6 +39,7 @@ import java.net.URI;
 public class ServiceResource {
 
     @Inject AssignServiceResourcesService assignServiceResourcesService;
+    @Inject ChangeServiceStatusService changeServiceStatusService;
     @Inject CreateServiceService createServiceService;
     @Inject GetServiceService getServiceService;
     @Inject ListServicesService listServicesService;
@@ -148,6 +151,37 @@ public class ServiceResource {
         );
         // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
         // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
+        return Response.ok(response)
+            .header("ETag", Etag.of(response.updatedAt()))
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .build();
+    }
+
+    /**
+     * Transiciones de estado del viaje: iniciar, finalizar, cancelar, eliminar y reabrir.
+     *
+     * <p>El despacho entra —opera el viaje— pero el veto de las transiciones destructivas y de la reapertura se
+     * decide adentro, contra el target pedido: no se puede expresar con {@code @RolesAllowed},
+     * que solo sabe de la puerta. {@code sales} no participa: registra y edita el servicio, pero
+     * la operacion del viaje es del despacho y la gerencia.
+     *
+     * <p>El {@code If-Match} se declara siempre y es obligatorio al cancelar, al eliminar y al reabrir.
+     * Esa condicionalidad tampoco se puede declarar: depende de un campo del cuerpo.
+     */
+    @POST
+    @Path("/{id}/status")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
+    public Response changeServiceStatus(
+        @PathParam("id") String id,
+        @HeaderParam("If-Match") String ifMatch,
+        @Valid @NotNull ServiceStatusChangeRequest serviceStatusChangeRequest
+    ) {
+        ServiceDetailResponse response = changeServiceStatusService.changeServiceStatus(
+            serviceResourceMapper.toChangeServiceStatusCommand(
+                serviceResourceMapper.toServiceId(id), ifMatch, serviceStatusChangeRequest)
+        );
         return Response.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
