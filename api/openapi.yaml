@@ -2591,10 +2591,12 @@ paths:
         ⚠️ Un viaje con recursos de REFUERZO todavía no se reabre hacia un estado
         que los retiene: sus adicionales también vuelven a quedar tomados y la
         verificación de disponibilidad hoy solo alcanza a los tres principales.
-        Responde 409 `OPS-009` y **no es forzable**. Es un límite con fecha de
-        vencimiento: se levanta cuando exista el endpoint de recursos adicionales.
-        Reabrir hacia "pendiente de asignación" no lo tiene, porque ese estado no
-        retiene nada.
+        Responde 409 `OPS-009` y **no es forzable**. El endpoint de refuerzos YA
+        existe, así que este límite es ALCANZABLE: sumar un refuerzo, cancelar y
+        querer reabrir deja al viaje sin poder volver. No lo sostiene una regla de
+        negocio sino el presupuesto de esperas de bloqueo, y se levanta en su propio
+        cambio, no con el endpoint de refuerzos. Reabrir hacia "pendiente de
+        asignación" no lo tiene, porque ese estado no retiene nada.
 
         Cada transición que AVANZA exige los datos que la etapa anterior tenía
         que haber dejado: iniciar pide conductor y tracto (la carreta es opcional, hay
@@ -2743,13 +2745,47 @@ paths:
       operationId: addServiceResources
       summary: Agregar recursos adicionales (solo con el viaje en ruta)
       description: |
-        RN-OP5 — solo con el servicio en ruta (otro estado → 409 `OPS-006`), al
-        menos un recurso y motivo de 10 caracteres o más.
+        RN-OP5 — solo con el servicio en ruta, al menos un recurso y motivo de 10
+        caracteres o más, medidos DESPUÉS de recortar los espacios de los bordes.
 
-        RN-OP4 — un recurso que ya participa del MISMO servicio → 409 `OPS-003`,
-        duro: no se fuerza. RN-OP3 — ocupado en OTRO servicio activo (como
-        principal o como refuerzo, ambas fuentes) → 409 `OPS-002`, forzable con
-        `force: true`.
+        El estado que no admite la acción se parte en dos códigos, igual que en la
+        asignación: `PENDING_ASSIGNMENT`, `PENDING_START` y `COMPLETED` responden 409
+        `OPS-006`, y los dos terminales inmutables, `CANCELLED` y `DELETED`, responden
+        409 `OPS-004`, el mismo código con el que los rechaza el PUT.
+
+        RN-OP4 — un recurso que ya participa del MISMO servicio, sea como principal
+        o como refuerzo sumado antes (se revisan AMBAS fuentes) → 409 `OPS-003`,
+        duro: no se fuerza. RN-OP3 — ocupado en OTRO servicio activo (también ambas
+        fuentes) → 409 `OPS-002`, forzable con `force: true`.
+
+        **El ORDEN entre esos dos es parte de la regla, no una preferencia de
+        implementación**: `OPS-003` se evalúa PRIMERO. Si se evaluara `OPS-002`
+        antes, un `force: true` colaría el duplicado que RN-OP4 declara no
+        forzable. Los 400 de negocio (recurso inexistente o dado de baja) se
+        contestan antes que los dos.
+
+        Los recursos NO reemplazan a los principales: se SUMAN. El viaje se queda en
+        ruta y sus conductor, tracto y carreta originales no se tocan. Un pedido con
+        los tres recursos deja UNA fila de refuerzo, no tres.
+
+        Los recursos tienen que existir y estar de alta (400 `COM-001`), pero su
+        disponibilidad NO se valida: sumar un refuerzo ELIGE (a diferencia de
+        reabrir, que RESTAURA), así que rige el mismo criterio que la asignación y un
+        tracto en mantenimiento se puede sumar igual.
+
+        Mandar `force: true` sin que haya conflicto suma el refuerzo normal y NO deja
+        registrado que se forzara nada.
+
+        Sin `If-Match`, igual que la asignación pero por una razón DISTINTA: aquella
+        se auto-protege porque ABANDONA el estado que la habilita, y esta se queda en
+        "en ruta". Lo que rechaza el reintento acá es `OPS-003`. Un `If-Match` que
+        llegue igual se ignora.
+
+        Los 400 de FORMATO del cuerpo (al menos un recurso, mínimo y tope del motivo,
+        byte NUL, ids no positivos, `force` no booleano) se contestan ANTES que
+        cualquier precondición, así que un id de viaje inexistente con un cuerpo
+        inválido responde 400 y no 404. Los textos libres no pueden contener el byte
+        NUL (`\u0000`): la columna no lo admite y se rechaza con 400.
       x-required-roles: [admin, general_manager, operations_manager, dispatcher]
       parameters:
         - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
@@ -2761,9 +2797,11 @@ paths:
             example: { driverId: 9, reason: 'Relevo por descanso reglamentario del conductor principal', force: false }
       responses:
         '200':
-          description: Recursos agregados
+          description: Refuerzos sumados; el viaje sigue en ruta
           headers:
             ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
+            Cache-Control: { schema: { type: string }, description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta' }
+            Vary: { schema: { type: string }, description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
@@ -2772,7 +2810,7 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409':
-          description: '`OPS-006` (el estado no admite la acción), `OPS-002` (forzable) u `OPS-003` (duro)'
+          description: 'En orden de PRECEDENCIA: `OPS-004` (cancelado o eliminado), `OPS-006` (el estado no admite la acción), `OPS-003` (el recurso ya participa de este mismo viaje; duro, no forzable) y `OPS-002` (tomado por otro viaje activo; forzable). Además `OPS-008` (conflicto de lock, transitorio) desde cualquier punto.'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
@@ -4438,6 +4476,10 @@ components:
         etiqueta sin interpretar el texto. Las entradas heredadas del sistema
         anterior llegan como `NOTE`.
 
+        `ASSIGNMENT` cubre TANTO la asignación de los recursos principales COMO los
+        refuerzos sumados con el viaje en ruta: los distingue el TEXTO de la entrada,
+        cuya primera línea nombra la acción.
+
     ServiceSummaryResponse:
       type: object
       description: |
@@ -4475,13 +4517,18 @@ components:
 
     ServiceAdditionalResourceResponse:
       type: object
-      description: Recurso sumado al viaje ya en ruta (relevo, apoyo), con su motivo.
+      description: |
+        Recurso sumado al viaje ya en ruta (relevo, apoyo), con su motivo.
+
+        Una fila es un PEDIDO, no un recurso: puede traer conductor, tracto y carreta a la vez,
+        uno solo o cualquier combinación. Los que no participaron viajan en null, y por eso los
+        tres son opcionales pese a que el pedido que la creó exigió al menos uno.
       required: [id, reason, assignedBy, assignedAt]
       properties:
         id:         { type: integer, format: int64 }
-        driver:     { $ref: '#/components/schemas/DriverRef' }
-        tractor:    { $ref: '#/components/schemas/FleetUnitRef' }
-        trailer:    { $ref: '#/components/schemas/FleetUnitRef' }
+        driver:     { oneOf: [{ $ref: '#/components/schemas/DriverRef' }],    type: ['object', 'null'] }
+        tractor:    { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
+        trailer:    { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         reason:     { type: string, maxLength: 500 }
         assignedBy: { $ref: '#/components/schemas/UserRef' }
         assignedAt: { type: string, format: date-time }
@@ -4514,6 +4561,7 @@ components:
             endDateTime:   { type: [string, 'null'], format: date-time, description: 'Fin real. Lo fija la transición a "completado" y la edición lo corrige; null mientras el viaje no haya cerrado' }
             additionalResources:
               type: array
+              description: 'Refuerzos sumados con el viaje en ruta, en orden cronológico ascendente. Lista vacía si no hay, NUNCA null.'
               items: { $ref: '#/components/schemas/ServiceAdditionalResourceResponse' }
             events:
               type: array
@@ -4622,14 +4670,29 @@ components:
 
     AddResourcesRequest:
       type: object
-      description: Al menos uno de `driverId`, `tractorId` o `trailerId`; si no viene ninguno, 400.
+      description: |
+        Al menos uno de `driverId`, `tractorId` o `trailerId`; si no viene ninguno, 400
+        `COM-001`. Es una condición ENTRE campos, así que no se puede declarar en el esquema:
+        la valida el servidor.
+
+        El mínimo del motivo se mide DESPUÉS de recortar los espacios de los bordes (diez
+        espacios no son un motivo), igual que la justificación de la edición: el `pattern`
+        dice eso mismo, para que un cliente generado no acepte lo que el servidor rechaza.
+
+        El motivo entra en la BITÁCORA del viaje y en la descripción de las filas de
+        auditoría. La bitácora viaja dentro del detalle, al que entra `dispatcher`, así
+        que es un texto libre escrito por roles que ven importes y leído por uno que no
+        (misma propiedad que la nota de la asignación y la justificación de la edición).
+        Sus saltos de línea se APLASTAN al escribirlo en la bitácora (se ven como `⏎`),
+        porque cada entrada tiene una línea por dato y un salto permitiría plantar una
+        línea falsa con el formato del servidor. En la auditoría se guarda CRUDO.
       required: [reason]
       properties:
-        driverId:  { type: [integer, 'null'] }
-        tractorId: { type: [integer, 'null'] }
-        trailerId: { type: [integer, 'null'] }
-        reason:    { type: string, minLength: 10, maxLength: 500 }
-        force:     { type: boolean, default: false }
+        driverId:  { type: [integer, 'null'], minimum: 1 }
+        tractorId: { type: [integer, 'null'], minimum: 1 }
+        trailerId: { type: [integer, 'null'], minimum: 1 }
+        reason:    { type: string, minLength: 10, maxLength: 500, pattern: '^\s*\S[\s\S]{8,}\S\s*$', description: 'Por qué se suma el refuerzo. Obligatorio; 10 caracteres o más ya recortado.' }
+        force:     { type: [boolean, 'null'], default: false, description: 'true = suma el recurso pese al conflicto OPS-002 y lo deja registrado en la bitácora y en la auditoría. Ausente, null y false son lo mismo. NO abre el duplicado del mismo viaje (OPS-003), que es duro.' }
 
     ServiceStatsResponse:
       type: object

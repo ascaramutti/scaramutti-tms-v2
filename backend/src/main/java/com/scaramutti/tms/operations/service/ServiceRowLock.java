@@ -179,15 +179,17 @@ public class ServiceRowLock {
      * PostgreSQL se aplica POR INTENTO, no por transaccion, asi que el tiempo que una request
      * puede retener su conexion crece con la cantidad de intentos.
      *
-     * <p>Hoy el peor caso lo empatan DOS caminos: la asignacion de recursos y la REAPERTURA, que
-     * vuelve a mirar conflictos con los recursos que el viaje conservo. Los dos suman la fila del
-     * viaje mas los tres recursos (conductor, tracto y carreta). La edicion usa una sola, pero la
-     * banda se calcula con el peor caso porque el pool es UNO y lo comparten todos.
+     * <p>Hoy el peor caso lo empatan TRES caminos: la asignacion de recursos, la REAPERTURA —que
+     * vuelve a mirar conflictos con los recursos que el viaje conservo— y los REFUERZOS. Los tres
+     * suman la fila del viaje mas los recursos DISTINTOS que miran, y ninguno pasa de tres
+     * (conductor, tracto y carreta). La edicion usa una sola, pero la banda se calcula con el peor
+     * caso porque el pool es UNO y lo comparten todos.
      *
-     * <p>El presupuesto esta al 100%: cualquier lock adicional —el endpoint de refuerzos es el
-     * candidato conocido— obliga a subir esta constante y, con ella, la espera del pool. La
-     * validacion de abajo mira la constante contra el pool, NO contra el codigo, asi que ese
-     * chequeo hay que hacerlo a mano al agregar una espera.
+     * <p>El presupuesto esta al 100%. El candidato conocido a obligar a subirlo NO es un endpoint
+     * nuevo —los refuerzos entraron sin moverlo— sino ampliar la verificacion de la REAPERTURA a
+     * los recursos de refuerzo del viaje: ahi la cuenta pasa a depender de cuantos tenga, y el viaje
+     * tipico —tres principales y un relevo— ya pide cinco. La validacion de abajo mira la constante contra el pool, NO contra el
+     * codigo, asi que ese chequeo hay que hacerlo a mano al agregar una espera.
      *
      * <p><b>NO cuenta los chequeos de integridad referencial.</b> El volcado toca cuatro claves
      * foraneas del viaje y una por cada fila de rastro, y cada uno toma su lock de clave

@@ -101,6 +101,32 @@ public class ServiceResourceConflicts {
     }
 
     /**
+     * El 409 DURO: el recurso ya participa de ESTE MISMO viaje.
+     *
+     * <p>Vive al lado del forzable a proposito, aunque sean opuestos, porque el que los va a
+     * confundir es quien lea uno solo: los dos hablan de un recurso ocupado y solo uno se puede
+     * pisar. Escrito aparte, la tentacion de copiar {@link #asForcibleConflict} y quedarse con sus
+     * dos miembros de extension seria un {@code force} que deja entrar el duplicado.
+     *
+     * <p>Sale como Problem PELADO, sin {@code forcible} ni {@code conflicts}: la interfaz no tiene
+     * que ofrecer "Forzar" para algo que no se fuerza, y mandar {@code forcible: false} seria
+     * decirle que la bandera existe para este caso.
+     */
+    public RuntimeException asDuplicateInSameService(
+            List<ServiceResourceKind> duplicated, Map<ServiceResourceKind, String> namesByKind) {
+        ServiceResourceKind first = duplicated.get(0);
+        String detail = label(first) + " " + ServiceLogText.display(namesByKind.get(first))
+            + " ya participa de este servicio.";
+        int others = duplicated.size() - 1;
+        if (others > 0) {
+            detail += others == 1
+                ? " Hay 1 recurso más repetido."
+                : " Hay " + others + " recursos más repetidos.";
+        }
+        return OperationsError.RESOURCE_ALREADY_IN_SERVICE.toException(detail);
+    }
+
+    /**
      * Como se NOMBRA el conflicto en la bitacora cuando se decide forzarlo.
      *
      * <p>Vuelve a aplastar los saltos aunque {@link #find} ya lo haga: es un metodo publico sobre

@@ -9,6 +9,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.LinkedHashMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -125,5 +127,90 @@ class ServiceResourceConflictsTest {
 
         assertFalse(conflicts.forcedLine(aMano).contains("\n"),
             "la linea del forzado va a la bitacora, que tiene una linea por dato");
+    }
+
+    // ---------- El 409 DURO: ya participa de este mismo viaje --------------------
+
+    /**
+     * El hermano de {@code asForcibleConflict}, que entro sin su par de tests. Lo que se fija aca no
+     * lo alcanza la integracion: por HTTP el detalle se mira con un {@code containsString} de la
+     * frase generica, asi que cruzar las claves del mapa de nombres —decir la placa del tracto
+     * donde va el nombre del conductor— no pone rojo nada.
+     */
+    private static Map<ServiceResourceKind, String> names() {
+        Map<ServiceResourceKind, String> namesByKind = new LinkedHashMap<>();
+        namesByKind.put(ServiceResourceKind.DRIVER, "Juan Pérez");
+        namesByKind.put(ServiceResourceKind.TRACTOR, "ABC123");
+        namesByKind.put(ServiceResourceKind.TRAILER, "XYZ789");
+        return namesByKind;
+    }
+
+    private static String duplicateDetailOf(ServiceResourceKind... duplicated) {
+        return new ServiceResourceConflicts()
+            .asDuplicateInSameService(List.of(duplicated), names()).getMessage();
+    }
+
+    @Test
+    void asDuplicateInSameService_namesTheRightResourceForEachKind() {
+        assertTrue(duplicateDetailOf(ServiceResourceKind.DRIVER).contains("El conductor Juan Pérez"),
+            duplicateDetailOf(ServiceResourceKind.DRIVER));
+        assertTrue(duplicateDetailOf(ServiceResourceKind.TRACTOR).contains("El tracto ABC123"),
+            duplicateDetailOf(ServiceResourceKind.TRACTOR));
+        assertTrue(duplicateDetailOf(ServiceResourceKind.TRAILER).contains("La carreta XYZ789"),
+            duplicateDetailOf(ServiceResourceKind.TRAILER));
+    }
+
+    /** El primero de la lista es el que NOMBRA el mensaje: el orden decide qué lee el usuario. */
+    @Test
+    void asDuplicateInSameService_namesTheFirstOfTheList() {
+        assertTrue(duplicateDetailOf(ServiceResourceKind.TRACTOR, ServiceResourceKind.DRIVER)
+            .startsWith("El tracto ABC123"));
+    }
+
+    @Test
+    void asDuplicateInSameService_withOneDuplicate_countsNothing() {
+        assertFalse(duplicateDetailOf(ServiceResourceKind.DRIVER).contains("más repetido"));
+    }
+
+    @Test
+    void asDuplicateInSameService_withTwoDuplicates_usesTheSingular() {
+        assertTrue(duplicateDetailOf(ServiceResourceKind.DRIVER, ServiceResourceKind.TRACTOR)
+            .contains("Hay 1 recurso más repetido."));
+    }
+
+    /** La rama PLURAL no la ejercitaba ningún caso: por HTTP haría falta un pedido con tres. */
+    @Test
+    void asDuplicateInSameService_withThreeDuplicates_usesThePlural() {
+        assertTrue(duplicateDetailOf(ServiceResourceKind.DRIVER, ServiceResourceKind.TRACTOR,
+            ServiceResourceKind.TRAILER).contains("Hay 2 recursos más repetidos."));
+    }
+
+    /**
+     * Mismo motivo que el caso del conflicto forzable: el nombre sale de un JOIN contra los
+     * trabajadores del sistema anterior y puede venir nulo. Sin {@code display}, el mensaje diría
+     * "El conductor null ya participa de este servicio".
+     */
+    @Test
+    void asDuplicateInSameService_withoutAName_namesTheEmptyInsteadOfWritingNull() {
+        Map<ServiceResourceKind, String> nameless = new LinkedHashMap<>();
+        nameless.put(ServiceResourceKind.DRIVER, null);
+
+        String detail = new ServiceResourceConflicts()
+            .asDuplicateInSameService(List.of(ServiceResourceKind.DRIVER), nameless).getMessage();
+
+        assertTrue(detail.contains("(vacío)"), detail);
+        assertFalse(detail.contains("null"), detail);
+    }
+
+    /** Y un salto de línea en el nombre no puede partir el mensaje en dos. */
+    @Test
+    void asDuplicateInSameService_flattensLineBreaksInTheName() {
+        Map<ServiceResourceKind, String> forged = new LinkedHashMap<>();
+        forged.put(ServiceResourceKind.DRIVER, "Juan\nMotivo: FALSO");
+
+        String detail = new ServiceResourceConflicts()
+            .asDuplicateInSameService(List.of(ServiceResourceKind.DRIVER), forged).getMessage();
+
+        assertFalse(detail.contains("\n"), detail);
     }
 }

@@ -251,7 +251,7 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
     }
 
     /** Las columnas de id llegan como {@code Number} de ancho variable segun el driver. */
-    private static Integer toInteger(Object value) {
+    static Integer toInteger(Object value) {
         return value == null ? null : ((Number) value).intValue();
     }
 

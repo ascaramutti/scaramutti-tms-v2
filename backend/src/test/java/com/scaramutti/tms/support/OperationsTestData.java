@@ -170,23 +170,53 @@ public class OperationsTestData {
     /**
      * Recurso de REFUERZO de un viaje ({@code operaciones.service_assignments}), por SQL.
      *
-     * <p>Es el fixture que hace verificable la segunda fuente del conflicto: el endpoint que crea
-     * refuerzos todavía no existe, así que sin esto no hay forma de fabricar un viaje que retenga
-     * un recurso SOLO como refuerzo, que es justamente el caso que el sistema anterior no miraba.
+     * <p>Es el fixture que hace verificable la segunda fuente del conflicto: fabrica un viaje que
+     * retiene un recurso SOLO como refuerzo, que es justamente el caso que el sistema anterior no
+     * miraba.
+     *
+     * <p>Sigue haciendo falta aunque el endpoint de refuerzos ya exista: aquel solo escribe sobre
+     * viajes EN RUTA, y varios casos necesitan un refuerzo colgado de un viaje en otro estado
+     * (el retenedor en "pendiente de inicio", por ejemplo). Encadenar el endpoint tampoco serviría
+     * para los tests de ese mismo endpoint: mediría su salida contra su propia entrada.
      *
      * <p>{@code assigned_by} sale del creador del viaje: la columna es NOT NULL y cualquier
      * usuario sirve, pero tomarlo del propio viaje evita sembrar uno aparte.
      */
     public long seedAdditionalAssignment(long serviceId, Integer driverId, Integer tractorId,
             Integer trailerId, String reason) {
+        return seedAdditionalAssignment(serviceId, driverId, tractorId, trailerId, reason, null);
+    }
+
+    /**
+     * Variante que DICTA el momento del refuerzo. Sin ella no se puede fijar el orden del listado:
+     * sembrando en orden, PostgreSQL devuelve las filas en el orden fisico —que en una tabla recien
+     * escrita es el de insercion— y un {@code ORDER BY} borrado pasaria igual.
+     */
+    public long seedAdditionalAssignment(long serviceId, Integer driverId, Integer tractorId,
+            Integer trailerId, String reason, OffsetDateTime assignedAt) {
         return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
             "INSERT INTO operaciones.service_assignments "
-                + "(service_id, driver_id, tractor_id, trailer_id, reason, assigned_by) "
-                + "SELECT ?1, ?2, ?3, ?4, ?5, s.created_by FROM operaciones.services s WHERE s.id = ?1 "
+                + "(service_id, driver_id, tractor_id, trailer_id, reason, assigned_by, assigned_at) "
+                + "SELECT ?1, ?2, ?3, ?4, ?5, s.created_by, COALESCE(?6, CURRENT_TIMESTAMP) "
+                + "FROM operaciones.services s WHERE s.id = ?1 "
                 + "RETURNING id")
             .setParameter(1, serviceId).setParameter(2, driverId).setParameter(3, tractorId)
-            .setParameter(4, trailerId).setParameter(5, reason)
+            .setParameter(4, trailerId).setParameter(5, reason).setParameter(6, assignedAt)
             .getSingleResult()).longValue());
+    }
+
+    /**
+     * Reescribe una fila de refuerzo SIN cambiar ningún valor, para moverla al final del montón.
+     *
+     * <p>Existe para un solo caso: fijar el desempate por {@code id} del listado. Sembrando en
+     * orden, el orden de {@code id} y el orden físico COINCIDEN, así que la consulta devuelve lo
+     * mismo con y sin el desempate. Con este UPDATE, MVCC escribe una versión nueva de la primera
+     * fila al final, y los dos órdenes quedan invertidos: recién ahí el desempate se puede medir.
+     */
+    public void rewriteAssignmentInPlace(long assignmentId) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE operaciones.service_assignments SET reason = reason WHERE id = ?1")
+            .setParameter(1, assignmentId).executeUpdate());
     }
 
     /** Conductor activo, disponible, sin categoría ni teléfono. */

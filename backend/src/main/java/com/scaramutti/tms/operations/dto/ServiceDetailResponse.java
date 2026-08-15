@@ -22,8 +22,8 @@ import java.util.List;
  *
  * <p>Los recursos asignados (conductor, tracto, carreta) viajan desde que existe el endpoint que
  * los asigna: son null mientras el viaje este pendiente de asignacion, y la carreta puede seguir
- * en null despues, porque es opcional. Los REFUERZOS todavia no estan: llegan con el endpoint que
- * los produce.
+ * en null despues, porque es opcional. Los REFUERZOS viajan aparte, en su propia lista: no
+ * reemplazan a los principales, se suman.
  */
 public record ServiceDetailResponse(
 
@@ -85,6 +85,9 @@ public record ServiceDetailResponse(
 
     @Schema(nullable = true, description = "Fin real del viaje; lo fija la transicion a \"completado\" y la edicion lo corrige; null mientras el viaje no haya cerrado")
     OffsetDateTime endDateTime,
+
+    @Schema(description = "Refuerzos sumados con el viaje en ruta, en orden cronologico ascendente. Lista vacia si no hay, nunca null")
+    List<ServiceAdditionalResourceResponse> additionalResources,
 
     @Schema(description = "Bitacora en orden cronologico ascendente")
     List<ServiceEventResponse> events,

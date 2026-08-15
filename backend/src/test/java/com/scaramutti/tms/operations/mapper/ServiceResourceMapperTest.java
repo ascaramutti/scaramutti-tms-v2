@@ -1,9 +1,11 @@
 package com.scaramutti.tms.operations.mapper;
 
+import com.scaramutti.tms.operations.dto.ServiceAddResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.model.TripScope;
+import com.scaramutti.tms.operations.service.cmd.AddServiceResourcesCommand;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
 import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
 import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
@@ -17,6 +19,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -629,5 +632,96 @@ class ServiceResourceMapperTest {
             OffsetDateTime start, OffsetDateTime end) {
         return new ServiceUpdateRequest(LocalDate.now(), "Piura", "Lima", BigDecimal.TEN,
             null, null, null, BigDecimal.TEN, 1, null, start, end, VALID_JUSTIFICATION);
+    }
+
+    // ---------- Refuerzos ------------------------------------------------------
+
+    private AddServiceResourcesCommand reinforcement(
+            Integer driverId, Integer tractorId, Integer trailerId, String reason, String force) {
+        return mapper.toAddServiceResourcesCommand(7L,
+            new ServiceAddResourcesRequest(driverId, tractorId, trailerId, reason, force));
+    }
+
+    private static final String VALID_REASON = "Relevo por descanso reglamentario";
+
+    @Test
+    void toAddServiceResourcesCommand_keepsTheThreeResourceIds() {
+        AddServiceResourcesCommand command = reinforcement(4, 5, 6, VALID_REASON, null);
+
+        assertEquals(7L, command.serviceId());
+        assertEquals(4, command.driverId());
+        assertEquals(5, command.tractorId());
+        assertEquals(6, command.trailerId());
+        assertEquals(VALID_REASON, command.reason());
+        assertFalse(command.force());
+    }
+
+    /** "Al menos uno" es una condición ENTRE campos: no se puede declarar, la sostiene el mapper. */
+    @Test
+    void toAddServiceResourcesCommand_withoutAnyResource_rejects() {
+        assertTrue(messageOf(() -> reinforcement(null, null, null, VALID_REASON, null))
+            .contains("al menos un recurso"));
+    }
+
+    /** Un solo recurso alcanza, sea cual sea: es lo que separa el refuerzo de la asignación. */
+    @Test
+    void toAddServiceResourcesCommand_withOnlyOneResource_isAccepted() {
+        assertEquals(4, reinforcement(4, null, null, VALID_REASON, null).driverId());
+        assertEquals(5, reinforcement(null, 5, null, VALID_REASON, null).tractorId());
+        assertEquals(6, reinforcement(null, null, 6, VALID_REASON, null).trailerId());
+    }
+
+    @Test
+    void toAddServiceResourcesCommand_trimsTheReason() {
+        assertEquals(VALID_REASON, reinforcement(4, null, null, "  " + VALID_REASON + "  ", null).reason());
+    }
+
+    /**
+     * El mínimo se mide DESPUÉS del recorte. Medido en crudo, "corta     " son diez caracteres y
+     * cinco de contenido, y la bitácora quedaría con un motivo que no explica nada.
+     */
+    @Test
+    void toAddServiceResourcesCommand_withAPaddedShortReason_rejects() {
+        assertTrue(messageOf(() -> reinforcement(4, null, null, "corta     ", null))
+            .contains("al menos 10 caracteres"));
+    }
+
+    @Test
+    void toAddServiceResourcesCommand_withAReasonOfSpaces_rejects() {
+        assertTrue(messageOf(() -> reinforcement(4, null, null, "            ", null))
+            .contains("al menos 10 caracteres"));
+    }
+
+    /** El NUL sobrevive al recorte y al mínimo, y PostgreSQL no lo admite en un texto. */
+    @Test
+    void toAddServiceResourcesCommand_withANulInTheReason_rejects() {
+        assertTrue(messageOf(() -> reinforcement(4, null, null, "Relevo\u0000 reglamentario", null))
+            .contains("no se pueden guardar"));
+    }
+
+    /**
+     * El motivo se mira ANTES que los recursos: un cuerpo con los dos problemas contesta por el
+     * campo que el usuario acaba de escribir, no por los combos.
+     */
+    @Test
+    void toAddServiceResourcesCommand_withBothProblems_rejectsByTheReason() {
+        assertTrue(messageOf(() -> reinforcement(null, null, null, "corta", null))
+            .contains("al menos 10 caracteres"));
+    }
+
+    /** Ausente, null y cualquier grafía de "false" significan lo mismo: NO forzar. */
+    @Test
+    void toAddServiceResourcesCommand_parsesForce() {
+        assertFalse(reinforcement(4, null, null, VALID_REASON, null).force());
+        assertFalse(reinforcement(4, null, null, VALID_REASON, "false").force());
+        assertFalse(reinforcement(4, null, null, VALID_REASON, "FALSE").force());
+        assertTrue(reinforcement(4, null, null, VALID_REASON, "true").force());
+        assertTrue(reinforcement(4, null, null, VALID_REASON, "TRUE").force());
+    }
+
+    @Test
+    void toAddServiceResourcesCommand_withAForceThatIsNotABoolean_rejects() {
+        assertTrue(messageOf(() -> reinforcement(4, null, null, VALID_REASON, "maybe"))
+            .contains("true o false"));
     }
 }

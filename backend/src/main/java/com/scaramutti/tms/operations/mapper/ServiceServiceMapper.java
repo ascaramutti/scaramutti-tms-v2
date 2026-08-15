@@ -1,6 +1,7 @@
 package com.scaramutti.tms.operations.mapper;
 
 import com.scaramutti.tms.auth.dto.UserResponse;
+import com.scaramutti.tms.operations.dto.ServiceAdditionalResourceResponse;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
 import com.scaramutti.tms.operations.dto.ServiceEventResponse;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
@@ -16,6 +17,7 @@ import com.scaramutti.tms.shared.entity.Client;
 import com.scaramutti.tms.shared.entity.Service;
 import com.scaramutti.tms.shared.entity.ServiceEvent;
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
+import com.scaramutti.tms.shared.repository.ServiceAssignmentRepository.ServiceAdditionalResourceRow;
 import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceListRow;
 import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitRef;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
@@ -75,6 +77,7 @@ public interface ServiceServiceMapper {
     @Mapping(target = "trailer",       source = "trailer")
     @Mapping(target = "startDateTime", source = "service.startDateTime")
     @Mapping(target = "endDateTime",   source = "service.endDateTime")
+    @Mapping(target = "additionalResources", source = "additionalResources")
     @Mapping(target = "events",        source = "events")
     @Mapping(target = "createdBy",     source = "createdBy")
     @Mapping(target = "createdAt",     source = "service.createdAt")
@@ -82,9 +85,27 @@ public interface ServiceServiceMapper {
     ServiceDetailResponse toServiceDetailResponse(
         Service service, ServiceClientSummary client, ServiceCargoTypeSummary cargoType,
         BigDecimal price, String currencyCode, ServiceDriverSummary driver,
-        FleetUnitRef tractor, FleetUnitRef trailer, List<ServiceEventResponse> events,
-        ServiceUserSummary createdBy
+        FleetUnitRef tractor, FleetUnitRef trailer,
+        List<ServiceAdditionalResourceResponse> additionalResources,
+        List<ServiceEventResponse> events, ServiceUserSummary createdBy
     );
+
+    /**
+     * Una fila de refuerzo, ya resuelta por consulta, a la respuesta. Los tres recursos se arman
+     * con los mismos dos helpers que los principales: el refuerzo no es otro tipo de conductor ni
+     * de unidad, y darle una forma propia obligaria a la pantalla a leer dos veces lo mismo.
+     */
+    default ServiceAdditionalResourceResponse toServiceAdditionalResourceResponse(
+            ServiceAdditionalResourceRow row, ServiceUserSummary assignedBy) {
+        return new ServiceAdditionalResourceResponse(
+            row.id(),
+            toServiceDriverSummary(row.driverId(), row.driverFullName()),
+            toFleetUnitRef(FleetUnitKind.TRACTOR, row.tractorId(), row.tractorPlate()),
+            toFleetUnitRef(FleetUnitKind.TRAILER, row.trailerId(), row.trailerPlate()),
+            row.reason(),
+            assignedBy,
+            row.assignedAt());
+    }
 
     /**
      * Los recursos asignados de una fila, ya resueltos por consulta, a los tipos de la respuesta.

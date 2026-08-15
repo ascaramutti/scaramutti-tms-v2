@@ -95,6 +95,9 @@ public class CreateServiceService {
             null,
             null,
             null,
+            // Los refuerzos solo se suman con el viaje YA en ruta, asi que uno recien creado no
+            // puede tener ninguno. Lista vacia y no null: el contrato la declara obligatoria.
+            List.of(),
             List.of(serviceServiceMapper.toServiceEventResponse(event, author)),
             author
         );

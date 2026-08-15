@@ -1,5 +1,6 @@
 package com.scaramutti.tms.operations.mapper;
 
+import com.scaramutti.tms.operations.dto.ServiceAddResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceAssignResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
 import com.scaramutti.tms.operations.dto.ServiceStatusChangeRequest;
@@ -7,6 +8,7 @@ import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.service.ServiceLogText;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.model.ServiceStatusTransition;
+import com.scaramutti.tms.operations.service.cmd.AddServiceResourcesCommand;
 import com.scaramutti.tms.operations.service.cmd.AssignServiceResourcesCommand;
 import com.scaramutti.tms.operations.service.cmd.ChangeServiceStatusCommand;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
@@ -301,6 +303,75 @@ public interface ServiceResourceMapper {
         qualifiedByName = "parseForce")
     AssignServiceResourcesCommand toAssignServiceResourcesCommand(
         long serviceId, ServiceAssignResourcesRequest serviceAssignResourcesRequest);
+
+    /**
+     * Guarda de entrada de los refuerzos. Corre ANTES del mapeo de abajo, igual que la de la
+     * asignacion y por el mismo motivo: escrita asi y no dentro de un metodo a mano, la validacion
+     * no se puede saltear, porque no queda ningun mapeo publico "puro" al que llamar de costado.
+     *
+     * <p>Las TRES van juntas en un solo metodo, y no una por {@code @BeforeMapping}, porque el
+     * ORDEN entre ellas es una decision y no un detalle: primero el motivo y despues los recursos.
+     * Un cuerpo con los dos problemas contesta por el motivo, que es el campo que el usuario acaba
+     * de escribir; empezar por los recursos lo mandaria a revisar los combos por un error que esta
+     * en el texto. Repartidas en tres metodos, ese orden quedaria librado a MapStruct.
+     */
+    @BeforeMapping
+    default void requireUsableReinforcement(ServiceAddResourcesRequest serviceAddResourcesRequest) {
+        requireStorableText(serviceAddResourcesRequest.reason(), "El motivo");
+        requireReason(serviceAddResourcesRequest.reason());
+        requireAtLeastOneResource(serviceAddResourcesRequest);
+    }
+
+    /**
+     * Refuerzos. El id sale de la ruta y el resto del cuerpo; los tres ids de recurso se mapean por
+     * nombre.
+     *
+     * <p>{@code reason} se recorta con el mismo qualifier que el resto de los textos del modulo: el
+     * MINIMO ya lo verifico la guarda de arriba sobre el valor recortado, asi que aca solo queda
+     * normalizar. {@code force} llega como TEXTO y se resuelve con {@code parseForce}, igual que en
+     * la asignacion y en la transicion: declarado como {@code Boolean}, un valor que no parsea lo
+     * rechaza el lector de JSON con un cuerpo que no es el Problem que el contrato promete.
+     */
+    @Mapping(target = "serviceId", source = "serviceId")
+    @Mapping(target = "reason", source = "serviceAddResourcesRequest.reason",
+        qualifiedByName = "trimToNull")
+    @Mapping(target = "force", source = "serviceAddResourcesRequest.force",
+        qualifiedByName = "parseForce")
+    AddServiceResourcesCommand toAddServiceResourcesCommand(
+        long serviceId, ServiceAddResourcesRequest serviceAddResourcesRequest);
+
+    /**
+     * El motivo del refuerzo, medido DESPUES de recortarlo, por el mismo motivo que la
+     * justificacion de la edicion: el minimo declarativo cuenta el texto CRUDO, asi que uno corto
+     * rellenado con espacios lo pasa entero y dejaria la bitacora —y el reporte semanal, que lo
+     * muestra al lado del conductor adicional— con un motivo que no explica nada.
+     */
+    private static void requireReason(String reason) {
+        String normalized = StringUtils.trimToNull(reason);
+        if (normalized == null
+                || normalized.length() < ServiceAddResourcesRequest.MIN_REASON_LENGTH) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "El motivo necesita al menos " + ServiceAddResourcesRequest.MIN_REASON_LENGTH
+                    + " caracteres");
+        }
+    }
+
+    /**
+     * Al menos uno de los tres recursos. Es una condicion ENTRE campos, asi que no se puede
+     * declarar en el esquema ni en una anotacion de campo: la sostiene esta guarda, y del lado de
+     * la base el CHECK de la tabla.
+     *
+     * <p>Muerde sobre el VALOR y no sobre la presencia de la clave: un formulario que serializa el
+     * objeto entero manda {@code null} en los combos que no se eligieron, y un pedido con los tres
+     * en null es exactamente el mismo pedido vacio que uno sin ninguna clave.
+     */
+    private static void requireAtLeastOneResource(ServiceAddResourcesRequest request) {
+        if (request.driverId() == null && request.tractorId() == null
+                && request.trailerId() == null) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "Hay que indicar al menos un recurso: conductor, tracto o carreta");
+        }
+    }
 
     /**
      * PostgreSQL no admite el byte NUL dentro de un texto: llega hasta el motor y revienta la

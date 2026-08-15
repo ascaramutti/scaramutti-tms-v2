@@ -50,6 +50,24 @@ public enum OperationsError implements ApiError {
         "El recurso ya está asignado a otro servicio activo"),
 
     /**
+     * Un recurso pedido ya participa de ESTE MISMO viaje, sea como recurso principal o como
+     * refuerzo sumado antes. Se miran las DOS fuentes: las columnas del viaje y las filas de
+     * refuerzos.
+     *
+     * <p>Se confunde con {@link #RESOURCE_CONFLICT} porque los dos hablan de un recurso ocupado,
+     * pero son opuestos en lo unico que le importa al cliente: aquel es forzable y este NO. Mandar
+     * dos veces el mismo conductor al mismo viaje no es una decision operativa discutible, es un
+     * pedido sin sentido, y por eso el cuerpo viaja como Problem pelado, sin {@code forcible} ni
+     * {@code conflicts}: la interfaz no tiene que ofrecer "Forzar".
+     *
+     * <p>Se evalua ANTES que el conflicto forzable, y el orden es parte de la regla, no del
+     * codigo: si se preguntara primero por el otro viaje, un {@code force} colaria el duplicado
+     * que este codigo existe para rechazar.
+     */
+    RESOURCE_ALREADY_IN_SERVICE("OPS-003", 409, "Duplicate resource",
+        "El recurso ya participa de este servicio"),
+
+    /**
      * El viaje esta cancelado o eliminado: los dos estados terminales son INMUTABLES. El
      * completado si se toca (corregir los datos de un viaje ya cerrado es legitimo), asi que este
      * error no habla del final del ciclo sino de sus dos salidas.
@@ -110,8 +128,16 @@ public enum OperationsError implements ApiError {
      * inicio" solo se llega asignando, pasar a "en ruta" siempre escribe el inicio (el que venga en
      * el cuerpo, o el momento de la llamada), y toda salida deja su fila de rastro. Si esa guarda
      * dispara, la fila entro SIN pasar por la aplicacion — el cutover del sistema anterior, o una
-     * escritura a mano. El cuarto es distinto: es un limite CONOCIDO de la reapertura, con fecha de
-     * vencimiento (se cae cuando exista el endpoint de refuerzos), y tampoco se reintenta.
+     * escritura a mano.
+     *
+     * <p>El cuarto es de otra naturaleza y desde que existe el endpoint de refuerzos es ALCANZABLE
+     * por la API, con esta secuencia: sumar un refuerzo, cancelar el viaje, intentar reabrirlo. No
+     * lo sostiene una regla de negocio sino el presupuesto de esperas de lock: verificar la
+     * disponibilidad al reabrir pide una espera por cada recurso DISTINTO del viaje, y el viaje tipico
+     * —tres principales y un relevo— ya pide 5 contra el techo de 4. Levantarlo es subir ese techo y el tope
+     * del pool en la misma proporcion —un ajuste de numeros sobre configuracion compartida, no una
+     * reingenieria del lockeo—, pero es un cambio propio: hasta que se haga, un viaje reforzado
+     * que se cancela no se puede reabrir por la aplicacion.
      *
      * <p>Por eso el mensaje NO le pide nada al usuario. No puede arreglarlo: la edicion corrige las
      * fechas reales que ya existen pero no las fija desde cero, asi que ofrecerle "corregi la fecha"

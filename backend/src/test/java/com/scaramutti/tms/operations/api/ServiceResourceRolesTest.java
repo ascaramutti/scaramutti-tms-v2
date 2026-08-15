@@ -118,6 +118,58 @@ class ServiceResourceRolesTest {
                 + status.stream().filter(role -> !fleetUnits.contains(role)).collect(Collectors.toSet()));
     }
 
+    /**
+     * Los REFUERZOS producen el mismo cuerpo de conflicto que la asignación —código y estado de
+     * OTRO viaje— y además persisten la placa en la bitácora, que sobrevive a la respuesta. Le
+     * aplican las mismas cuatro precondiciones, y su javadoc las promete explícitamente.
+     */
+    @Test
+    void reinforcementRoles_areASubsetOfTheDetailRoles() {
+        Set<String> reinforcement = rolesOf("addServiceResources");
+        Set<String> detail = rolesOf("getService");
+
+        assertTrue(detail.containsAll(reinforcement),
+            "quien suma refuerzos tiene que poder leer el detalle: el 200 ES el detalle, y el 409 "
+                + "nombra otro viaje. Sobran en los refuerzos: "
+                + reinforcement.stream().filter(role -> !detail.contains(role)).collect(Collectors.toSet()));
+    }
+
+    @Test
+    void reinforcementRoles_areASubsetOfTheListRoles() {
+        Set<String> reinforcement = rolesOf("addServiceResources");
+        Set<String> list = rolesOf("listServices");
+
+        assertTrue(list.containsAll(reinforcement),
+            "sobran en los refuerzos: "
+                + reinforcement.stream().filter(role -> !list.contains(role)).collect(Collectors.toSet()));
+    }
+
+    @Test
+    void reinforcementRoles_areASubsetOfTheSharedCatalogRoles() {
+        Set<String> reinforcement = rolesOf(ServiceResource.class, "addServiceResources");
+        Set<String> drivers = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.driver.api.DriverResource.class, "listDrivers");
+        Set<String> fleetUnits = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.fleetunit.api.FleetUnitResource.class, "listFleetUnits");
+
+        assertTrue(drivers.containsAll(reinforcement),
+            "quien suma refuerzos lee nombres de conductor por el conflicto y por la bitacora; sobran: "
+                + reinforcement.stream().filter(role -> !drivers.contains(role)).collect(Collectors.toSet()));
+        assertTrue(fleetUnits.containsAll(reinforcement),
+            "y placas de flota; sobran: "
+                + reinforcement.stream().filter(role -> !fleetUnits.contains(role)).collect(Collectors.toSet()));
+    }
+
+    /**
+     * Y la simetría con la asignación: son la misma operación sobre el mismo viaje (elegir recursos)
+     * y el contrato les da la misma lista. Si alguna vez divergen, que sea una decisión escrita.
+     */
+    @Test
+    void reinforcementRoles_matchTheAssignmentRoles() {
+        assertEquals(rolesOf("assignServiceResources"), rolesOf("addServiceResources"),
+            "asignar y reforzar son la misma decisión operativa; el contrato les da la misma lista");
+    }
+
     private Set<String> rolesOf(String methodName) {
         return rolesOf(ServiceResource.class, methodName);
     }

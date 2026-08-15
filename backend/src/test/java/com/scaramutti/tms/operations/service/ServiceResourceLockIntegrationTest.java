@@ -260,6 +260,51 @@ class ServiceResourceLockIntegrationTest {
         .then().statusCode(200).body("status", equalTo("PENDING_START"));
     }
 
+    /**
+     * Y el TERCER camino que toma estos locks: los REFUERZOS.
+     *
+     * <p>Vale por lo mismo que el de la reapertura, y no por simetría: la carrera de dos hilos del
+     * test del endpoint sincroniza el disparo, no la lectura, así que el perdedor puede llegar
+     * tarde, ver la fila del ganador ya confirmada y contestar `OPS-002` sin que ningún lock haya
+     * intervenido — verde con el envoltorio borrado. El caso que retiene la FILA tampoco alcanza:
+     * ese conflicto lo traduce el envoltorio de adentro de {@code findByIdForUpdate}. Este es el
+     * único que ejercita el de AFUERA, el que envuelve la operación entera.
+     *
+     * <p>Sin él: un refuerzo que pierda la espera por el advisory del conductor —dentro de la
+     * consulta de conflictos— sale 500 donde el contrato declara 409 `OPS-008`.
+     */
+    @Test
+    @Timeout(60)
+    void addResources_whenTheResourceLockIsHeldByAnotherTransaction_returns409() throws Exception {
+        long id = createService();
+        given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+            .body(assignmentPayload())
+        .when().post("/services/" + id + "/assignment").then().statusCode(200);
+        given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+            .body(Map.of("target", "IN_PROGRESS"))
+        .when().post("/services/" + id + "/status").then().statusCode(200);
+
+        int reinforcementDriverId = operationsFixtures.seedDriver("ZTEST Relevo", "Lock");
+        String key = ServiceResourceLockKeys.of(ServiceResourceKind.DRIVER, reinforcementDriverId);
+        Map<String, Object> reinforcement = Map.of(
+            "driverId", reinforcementDriverId,
+            "reason", "Relevo por descanso reglamentario del conductor");
+
+        withResourceLockHeld(key, () ->
+            given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+                .body(reinforcement)
+            .when().post("/services/" + id + "/resources")
+            .then().statusCode(409)
+                .contentType("application/problem+json")
+                .body("code", equalTo("OPS-008")));
+
+        // soltado el lock, el MISMO refuerzo pasa: eso es lo que lo vuelve transitorio
+        given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+            .body(reinforcement)
+        .when().post("/services/" + id + "/resources")
+        .then().statusCode(200).body("additionalResources.size()", equalTo(1));
+    }
+
     // ---------- Helpers ---------------------------------------------------------
 
     /** Cancela el viaje y devuelve el ETag que quedó, que es el que la reapertura va a exigir. */
