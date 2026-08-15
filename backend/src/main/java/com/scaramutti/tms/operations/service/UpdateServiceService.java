@@ -1,7 +1,6 @@
 package com.scaramutti.tms.operations.service;
 
 import com.scaramutti.tms.auth.security.CurrentUser;
-import com.scaramutti.tms.operations.OperationsError;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
 import com.scaramutti.tms.operations.model.ServiceAuditChangeType;
 import com.scaramutti.tms.operations.model.ServiceEventType;
@@ -16,6 +15,7 @@ import com.scaramutti.tms.shared.repository.CurrencyRepository;
 import com.scaramutti.tms.shared.repository.ServiceAuditLogRepository;
 import com.scaramutti.tms.shared.repository.ServiceEventRepository;
 import com.scaramutti.tms.shared.repository.ServiceRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.shared.util.Etag;
 import com.scaramutti.tms.shared.util.StringUtils;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -25,10 +25,7 @@ import jakarta.transaction.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -47,13 +44,6 @@ import java.util.Set;
  */
 @ApplicationScoped
 public class UpdateServiceService {
-
-    /**
-     * Los dos estados que ya no admiten edicion. El COMPLETED queda AFUERA a proposito: corregir
-     * los datos de un viaje ya cerrado es el caso que mas justifica este endpoint.
-     */
-    private static final Set<ServiceStatus> IMMUTABLE_STATUSES =
-        EnumSet.of(ServiceStatus.CANCELLED, ServiceStatus.DELETED);
 
     /** Como se muestra en la bitacora un valor que no todos los roles pueden ver. */
     private static final String HIDDEN_VALUE_LABEL = "(no se muestra)";
@@ -130,9 +120,7 @@ public class UpdateServiceService {
     // ---------- Precondiciones -------------------------------------------------
 
     private void rejectIfImmutable(Service service) {
-        if (IMMUTABLE_STATUSES.contains(ServiceStatus.valueOf(service.status))) {
-            throw OperationsError.SERVICE_NOT_EDITABLE.toException();
-        }
+        ServiceStatusGuards.rejectIfImmutable(ServiceStatus.valueOf(service.status));
     }
 
     /**
@@ -175,13 +163,13 @@ public class UpdateServiceService {
         // fecha de inicio, y ahi un mensaje que hable del estado contradice lo que el usuario tiene
         // en pantalla. Y NO promete un remedio: en un viaje migrado ya completado, la transicion
         // que habria fijado la fecha ya ocurrio y no vuelve, asi que esa fila se sanea por el
-        // script de cutover; y en uno nacido en v2, el endpoint que las fija todavia no existe.
-        // Prometer "lo pone el cambio de estado" seria mandar al usuario a una puerta cerrada.
+        // script de cutover; y en uno nacido en v2 que todavia no arranco, la fecha aparece sola
+        // cuando el viaje pase a en ruta. Prometer "corregila" seria mandarlo a una puerta cerrada.
         if (current == null) {
             throw CommonError.VALIDATION_FAILED.toException(
                 "La fecha " + which + " todavía no está registrada, y acá se corrige, no se fija.");
         }
-        return requested.withOffsetSameInstant(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
+        return DateUtils.toStorableUtc(requested);
     }
 
     /**

@@ -8,7 +8,6 @@ import com.scaramutti.tms.operations.model.ServiceAuditChangeType;
 import com.scaramutti.tms.operations.model.ServiceEventType;
 import com.scaramutti.tms.operations.model.ServiceResourceKind;
 import com.scaramutti.tms.operations.model.ServiceStatus;
-import com.scaramutti.tms.operations.model.ServiceStatusLabels;
 import com.scaramutti.tms.operations.service.cmd.AssignServiceResourcesCommand;
 import com.scaramutti.tms.shared.entity.Driver;
 import com.scaramutti.tms.shared.entity.Service;
@@ -22,7 +21,6 @@ import com.scaramutti.tms.shared.repository.ServiceAuditLogRepository;
 import com.scaramutti.tms.shared.repository.ServiceEventRepository;
 import com.scaramutti.tms.shared.repository.ServiceRepository;
 import com.scaramutti.tms.shared.repository.ServiceResourceConflictRepository;
-import com.scaramutti.tms.shared.repository.ServiceResourceConflictRepository.ServiceResourceConflictRow;
 import com.scaramutti.tms.shared.repository.TractorRepository;
 import com.scaramutti.tms.shared.repository.TrailerRepository;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -30,12 +28,7 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.util.ArrayList;
-import java.util.Locale;
-import java.util.EnumSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 /**
  * Asignacion de los recursos principales de un viaje: conductor, tracto y, si va, carreta.
@@ -55,23 +48,15 @@ public class AssignServiceResourcesService {
     /** Unico estado desde el que se asigna: el viaje todavia no tiene recursos. */
     private static final ServiceStatus ASSIGNABLE_STATUS = ServiceStatus.PENDING_ASSIGNMENT;
 
-    /** Los dos terminales inmutables, que llevan codigo propio (el mismo que rechaza la edicion). */
-    private static final Set<ServiceStatus> IMMUTABLE_STATUSES =
-        EnumSet.of(ServiceStatus.CANCELLED, ServiceStatus.DELETED);
-
     private static final String ASSIGNMENT_DESCRIPTION = "Asignación de recursos";
 
     private static final String FORCED_ASSIGNMENT_DESCRIPTION =
         "Asignación de recursos forzando un conflicto de disponibilidad";
 
-    /** Claves de los miembros de extension del error de conflicto, como las declara el contrato. */
-    private static final String FORCIBLE_FIELD = "forcible";
-    private static final String CONFLICTS_FIELD = "conflicts";
-
     @Inject ServiceRepository serviceRepository;
     @Inject ServiceEventRepository serviceEventRepository;
     @Inject ServiceAuditLogRepository serviceAuditLogRepository;
-    @Inject ServiceResourceConflictRepository serviceResourceConflictRepository;
+    @Inject ServiceResourceConflicts serviceResourceConflicts;
     @Inject DriverRepository driverRepository;
     @Inject TractorRepository tractorRepository;
     @Inject TrailerRepository trailerRepository;
@@ -114,9 +99,11 @@ public class AssignServiceResourcesService {
         // La consulta toma ella misma el lock de los recursos que mira, y por eso va DESPUES del
         // lock de la fila: ese es el que puso el tope de espera, y al reves la espera por el lock
         // de un recurso no tendria techo.
-        List<ServiceResourceConflictResponse> conflicts = findConflicts(command, resources);
+        List<ServiceResourceConflictResponse> conflicts = serviceResourceConflicts.find(
+            command.serviceId(), command.driverId(), command.tractorId(), command.trailerId(),
+            resources.driverFullName(), resources.tractorPlate(), resources.trailerPlate());
         if (!conflicts.isEmpty() && !command.force()) {
-            throw conflictException(conflicts);
+            throw serviceResourceConflicts.asForcibleConflict(conflicts);
         }
 
         // Los valores ANTERIORES se leen antes de pisarlos. Hoy los tres recursos son siempre
@@ -153,9 +140,7 @@ public class AssignServiceResourcesService {
      */
     private void requireAssignableStatus(Service service) {
         ServiceStatus status = ServiceStatus.valueOf(service.status);
-        if (IMMUTABLE_STATUSES.contains(status)) {
-            throw OperationsError.SERVICE_NOT_EDITABLE.toException();
-        }
+        ServiceStatusGuards.rejectIfImmutable(status);
         if (status != ASSIGNABLE_STATUS) {
             throw OperationsError.ACTION_NOT_ALLOWED_FOR_STATUS.toException();
         }
@@ -208,98 +193,9 @@ public class AssignServiceResourcesService {
     private void requireActive(boolean usable, ServiceResourceKind kind) {
         if (!usable) {
             throw CommonError.VALIDATION_FAILED.toException(kind == ServiceResourceKind.TRAILER
-                ? label(kind) + " indicada no existe o está inactiva"
-                : label(kind) + " indicado no existe o está inactivo");
+                ? serviceResourceConflicts.label(kind) + " indicada no existe o está inactiva"
+                : serviceResourceConflicts.label(kind) + " indicado no existe o está inactivo");
         }
-    }
-
-    // ---------- Conflicto ------------------------------------------------------
-
-    /**
-     * Los recursos pedidos que ya retiene otro viaje activo, con su etiqueta pegada.
-     *
-     * <p>El nombre no sale de la consulta: los conflictos solo pueden ser sobre los tres recursos
-     * que se pidieron, y esos ya estan resueltos. Traerlo de la consulta obligaria a colgarle
-     * tres uniones externas para volver a leer lo mismo.
-     */
-    private List<ServiceResourceConflictResponse> findConflicts(
-            AssignServiceResourcesCommand command, AssignedResources resources) {
-        Map<ServiceResourceKind, String> namesByKind = new LinkedHashMap<>();
-        namesByKind.put(ServiceResourceKind.DRIVER, resources.driverFullName());
-        namesByKind.put(ServiceResourceKind.TRACTOR, resources.tractorPlate());
-        namesByKind.put(ServiceResourceKind.TRAILER, resources.trailerPlate());
-
-        List<ServiceResourceConflictRow> rows = serviceResourceConflictRepository.findActiveConflicts(
-            command.serviceId(), command.driverId(), command.tractorId(), command.trailerId());
-
-        List<ServiceResourceConflictResponse> conflicts = new ArrayList<>();
-        for (ServiceResourceConflictRow row : rows) {
-            // Se aplastan ACA, al armar el DTO, y no solo en el texto del error: los dos valores
-            // salen de la base y las dos salidas de la misma respuesta —el mensaje y la lista—
-            // no pueden discrepar sobre si el salto de linea se ve. La pantalla que junte la
-            // lista en un bloque de texto tendria el mismo agujero que la bitacora cierra.
-            conflicts.add(new ServiceResourceConflictResponse(
-                row.resource(), flat(namesByKind.get(row.resource())),
-                flat(row.serviceCode()), row.serviceStatus()));
-        }
-        return conflicts;
-    }
-
-    /**
-     * El 409 forzable, con los dos miembros de extension que la interfaz necesita para ofrecer
-     * "Forzar asignacion". El texto nombra al primero y cuenta el resto: el detalle completo ya
-     * viaja en la lista, y un mensaje que enumere cinco recursos no se lee.
-     */
-    private RuntimeException conflictException(List<ServiceResourceConflictResponse> conflicts) {
-        return OperationsError.RESOURCE_CONFLICT.toException(
-            conflictDetail(conflicts),
-            Map.of(FORCIBLE_FIELD, true, CONFLICTS_FIELD, conflicts));
-    }
-
-    private String conflictDetail(List<ServiceResourceConflictResponse> conflicts) {
-        ServiceResourceConflictResponse first = conflicts.get(0);
-        // Los valores ya vienen aplastados desde findConflicts: aca solo se arma la frase.
-        String detail = label(first.resource()) + " " + first.resourceName()
-            + " ya está " + assignedParticiple(first.resource()) + " al servicio "
-            + first.serviceCode() + " (" + statusLabel(first.serviceStatus()) + ").";
-        // Se cuentan RECURSOS distintos, no filas: el mismo conductor retenido por dos viajes
-        // son dos filas y UN solo recurso en conflicto, y decir "hay 1 recurso mas" ahi seria
-        // falso. Es alcanzable con este endpoint solo, forzando la segunda asignacion.
-        long others = conflicts.stream()
-            .map(ServiceResourceConflictResponse::resource).distinct().count() - 1;
-        if (others > 0) {
-            detail += others == 1
-                ? " Hay 1 recurso más en conflicto."
-                : " Hay " + others + " recursos más en conflicto.";
-        }
-        return detail;
-    }
-
-    private String label(ServiceResourceKind kind) {
-        return switch (kind) {
-            case DRIVER -> "El conductor";
-            case TRACTOR -> "El tracto";
-            case TRAILER -> "La carreta";
-        };
-    }
-
-    /**
-     * El participio concuerda con el genero del recurso. Parece un detalle de estilo y no lo es:
-     * el mensaje lo lee la persona que decide si pisa un control de disponibilidad, y "La carreta
-     * ABC123 ya está asignado" delata que el texto se arma pegando pedazos, que es justo lo que
-     * hace dudar de si el dato tambien esta armado a los pedazos.
-     */
-    private String assignedParticiple(ServiceResourceKind kind) {
-        return kind == ServiceResourceKind.TRAILER ? "asignada" : "asignado";
-    }
-
-    /**
-     * El estado, como lo nombra el negocio. Los seis viven en una tabla compartida: acá solo
-     * llegan los dos que pueden retener un recurso, pero el mismo estado tiene que llamarse igual
-     * en toda la aplicación, y con una copia por servicio eso dura hasta que alguien retoque una.
-     */
-    private String statusLabel(ServiceStatus status) {
-        return ServiceStatusLabels.of(status);
     }
 
     // ---------- Escritura ------------------------------------------------------
@@ -427,12 +323,7 @@ public class AssignServiceResourcesService {
         }
         if (wasForced(conflicts, command)) {
             for (ServiceResourceConflictResponse conflict : conflicts) {
-                lines.add("Asignación forzada: "
-                    + label(conflict.resource()).toLowerCase(Locale.ROOT)
-                    + " " + flat(conflict.resourceName())
-                    + " ya estaba " + assignedParticiple(conflict.resource()) + " al servicio "
-                    + flat(conflict.serviceCode())
-                    + " (" + statusLabel(conflict.serviceStatus()) + ")");
+                lines.add("Asignación forzada: " + serviceResourceConflicts.forcedLine(conflict));
             }
         }
         if (command.note() != null) {
