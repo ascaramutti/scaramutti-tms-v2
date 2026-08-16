@@ -366,11 +366,23 @@ public class ChangeServiceStatusService {
         // solo los tres principales: validar tres y restablecer N seria el mismo agujero que este
         // bloque cierra, entrando por la otra mitad. Se rechaza en vez de mirar de menos.
         //
-        // Es un limite CON FECHA DE VENCIMIENTO: hoy ningun endpoint escribe esa tabla (el de
-        // refuerzos todavia no existe), asi que por la API es inalcanzable; se abre con el cutover.
-        // Cuando exista ese endpoint, la consulta de conflictos tiene que aceptar la lista completa
-        // de recursos y este rechazo se cae — junto con revisar el presupuesto de esperas de lock,
-        // que es lo que hoy impide ampliarla sin pensarlo.
+        // Desde que existe el endpoint de refuerzos esto es ALCANZABLE por la API, con esta
+        // secuencia: sumar un refuerzo, cancelar el viaje, intentar reabrirlo. Deja de ser un
+        // rechazo defensivo y pasa a ser un callejon sin salida real: ese viaje ya no se reabre.
+        //
+        // Lo que lo sostiene NO es una regla de negocio sino el presupuesto de esperas de lock.
+        // Ampliar la consulta a la lista completa pide una espera por cada recurso DISTINTO del
+        // viaje (volver a pedir un lock que la transaccion ya tiene no espera: solo incrementa un
+        // contador), o sea 1 por la fila + los principales + los de refuerzo que no repitan. El
+        // viaje tipico —tres principales y un relevo de conductor— pide 5, una por encima del
+        // techo de MAX_LOCK_WAITS_PER_TRANSACTION, que hoy es 4 (1s x 4 < los 5s que el pool
+        // espera por una conexion).
+        //
+        // Dicho de otro modo: NO hace falta rediseñar el lockeo para levantar esto. Hace falta
+        // subir el tope del pool y la constante en la misma proporcion, con la banda recalculada
+        // para el peor caso que se decida soportar (cuantos refuerzos por viaje). Sigue siendo un
+        // cambio propio —toca configuracion compartida con cotizaciones y almacen— pero es un
+        // ajuste de numeros, no una reingenieria.
         if (serviceRepository.countAdditionalResources(service.id) > 0) {
             throw OperationsError.SERVICE_DATA_INCOMPLETE.toException(
                 "El viaje tiene recursos de refuerzo y todavía no se puede verificar su "

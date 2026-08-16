@@ -1,5 +1,6 @@
 package com.scaramutti.tms.operations.api;
 
+import com.scaramutti.tms.operations.dto.ServiceAddResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceAssignResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
@@ -7,6 +8,7 @@ import com.scaramutti.tms.operations.dto.ServiceStatusChangeRequest;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.mapper.ServiceResourceMapper;
+import com.scaramutti.tms.operations.service.AddServiceResourcesService;
 import com.scaramutti.tms.operations.service.AssignServiceResourcesService;
 import com.scaramutti.tms.operations.service.ChangeServiceStatusService;
 import com.scaramutti.tms.operations.service.CreateServiceService;
@@ -38,6 +40,7 @@ import java.net.URI;
 @Produces(MediaType.APPLICATION_JSON)
 public class ServiceResource {
 
+    @Inject AddServiceResourcesService addServiceResourcesService;
     @Inject AssignServiceResourcesService assignServiceResourcesService;
     @Inject ChangeServiceStatusService changeServiceStatusService;
     @Inject CreateServiceService createServiceService;
@@ -148,6 +151,42 @@ public class ServiceResource {
         ServiceDetailResponse response = assignServiceResourcesService.assignServiceResources(
             serviceResourceMapper.toAssignServiceResourcesCommand(
                 serviceResourceMapper.toServiceId(id), serviceAssignResourcesRequest)
+        );
+        // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
+        // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
+        return Response.ok(response)
+            .header("ETag", Etag.of(response.updatedAt()))
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .build();
+    }
+
+    /**
+     * Sumar refuerzos SI es del despacho, por lo mismo que asignar: es la operacion del viaje, no
+     * su registro.
+     *
+     * <p>No lleva {@code If-Match}, igual que la asignacion, <b>pero por una razon DISTINTA y por
+     * eso se escribe</b>: aquella se auto-protege porque ABANDONA el estado que la habilita, y esta
+     * se queda en "en ruta", asi que un segundo envio del mismo cuerpo encuentra el endpoint
+     * todavia habilitado. Lo que rechaza el reintento aca es OPS-003: el mismo recurso sobre el
+     * mismo viaje rebota duro y {@code force} no lo abre. La idempotencia frente al doble-click la
+     * da el duplicado, no el estado.
+     *
+     * <p><b>Precondicion de esta lista de roles:</b> misma que la asignacion, y subconjunto de la
+     * del detalle por el mismo motivo — el cuerpo del conflicto nombra el codigo y el estado de
+     * OTRO viaje, y un rol que solo pudiera reforzar convertiria ese 409 en un canal de lectura.
+     */
+    @POST
+    @Path("/{id}/resources")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
+    public Response addServiceResources(
+        @PathParam("id") String id,
+        @Valid @NotNull ServiceAddResourcesRequest serviceAddResourcesRequest
+    ) {
+        ServiceDetailResponse response = addServiceResourcesService.addServiceResources(
+            serviceResourceMapper.toAddServiceResourcesCommand(
+                serviceResourceMapper.toServiceId(id), serviceAddResourcesRequest)
         );
         // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
         // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.

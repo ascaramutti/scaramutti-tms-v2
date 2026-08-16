@@ -155,14 +155,20 @@ public class ServiceResourceConflictRepository {
      * aca — los conflictos solo pueden ser sobre los tres que se pidieron, y esos ya los resolvio
      * quien llama para poder validarlos.
      *
-     * <p><b>{@code excludedServiceId} hoy no es alcanzable, y se deja igual.</b> Medido con una
-     * mutacion: quitando esa condicion, ningun test se pone rojo. La razon es que el filtro de
-     * estados ya la contiene: los dos llamadores de hoy pasan un viaje que NO retiene recursos —la
-     * asignacion, con el viaje en "pendiente de asignacion", y la reapertura, con el viaje todavia
-     * cancelado o eliminado—, asi que la fila propia nunca entra en el resultado. Se conserva porque el endpoint de refuerzos va a llamar a esta misma
-     * consulta con el viaje YA en ruta, y ahi si se encontraria a si mismo: el choque contra
-     * OTRO viaje es el conflicto forzable, y el choque contra el PROPIO viaje es un error duro
-     * distinto. Escrito aca para que no se lo lea como una condicion de mas y se lo borre.
+     * <p><b>{@code excludedServiceId} es REDUNDANTE para los tres llamadores, y esta encolado para
+     * borrarse.</b> Ninguno le pasa un viaje que pueda aparecer en su propia respuesta: al asignar
+     * esta en "pendiente de asignacion" y al reabrir sigue cancelado o eliminado, o sea que no
+     * retienen nada; los refuerzos son los primeros que pasan un viaje EN RUTA, pero el caso exacto
+     * en que apareceria lo rechaza antes el 409 duro del duplicado.
+     *
+     * <p>Medido, no supuesto: quitando la condicion y el binding, los UNICOS casos que caen son los
+     * tres de {@code ServiceResourceConflictRepositoryTest}, escritos para esto. El resto de la
+     * suite queda verde.
+     *
+     * <p>No se borra ACA porque hacerlo bien es sacar tambien el parametro y renombrar el metodo
+     * (sin la exclusion, el nombre miente), y eso toca los tres llamadores: es una mudanza de codigo
+     * compartido y va en su propio cambio. Mientras tanto lo fija ese test, que llama a este metodo
+     * directo porque por endpoint la condicion no se alcanza.
      *
      * <p><b>Toma los locks de los recursos consultados antes de consultar.</b> No es un efecto
      * colateral escondido: es la unica forma de que la respuesta siga siendo cierta hasta el

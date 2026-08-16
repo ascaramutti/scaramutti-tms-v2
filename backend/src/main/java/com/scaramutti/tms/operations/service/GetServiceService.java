@@ -3,6 +3,7 @@ package com.scaramutti.tms.operations.service;
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.service.UserLookup;
 import com.scaramutti.tms.operations.OperationsError;
+import com.scaramutti.tms.operations.dto.ServiceAdditionalResourceResponse;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
 import com.scaramutti.tms.operations.dto.ServiceEventResponse;
 import com.scaramutti.tms.operations.dto.embedded.ServiceUserSummary;
@@ -16,6 +17,8 @@ import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.CargoTypeRepository;
 import com.scaramutti.tms.shared.repository.ClientRepository;
 import com.scaramutti.tms.shared.repository.CurrencyRepository;
+import com.scaramutti.tms.shared.repository.ServiceAssignmentRepository;
+import com.scaramutti.tms.shared.repository.ServiceAssignmentRepository.ServiceAdditionalResourceRow;
 import com.scaramutti.tms.shared.repository.ServiceEventRepository;
 import com.scaramutti.tms.shared.repository.ServiceRepository;
 import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceAssignedResourcesRow;
@@ -27,6 +30,7 @@ import org.jboss.logging.Logger;
 
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Detalle de un servicio de transporte, con su bitacora.
@@ -42,6 +46,7 @@ public class GetServiceService {
     private static final Logger LOG = Logger.getLogger(GetServiceService.class);
 
     @Inject ServiceRepository serviceRepository;
+    @Inject ServiceAssignmentRepository serviceAssignmentRepository;
     @Inject ServiceEventRepository serviceEventRepository;
     @Inject ClientRepository clientRepository;
     @Inject CargoTypeRepository cargoTypeRepository;
@@ -71,8 +76,16 @@ public class GetServiceService {
         }
 
         List<ServiceEvent> events = serviceEventRepository.listByServiceIdOrderedByCreatedAt(serviceId);
+        List<ServiceAdditionalResourceRow> additionalResources =
+            serviceAssignmentRepository.listByServiceId(serviceId);
+        // Los autores de la bitacora y los de los refuerzos van en el MISMO lote: son el mismo
+        // puñado de personas, y pedirlos por separado seria dos consultas para traer dos veces a
+        // los mismos usuarios.
         Map<Integer, UserResponse> authorsById = userLookup.requireAllById(
-            events.stream().map(event -> event.createdBy).toList());
+            Stream.concat(
+                events.stream().map(event -> event.createdBy),
+                additionalResources.stream().map(ServiceAdditionalResourceRow::assignedBy)
+            ).toList());
 
         Currency currency = requireCurrency(service);
         boolean includePrices = servicePriceVisibility.includePrices();
@@ -92,8 +105,18 @@ public class GetServiceService {
                 FleetUnitKind.TRACTOR, resources.tractorId(), resources.tractorPlate()),
             serviceServiceMapper.toFleetUnitRef(
                 FleetUnitKind.TRAILER, resources.trailerId(), resources.trailerPlate()),
+            toAdditionalResourceResponses(additionalResources, authorsById),
             toEventResponses(events, authorsById),
             summaryOf(service.createdBy, authorsById));
+    }
+
+    private List<ServiceAdditionalResourceResponse> toAdditionalResourceResponses(
+            List<ServiceAdditionalResourceRow> additionalResources,
+            Map<Integer, UserResponse> authorsById) {
+        return additionalResources.stream()
+            .map(row -> serviceServiceMapper.toServiceAdditionalResourceResponse(
+                row, summaryOf(row.assignedBy(), authorsById)))
+            .toList();
     }
 
     private List<ServiceEventResponse> toEventResponses(
@@ -105,8 +128,9 @@ public class GetServiceService {
     }
 
     /**
-     * El lote ya trae a los autores de la bitacora; quien creo el servicio casi siempre es uno de
-     * ellos (la primera linea es suya), asi que se busca ahi antes de ir a la base.
+     * El lote ya trae a los autores de la bitacora Y a los de los refuerzos; quien creo el
+     * servicio casi siempre es uno de ellos (la primera linea es suya), asi que se busca ahi
+     * antes de ir a la base.
      */
     private ServiceUserSummary summaryOf(Integer userId, Map<Integer, UserResponse> authorsById) {
         UserResponse user = authorsById.get(userId);

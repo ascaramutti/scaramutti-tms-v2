@@ -4,6 +4,7 @@ import com.scaramutti.tms.operations.OperationsError;
 import com.scaramutti.tms.operations.dto.ServiceResourceConflictResponse;
 import com.scaramutti.tms.operations.model.ServiceResourceKind;
 import com.scaramutti.tms.operations.model.ServiceStatusLabels;
+import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.repository.ServiceResourceConflictRepository;
 import com.scaramutti.tms.shared.repository.ServiceResourceConflictRepository.ServiceResourceConflictRow;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -51,10 +52,8 @@ public class ServiceResourceConflicts {
     public List<ServiceResourceConflictResponse> find(long serviceId,
             Integer driverId, Integer tractorId, Integer trailerId,
             String driverName, String tractorPlate, String trailerPlate) {
-        Map<ServiceResourceKind, String> namesByKind = new LinkedHashMap<>();
-        namesByKind.put(ServiceResourceKind.DRIVER, driverName);
-        namesByKind.put(ServiceResourceKind.TRACTOR, tractorPlate);
-        namesByKind.put(ServiceResourceKind.TRAILER, trailerPlate);
+        Map<ServiceResourceKind, String> namesByKind =
+            namesByKind(driverName, tractorPlate, trailerPlate);
 
         List<ServiceResourceConflictRow> rows = serviceResourceConflictRepository.findActiveConflicts(
             serviceId, driverId, tractorId, trailerId);
@@ -77,6 +76,20 @@ public class ServiceResourceConflicts {
     }
 
     /**
+     * Como se llama cada recurso, por tipo. Vive aca y no inline en cada mensaje porque es
+     * vocabulario del modulo, no de un mensaje: con una copia por lado, el dia que aparezca un
+     * cuarto tipo de recurso se actualiza una sola y el otro nombra "(vacio)" donde va un nombre.
+     */
+    public Map<ServiceResourceKind, String> namesByKind(
+            String driverName, String tractorPlate, String trailerPlate) {
+        Map<ServiceResourceKind, String> namesByKind = new LinkedHashMap<>();
+        namesByKind.put(ServiceResourceKind.DRIVER, driverName);
+        namesByKind.put(ServiceResourceKind.TRACTOR, tractorPlate);
+        namesByKind.put(ServiceResourceKind.TRAILER, trailerPlate);
+        return namesByKind;
+    }
+
+    /**
      * El 409 forzable, con los dos miembros de extension que la interfaz necesita. El texto nombra
      * al primero y cuenta el resto: el detalle completo ya viaja en la lista, y un mensaje que
      * enumere cinco recursos no se lee.
@@ -85,6 +98,32 @@ public class ServiceResourceConflicts {
         return OperationsError.RESOURCE_CONFLICT.toException(
             detailOf(conflicts),
             Map.of(FORCIBLE_FIELD, true, CONFLICTS_FIELD, conflicts));
+    }
+
+    /**
+     * El 409 DURO: el recurso ya participa de ESTE MISMO viaje.
+     *
+     * <p>Vive al lado del forzable a proposito, aunque sean opuestos, porque el que los va a
+     * confundir es quien lea uno solo: los dos hablan de un recurso ocupado y solo uno se puede
+     * pisar. Escrito aparte, la tentacion de copiar {@link #asForcibleConflict} y quedarse con sus
+     * dos miembros de extension seria un {@code force} que deja entrar el duplicado.
+     *
+     * <p>Sale como Problem PELADO, sin {@code forcible} ni {@code conflicts}: la interfaz no tiene
+     * que ofrecer "Forzar" para algo que no se fuerza, y mandar {@code forcible: false} seria
+     * decirle que la bandera existe para este caso.
+     */
+    public RuntimeException asDuplicateInSameService(
+            List<ServiceResourceKind> duplicated, Map<ServiceResourceKind, String> namesByKind) {
+        ServiceResourceKind first = duplicated.get(0);
+        String detail = label(first) + " " + ServiceLogText.display(namesByKind.get(first))
+            + " ya participa de este servicio.";
+        int others = duplicated.size() - 1;
+        if (others > 0) {
+            detail += others == 1
+                ? " Hay 1 recurso más repetido."
+                : " Hay " + others + " recursos más repetidos.";
+        }
+        return OperationsError.RESOURCE_ALREADY_IN_SERVICE.toException(detail);
     }
 
     /**
@@ -120,6 +159,27 @@ public class ServiceResourceConflicts {
                 : " Hay " + others + " recursos más en conflicto.";
         }
         return detail;
+    }
+
+    /**
+     * El 400 de "no existe o esta dado de baja", con el mensaje concordado por genero.
+     *
+     * <p>Vive aca y no en el service que lo estreno porque la regla es del MODULO y no de un
+     * endpoint: la aplica todo el que ELIJA recursos. Con una copia por endpoint, endurecer el
+     * chequeo por un lado (sumarle la disponibilidad del catalogo, cambiar la baja por un estado)
+     * deja al otro aceptando lo que este rechaza, y el mismo error deja de leerse igual segun por
+     * donde entre.
+     *
+     * <p>Recibe el TIPO y no una etiqueta ya armada, por lo mismo que el mensaje del conflicto: con
+     * la etiqueta suelta, "La carreta indicado no existe o esta inactivo" se cuela sin que nada
+     * falle.
+     */
+    public void requireActiveResource(boolean usable, ServiceResourceKind kind) {
+        if (!usable) {
+            throw CommonError.VALIDATION_FAILED.toException(kind == ServiceResourceKind.TRAILER
+                ? label(kind) + " indicada no existe o está inactiva"
+                : label(kind) + " indicado no existe o está inactivo");
+        }
     }
 
     /**

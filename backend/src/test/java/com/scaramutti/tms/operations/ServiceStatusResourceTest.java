@@ -836,9 +836,10 @@ class ServiceStatusResourceTest {
      * quedar retenidos y la consulta de conflictos solo mira los tres principales. Validar tres y
      * restablecer N sería el mismo agujero que este bloque cierra, por la otra mitad.
      *
-     * <p>Es un límite con fecha de vencimiento: hoy ningún endpoint escribe esa tabla, así que por
-     * la API es inalcanzable; se abre con el cutover y se cierra cuando exista el endpoint de
-     * refuerzos.
+     * <p>Es un límite VIGENTE, y desde que existe el endpoint de refuerzos ya no es teórico: se
+     * llega por la API con sumar un refuerzo, cancelar y querer reabrir. Este caso lo siembra por
+     * SQL porque necesita el viaje en "pendiente de inicio", que aquel endpoint no acepta; el
+     * camino completo por HTTP lo cubre {@code ServiceReinforcementResourceTest}.
      */
     @ParameterizedTest
     @ValueSource(strings = { "DRIVER", "TRACTOR", "TRAILER" })
