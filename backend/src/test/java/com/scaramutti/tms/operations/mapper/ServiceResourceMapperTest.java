@@ -2,6 +2,7 @@ package com.scaramutti.tms.operations.mapper;
 
 import com.scaramutti.tms.operations.dto.ServiceAddResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
+import com.scaramutti.tms.operations.dto.ServiceStatusChangeRequest;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.model.TripScope;
@@ -11,6 +12,8 @@ import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
 import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
 import com.scaramutti.tms.shared.exception.ApiException;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mapstruct.factory.Mappers;
 
 import java.math.BigDecimal;
@@ -172,10 +175,20 @@ class ServiceResourceMapperTest {
         assertTrue(messageOf(() -> query("abc\u001Fdef")).contains("caracteres no válidos"));
     }
 
-    /** Un salto de línea NO está prohibido: separa palabras igual que un espacio. */
-    @Test
-    void toListServicesQuery_withNewlineInSearch_splitsTheWords() {
-        assertEquals("Piura Lima", query("Piura\nLima").q());
+    /**
+     * Un salto de línea NO está prohibido: separa palabras igual que un espacio. Y lo mismo los
+     * otros cuatro.
+     *
+     * <p>Van los SEIS y escritos, no leídos de la constante: la lista existe para reflejar
+     * exactamente el {@code \s} con el que {@code MultiWordSearch} parte el término, así que
+     * probarla contra sí misma no verifica esa correspondencia. Con un solo caso (el salto), la
+     * constante se podía recortar a la mitad y un término pegado desde Windows —que trae retorno de
+     * carro— se iba en 400 "caracteres no válidos" sin que nada fallara.
+     */
+    @ParameterizedTest
+    @ValueSource(chars = {' ', '\t', '\n', '\013', '\f', '\r'})
+    void toListServicesQuery_withAnyWordSeparatorInSearch_splitsTheWords(char separator) {
+        assertEquals("Piura Lima", query("Piura" + separator + "Lima").q());
     }
 
     // ---------- Estado ---------------------------------------------------------
@@ -342,6 +355,34 @@ class ServiceResourceMapperTest {
         assertEquals(100, mapper.toListServicesQuery(null, null, null, null, null, null, "100").size());
     }
 
+    /**
+     * Y el otro extremo, PEDIDO EXPLÍCITAMENTE: la primera página y el tamaño mínimo que el
+     * contrato publica como válidos.
+     *
+     * <p>El caso de los valores por defecto no cubre esto aunque dé los mismos números: ausente y
+     * vacío salen por el atajo del valor por defecto sin llegar a la comparación de rango. Sin este
+     * caso, escribir el borde de abajo como "menor o igual" en vez de "menor" rechazaba con 400
+     * justo esos dos valores y la suite entera seguía en verde.
+     */
+    @Test
+    void toListServicesQuery_withTheMinimumPagingValues_isAccepted() {
+        assertEquals(1, mapper.toListServicesQuery(null, null, null, null, null, null, "1").size());
+        assertEquals(0, mapper.toListServicesQuery(null, null, null, null, null, "0", null).page());
+    }
+
+    /**
+     * Un entero bien escrito pero más grande que el tipo. Es la única rama del parseo de filtros que
+     * no alcanza la expresión de cifras árabigas: la pasa entera y revienta recién al convertir.
+     * Sin este caso, esa rama podía devolver null y el filtro se descartaba en silencio, sirviendo
+     * el listado COMPLETO con 200 donde el contrato promete 400.
+     */
+    @Test
+    void toListServicesQuery_withAnIntegerFilterTooBig_saysSo() {
+        assertTrue(messageOf(() ->
+                mapper.toListServicesQuery(null, null, "9999999999", null, null, null, null))
+            .contains("clientId"));
+    }
+
     @Test
     void toListServicesQuery_withPageSizeOutOfRange_namesTheRange() {
         assertTrue(messageOf(() -> mapper.toListServicesQuery(null, null, null, null, null, null, "101"))
@@ -483,13 +524,22 @@ class ServiceResourceMapperTest {
             .contains("fecha tentativa"));
     }
 
-    /** Los dos bordes que SÍ entran, para que la ventana no se cierre de más. */
+    /**
+     * Los dos bordes que SÍ entran, para que la ventana no se cierre de más.
+     *
+     * <p>Las fechas van ESCRITAS y no tomadas de la constante que definen la ventana: pasadas por
+     * la constante, la prueba compara el valor contra sí mismo y sigue en verde con la ventana
+     * corrida a cualquier otro par de fechas, o sea deja de medir lo que dice medir. El caso
+     * hermano de arriba ya escribe el 1899-12-31 que queda un día afuera.
+     */
     @Test
     void toUpdateServiceCommand_withTheEdgesOfTheBusinessWindow_isAccepted() {
-        assertEquals(ServiceResourceMapper.MIN_BUSINESS_DATE, mapper.toUpdateServiceCommand(
-            1L, null, updateRequest(ServiceResourceMapper.MIN_BUSINESS_DATE)).tentativeDate());
-        assertEquals(ServiceResourceMapper.MAX_BUSINESS_DATE, mapper.toUpdateServiceCommand(
-            1L, null, updateRequest(ServiceResourceMapper.MAX_BUSINESS_DATE)).tentativeDate());
+        LocalDate firstDayInside = LocalDate.of(1900, 1, 1);
+        LocalDate lastDayInside = LocalDate.of(2999, 12, 31);
+        assertEquals(firstDayInside, mapper.toUpdateServiceCommand(
+            1L, null, updateRequest(firstDayInside)).tentativeDate());
+        assertEquals(lastDayInside, mapper.toUpdateServiceCommand(
+            1L, null, updateRequest(lastDayInside)).tentativeDate());
     }
 
     /** La misma ventana rige para las marcas de tiempo, que van a otra columna con el mismo tope. */
@@ -560,6 +610,27 @@ class ServiceResourceMapperTest {
     }
 
     /**
+     * El NUL al PRINCIPIO tiene caso propio porque es el borde de POSICIÓN y no de campo: las
+     * cuatro aserciones del caso hermano (abajo) lo mandan en el MEDIO de la cadena, así que
+     * escrita la guarda como "aparece después del primer carácter" las cuatro quedarían en verde.
+     *
+     * <p>La guarda hoy es correcta y siempre lo fue: mira toda la cadena. Lo que faltaba era el
+     * caso que lo sostuviera, y sin él el error se podía introducir sin que nada fallara. En un
+     * campo MULTILÍNEA no hay red debajo (la guarda de una línea no lo mira), así que el byte
+     * llegaría hasta PostgreSQL, que no lo admite, y saldría un 500 donde el contrato promete
+     * un 400.
+     */
+    @Test
+    void toUpdateServiceCommand_withANulCharacterAtTheStartOfAMultilineField_isRejected() {
+        assertTrue(messageOf(() -> mapper.toUpdateServiceCommand(1L, null,
+                updateRequest("Piura", "Lima", "\u0000al principio", VALID_JUSTIFICATION)))
+            .contains("observaciones"));
+        assertTrue(messageOf(() -> mapper.toUpdateServiceCommand(1L, null,
+                updateRequest("Piura", "Lima", null, "\u0000justificacion larga")))
+            .contains("justificación"));
+    }
+
+    /**
      * El byte NUL en los textos libres. Como función pura se puede afirmar el MENSAJE de cada
      * campo: por HTTP los cuatro rechazos son el mismo 400 con el mismo código, así que sin mirar
      * el detalle parecería probado uno solo.
@@ -576,6 +647,42 @@ class ServiceResourceMapperTest {
                 updateRequest("Piura", "Lima", withNul, VALID_JUSTIFICATION))).contains("observaciones"));
         assertTrue(messageOf(() -> mapper.toUpdateServiceCommand(1L, null,
                 updateRequest("Piura", "Lima", null, withNul + " y larga"))).contains("justificación"));
+    }
+
+    /**
+     * Los DOS separadores de línea de Unicode en un texto de una línea (el origen, el destino).
+     *
+     * <p>Quedan fuera de la definición de "control ISO", así que la guarda los nombra aparte. Sin
+     * esta prueba esa mitad se podía borrar y la suite seguía verde: los demás casos usan controles
+     * ISO, que la primera mitad ya cubre. Y el motivo por el que importan es el mismo que el del
+     * salto común: el aplastado que la bitácora aplica ({@code \R}) SÍ los trata como salto, así que
+     * pasar sin rechazo dejaría plantar una línea con el formato del servidor.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"\u2028", "\u2029"})
+    void toUpdateServiceCommand_withAUnicodeLineSeparatorInASingleLineField_isRejected(
+            String separator) {
+        assertTrue(messageOf(() -> mapper.toUpdateServiceCommand(1L, null,
+                updateRequest("Piura" + separator + "Lima", "Lima", null, VALID_JUSTIFICATION)))
+            .contains("saltos de línea"));
+        assertTrue(messageOf(() -> mapper.toUpdateServiceCommand(1L, null,
+                updateRequest("Piura", "Lima" + separator + "Sullana", null, VALID_JUSTIFICATION)))
+            .contains("saltos de línea"));
+    }
+
+    /**
+     * La marca de tiempo de la transición se recibe como TEXTO, y su rechazo tiene mensaje propio.
+     *
+     * <p>Se afirma acá y no por HTTP por el mismo motivo que el resto de este archivo: contra el
+     * servidor los rechazos de este endpoint son todos el mismo 400 con el mismo código, así que
+     * el texto podía cambiarse por cualquier otro sin que nada fallara y el usuario quedaba sin
+     * saber qué formato mandar.
+     */
+    @Test
+    void toChangeServiceStatusCommand_withADateTimeThatDoesNotParse_saysTheExpectedFormat() {
+        assertTrue(messageOf(() -> mapper.toChangeServiceStatusCommand(1L, null,
+                new ServiceStatusChangeRequest("IN_PROGRESS", "ayer", null, null)))
+            .contains("AAAA-MM-DDTHH:MM:SSZ"));
     }
 
     /** Los controles que la columna SÍ admite no se tocan: un salto de línea es texto legítimo. */
