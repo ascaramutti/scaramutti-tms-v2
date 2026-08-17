@@ -14,23 +14,17 @@ import com.scaramutti.tms.operations.service.cmd.ChangeServiceStatusCommand;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
 import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
 import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
+import com.scaramutti.tms.operations.util.ServiceRequestParsing;
 import com.scaramutti.tms.shared.exception.CommonError;
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
-import com.scaramutti.tms.shared.util.MultiWordSearch;
 import com.scaramutti.tms.shared.util.StringUtils;
 import org.mapstruct.BeforeMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.Named;
 
-import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
-import java.util.regex.Pattern;
 import java.util.Arrays;
 import java.util.stream.Collectors;
-import java.util.List;
 
 /**
  * Mapper de la capa REST del servicio de transporte.
@@ -39,8 +33,27 @@ import java.util.List;
  * del listado, la comparacion de la guarda anti doble-click y lo que el usuario ve en el
  * detalle (un espacio de mas los volveria rutas "distintas"), y las observaciones que ademas
  * quedan en null cuando llegan vacias. NO se pasan a mayusculas: son nombres de lugares.
+ *
+ * <p>El parseo de la entrada cruda (textos guardables, numeros, fechas y su ventana de negocio,
+ * termino de busqueda, bandera de forzado) vive en {@link ServiceRequestParsing}. Aca queda lo que
+ * conoce los DTOs y el dominio: el estado, la transicion, el motivo, la justificacion y las
+ * condiciones entre campos.
+ *
+ * <p>⚠️ Al agregar un {@code @Mapping} con destino {@code String}, ponerle SIEMPRE su
+ * {@code qualifiedByName}. Las clases de {@code uses} aportan sus estaticos al pool de candidatos
+ * AUTOMATICOS de MapStruct, y {@code ServiceRequestParsing.parseSearch} es {@code String -> String}:
+ * un campo de texto nuevo que se mapee solo por coincidir el nombre lo elegiria y rechazaria con el
+ * 400 de la busqueda ("necesita al menos 3 caracteres") un valor que no tiene nada que ver.
+ *
+ * <p>Lo que de verdad protege es el {@code @Named} de esos metodos, que los saca del pool: con el
+ * puesto, un destino sin calificar NO puede elegirlos. Calificar igual todos los destinos es
+ * higiene, no la reja. Las dos cosas las sostiene
+ * {@code ServiceRequestParsingMapStructPoolTest}, con un mapper canario que tiene justamente un
+ * destino {@code String} sin calificar y se pone en rojo si la anotacion desaparece. Es el mismo
+ * defecto que ya documenta {@code StringUtils.escapeLikeWildcards}, donde fue un bug real.
  */
-@Mapper(config = SharedMapperConfig.class, uses = StringUtils.class)
+@Mapper(config = SharedMapperConfig.class,
+    uses = {StringUtils.class, ServiceRequestParsing.class})
 public interface ServiceResourceMapper {
 
     /**
@@ -52,11 +65,14 @@ public interface ServiceResourceMapper {
      * el service tenga que contemplar, es un valor que nunca debio entrar.
      */
     default CreateServiceCommand toCreateServiceCommand(ServiceCreateRequest serviceCreateRequest) {
-        requireDateWithinBusinessWindow(serviceCreateRequest.tentativeDate(), "La fecha tentativa");
-        requireSingleLineText(StringUtils.trimToNull(serviceCreateRequest.origin()), "El origen");
-        requireSingleLineText(
+        ServiceRequestParsing.requireDateWithinBusinessWindow(
+            serviceCreateRequest.tentativeDate(), "La fecha tentativa");
+        ServiceRequestParsing.requireSingleLineText(
+            StringUtils.trimToNull(serviceCreateRequest.origin()), "El origen");
+        ServiceRequestParsing.requireSingleLineText(
             StringUtils.trimToNull(serviceCreateRequest.destination()), "El destino");
-        requireStorableText(serviceCreateRequest.observations(), "Las observaciones");
+        ServiceRequestParsing.requireStorableText(
+            serviceCreateRequest.observations(), "Las observaciones");
         return toCreateServiceCommandFields(serviceCreateRequest);
     }
 
@@ -79,13 +95,18 @@ public interface ServiceResourceMapper {
      */
     default UpdateServiceCommand toUpdateServiceCommand(
             long serviceId, String ifMatch, ServiceUpdateRequest request) {
-        requireDateWithinBusinessWindow(request.tentativeDate(), "La fecha tentativa");
-        requireDateTimeWithinBusinessWindow(request.startDateTime(), "La fecha de inicio real");
-        requireDateTimeWithinBusinessWindow(request.endDateTime(), "La fecha de fin real");
-        requireSingleLineText(StringUtils.trimToNull(request.origin()), "El origen");
-        requireSingleLineText(StringUtils.trimToNull(request.destination()), "El destino");
-        requireStorableText(request.observations(), "Las observaciones");
-        requireStorableText(request.justification(), "La justificación");
+        ServiceRequestParsing.requireDateWithinBusinessWindow(
+            request.tentativeDate(), "La fecha tentativa");
+        ServiceRequestParsing.requireDateTimeWithinBusinessWindow(
+            request.startDateTime(), "La fecha de inicio real");
+        ServiceRequestParsing.requireDateTimeWithinBusinessWindow(
+            request.endDateTime(), "La fecha de fin real");
+        ServiceRequestParsing.requireSingleLineText(
+            StringUtils.trimToNull(request.origin()), "El origen");
+        ServiceRequestParsing.requireSingleLineText(
+            StringUtils.trimToNull(request.destination()), "El destino");
+        ServiceRequestParsing.requireStorableText(request.observations(), "Las observaciones");
+        ServiceRequestParsing.requireStorableText(request.justification(), "La justificación");
         return new UpdateServiceCommand(
             serviceId,
             ifMatch,
@@ -114,11 +135,14 @@ public interface ServiceResourceMapper {
     default ChangeServiceStatusCommand toChangeServiceStatusCommand(
             long serviceId, String ifMatch, ServiceStatusChangeRequest serviceStatusChangeRequest) {
         ServiceStatusTransition transition = parseTransition(serviceStatusChangeRequest.target());
-        OffsetDateTime dateTime = parseDateTime(serviceStatusChangeRequest.dateTime());
-        requireDateTimeWithinBusinessWindow(dateTime, "La fecha de la transición");
+        OffsetDateTime dateTime =
+            ServiceRequestParsing.parseDateTime(serviceStatusChangeRequest.dateTime());
+        ServiceRequestParsing.requireDateTimeWithinBusinessWindow(
+            dateTime, "La fecha de la transición");
         requireDateTimeApplies(transition, dateTime);
-        requireStorableText(serviceStatusChangeRequest.note(), noteSubject(transition));
-        boolean force = parseForce(serviceStatusChangeRequest.force());
+        ServiceRequestParsing.requireStorableText(
+            serviceStatusChangeRequest.note(), noteSubject(transition));
+        boolean force = ServiceRequestParsing.parseForce(serviceStatusChangeRequest.force());
         requireForceApplies(transition, force);
         return new ChangeServiceStatusCommand(
             serviceId,
@@ -153,54 +177,6 @@ public interface ServiceResourceMapper {
             "El estado pedido tiene que ser uno de: "
                 + Arrays.stream(ServiceStatusTransition.values())
                     .map(Enum::name).collect(Collectors.joining(", ")));
-    }
-
-    /**
-     * La marca de tiempo, de texto a objeto. Mismo motivo que el destino y que el id de ruta, y
-     * este quedo MEDIDO: con el campo declarado como {@code OffsetDateTime}, un "ayer" sale con
-     * un 400 cuyo cuerpo no es el Problem que el contrato promete, con content-type comun y
-     * filtrando el nombre de la clase, la linea y la columna donde el parser se trabo.
-     */
-    private static OffsetDateTime parseDateTime(String value) {
-        String normalized = StringUtils.trimToNull(value);
-        if (normalized == null) {
-            return null;
-        }
-        try {
-            return OffsetDateTime.parse(normalized);
-        } catch (DateTimeParseException e) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "La fecha tiene que venir con formato AAAA-MM-DDTHH:MM:SSZ");
-        }
-    }
-
-    /**
-     * El indicador de forzado, de texto a booleano. Mismo motivo que el destino y la marca de
-     * tiempo: declarado como {@code Boolean}, un valor que no parsea lo rechaza el lector de JSON
-     * antes de que corra una linea nuestra, y la respuesta sale con un cuerpo que no es el Problem
-     * que el contrato promete, filtrando internos del parser.
-     *
-     * <p>La tecnica cubre los ESCALARES, que es de donde viene el trafico real: Jackson convierte
-     * un booleano o un numero JSON a texto y el valor llega hasta aca. Un objeto o un arreglo
-     * siguen cayendo en el lector, y eso se cierra de una vez para toda la API con un manejador de
-     * los errores de deserializacion, que este proyecto todavia no tiene. Hay un caso que fija
-     * donde termina la tecnica, para que el limite este medido y no solo escrito.
-     *
-     * <p>Ausente, null y cualquier forma de "false" significan lo mismo: NO forzar. El default
-     * tiene que ser ese y no "vino la clave": un formulario que serializa el objeto entero manda
-     * el campo siempre, y con el default invertido forzaria sin que nadie lo haya pedido.
-     */
-    @Named("parseForce")
-    static boolean parseForce(String value) {
-        String normalized = StringUtils.trimToNull(value);
-        if (normalized == null || "false".equalsIgnoreCase(normalized)) {
-            return false;
-        }
-        if ("true".equalsIgnoreCase(normalized)) {
-            return true;
-        }
-        throw CommonError.VALIDATION_FAILED.toException(
-            "El indicador de forzado tiene que ser true o false");
     }
 
     /**
@@ -283,7 +259,8 @@ public interface ServiceResourceMapper {
     @BeforeMapping
     default void requireStorableAssignmentNote(
             ServiceAssignResourcesRequest serviceAssignResourcesRequest) {
-        requireStorableText(serviceAssignResourcesRequest.note(), "La nota");
+        ServiceRequestParsing.requireStorableText(
+            serviceAssignResourcesRequest.note(), "La nota");
     }
 
     /**
@@ -317,7 +294,8 @@ public interface ServiceResourceMapper {
      */
     @BeforeMapping
     default void requireUsableReinforcement(ServiceAddResourcesRequest serviceAddResourcesRequest) {
-        requireStorableText(serviceAddResourcesRequest.reason(), "El motivo");
+        ServiceRequestParsing.requireStorableText(
+            serviceAddResourcesRequest.reason(), "El motivo");
         requireReason(serviceAddResourcesRequest.reason());
         requireAtLeastOneResource(serviceAddResourcesRequest);
     }
@@ -374,56 +352,6 @@ public interface ServiceResourceMapper {
     }
 
     /**
-     * PostgreSQL no admite el byte NUL dentro de un texto: llega hasta el motor y revienta la
-     * sentencia con un 500 donde el contrato promete un 400. Sobrevive a todo lo demas —no lo
-     * saca el recorte, no lo tapa el minimo de largo y para Java es un caracter mas—, asi que se
-     * rechaza explicitamente.
-     *
-     * <p>En un texto MULTILINEA (observaciones, justificacion) se rechaza solo el NUL: un salto de
-     * linea o una tabulacion ahi son legitimos y la columna los guarda sin problema.
-     */
-    private static void requireStorableText(String value, String what) {
-        if (value != null && value.indexOf('\0') >= 0) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                what + " tiene caracteres que no se pueden guardar");
-        }
-    }
-
-    /**
-     * Un texto de UNA LINEA (el origen, el destino) rechaza ademas cualquier caracter de control.
-     *
-     * <p>No es cosmetico: esos dos campos se vuelcan al log de la aplicacion —la guarda anti
-     * doble-click del ALTA los registra— y el formato del log es una linea por evento. Un salto de
-     * linea en el medio del origen deja escrita una linea entera con el formato del servidor,
-     * inventando un evento que nunca ocurrio. Es el mismo defecto que la bitacora cierra
-     * aplastando los saltos, entrando por la otra puerta. La edicion aplica la misma regla por
-     * consistencia: es el mismo campo y el mismo dato, y dos varas para el mismo texto segun por
-     * donde entre es como estas reglas se pudren.
-     *
-     * <p>Se mide sobre el texto YA RECORTADO: al log llega el recortado, asi que un salto al final
-     * —lo que deja pegar desde una planilla— no inventa ninguna linea, y rechazarlo seria endurecer
-     * mas de lo que el motivo pide (y de forma asimetrica con el espacio, que si se tolera).
-     * Un nombre de lugar no tiene saltos ni tabulaciones en el medio, asi que la regla no le quita
-     * nada a nadie.
-     */
-    /**
-     * Control ISO, mas los dos separadores de linea de Unicode que quedan afuera de esa definicion
-     * y que el aplastado de la bitacora ({@code \R}) si trata como salto. Sin ellos, la guarda
-     * dejaria pasar dos caracteres que son literalmente lo que dice rechazar.
-     */
-    private static boolean isControlOrLineSeparator(int codePoint) {
-        return Character.isISOControl(codePoint) || codePoint == 0x2028 || codePoint == 0x2029;
-    }
-
-    private static void requireSingleLineText(String value, String what) {
-        requireStorableText(value, what);
-        if (value != null && value.chars().anyMatch(ServiceResourceMapper::isControlOrLineSeparator)) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                what + " no puede tener saltos de línea ni caracteres de control");
-        }
-    }
-
-    /**
      * La justificacion se mide DESPUES de recortarla. El minimo declarativo cuenta el texto CRUDO,
      * asi que un texto corto rellenado con espacios hasta llegar al largo pedido lo pasa entero
      * ({@code "corta     "} son diez caracteres y cinco de contenido) y dejaria la bitacora con
@@ -440,45 +368,6 @@ public interface ServiceResourceMapper {
         return normalized;
     }
 
-    // ---------- Termino de busqueda --------------------------------------------
-
-    /** Mínimo de caracteres del término y de cada palabra, como declara el contrato. */
-    int MIN_SEARCH_LENGTH = 3;
-
-    /** Tope de caracteres del término, como declara el contrato. */
-    int MAX_SEARCH_LENGTH = 200;
-
-    /** Tope de palabras de la búsqueda: cada una multiplica las condiciones de la consulta. */
-    int MAX_SEARCH_TOKENS = 8;
-
-    /** Los mismos que {@code \s} de la expresion con la que se parte el termino en palabras. */
-    String WORD_SEPARATORS = " \t\n\u000B\f\r";
-
-    // ---------- Paginacion ------------------------------------------------------
-
-    int MAX_PAGE_SIZE = 100;
-    int DEFAULT_PAGE = 0;
-    int DEFAULT_PAGE_SIZE = 20;
-
-    // ---------- Fechas ----------------------------------------------------------
-
-    /**
-     * Ventana admisible de CUALQUIER fecha del viaje, venga por filtro o por cuerpo. El formato
-     * ISO acepta años de hasta nueve cifras y las columnas de fecha de PostgreSQL no: un valor
-     * por fuera de su rango llega hasta el motor y revienta con un 500 donde el contrato promete
-     * un 400. Los bordes son de NEGOCIO, no del motor (el tope real esta miles de años mas
-     * arriba): ninguna fecha util de un viaje cae fuera de esto, asi que un valor asi siempre es
-     * un error de quien llama.
-     */
-    LocalDate MIN_BUSINESS_DATE = LocalDate.of(1900, 1, 1);
-
-    LocalDate MAX_BUSINESS_DATE = LocalDate.of(2999, 12, 31);
-
-    // ---------- Otros -----------------------------------------------------------
-
-    /** Cifras arabigas: {@code Integer.valueOf} acepta las de cualquier alfabeto. */
-    Pattern ASCII_INTEGER = Pattern.compile("-?[0-9]+");
-
     /**
      * Query params del listado a filtros.
      *
@@ -490,13 +379,16 @@ public interface ServiceResourceMapper {
     default ListServicesQuery toListServicesQuery(String q, String status, String clientId,
             String dateFrom, String dateTo, String page, String size) {
         return new ListServicesQuery(
-            parseSearch(q),
+            ServiceRequestParsing.parseSearch(q),
             parseStatus(status),
-            parseInteger(clientId, "clientId"),
-            parseDate(dateFrom, "dateFrom"),
-            parseDate(dateTo, "dateTo"),
-            parseRangedInt(page, "page", DEFAULT_PAGE, 0, Integer.MAX_VALUE),
-            parseRangedInt(size, "size", DEFAULT_PAGE_SIZE, 1, MAX_PAGE_SIZE));
+            ServiceRequestParsing.parseInteger(clientId, "clientId"),
+            ServiceRequestParsing.parseDate(dateFrom, "dateFrom"),
+            ServiceRequestParsing.parseDate(dateTo, "dateTo"),
+            ServiceRequestParsing.parseRangedInt(
+                page, "page", ServiceRequestParsing.DEFAULT_PAGE, 0, Integer.MAX_VALUE),
+            ServiceRequestParsing.parseRangedInt(
+                size, "size", ServiceRequestParsing.DEFAULT_PAGE_SIZE,
+                1, ServiceRequestParsing.MAX_PAGE_SIZE));
     }
 
     /**
@@ -511,7 +403,7 @@ public interface ServiceResourceMapper {
         // debajo del espacio, con lo cual "/services/1", "/services/ 1" y hasta un id con un NUL
         // pegado serian la misma direccion. El endpoint hermano ya rechaza los controles en la
         // busqueda; el mismo criterio vale aca.
-        if (id == null || !ASCII_INTEGER.matcher(id).matches()) {
+        if (id == null || !ServiceRequestParsing.ASCII_INTEGER.matcher(id).matches()) {
             throw CommonError.VALIDATION_FAILED.toException(
                 "El id del servicio tiene que ser un número entero");
         }
@@ -521,56 +413,6 @@ public interface ServiceResourceMapper {
             throw CommonError.VALIDATION_FAILED.toException(
                 "El id del servicio está fuera de rango");
         }
-    }
-
-    /**
-     * Normaliza el termino de busqueda y RECIEN AHI lo mide, para que el rechazo salga con el
-     * mensaje que corresponde: medido en crudo, un termino de una letra con espacios de relleno
-     * tambien termina en 400, pero en el de "ninguna palabra util", que describe otra regla.
-     *
-     * <p>Lo que de verdad acota el costo de la consulta es el filtro de ABAJO: las palabras de
-     * menos de {@link #MIN_SEARCH_LENGTH} caracteres se descartan (un "de" no acota nada y si
-     * multiplica el costo); si no queda ninguna util, es un 400 en vez de un listado completo
-     * disfrazado de resultado de busqueda.
-     *
-     * <p>Los caracteres de control que no separan palabras se rechazan aparte: un NUL incrustado
-     * sobrevive al trim y a la division en palabras, y PostgreSQL no admite ese byte en un texto,
-     * asi que llegaria hasta el motor a reventar la consulta con un 500 donde el contrato promete
-     * un 400.
-     */
-    private static String parseSearch(String q) {
-        String normalized = StringUtils.trimToNull(q);
-        if (normalized == null) {
-            return null;
-        }
-        // Se aceptan los que el partidor de palabras trata como separador (salto de linea,
-        // tabulacion y compañia). NO alcanza con preguntar por "espacio en blanco": Java cuenta
-        // como tales cuatro controles que el partidor NO separa, y esos viajarian dentro del
-        // termino hasta la consulta.
-        if (normalized.chars().anyMatch(c -> Character.isISOControl(c) && WORD_SEPARATORS.indexOf(c) < 0)) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "La búsqueda tiene caracteres no válidos");
-        }
-        if (normalized.length() < MIN_SEARCH_LENGTH) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "La búsqueda necesita al menos " + MIN_SEARCH_LENGTH + " caracteres");
-        }
-        if (normalized.length() > MAX_SEARCH_LENGTH) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "La búsqueda admite hasta " + MAX_SEARCH_LENGTH + " caracteres");
-        }
-        List<String> tokens = Arrays.stream(MultiWordSearch.tokenize(normalized))
-            .filter(token -> token.length() >= MIN_SEARCH_LENGTH)
-            .toList();
-        if (tokens.isEmpty()) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "La búsqueda necesita al menos una palabra de " + MIN_SEARCH_LENGTH + " caracteres");
-        }
-        if (tokens.size() > MAX_SEARCH_TOKENS) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "La búsqueda admite hasta " + MAX_SEARCH_TOKENS + " palabras");
-        }
-        return String.join(" ", tokens);
     }
 
     /**
@@ -591,99 +433,6 @@ public interface ServiceResourceMapper {
             throw CommonError.VALIDATION_FAILED.toException(
                 "El estado indicado no existe: " + ServiceLogText.abbreviate(normalized));
         }
-    }
-
-    private static Integer parseInteger(String value, String field) {
-        String normalized = StringUtils.trimToNull(value);
-        if (normalized == null) {
-            return null;
-        }
-        // Integer.valueOf acepta cifras de CUALQUIER alfabeto: un "٥" arabigo o un "５" de ancho
-        // completo entran como 5. El contrato declara un entero, no cualquier grafia de un 5.
-        if (!ASCII_INTEGER.matcher(normalized).matches()) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "El filtro " + field + " tiene que ser un número entero");
-        }
-        try {
-            return Integer.valueOf(normalized);
-        } catch (NumberFormatException e) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "El filtro " + field + " tiene que ser un número entero");
-        }
-    }
-
-    private static LocalDate parseDate(String value, String field) {
-        String normalized = StringUtils.trimToNull(value);
-        if (normalized == null) {
-            return null;
-        }
-        LocalDate parsed;
-        try {
-            parsed = LocalDate.parse(normalized);
-        } catch (DateTimeParseException e) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "El filtro " + field + " tiene que ser una fecha con formato AAAA-MM-DD");
-        }
-        if (parsed.isBefore(MIN_BUSINESS_DATE) || parsed.isAfter(MAX_BUSINESS_DATE)) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "El filtro " + field + " tiene que estar entre "
-                    + MIN_BUSINESS_DATE + " y " + MAX_BUSINESS_DATE);
-        }
-        return parsed;
-    }
-
-    /**
-     * Misma ventana que los filtros, aplicada a una fecha que llega YA TIPADA en el cuerpo. El
-     * tipado no protege de nada acá: el lector de JSON acepta el año de nueve cifras del formato
-     * ISO y lo entrega como una fecha perfectamente valida para Java, que recien revienta contra
-     * la columna.
-     */
-    private static void requireDateWithinBusinessWindow(LocalDate date, String what) {
-        if (date == null) {
-            return;
-        }
-        if (date.isBefore(MIN_BUSINESS_DATE) || date.isAfter(MAX_BUSINESS_DATE)) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                what + " tiene que estar entre " + MIN_BUSINESS_DATE + " y " + MAX_BUSINESS_DATE);
-        }
-    }
-
-    /**
-     * Hermano del anterior para las marcas de tiempo. Se mide DOS veces, y las dos hacen falta.
-     *
-     * <p>Primero tal como vino: convertir de huso una marca pegada al tope del tipo lo desborda y
-     * revienta con un error de fecha que nadie mapea, o sea un 500 justo en la clase de entrada
-     * que esta ventana existe para atajar. Midiendo antes, esos valores nunca llegan a
-     * convertirse.
-     *
-     * <p>Y despues en UTC, que es el huso en el que la marca se va a GUARDAR: las 23:00 del ultimo
-     * dia de la ventana escritas con catorce horas de atraso caen, en UTC, en el primer dia de
-     * afuera. El chequeo y el valor que protege tienen que mirar el mismo marco.
-     */
-    private static void requireDateTimeWithinBusinessWindow(OffsetDateTime dateTime, String what) {
-        if (dateTime == null) {
-            return;
-        }
-        requireDateWithinBusinessWindow(dateTime.toLocalDate(), what);
-        requireDateWithinBusinessWindow(
-            dateTime.withOffsetSameInstant(ZoneOffset.UTC).toLocalDate(), what);
-    }
-
-    /** Entero de paginacion: ausente o vacio toma el valor por defecto; fuera de rango es 400. */
-    private static int parseRangedInt(String value, String field, int fallback, int min, int max) {
-        Integer parsed = parseInteger(value, field);
-        if (parsed == null) {
-            return fallback;
-        }
-        if (parsed < min) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "El filtro " + field + " no puede ser menor que " + min);
-        }
-        if (parsed > max) {
-            throw CommonError.VALIDATION_FAILED.toException(
-                "El filtro " + field + " no puede ser mayor que " + max);
-        }
-        return parsed;
     }
 
 }
