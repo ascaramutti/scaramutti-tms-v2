@@ -68,8 +68,10 @@ public final class DateUtils {
 
     /**
      * Inicio del dia SIGUIENTE (00:00) en zona Lima. Es el borde EXCLUSIVO superior de un
-     * rango cuyo {@code dateTo} es inclusivo del dia completo ({@code < limaNextDayStart}
-     * cubre hasta las 23:59:59.999 de {@code date}). Complementa a {@link #limaDayStart}.
+     * rango cuyo {@code dateTo} es inclusivo del dia completo: {@code < limaNextDayStart} cubre
+     * hasta las 23:59:59.999999 de {@code date}, que es la resolucion real de las columnas
+     * contra las que se usa.
+     * Complementa a {@link #limaDayStart}.
      */
     public static OffsetDateTime limaNextDayStart(java.time.LocalDate date) {
         return date.plusDays(1).atStartOfDay(LIMA).toOffsetDateTime();
