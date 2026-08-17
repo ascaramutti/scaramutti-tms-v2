@@ -161,6 +161,14 @@ class PublishedContractTest {
                 containsString("Authorization"))
             .body("paths.'/services'.post.responses.'201'.headers.Vary.description",
                 containsString("Authorization"))
+            // El strip es el que MAS necesita esto: su ruta es un literal que tambien matchea la
+            // plantilla del detalle, asi que un bloque colgado de la ruta equivocada deja las dos
+            // claves presentes y la suite verde.
+            .body("paths.'/services/stats'.get.operationId", equalTo("getServiceStats"))
+            .body("paths.'/services/stats'.get.responses.'200'.headers.'Cache-Control'.schema.type",
+                equalTo("string"))
+            .body("paths.'/services/stats'.get.responses.'200'.headers.Vary.description",
+                containsString("Authorization"))
             // el patrón de la justificación: es lo que traduce al cliente el mínimo REAL (que se
             // mide sobre el texto recortado), y el minLength solo no lo expresa
             .body("components.schemas.ServiceUpdateRequest.properties.justification.pattern",

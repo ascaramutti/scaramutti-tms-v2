@@ -2287,23 +2287,56 @@ paths:
       summary: Indicadores del tablero operativo
       description: |
         RN-OP14 — `completedThisWeek` y `weekCycle` usan el ciclo operativo de la
-        empresa: miércoles 00:00 a martes 23:59, hora de América/Lima.
+        empresa: de miércoles a martes, hora de América/Lima. Los otros tres
+        contadores (`pendingAssignment`, `pendingStart`, `inProgress`) son
+        GLOBALES: cuentan todos los viajes en ese estado, sin ventana de tiempo. La ventana de la
+        consulta es SEMIABIERTA, desde el miércoles 00:00 de Lima inclusive hasta
+        el miércoles siguiente 00:00 de Lima exclusive.
 
         Los contadores de recursos miden lo MISMO que el tablero del sistema
         anterior, para que el número no cambie de significado con el cambio de
         sistema: `driversOnRoad` = conductores PRINCIPALES distintos en
         servicios en ruta (los refuerzos no cuentan) sobre el total de
-        conductores activos (`public.drivers`); `unitsOnRoad` = tractos
+        conductores de alta (`public.drivers`); `unitsOnRoad` = tractos
         PRINCIPALES distintos en servicios en ruta (los de refuerzo tampoco
-        cuentan) sobre el total de TRACTOS activos (carretas y escoltas no
+        cuentan) sobre el total de TRACTOS de alta (carretas y escoltas no
         participan del indicador).
 
         En ambos objetos, `active` = el numerador (los que están en ruta AHORA)
         y `total` = el denominador (el padrón vigente de ese recurso).
+
+        NINGUNO de los dos números mira la disponibilidad del catálogo, solo el alta:
+        un tracto en mantenimiento sigue contando en el padrón, y un conductor en
+        ruta cuenta en `active` aunque figure NO DISPONIBLE, que es justamente
+        como tiene que estar.
+
+        **Desviación consciente respecto del sistema anterior**: el numerador
+        también exige que el recurso esté de alta. Allá no lo hacía, así que un
+        conductor dado de baja mientras su viaje seguía en ruta producía un
+        "6 de 5" en pantalla; lo que la paridad tiene que preservar es el
+        SIGNIFICADO del número, y una fracción imposible se lee como sistema roto.
+
+        ⚠️ `weekCycle.end` es el **MARTES, inclusive** (la etiqueta que la pantalla
+        imprime), NO el miércoles exclusivo con el que se consulta. Son dos cosas
+        distintas y se confunden. El semiabierto es para no perder ningún instante
+        del martes: la columna guarda microsegundos y un tope escrito como
+        `23:59:59.999` deja fuera los últimos 999.
+
+        `DELETED` y `CANCELLED` no entran en ningún contador. Un `COMPLETED` sin
+        fecha de fin real no cae en ninguna semana y NO se compensa con otra
+        fecha: ese dato lo sanea el cutover, y taparlo escondería justo lo que hay
+        que ver.
       x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
       responses:
         '200':
           description: Contadores del tablero
+          headers:
+            Cache-Control:
+              description: '`no-store`: el cuerpo no depende del rol, pero no debe sobrevivir a la sesión en un proxy ni en un perfil de browser compartido'
+              schema: { type: string }
+            Vary:
+              description: '`Authorization`: hoy el cuerpo es igual para los cinco roles, así que es la segunda red por si alguien saca el `no-store` para poder cachear'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ServiceStatsResponse' }
@@ -4696,30 +4729,36 @@ components:
 
     ServiceStatsResponse:
       type: object
+      description: |
+        La tira de indicadores que va arriba del listado. El cuerpo es IDÉNTICO para los cinco
+        roles: no lleva un solo importe, así que la regla de precios no recorta nada acá.
       required: [pendingAssignment, pendingStart, inProgress, completedThisWeek, driversOnRoad, unitsOnRoad, weekCycle]
       properties:
-        pendingAssignment: { type: integer }
-        pendingStart:      { type: integer }
-        inProgress:        { type: integer }
-        completedThisWeek: { type: integer, description: 'Ciclo operativo miércoles→martes, América/Lima (RN-OP14)' }
+        pendingAssignment: { type: integer, minimum: 0, description: 'Viajes esperando que se les asignen recursos. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek' }
+        pendingStart:      { type: integer, minimum: 0, description: 'Viajes con recursos asignados que todavía no arrancaron. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek' }
+        inProgress:        { type: integer, minimum: 0, description: 'Viajes en ruta. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek' }
+        completedThisWeek: { type: integer, minimum: 0, description: 'Completados con fecha de fin real dentro del ciclo operativo miércoles→martes de América/Lima (RN-OP14)' }
         driversOnRoad:
           type: object
+          description: 'Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan.'
           required: [active, total]
           properties:
-            active: { type: integer }
-            total:  { type: integer }
+            active: { type: integer, minimum: 0 }
+            total:  { type: integer, minimum: 0 }
         unitsOnRoad:
           type: object
+          description: 'TRACTOS principales distintos en viajes en ruta, sobre el padrón de tractos de alta. Carretas y escoltas NO participan, pese al nombre del campo.'
           required: [active, total]
           properties:
-            active: { type: integer }
-            total:  { type: integer }
+            active: { type: integer, minimum: 0 }
+            total:  { type: integer, minimum: 0 }
         weekCycle:
           type: object
+          description: 'El ciclo vigente. `end` es el MARTES inclusive, no el miércoles con el que se consulta.'
           required: [start, end]
           properties:
-            start: { type: string, format: date }
-            end:   { type: string, format: date }
+            start: { type: string, format: date, description: 'Miércoles en que abrió el ciclo (Lima)' }
+            end:   { type: string, format: date, description: 'Martes en que cierra, INCLUSIVE (Lima)' }
 
     ServicesReportRowResponse:
       type: object
