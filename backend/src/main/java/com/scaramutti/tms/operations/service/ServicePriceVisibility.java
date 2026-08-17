@@ -11,9 +11,10 @@ import java.util.Set;
  * Quien puede ver lo que se cobra por un viaje. La regla vive en el SERVIDOR y no en la interfaz:
  * esconder la columna en la pantalla no serviria, porque bastaria mirar la respuesta cruda.
  *
- * <p>Es un componente propio porque la aplican cuatro endpoints —el listado y el detalle omiten
- * los importes, el alta y la edicion no dejan escribirlos a ciegas— y va a aplicarla un quinto
- * (el reporte): tenerla en un solo lugar evita que se conteste distinto segun por donde se
+ * <p>Es un componente propio porque la aplican CINCO endpoints, y no todos de la misma manera: el
+ * listado y el detalle OMITEN los importes, el alta y la edicion no dejan escribirlos a ciegas, y
+ * el reporte niega el endpoint ENTERO (RN-OP8: es un documento de facturacion, no una fila con dos
+ * campos de menos). Tenerla en un solo lugar evita que se conteste distinto segun por donde se
  * pregunte, que es la forma en que estas reglas se pudren.
  */
 @ApplicationScoped
@@ -47,6 +48,9 @@ public class ServicePriceVisibility {
      * adivinanza, y ademas podria adivinarlo por descarte mirando si la bitacora registro el
      * cambio. Ignorar el precio del cuerpo seria peor: dejaria un endpoint que miente sobre lo
      * que guardo.
+     *
+     * <p>El reporte lo usa por otro motivo: ahi no hay cuerpo que exigir, se le niega el endpoint
+     * ENTERO porque el documento es de facturacion (RN-OP8). El metodo sirve a los dos casos.
      *
      * <p>Hace falta porque la lista de roles del endpoint es un O y esto es un VETO: el dia que
      * un usuario tenga dos roles, uno que sume despacho y ventas entraria por la lista.

@@ -29,9 +29,10 @@ import java.util.regex.Pattern;
  * vive en otro paquete. Ninguno permite saltear nada (validan o normalizan), asi que la apertura no
  * agrega superficie util a nadie. Los auxiliares que nadie llama de afuera si quedan privados.
  *
- * <p>El segundo motivo, mas chico, es tener el parseo de fechas y la ventana de negocio disponibles
- * sin arrastrar el mapeo de los cinco cuerpos que el mapper tambien atiende. Todavia no hay un
- * segundo consumidor: el reporte va a serlo.
+ * <p>Se escribio ademas un segundo motivo —tener el parseo de fechas disponible sin arrastrar el
+ * mapeo de los cinco cuerpos— y conviene decir que TODAVIA no se cumple: el reporte lo consume a
+ * traves de {@code ServiceResourceMapper}, o sea por el mismo mapper que ese motivo decia evitar.
+ * Sigue sin haber un consumidor independiente. El motivo que si es real es el de arriba.
  *
  * <p>Nada de lo que hay aca conoce un DTO, un tipo del dominio ni la forma de una ruta: lo que
  * depende del cuerpo que se esta validando (el estado, la transicion, el motivo, la justificacion)

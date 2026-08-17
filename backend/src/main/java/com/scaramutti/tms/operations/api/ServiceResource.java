@@ -15,6 +15,7 @@ import com.scaramutti.tms.operations.service.ChangeServiceStatusService;
 import com.scaramutti.tms.operations.service.CreateServiceService;
 import com.scaramutti.tms.operations.service.GetServiceService;
 import com.scaramutti.tms.operations.service.GetServiceStatsService;
+import com.scaramutti.tms.operations.service.GetServicesReportService;
 import com.scaramutti.tms.operations.service.ListServicesService;
 import com.scaramutti.tms.operations.service.UpdateServiceService;
 import com.scaramutti.tms.shared.dto.PageResponse;
@@ -48,6 +49,7 @@ public class ServiceResource {
     @Inject CreateServiceService createServiceService;
     @Inject GetServiceService getServiceService;
     @Inject GetServiceStatsService getServiceStatsService;
+    @Inject GetServicesReportService getServicesReportService;
     @Inject ListServicesService listServicesService;
     @Inject UpdateServiceService updateServiceService;
     @Inject ServiceResourceMapper serviceResourceMapper;
@@ -106,6 +108,56 @@ public class ServiceResource {
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager", "dispatcher"})
     public Response getServiceStats() {
         return Response.ok(getServiceStatsService.getServiceStats())
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .build();
+    }
+
+
+    /**
+     * El reporte de facturacion de UNA semana operativa: los viajes cerrados y cuanto se cobro por ellos.
+     *
+     * <p>A diferencia del listado y del detalle, al despacho NO se le omiten los importes: se le
+     * niega el reporte entero (RN-OP8). Por eso {@code dispatcher} no figura abajo. La lista de
+     * roles NO alcanza como unica reja —es un O, y un usuario que sumara despacho y ventas entraria
+     * por ella—, asi que el service aplica ademas el VETO, DESPUES de parsear la semana. Ojo con el
+     * alcance de eso: el que recibe 400 con la fecha mal formada es el de DOBLE rol, el unico que
+     * llega hasta el veto. Un despachante PURO rebota antes, en la anotacion, y recibe 403 con
+     * cualquier fecha.
+     *
+     * <p>A la inversa si alcanzaria: el conjunto de roles del veto es HOY el mismo que el de abajo,
+     * asi que la lista sola no frena a nadie que el veto deje pasar. Se conserva igual por dos
+     * motivos: es la reja que el contrato PUBLICA ({@code x-required-roles}), y el dia que los dos
+     * conjuntos diverjan hace fallar cerrado en vez de abierto.
+     *
+     * <p>Se pide de a UNA semana operativa y nunca por rango libre, y el motivo no es tecnico: el
+     * archivo existe para calcular bonos, y un reporte que mezcla semanas no sirve para eso. Eso
+     * ademas acota el volumen solo: una semana son decenas de viajes, no la tabla entera, asi que la
+     * falta de paginacion —que el contrato no publica— deja de ser una pregunta abierta.
+     *
+     * <p>La semana llega como TEXTO y se convierte en el mapper, igual que los filtros del listado:
+     * declarada con su tipo, una fecha que no parsea termina en un 404 sin cuerpo del framework en
+     * vez del 400 con detalle que promete el contrato.
+     *
+     * <p>La semana EN CURSO se puede consultar: la respuesta trae {@code closed} y la pantalla apaga
+     * la exportacion, que es donde la regla muerde. Es lo mismo que hace el sistema anterior.
+     *
+     * <p>Declarado antes que {@code @Path("/{id}")} por prolijidad, igual que {@code /stats}. El
+     * orden de declaracion es COSMETICO: lo que decide es la precedencia del segmento literal en la
+     * especificacion de JAX-RS, asi que mover el metodo no rompe nada y ningun test podria verlo. El
+     * detalle recibe el id como TEXTO, asi que su plantilla matchea el literal {@code report} sin
+     * ningun filtro de tipo que lo salve. JAX-RS resuelve bien porque el segmento literal gana, y
+     * hay un test que lo fija.
+     *
+     * <p>Las dos cabeceras van por lo que lleva el cuerpo: son TODO importes, asi que no debe
+     * sobrevivir a la sesion en ningun cache, y el {@code Vary} evita que se le sirva a otro rol.
+     */
+    @GET
+    @Path("/report")
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
+    public Response getServicesReport(@QueryParam("weekStart") String weekStart) {
+        return Response.ok(getServicesReportService.getServicesReport(
+                serviceResourceMapper.toGetServicesReportQuery(weekStart)))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
             .build();

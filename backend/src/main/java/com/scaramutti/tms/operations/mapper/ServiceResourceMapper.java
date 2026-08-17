@@ -12,6 +12,7 @@ import com.scaramutti.tms.operations.service.cmd.AddServiceResourcesCommand;
 import com.scaramutti.tms.operations.service.cmd.AssignServiceResourcesCommand;
 import com.scaramutti.tms.operations.service.cmd.ChangeServiceStatusCommand;
 import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
+import com.scaramutti.tms.operations.service.cmd.GetServicesReportQuery;
 import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
 import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
 import com.scaramutti.tms.operations.util.ServiceRequestParsing;
@@ -22,6 +23,8 @@ import org.mapstruct.BeforeMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 
+import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.stream.Collectors;
@@ -389,6 +392,40 @@ public interface ServiceResourceMapper {
             ServiceRequestParsing.parseRangedInt(
                 size, "size", ServiceRequestParsing.DEFAULT_PAGE_SIZE,
                 1, ServiceRequestParsing.MAX_PAGE_SIZE));
+    }
+
+
+    /**
+     * La semana del reporte. Llega como TEXTO por el mismo motivo que los filtros del listado:
+     * declarada con su tipo, una fecha que no parsea termina en un 404 sin cuerpo del framework en
+     * vez del 400 con detalle que promete el contrato.
+     *
+     * <p>Que este AUSENTE tambien se rechaza aca. El contrato la declara obligatoria, pero JAX-RS no
+     * contesta nada por un query param requerido que falta: simplemente llega null.
+     */
+    default GetServicesReportQuery toGetServicesReportQuery(String weekStart) {
+        LocalDate parsed = ServiceRequestParsing.parseDate(weekStart, "weekStart");
+        if (parsed == null) {
+            throw CommonError.VALIDATION_FAILED.toException("El filtro weekStart es obligatorio");
+        }
+        requireCycleOpeningDay(parsed);
+        return new GetServicesReportQuery(parsed);
+    }
+
+    /**
+     * La semana operativa abre en MIERCOLES (RN-OP14), asi que cualquier otro dia se rechaza en vez
+     * de ajustarse al miercoles de esa semana.
+     *
+     * <p>Ajustarla seria mas comodo y es lo que haria un endpoint indulgente, pero taparia un error
+     * de quien llama: dos fechas distintas devolverian el mismo reporte y nadie se enteraria de que
+     * la pantalla esta construyendo mal el parametro. El modulo prefiere fallar ruidoso, que es el
+     * mismo criterio con el que el estado del listado no acepta otra grafia.
+     */
+    private static void requireCycleOpeningDay(LocalDate weekStart) {
+        if (weekStart.getDayOfWeek() != DayOfWeek.WEDNESDAY) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "El filtro weekStart tiene que ser un miércoles: la semana operativa abre ese día");
+        }
     }
 
     /**

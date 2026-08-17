@@ -335,6 +335,81 @@ class ServiceResourceMapperTest {
         assertEquals(LocalDate.of(2999, 12, 31), result.dateTo());
     }
 
+    // ---------- Semana del reporte ----------------------------------------------
+
+    /** Un miércoles bien escrito se traduce tal cual. */
+    @Test
+    void toGetServicesReportQuery_readsTheWeekStart() {
+        assertEquals(LocalDate.of(2027, 3, 10),
+            mapper.toGetServicesReportQuery("2027-03-10").weekStart());
+    }
+
+    /**
+     * Es OBLIGATORIO, y eso lo tiene que decir este parseo: JAX-RS no contesta nada por un query
+     * param requerido que falta, simplemente llega null.
+     *
+     * <p>El vacío se trata igual que el ausente, que es como un formulario serializa un filtro sin
+     * elegir.
+     */
+    @Test
+    void toGetServicesReportQuery_withoutTheWeek_saysItIsRequired() {
+        assertTrue(messageOf(() -> mapper.toGetServicesReportQuery(null))
+            .contains("weekStart es obligatorio"));
+        assertTrue(messageOf(() -> mapper.toGetServicesReportQuery("   "))
+            .contains("weekStart es obligatorio"));
+    }
+
+    /** El formato lo verifica el parseo compartido, y el mensaje nombra el campo. */
+    @Test
+    void toGetServicesReportQuery_withAMalformedDate_namesTheField() {
+        assertTrue(messageOf(() -> mapper.toGetServicesReportQuery("10/03/2027"))
+            .contains("filtro weekStart"));
+        assertTrue(messageOf(() -> mapper.toGetServicesReportQuery("2027-02-31"))
+            .contains("filtro weekStart"));
+    }
+
+    /**
+     * La ventana de negocio también rige: el formato ISO admite años de nueve cifras y la columna no,
+     * así que sin esto el valor llega al motor y sale un 500 donde el contrato promete un 400.
+     */
+    @Test
+    void toGetServicesReportQuery_withADateOutsideTheBusinessWindow_isRejected() {
+        // El año de nueve cifras va CON signo: sin él, el ISO estricto lo rechaza por FORMATO y la
+        // aserción sale por la otra rama, midiendo lo que el caso del formato ya mide.
+        assertTrue(messageOf(() -> mapper.toGetServicesReportQuery("+999999999-12-31"))
+            .contains("entre 1900-01-01 y 2999-12-31"));
+        // 1899-12-27 es MIÉRCOLES a propósito: con un día cualquiera el rechazo vendría de la regla
+        // del miércoles y borrar la ventana entera dejaría el caso en verde.
+        assertTrue(messageOf(() -> mapper.toGetServicesReportQuery("1899-12-27"))
+            .contains("entre 1900-01-01 y 2999-12-31"));
+    }
+
+    /**
+     * La semana operativa abre en MIÉRCOLES, así que los otros seis días se rechazan en vez de
+     * ajustarse al miércoles de esa semana.
+     *
+     * <p>Ajustar sería más cómodo, pero taparía un error de quien llama: dos fechas distintas
+     * devolverían el mismo reporte y nadie se enteraría de que la pantalla arma mal el parámetro.
+     */
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2, 3, 4, 5, 6})
+    void toGetServicesReportQuery_withADayThatIsNotWednesday_saysSo(int daysAfterWednesday) {
+        String notWednesday = LocalDate.of(2027, 3, 10).plusDays(daysAfterWednesday).toString();
+
+        assertTrue(messageOf(() -> mapper.toGetServicesReportQuery(notWednesday))
+            .contains("miércoles"));
+    }
+
+    /** Los dos bordes de la ventana que caen en miércoles SÍ entran. */
+    @Test
+    void toGetServicesReportQuery_withTheFirstAndLastWednesdaysInsideTheWindow_isAccepted() {
+        // 1900-01-03 y 2999-12-25 son los miércoles de los extremos de la ventana.
+        assertEquals(LocalDate.of(1900, 1, 3),
+            mapper.toGetServicesReportQuery("1900-01-03").weekStart());
+        assertEquals(LocalDate.of(2999, 12, 25),
+            mapper.toGetServicesReportQuery("2999-12-25").weekStart());
+    }
+
     // ---------- Paginación ------------------------------------------------------
 
     /** Ausente y vacío son lo mismo: un filtro sin elegir toma el valor por defecto. */

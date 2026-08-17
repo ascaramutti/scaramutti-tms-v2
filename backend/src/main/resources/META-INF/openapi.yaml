@@ -1949,6 +1949,75 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /services/report:
+    get:
+      tags: [Operations]
+      operationId: getServicesReport
+      summary: Reporte de servicios completados de una semana operativa
+      description: |
+        Servicios completados dentro de UNA semana operativa (miércoles→martes,
+        hora de América/Lima, RN-OP14). Se pide de a una semana y NUNCA por rango
+        libre: un reporte que mezcla semanas no sirve para el cálculo de bonos,
+        que es para lo que se usa.
+
+        `weekStart` es el MIÉRCOLES que abre la semana. Si la fecha no cae en
+        miércoles → 400 `COM-001`: se rechaza en vez de ajustarla, para que un
+        error de quien llama se vea en vez de taparse.
+
+        La semana EN CURSO se puede consultar: `closed` dice si ya cerró. Lo que
+        depende de eso es la EXPORTACIÓN, que solo tiene sentido sobre una semana
+        cerrada — un archivo de bonos de una semana abierta se lee como
+        definitivo sin serlo.
+
+        Totales POR MONEDA sin conversión.
+
+        RN-OP8 — es un reporte de facturación: `dispatcher` recibe 403. El veto
+        MANDA sobre la lista de roles de abajo: un usuario que sume `dispatcher`
+        y otro rol la cumple y recibe 403 igual, siempre que `weekStart` sea
+        legible. El parseo del parámetro corre ANTES que el veto, así que ese
+        mismo usuario con una fecha mal formada recibe 400, no 403.
+
+        Este endpoint NO exporta: publica `closed` para que la pantalla apague el
+        botón. El formato de la exportación, y si la genera el cliente o el
+        servidor, está SIN RESOLVER y va en su propio cambio.
+
+        Una fila migrada sin fecha de inicio o sin conductor aborta el reporte en vez
+        de publicarse incompleta: es un documento de facturación y un nulo silencioso
+        ahí se paga. Sale con el mismo Problem que el resto del proyecto
+        (`COM-500`, con el `detail` nombrando el viaje). Lo que NO está declarado es
+        el status: ningún endpoint de esta spec declara el 500, así que el cliente
+        generado no lo va a tipar, pero el cuerpo sí es el Problem de la casa.
+
+        La `duración` por viaje no viaja como campo: la calcula el cliente con
+        `startDateTime` y `endDateTime`, que por eso son ambos obligatorios.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - name: weekStart
+          in: query
+          required: true
+          description: >-
+            Miércoles que abre la semana operativa, en fecha de Lima. Tiene que caer en miércoles
+            (400 `COM-001` si no) y estar dentro de la ventana de negocio 1900-01-01 … 2999-12-31.
+            Con las dos reglas juntas, los extremos REALMENTE aceptables son los miércoles de esos
+            bordes: 1900-01-03 y 2999-12-25.
+          schema: { type: string, format: date, example: '2026-08-19' }
+      responses:
+        '200':
+          description: Filas + totales por moneda
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es TODO importes y no debe sobrevivir a la sesión en ningún proxy ni perfil de browser compartido'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es igual para los cuatro roles que entran, y es la segunda red del día en que alguien saque el `no-store`: con `no-store` puesto, ningún caché conforme lo almacena'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServicesReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /services/{id}:
     parameters:
       - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
@@ -4314,6 +4383,78 @@ components:
         createdBy:     { $ref: '#/components/schemas/UserRef' }
         createdAt:     { type: string, format: date-time }
         updatedAt:     { type: string, format: date-time, description: 'Ultima actualizacion. Para el If-Match reenviar el header ETag tal cual, NO este valor' }
+
+    ServicesReportRowResponse:
+      type: object
+      required: [serviceId, code, clientName, tripScope, origin, destination, startDateTime, endDateTime, price, currencyCode, principalDriver, additionalDrivers]
+      properties:
+        serviceId:       { type: integer, format: int64 }
+        code:            { type: string }
+        clientName:      { type: string }
+        tripScope:       { $ref: '#/components/schemas/TripScope' }
+        origin:          { type: string }
+        destination:     { type: string }
+        startDateTime:   { type: string, format: date-time }
+        endDateTime:     { type: string, format: date-time }
+        price:           { type: number, format: double }
+        # Se declara por FORMA y no como enum cerrado: el codigo devuelve lo que tenga
+        # `public.currencies.code`, sin CHECK que lo limite, asi que un enum dejaria al cliente
+        # TypeScript generado recibiendo un valor fuera de la union el dia que se siembre una
+        # tercera moneda. El listado y el detalle ya se relajaron igual en el PR #141.
+        currencyCode:    { type: string, pattern: '^[A-Z]{3}$' }
+        principalDriver: { type: string }
+        additionalDrivers:
+          type: array
+          description: Conductores sumados en ruta, con el motivo de cada relevo.
+          items:
+            type: object
+            required: [name, reason]
+            properties:
+              name:   { type: string }
+              reason: { type: string }
+
+    ServicesReportTotalsResponse:
+      type: object
+      description: Una fila por moneda, sin conversión (mismo criterio que el reporte de almacén).
+      required: [currencyCode, totalServices, totalRevenue]
+      properties:
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$' }
+        totalServices: { type: integer }
+        totalRevenue:  { type: number, format: double }
+
+    ServicesReportResponse:
+      type: object
+      required: [weekCycle, closed, rows, totals]
+      properties:
+        weekCycle:
+          type: object
+          description: >-
+            La semana que se está reportando. `end` es el MARTES inclusive, no el miércoles con el
+            que se consulta la base: son dos fechas distintas separadas por un día.
+          required: [start, end]
+          properties:
+            start: { type: string, format: date, description: 'Miércoles en que abrió (Lima)' }
+            end:   { type: string, format: date, description: 'Martes en que cierra, INCLUSIVE (Lima)' }
+        closed:
+          type: boolean
+          description: >-
+            Si la semana ya cerró. La semana EN CURSO se puede consultar y devuelve `false`; lo que
+            depende de esto es la exportación, no la lectura. Va UN solo campo y no dos: publicar
+            además su negación deja dos formas de la misma verdad que pueden contradecirse.
+        rows:
+          type: array
+          description: >-
+            Ordenadas por fecha de fin ascendente (el desempate por id las deja en un orden estable
+            entre dos impresiones de la misma semana). Lista vacía si no hubo servicios completados en
+            la semana, nunca null.
+          items: { $ref: '#/components/schemas/ServicesReportRowResponse' }
+        totals:
+          type: array
+          description: >-
+            Una fila por cada moneda PRESENTE en la semana, en el orden en que aparecen en las filas.
+            Lista vacía si no hubo servicios, nunca null: no se publica una fila en cero por cada
+            moneda del catálogo.
+          items: { $ref: '#/components/schemas/ServicesReportTotalsResponse' }
 
     ServiceStatsResponse:
       type: object
