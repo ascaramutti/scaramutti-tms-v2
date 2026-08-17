@@ -170,6 +170,52 @@ class ServiceResourceRolesTest {
             "asignar y reforzar son la misma decisión operativa; el contrato les da la misma lista");
     }
 
+    /**
+     * El strip no puede tener MAS audiencia que el listado, porque es el resumen de lo mismo: sus
+     * cuatro contadores de viajes son reproducibles pidiendo el listado filtrado por estado y
+     * leyendo el total. Si alguna vez el listado recorta su lista, el strip seguiria contando en
+     * voz alta lo que la otra puerta ya no deja ver.
+     */
+    @Test
+    void statsRoles_areASubsetOfTheListRoles() {
+        Set<String> stats = rolesOf("getServiceStats");
+        Set<String> list = rolesOf("listServices");
+
+        assertTrue(list.containsAll(stats),
+            "sobran en el strip: "
+                + stats.stream().filter(role -> !list.contains(role)).collect(Collectors.toSet()));
+    }
+
+    /**
+     * Y tampoco mas que el catalogo de conductores, del que publica el TAMAÑO del padron
+     * ({@code driversOnRoad.total} = los conductores de alta).
+     *
+     * <p>Ninguno de los dos puede fallar hoy: son guardas hacia adelante. El escenario que cierran
+     * es la consolidacion de la flota que ya esta en cola, que es el PR que toca justamente esos dos
+     * catalogos — si esa limpieza le saca un rol a {@code listDrivers} o a {@code listFleetUnits},
+     * el strip queda como la UNICA puerta por la que ese rol sigue leyendo cuanta gente y cuantas
+     * unidades tiene la empresa, y nada se pondria rojo.
+     *
+     * <p>Van los DOS y no solo el de conductores. Que la lista de la flota sea hoy mas ancha es una
+     * holgura, no un invariante: no hay nada que impida que la consolidacion la recorte, y es
+     * exactamente el PR donde eso pasaria.
+     */
+    @Test
+    void statsRoles_areASubsetOfTheSharedCatalogRoles() {
+        Set<String> stats = rolesOf(ServiceResource.class, "getServiceStats");
+        Set<String> drivers = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.driver.api.DriverResource.class, "listDrivers");
+        Set<String> fleetUnits = rolesOf(
+            com.scaramutti.tms.sharedcatalogs.fleetunit.api.FleetUnitResource.class, "listFleetUnits");
+
+        assertTrue(drivers.containsAll(stats),
+            "el strip publica el tamaño del padron de conductores; sobran: "
+                + stats.stream().filter(role -> !drivers.contains(role)).collect(Collectors.toSet()));
+        assertTrue(fleetUnits.containsAll(stats),
+            "y el de tractos; sobran: "
+                + stats.stream().filter(role -> !fleetUnits.contains(role)).collect(Collectors.toSet()));
+    }
+
     private Set<String> rolesOf(String methodName) {
         return rolesOf(ServiceResource.class, methodName);
     }

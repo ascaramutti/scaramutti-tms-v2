@@ -145,6 +145,11 @@ public class OperationsTestData {
         return warehouseFixtures.seedTrailer(nextOperationsPlate(), isActive, statusName);
     }
 
+    /** Escolta con placa propia de la corrida, por el mismo motivo que las dos de arriba. */
+    public int seedEscort() {
+        return warehouseFixtures.seedEscortVehicle(nextOperationsPlate());
+    }
+
     /**
      * Unidad con una placa DICTADA por el test, para fabricar el dato que el sistema anterior sí
      * puede escribir y el alta de v2 no: una placa con un salto de línea adentro. La columna es
@@ -225,13 +230,48 @@ public class OperationsTestData {
     }
 
     /**
+     * ENVEJECE un viaje: mueve su fecha de alta, la de última modificación y la tentativa.
+     *
+     * <p>El alta siempre escribe "ahora" y ninguno de los {@code force*} toca estas tres columnas,
+     * así que sin esto todo viaje sembrado nace DENTRO del ciclo vigente. Eso deja sin medir que los
+     * contadores por estado sean globales: acotarlos a la semana no movería ningún delta.
+     */
+    public void forceServiceAge(long serviceId, OffsetDateTime createdAt) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE operaciones.services SET created_at = ?1, updated_at = ?1, "
+                    // La fecha tentativa se deriva en hora de LIMA. Un CAST pelado la resuelve con
+                    // el huso de la SESION, que puede correrla un dia: es la misma confusion contra
+                    // la que esta escrito el endpoint, y no vale la pena dejarla sembrada aca.
+                    + "tentative_date = (?1 AT TIME ZONE 'America/Lima')::date WHERE id = ?2")
+            .setParameter(1, createdAt).setParameter(2, serviceId).executeUpdate());
+    }
+
+    /**
      * Conductor con su trabajador asociado (de ahí sale el nombre y el teléfono del listado).
      * La licencia se genera única por corrida: la columna tiene índice UNIQUE en v1.
      */
     public int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
             String statusName, boolean isActive) {
+        return seedDriver(firstName, lastName, phone, licenseCategory, statusName, isActive, true);
+    }
+
+    /**
+     * Variante que ademas DA DE BAJA al trabajador detras del conductor.
+     *
+     * <p>Existe porque son dos banderas distintas y solo una manda: el padron mira
+     * {@code drivers.is_active} y NO {@code workers.is_active}, igual que el buscador que decide a
+     * quien se puede asignar. Cuando un empleado se va, el sistema anterior lo da de baja como
+     * TRABAJADOR sin garantia de bajar tambien su fila de conductor, asi que la poblacion existe.
+     */
+    public int seedDriverWithInactiveWorker(String firstName, String lastName) {
+        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false);
+    }
+
+    private int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
+            String statusName, boolean isActive, boolean workerIsActive) {
         long n = SEQ.incrementAndGet();
-        int workerId = warehouseFixtures.seedWorker("ZTESTD" + n, firstName, lastName, "Conductor", true);
+        int workerId = warehouseFixtures.seedWorker(
+            "ZTESTD" + n, firstName, lastName, "Conductor", workerIsActive);
         if (phone != null) {
             QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
                 "UPDATE public.workers SET phone = ?1 WHERE id = ?2")

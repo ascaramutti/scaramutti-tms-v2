@@ -5,6 +5,7 @@ import com.scaramutti.tms.operations.dto.ServiceAssignResourcesRequest;
 import com.scaramutti.tms.operations.dto.ServiceCreateRequest;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
 import com.scaramutti.tms.operations.dto.ServiceStatusChangeRequest;
+import com.scaramutti.tms.operations.dto.ServiceStatsResponse;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
 import com.scaramutti.tms.operations.mapper.ServiceResourceMapper;
@@ -13,6 +14,7 @@ import com.scaramutti.tms.operations.service.AssignServiceResourcesService;
 import com.scaramutti.tms.operations.service.ChangeServiceStatusService;
 import com.scaramutti.tms.operations.service.CreateServiceService;
 import com.scaramutti.tms.operations.service.GetServiceService;
+import com.scaramutti.tms.operations.service.GetServiceStatsService;
 import com.scaramutti.tms.operations.service.ListServicesService;
 import com.scaramutti.tms.operations.service.UpdateServiceService;
 import com.scaramutti.tms.shared.dto.PageResponse;
@@ -45,6 +47,7 @@ public class ServiceResource {
     @Inject ChangeServiceStatusService changeServiceStatusService;
     @Inject CreateServiceService createServiceService;
     @Inject GetServiceService getServiceService;
+    @Inject GetServiceStatsService getServiceStatsService;
     @Inject ListServicesService listServicesService;
     @Inject UpdateServiceService updateServiceService;
     @Inject ServiceResourceMapper serviceResourceMapper;
@@ -70,6 +73,39 @@ public class ServiceResource {
         // El cuerpo depende de QUIEN pregunta (el despacho no recibe precios), asi que no debe
         // guardarse en ningun cache intermedio: serviria la respuesta de un rol a otro.
         return Response.ok(services)
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .build();
+    }
+
+    /**
+     * Los indicadores del tablero. Misma audiencia que el listado, que es la pantalla donde viven.
+     *
+     * <p>Sin recorte por rol: el cuerpo no lleva un solo importe, asi que es IDENTICO para los
+     * cinco roles. Se deja escrito para que nadie copie aca la maquinaria que le esconde los precios
+     * al despacho.
+     *
+     * <p>Las dos cabeceras van igual que en los vecinos, aunque el argumento de cada una sea
+     * distinto aca. El {@code no-store} protege de que la respuesta sobreviva a la SESION: sin el,
+     * un proxy o un perfil de browser compartido puede guardar el cuerpo y servirlo despues del
+     * cierre de sesion. El {@code Vary} protegeria de mezclar ROLES, que hoy no puede pasar porque
+     * el cuerpo no depende de quien pregunta; se manda igual porque es la segunda red del dia en
+     * que alguien saque el {@code no-store} para poder cachear —y este, que es un tablero, es
+     * justamente el cuerpo donde mas tienta hacerlo—. Un test fija las DOS cabeceras, y otro
+     * fija la premisa de la segunda: que el cuerpo es igual para los cinco roles.
+     *
+     * <p>⚠️ Declarado ANTES que {@code @Path("/{id}")} a proposito. El detalle recibe el id como
+     * TEXTO —para poder contestar un 400 con detalle en vez del 404 vacio del framework— asi que
+     * su plantilla matchea el literal {@code stats} sin ningun filtro de tipo que lo salve. JAX-RS
+     * resuelve bien (el segmento literal gana), pero aca no hay red: si esa precedencia fallara,
+     * {@code GET /services/stats} caeria en el detalle y contestaria "el servicio no existe". Hay
+     * un test que lo fija.
+     */
+    @GET
+    @Path("/stats")
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager", "dispatcher"})
+    public Response getServiceStats() {
+        return Response.ok(getServiceStatsService.getServiceStats())
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
             .build();
