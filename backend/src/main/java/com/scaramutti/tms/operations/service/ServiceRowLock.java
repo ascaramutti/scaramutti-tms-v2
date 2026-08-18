@@ -182,8 +182,9 @@ public class ServiceRowLock {
      * <p>Hoy el peor caso lo empatan TRES caminos: la asignacion de recursos, la REAPERTURA —que
      * vuelve a mirar conflictos con los recursos que el viaje conservo— y los REFUERZOS. Los tres
      * suman la fila del viaje mas los recursos DISTINTOS que miran, y ninguno pasa de tres
-     * (conductor, tracto y carreta). La edicion usa una sola, pero la banda se calcula con el peor
-     * caso porque el pool es UNO y lo comparten todos.
+     * (conductor, tracto y carreta). La edicion usa una sola y la BAJA de refuerzos dos (la fila del
+     * viaje y la del refuerzo que borra), pero la banda se calcula con el peor caso porque el pool
+     * es UNO y lo comparten todos.
      *
      * <p>El presupuesto esta al 100%. El candidato conocido a obligar a subirlo NO es un endpoint
      * nuevo —los refuerzos entraron sin moverlo— sino ampliar la verificacion de la REAPERTURA a

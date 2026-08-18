@@ -153,6 +153,20 @@ public enum OperationsError implements ApiError {
     // alcance del codigo a quien lo lea desde el catalogo.
     SERVICE_DATA_INCOMPLETE("OPS-009", 409, "Conflict",
         "Al viaje le falta un dato que esta transición necesita"),
+
+    /**
+     * El refuerzo que se quiere dar de baja no existe en ESTE viaje.
+     *
+     * <p>Cubre los dos casos con la MISMA respuesta y eso es deliberado: que el refuerzo no exista,
+     * y que exista pero sea de OTRO viaje. Distinguirlos convertiria el 404 en un canal para
+     * averiguar que ids de refuerzo estan vivos en viajes que quien pregunta puede no poder leer.
+     * Se sostiene acotando por el viaje DENTRO de la consulta, no comparando despues.
+     *
+     * <p>No comparte el OPS-005 del viaje inexistente porque manda a mirar otra cosa: aquel dice
+     * que el viaje no esta, este que el viaje esta y el refuerzo no.
+     */
+    REINFORCEMENT_NOT_FOUND("OPS-010", 404, "Resource not found",
+        "El refuerzo indicado no existe en este servicio"),
     ;
 
     private final String code;
