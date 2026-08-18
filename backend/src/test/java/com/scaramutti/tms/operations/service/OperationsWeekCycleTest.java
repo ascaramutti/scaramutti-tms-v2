@@ -1,6 +1,8 @@
 package com.scaramutti.tms.operations.service;
 
 import com.scaramutti.tms.operations.dto.embedded.ServiceWeekCycleSummary;
+import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.util.DateUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -13,6 +15,8 @@ import java.time.OffsetDateTime;
 import java.time.temporal.ChronoUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -96,7 +100,7 @@ class OperationsWeekCycleTest {
 
     /**
      * El fin que se PUBLICA es el martes; el que se CONSULTA es el miércoles siguiente. Están a un
-     * día de distancia y confundirlos corre la etiqueta una semana entera.
+     * día de distancia y confundirlos corre la etiqueta un dia.
      */
     @Test
     void thePublishedEndIsTheTuesdayNotTheExclusiveWednesday() {
@@ -145,5 +149,78 @@ class OperationsWeekCycleTest {
             "el ciclo empieza después del instante que lo pidió");
         assertTrue(asked.isBefore(OperationsWeekCycle.endExclusiveInstant(cycle)),
             "el ciclo termina antes del instante que lo pidió");
+    }
+
+    // ---------- Si el ciclo ya cerro ---------------------------------------------
+
+    /**
+     * El corte es el borde EXCLUSIVO —el miércoles siguiente a las 00:00 de Lima— y no el martes que
+     * se publica. Los tres instantes están a un microsegundo de distancia entre sí, que es la
+     * resolución de la columna, y ese es el único borde que importa.
+     *
+     * <p>Se prueba con instantes LITERALES porque el reloj no sirve: desde un test de integración
+     * este borde solo se podría discriminar el día exacto en que la semana cierra, y una mutación
+     * que corra el corte un día sobrevive cualquier caso que use una semana futura o una de hace
+     * siete días. Eso pasó, y por eso este método existe acá y no dentro del service.
+     */
+    @Test
+    void hasClosed_isDecidedByTheExclusiveBoundary_notByTheTuesdayItPublishes() {
+        ServiceWeekCycleSummary cycle = OperationsWeekCycle.at(Instant.parse(CYCLE_OPENS_UTC));
+        Instant closesAt = OperationsWeekCycle.endExclusiveInstant(cycle).toInstant();
+
+        assertFalse(OperationsWeekCycle.hasClosed(cycle, closesAt.minusNanos(1_000)),
+            "un microsegundo antes del borde la semana sigue ABIERTA");
+        assertTrue(OperationsWeekCycle.hasClosed(cycle, closesAt),
+            "en el borde exacto ya cerró: la ventana es semiabierta");
+        assertTrue(OperationsWeekCycle.hasClosed(cycle, closesAt.plusNanos(1_000)),
+            "y después, obviamente");
+    }
+
+    /**
+     * El martes ENTERO la semana sigue abierta. Es el caso que separa el borde publicado del
+     * consultado: atar el corte a {@code weekCycle.end()} daría por cerrada la semana durante todo
+     * su último día, y el archivo de bonos saldría un día antes de tiempo.
+     */
+    @Test
+    void hasClosed_isFalseForTheWholeLastDay() {
+        ServiceWeekCycleSummary cycle = OperationsWeekCycle.at(Instant.parse(CYCLE_OPENS_UTC));
+        Instant tuesdayNoonLima = DateUtils.limaDayStart(cycle.end()).plusHours(12).toInstant();
+
+        assertFalse(OperationsWeekCycle.hasClosed(cycle, tuesdayNoonLima),
+            "el martes al mediodía la semana todavía no cerró");
+    }
+
+    /**
+     * El ciclo del reporte sale del dia PEDIDO, sin fabricar un instante intermedio. Fija las dos
+     * mitades: que el miercoles pedido sea el que abre, y que el martes publicado sea el sexto dia.
+     */
+    @Test
+    void startingOn_aWednesday_opensThatDayAndClosesSixDaysLater() {
+        LocalDate wednesday = LocalDate.of(2027, 3, 10);
+
+        ServiceWeekCycleSummary cycle = OperationsWeekCycle.startingOn(wednesday);
+
+        assertEquals(wednesday, cycle.start());
+        assertEquals(wednesday.plusDays(6), cycle.end());
+    }
+
+    /**
+     * Cualquier otro dia es un error de PROGRAMACION: el rechazo con 400 que ve el cliente lo hace el
+     * mapper, antes. Se afirma el codigo y no solo el tipo, porque lo que importa es que salga como
+     * el Problem de la casa: un {@code IllegalArgumentException} no tiene mapper y daria un 500
+     * pelado, sin {@code code} ni {@code detail}.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"2027-03-11", "2027-03-12", "2027-03-13", "2027-03-14", "2027-03-15",
+        "2027-03-16"})
+    void startingOn_anyOtherDay_failsWithTheHouseProblem(String notAWednesday) {
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> OperationsWeekCycle.startingOn(LocalDate.parse(notAWednesday)));
+
+        assertEquals("COM-500", thrown.code());
+        assertTrue(thrown.getMessage().contains("miercoles"),
+            "el mensaje tiene que decir en qué día abre el ciclo");
+        assertTrue(thrown.getMessage().contains(notAWednesday),
+            "y cuál se pidió: sin eso, la mitad final del mensaje no la mide nadie");
     }
 }

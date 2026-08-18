@@ -5,6 +5,8 @@ import com.scaramutti.tms.operations.dto.ServiceAdditionalResourceResponse;
 import com.scaramutti.tms.operations.dto.ServiceDetailResponse;
 import com.scaramutti.tms.operations.dto.ServiceEventResponse;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
+import com.scaramutti.tms.operations.dto.ServicesReportRowResponse;
+import com.scaramutti.tms.operations.dto.embedded.ServiceAdditionalDriverSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceCargoTypeSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceClientSummary;
 import com.scaramutti.tms.operations.dto.embedded.ServiceDriverSummary;
@@ -18,6 +20,8 @@ import com.scaramutti.tms.shared.entity.Service;
 import com.scaramutti.tms.shared.entity.ServiceEvent;
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.repository.ServiceAssignmentRepository.ServiceAdditionalResourceRow;
+import com.scaramutti.tms.shared.repository.ServiceReportRepository.ServiceAdditionalDriverRow;
+import com.scaramutti.tms.shared.repository.ServiceReportRepository.ServicesReportRow;
 import com.scaramutti.tms.shared.repository.ServiceRepository.ServiceListRow;
 import com.scaramutti.tms.sharedcatalogs.fleetunit.dto.FleetUnitRef;
 import com.scaramutti.tms.warehouse.model.FleetUnitKind;
@@ -146,6 +150,40 @@ public interface ServiceServiceMapper {
             row.createdAt()
         );
     }
+
+
+    /**
+     * Fila del reporte a respuesta. Se arma a mano y no por declaracion porque los refuerzos NO
+     * salen de la misma fila: vienen de la segunda consulta, ya agrupados por viaje, y entran como
+     * segundo argumento.
+     *
+     * <p>Aca los importes viajan SIEMPRE. A diferencia del listado, este endpoint no le omite los
+     * precios a nadie: a quien no puede verlos se le niega el reporte entero (RN-OP8), asi que no
+     * hay una variante del cuerpo por rol.
+     */
+    default ServicesReportRowResponse toServicesReportRowResponse(
+            ServicesReportRow row, List<ServiceAdditionalDriverSummary> additionalDrivers) {
+        return new ServicesReportRowResponse(
+            row.serviceId(),
+            row.code(),
+            row.clientName(),
+            TripScope.valueOf(row.tripScope()),
+            row.origin(),
+            row.destination(),
+            row.startDateTime(),
+            row.endDateTime(),
+            row.price(),
+            row.currencyCode(),
+            row.principalDriverName(),
+            additionalDrivers
+        );
+    }
+
+    /** Un conductor de refuerzo: del nombre y el motivo, el viaje al que pertenece ya no importa. */
+    @Mapping(target = "name",   source = "driverName")
+    @Mapping(target = "reason", source = "reason")
+    ServiceAdditionalDriverSummary toServiceAdditionalDriverSummary(
+        ServiceAdditionalDriverRow serviceAdditionalDriverRow);
 
     ServiceClientSummary toServiceClientSummary(Client client);
 

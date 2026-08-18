@@ -22,9 +22,17 @@ public class CurrentUser {
     @Inject JsonWebToken jsonWebToken;
 
     /**
-     * Indica si el usuario autenticado tiene alguno de los roles dados. Lo usan las reglas de
-     * negocio que cambian la RESPUESTA segun quien pregunta (por ejemplo, que precios ve cada
-     * rol), no el acceso al endpoint: eso lo resuelve {@code @RolesAllowed} antes de llegar aca.
+     * Indica si el usuario autenticado tiene alguno de los roles dados. Lo usan sobre todo las
+     * reglas de negocio que cambian la RESPUESTA segun quien pregunta (por ejemplo, que precios ve
+     * cada rol), y para esas el acceso ya lo resolvio {@code @RolesAllowed} antes de llegar aca.
+     *
+     * <p><b>Pero no siempre es asi.</b> En {@code GET /services/report} este metodo decide ACCESO:
+     * la regla es un VETO al despacho y la lista de roles no alcanza para expresarla, porque es un
+     * O. Un despachante PURO rebota antes, en el {@code @RolesAllowed}; el que no rebota es el que
+     * SUMA despacho y un rol con precios, y a ese lo frena unicamente el veto que se apoya en este
+     * metodo. Borrarlo le publica la facturacion de la semana entera. Antes de dar por redundante
+     * una llamada a este metodo, hay que mirar si lo que decide es la forma de la respuesta o el
+     * acceso.
      *
      * <p>Deniega por defecto: sin token o sin claim de roles devuelve {@code false} en vez de
      * romper, para que la falta de datos nunca se lea como un si. Que un rol nuevo NO herede

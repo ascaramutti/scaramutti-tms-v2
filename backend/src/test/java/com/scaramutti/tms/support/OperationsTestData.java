@@ -3,6 +3,7 @@ package com.scaramutti.tms.support;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.persistence.EntityManager;
 import java.time.OffsetDateTime;
 
@@ -101,6 +102,31 @@ public class OperationsTestData {
                 "UPDATE operaciones.services SET start_date_time = ?1, end_date_time = ?2 "
                     + "WHERE id = ?3")
             .setParameter(1, start).setParameter(2, end).setParameter(3, serviceId).executeUpdate());
+    }
+
+    /**
+     * Las dos fechas de un viaje, leidas DIRECTO de la base.
+     *
+     * <p>Existe para que un caso pueda verificar su propia siembra sin pasar por el endpoint que
+     * esta probando. Verificarla con el endpoint tiene dos costos: la precondicion se apoya en el
+     * sujeto de la prueba, y cualquier mutacion de la consulta hace fallar la clase entera con un
+     * mensaje que culpa al fixture, escondiendo que el defecto estaba en el endpoint.
+     */
+    public OffsetDateTime[] serviceDatesOf(long serviceId) {
+        Object[] row = (Object[]) entityManager.createNativeQuery(
+                "SELECT start_date_time, end_date_time FROM operaciones.services WHERE id = ?1")
+            .setParameter(1, serviceId).getSingleResult();
+        return new OffsetDateTime[] {toOffsetDateTime(row[0]), toOffsetDateTime(row[1])};
+    }
+
+    /**
+     * Se REUSA el conversor compartido en vez de castear a {@code Instant}: su javadoc documenta que
+     * Hibernate/PG devuelve {@code OffsetDateTime}, {@code Instant} o {@code Timestamp} segun version
+     * y driver, y este metodo corre en la PRECONDICION de casi todos los casos del reporte. Un cast a
+     * un solo tipo convertiria un upgrade de driver en veinticinco fallas que culpan al fixture.
+     */
+    private static OffsetDateTime toOffsetDateTime(Object value) {
+        return value == null ? null : DateUtils.toOffsetDateTime(value);
     }
 
     /**
