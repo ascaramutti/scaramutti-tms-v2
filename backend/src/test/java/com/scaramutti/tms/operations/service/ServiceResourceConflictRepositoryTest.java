@@ -193,7 +193,7 @@ class ServiceResourceConflictRepositoryTest {
                 serviceAssignmentRepository.findResourcesAlreadyInService(
                     serviceId, driverId, null, null)));
 
-        assertTrue(failure.getMessage().contains("lock de la fila"), failure.getMessage());
+        assertTrue(failure.getMessage().contains("todavia no se tomo"), failure.getMessage());
     }
 
     /**

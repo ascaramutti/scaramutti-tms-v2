@@ -2673,7 +2673,10 @@ paths:
         existe, así que este límite es ALCANZABLE: sumar un refuerzo, cancelar y
         querer reabrir deja al viaje sin poder volver. No lo sostiene una regla de
         negocio sino el presupuesto de esperas de bloqueo, y se levanta en su propio
-        cambio, no con el endpoint de refuerzos. Reabrir hacia "pendiente de
+        cambio, no con el endpoint de refuerzos. Lo que SÍ evita el callejón es dar de
+        baja los refuerzos con `DELETE /services/{id}/resources/{assignmentId}` ANTES
+        de cancelar, porque la guarda cuenta filas vivas; sobre un viaje ya cancelado
+        no hay salida, ya que para quitarlos hay que estar en ruta. Reabrir hacia "pendiente de
         asignación" no lo tiene, porque ese estado no retiene nada.
 
         Cada transición que AVANZA exige los datos que la etapa anterior tenía
@@ -2892,6 +2895,73 @@ paths:
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
+
+  /services/{id}/resources/{assignmentId}:
+    delete:
+      tags: [Operations]
+      operationId: removeServiceResource
+      summary: Dar de baja un refuerzo cargado por error (solo con el viaje en ruta)
+      description: |
+        Quita UNA fila de refuerzo del viaje. Es la contracara de `POST
+        /services/{id}/resources` y comparte su guarda de estado: solo con el viaje
+        EN RUTA. `PENDING_ASSIGNMENT`, `PENDING_START` y `COMPLETED` responden 409
+        `OPS-006`; los dos terminales inmutables, `CANCELLED` y `DELETED`, responden
+        409 `OPS-004`, el mismo código con el que los rechaza el PUT.
+
+        `assignmentId` se acota al viaje del path DENTRO de la consulta, no
+        comparando después. Un refuerzo que no existe y uno que existe pero es de
+        OTRO viaje responden lo MISMO (404 `OPS-010`), a propósito: distinguirlos
+        convertiría el 404 en un canal para averiguar qué refuerzos están vivos en
+        viajes que quien pregunta podría no poder leer.
+
+        La baja es FÍSICA: la fila de refuerzo desaparece. El rastro NO se va con
+        ella, porque la bitácora y la auditoría cuelgan del viaje y no del refuerzo.
+
+        Sin cuerpo. El alta pide un motivo y la baja no: el "por qué" de un refuerzo
+        cargado por error es siempre el mismo, y el quién, el cuándo y el qué ya
+        quedan en el rastro.
+
+        Sin `If-Match`, igual que el alta pero por una razón mejor: acá el reintento
+        lo rechaza el 404, porque la fila ya no está. Un `If-Match` que llegue se
+        ignora.
+
+        **Sobre la reapertura.** `OPS-009` impide reabrir un viaje con refuerzos, y la
+        guarda cuenta filas VIVAS: quitarlos ANTES de cancelar deja el viaje
+        reabrible, y ése es el camino a ofrecerle al despacho. Lo que la baja NO
+        puede es rescatar a uno YA cancelado, porque para quitar el refuerzo hay que
+        estar EN RUTA. Para esos, el límite de D-OPS-18 sigue en pie.
+
+        Devuelve el detalle completo, como sus seis vecinos, y acá el motivo es además
+        técnico: el borrado mueve la versión del viaje, así que un 204 dejaría al
+        cliente con un `ETag` que la base ya no tiene y su próximo `If-Match` comería
+        un 412 espurio.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: assignmentId, in: path, required: true, description: 'Id de la fila de refuerzo: el que publica `additionalResources[].id` del detalle', schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Refuerzo dado de baja; el viaje sigue en ruta
+          headers:
+            ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
+            Cache-Control: { schema: { type: string }, description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta' }
+            Vary: { schema: { type: string }, description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`OPS-005` si el viaje no existe; `OPS-010` si el refuerzo no existe o no es de este viaje. El 404 del refuerzo se evalúa DESPUÉS de la guarda de estado: sobre un viaje cancelado o fuera de ruta manda el 409.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: 'En orden de PRECEDENCIA: `OPS-004` (cancelado o eliminado) y `OPS-006` (el estado no admite la acción). Además `OPS-008` (conflicto de lock, transitorio) desde cualquier punto.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
 
 # =============================================================================
 components:

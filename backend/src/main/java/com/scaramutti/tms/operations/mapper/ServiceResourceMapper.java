@@ -453,6 +453,30 @@ public interface ServiceResourceMapper {
     }
 
     /**
+     * El id del REFUERZO, de texto a numero. Mismo criterio y mismo motivo que {@link #toServiceId}:
+     * es un segmento de ruta nuevo, y declarado con su tipo un id que no parsea daria el 404 sin
+     * cuerpo del framework, indistinguible del 404 legitimo de "ese refuerzo no existe".
+     *
+     * <p>⚠️ Los DOS textos de abajo son intercambiables para la suite: los casos afirman el codigo
+     * ({@code COM-001}) y no el detalle, que es la convencion de la casa para los ids de ruta.
+     * Heredado de {@link #toServiceId}, que tiene el mismo hueco; queda escrito para que no se lea
+     * como cobertura.
+     */
+    default long toAssignmentId(String assignmentId) {
+        if (assignmentId == null
+                || !ServiceRequestParsing.ASCII_INTEGER.matcher(assignmentId).matches()) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "El id del refuerzo tiene que ser un número entero");
+        }
+        try {
+            return Long.parseLong(assignmentId);
+        } catch (NumberFormatException e) {
+            throw CommonError.VALIDATION_FAILED.toException(
+                "El id del refuerzo está fuera de rango");
+        }
+    }
+
+    /**
      * El estado es un dominio CERRADO y en mayusculas, igual que en el contrato: no se acepta
      * otra grafia, que es el mismo criterio de aceptacion que el listado de cotizaciones. Lo que
      * si cambia es la RESPUESTA al valor invalido: alla el parametro esta declarado con el tipo

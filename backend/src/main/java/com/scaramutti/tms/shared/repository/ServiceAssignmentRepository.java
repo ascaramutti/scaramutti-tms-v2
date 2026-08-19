@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.Locale;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -33,51 +34,101 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
     EntityManager entityManager;
 
     /**
-     * Los refuerzos de un viaje, con el nombre del conductor y las placas ya resueltos, en el orden
-     * en que se sumaron.
+     * El SELECT de los refuerzos de un viaje, con el nombre del conductor y las placas ya resueltos.
      *
-     * <p>Una sola consulta con tres uniones EXTERNAS: cada fila es un PEDIDO y puede traer uno,
-     * dos o los tres recursos, asi que con uniones internas desaparecerian justamente las filas
-     * que no los traen todos, que son la mayoria.
+     * <p>Se comparte entre el listado y la busqueda de UNO porque esos valores tienen que resolverse
+     * con la MISMA expresion en los dos: si el listado y la baja los armaran por separado, la linea
+     * de bitacora de la baja podria nombrar al mismo conductor distinto que el resto del modulo. El
+     * nombre sale de la MISMA expresion que el catalogo ({@link DriverRepository}), por el mismo
+     * motivo que en {@link ServiceRepository}.
      *
-     * <p>Se desempata por {@code id} y no solo por la fecha: dos refuerzos cargados dentro del
-     * mismo microsegundo dejarian el orden a criterio del motor, y una bitacora que se reordena
-     * sola entre dos lecturas no es una bitacora.
+     * <p>Cuatro uniones EXTERNAS, una por cada tabla que se cruza (los tres RECURSOS mas el
+     * trabajador detras del conductor): cada fila es un PEDIDO y puede traer uno, dos o los tres,
+     * asi que con uniones internas desapareceria justamente la mayoria, que son las que no los traen
+     * todos.
+     */
+    private static final String ADDITIONAL_RESOURCE_SELECT =
+        "SELECT a.id, a.driver_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
+            + "a.tractor_id, tra.plate AS tractor_plate, a.trailer_id, tri.plate AS trailer_plate, "
+            + "a.reason, a.assigned_by, a.assigned_at "
+            + "FROM operaciones.service_assignments a "
+            + "LEFT JOIN public.drivers d ON d.id = a.driver_id "
+            + "LEFT JOIN public.workers w ON w.id = d.worker_id "
+            + "LEFT JOIN public.tractors tra ON tra.id = a.tractor_id "
+            + "LEFT JOIN public.trailers tri ON tri.id = a.trailer_id "
+            + "WHERE a.service_id = :serviceId ";
+
+    /**
+     * Los refuerzos de un viaje, en el orden en que se sumaron.
      *
-     * <p>El nombre del conductor se arma con la MISMA expresion que el catalogo
-     * ({@link DriverRepository}), por el mismo motivo que en {@link ServiceRepository}: dos formas
-     * de componerlo harian que la misma persona se llame distinto segun por donde se la mire.
+     * <p>Se desempata por {@code id} y no solo por la fecha: dos refuerzos cargados dentro del mismo
+     * microsegundo dejarian el orden a criterio del motor, y una bitacora que se reordena sola entre
+     * dos lecturas no es una bitacora.
      */
     public List<ServiceAdditionalResourceRow> listByServiceId(long serviceId) {
         Query query = entityManager.createNativeQuery(
-            "SELECT a.id, a.driver_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
-                + "a.tractor_id, tra.plate AS tractor_plate, a.trailer_id, tri.plate AS trailer_plate, "
-                + "a.reason, a.assigned_by, a.assigned_at "
-                + "FROM operaciones.service_assignments a "
-                + "LEFT JOIN public.drivers d ON d.id = a.driver_id "
-                + "LEFT JOIN public.workers w ON w.id = d.worker_id "
-                + "LEFT JOIN public.tractors tra ON tra.id = a.tractor_id "
-                + "LEFT JOIN public.trailers tri ON tri.id = a.trailer_id "
-                + "WHERE a.service_id = :serviceId "
-                + "ORDER BY a.assigned_at, a.id", Tuple.class);
+            ADDITIONAL_RESOURCE_SELECT + "ORDER BY a.assigned_at, a.id", Tuple.class);
         query.setParameter("serviceId", serviceId);
 
         @SuppressWarnings("unchecked")
         List<Tuple> rows = query.getResultList();
         List<ServiceAdditionalResourceRow> resources = new ArrayList<>(rows.size());
         for (Tuple row : rows) {
-            resources.add(new ServiceAdditionalResourceRow(
-                ((Number) row.get(0)).longValue(),
-                ServiceRepository.toInteger(row.get(1)), (String) row.get(2),
-                ServiceRepository.toInteger(row.get(3)), (String) row.get(4),
-                ServiceRepository.toInteger(row.get(5)), (String) row.get(6),
-                (String) row.get(7),
-                ServiceRepository.toInteger(row.get(8)),
-                // NO se castea directo: segun la version del driver la misma columna llega como
-                // Instant, Timestamp u OffsetDateTime. Mismo helper que el listado de viajes.
-                DateUtils.toOffsetDateTime(row.get(9))));
+            resources.add(toAdditionalResourceRow(row));
         }
         return resources;
+    }
+
+    /**
+     * UN refuerzo por su id, ACOTADO a su viaje.
+     *
+     * <p>El id del viaje entra en la CONSULTA y no se compara despues. Asi un refuerzo de otro
+     * viaje no se puede tocar, y ademas no se distingue de uno inexistente: los dos devuelven vacio
+     * y el endpoint contesta lo mismo, sin abrir un canal para averiguar que ids estan vivos.
+     */
+    public Optional<ServiceAdditionalResourceRow> findByIdAndServiceId(long assignmentId, long serviceId) {
+        Query query = entityManager.createNativeQuery(
+            ADDITIONAL_RESOURCE_SELECT + "AND a.id = :assignmentId", Tuple.class);
+        query.setParameter("serviceId", serviceId);
+        query.setParameter("assignmentId", assignmentId);
+
+        @SuppressWarnings("unchecked")
+        List<Tuple> rows = query.getResultList();
+        return rows.isEmpty() ? Optional.empty() : Optional.of(toAdditionalResourceRow(rows.get(0)));
+    }
+
+    /**
+     * Baja FISICA de un refuerzo, acotada a su viaje.
+     *
+     * <p>⚠️ El que no tiene red propia es ESTE filtro: romperlo solo no se nota, porque la busqueda
+     * de arriba ya rechazo el id ajeno. Al reves NO es simetrico —el filtro de
+     * {@link #findByIdAndServiceId} vive en {@link #ADDITIONAL_RESOURCE_SELECT}, que comparte
+     * {@link #listByServiceId}, asi que romperlo pone en rojo al detalle y a los refuerzos—. Dentro
+     * de la clase de test de la BAJA hacen falta los dos para que algo se caiga; fuera de ella, no.
+     * Se conserva para que un llamador futuro que se saltee la busqueda no borre lo ajeno.
+     *
+     * @return cuantas filas se borraron: 1 si estaba, 0 si no. El llamador ya la busco, asi que un
+     *     0 aca significa que otra transaccion se le adelanto.
+     */
+    public long deleteByIdAndServiceId(long assignmentId, long serviceId) {
+        // Misma guarda que el chequeo de duplicados, y por el mismo motivo: esto se apoya en que la
+        // fila del viaje YA este lockeada. Sin ese lock, dos bajas simultaneas del mismo refuerzo no
+        // se ven entre si y las dos escriben rastro.
+        requireServiceRowAlreadyLocked();
+        return delete("id = ?1 and serviceId = ?2", assignmentId, serviceId);
+    }
+
+    private static ServiceAdditionalResourceRow toAdditionalResourceRow(Tuple row) {
+        return new ServiceAdditionalResourceRow(
+            ((Number) row.get(0)).longValue(),
+            ServiceRepository.toInteger(row.get(1)), (String) row.get(2),
+            ServiceRepository.toInteger(row.get(3)), (String) row.get(4),
+            ServiceRepository.toInteger(row.get(5)), (String) row.get(6),
+            (String) row.get(7),
+            ServiceRepository.toInteger(row.get(8)),
+            // NO se castea directo: segun la version del driver la misma columna llega como
+            // Instant, Timestamp u OffsetDateTime. Mismo helper que el listado de viajes.
+            DateUtils.toOffsetDateTime(row.get(9)));
     }
 
     /**
@@ -127,11 +178,11 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
     /**
      * Corta si quien llama todavia no tomo la fila del viaje.
      *
-     * <p>Es la mitad VERIFICABLE de lo que promete el javadoc de arriba, y sigue el mismo patron
-     * que {@code ServiceResourceConflictRepository.requirePreconditions()}: esta consulta no toma
-     * locks porque se apoya en el de la fila, asi que sin esa guarda el olvido no falla — devuelve
-     * "sin duplicado" y dos refuerzos concurrentes insertan los dos, con la base aceptandolos
-     * porque tampoco hay indice unico que los frene.
+     * <p>La usan los DOS caminos que tocan refuerzos apoyandose en ese lock, y sin ella el olvido
+     * no falla en ninguno: el chequeo de duplicados devuelve "sin duplicado" y dos refuerzos
+     * concurrentes entran los dos (no hay indice unico que los frene), y la baja borra sin
+     * serializar, con lo cual dos bajas simultaneas escriben rastro las dos. Sigue el mismo patron
+     * que {@code ServiceResourceConflictRepository.requirePreconditions()}.
      *
      * <p>Se detecta por el tope de espera, que lo pone la lectura con lock de la fila y solo ella.
      * No prueba que sea la fila CORRECTA, pero cierra el olvido real: llamar antes de lockear.
@@ -148,9 +199,9 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
             .getSingleResult();
         if ("0".equals(settings[0])) {
             throw new IllegalStateException(
-                "el chequeo de duplicados se apoya en el lock de la fila del viaje, que todavia no "
-                    + "se tomo: sin el, dos refuerzos simultaneos no se ven entre si y los dos "
-                    + "entran.");
+                "esta consulta se apoya en el lock de la fila del viaje, que todavia no se tomo: "
+                    + "sin el, dos escrituras simultaneas sobre los refuerzos del mismo viaje no se "
+                    + "ven entre si.");
         }
         // Se verifica por SIMETRIA con la hermana y para que este flow declare el nivel del que
         // depende. Con la guarda puesta, las dos cortan acá con 500 y ese es el punto; lo que
@@ -173,8 +224,9 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
         // unico que queda tapando el agujero es la otra mitad, la del tope de espera.
         if (!"read committed".equals(settings[1])) {
             throw new IllegalStateException(
-                "el chequeo de duplicados necesita READ COMMITTED para ver lo que confirmo la "
-                    + "transaccion que gano el lock; nivel actual: " + settings[1]);
+                "las consultas de refuerzos que se apoyan en el lock de la fila del viaje necesitan "
+                    + "READ COMMITTED para ver lo que confirmo la transaccion que lo gano; nivel "
+                    + "actual: " + settings[1]);
         }
     }
 

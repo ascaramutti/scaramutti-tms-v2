@@ -17,6 +17,7 @@ import com.scaramutti.tms.operations.service.GetServiceService;
 import com.scaramutti.tms.operations.service.GetServiceStatsService;
 import com.scaramutti.tms.operations.service.GetServicesReportService;
 import com.scaramutti.tms.operations.service.ListServicesService;
+import com.scaramutti.tms.operations.service.RemoveServiceResourceService;
 import com.scaramutti.tms.operations.service.UpdateServiceService;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.util.Etag;
@@ -25,6 +26,7 @@ import jakarta.inject.Inject;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.HeaderParam;
 import jakarta.ws.rs.POST;
@@ -44,6 +46,7 @@ import java.net.URI;
 public class ServiceResource {
 
     @Inject AddServiceResourcesService addServiceResourcesService;
+    @Inject RemoveServiceResourceService removeServiceResourceService;
     @Inject AssignServiceResourcesService assignServiceResourcesService;
     @Inject ChangeServiceStatusService changeServiceStatusService;
     @Inject CreateServiceService createServiceService;
@@ -278,6 +281,46 @@ public class ServiceResource {
         );
         // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
         // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
+        return Response.ok(response)
+            .header("ETag", Etag.of(response.updatedAt()))
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .build();
+    }
+
+    /**
+     * Baja de un refuerzo cargado por error. Contracara del alta, con su misma guarda de estado y
+     * sus mismos roles: quien manda el relevo es quien lo corrige.
+     *
+     * <p>El despacho entra por esa simetria, y NO por ser una operacion menor que las que ya puede
+     * hacer: RN-OP7 justamente le VETA cancelar y eliminar. No hay excepcion a esa regla aca, porque
+     * lo que se borra es la fila del refuerzo y el viaje sigue en ruta.
+     *
+     * <p>La lista es subconjunto de la del detalle, y tiene que seguir siendolo: el 200 devuelve el
+     * detalle completo, asi que sumar un rol aca sin sumarlo al {@code GET /services/{id}} le daria
+     * por esta puerta una lectura que por la suya no tiene.
+     *
+     * <p>Los dos ids se reciben como TEXTO por el mismo motivo que en el resto del modulo:
+     * declarados con su tipo, uno que no parsea da el 404 sin cuerpo del framework en vez del 400
+     * con detalle.
+     *
+     * <p>Sin {@code If-Match} y sin cuerpo. Devuelve el detalle, como sus seis vecinos, y con una
+     * razon que aca es tecnica: la baja MUEVE la version del viaje, asi que un 204 dejaria al
+     * cliente con un ETag que la base ya no tiene y su proximo {@code If-Match} comeria un 412
+     * espurio.
+     */
+    @DELETE
+    @Path("/{id}/resources/{assignmentId}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
+    public Response removeServiceResource(
+        @PathParam("id") String id,
+        @PathParam("assignmentId") String assignmentId
+    ) {
+        ServiceDetailResponse response = removeServiceResourceService.removeServiceResource(
+            serviceResourceMapper.toServiceId(id),
+            serviceResourceMapper.toAssignmentId(assignmentId));
+        // Mismas tres cabeceras que el alta, por el mismo motivo: el cuerpo es el detalle, depende
+        // de QUIEN pregunta y no se guarda en ninguna cache.
         return Response.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
