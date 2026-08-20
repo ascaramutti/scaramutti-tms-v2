@@ -16,7 +16,12 @@ import { matchesPathPrefix } from './pathMatching'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
-import { OPERATIONS_ROLES, QUOTATION_ROLES, WAREHOUSE_ROLES } from '../auth/moduleRoles'
+import {
+  OPERATIONS_ROLES,
+  QUOTATION_ROLES,
+  SERVICES_REPORT_ROLES,
+  WAREHOUSE_ROLES,
+} from '../auth/moduleRoles'
 import type { UserRole } from '../../api'
 
 interface MenuItem {
@@ -43,9 +48,14 @@ interface MenuGroup {
  * entera) pero NO son el módulo comercial. Sin esta lista el prefijo marcaría
  * activo el item de Cotizaciones mientras el usuario está en otro módulo.
  */
-const NON_QUOTATION_SUBTREES = ['/cotizaciones/cuenta', '/cotizaciones/almacen']
+const NON_QUOTATION_SUBTREES = [
+  '/cotizaciones/cuenta',
+  '/cotizaciones/almacen',
+  '/cotizaciones/operaciones',
+]
 
 const WAREHOUSE_BASE = '/cotizaciones/almacen'
+const OPERATIONS_BASE = '/cotizaciones/operaciones'
 
 // Matriz de permisos del menú alineada con `x-required-roles` del contrato OpenAPI.
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
@@ -53,10 +63,26 @@ const MENU: MenuGroup[] = [
   {
     label: 'Operaciones',
     items: [
-      // Cross-link a v1 (servicios/viajes, otra SPA en la raíz del dominio).
-      // Los roles de almacén no tienen cuenta allá: el link los dejaría en un
-      // login ajeno.
-      { icon: Route, label: 'Servicios / Viajes', href: '/', allowedRoles: OPERATIONS_ROLES },
+      {
+        icon: Route,
+        label: 'Servicios',
+        to: OPERATIONS_BASE,
+        allowedRoles: OPERATIONS_ROLES,
+        // El detalle y el alta de un viaje van a colgar de acá cuando lleguen
+        // sus pantallas, y tienen que seguir marcando activo Servicios. El
+        // prefijo pelado no sirve: marcaría activo el item también en Reportes.
+        activeWhen: (pathname) =>
+          pathname === OPERATIONS_BASE ||
+          matchesPathPrefix(pathname, `${OPERATIONS_BASE}/servicios`),
+      },
+      {
+        // Sin `to` hasta que exista su pantalla: el item queda deshabilitado en
+        // vez de llevar a una ruta que no resuelve. Roles propios: el reporte
+        // deja afuera al despachador, a diferencia del resto del módulo.
+        icon: FileBarChart2,
+        label: 'Reportes de operaciones',
+        allowedRoles: SERVICES_REPORT_ROLES,
+      },
     ],
   },
   {

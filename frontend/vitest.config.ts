@@ -20,7 +20,12 @@ export default defineConfig({
         'src/test/**',                      // setup/mocks
         '**/*.test.{ts,tsx}',               // tests
         'src/main.tsx',                     // entrypoint, dificil de testear sin browser
-        // Wiring/config sin logica: se valida con build + smoke browser, no con unit tests.
+        // Wiring/config sin logica de negocio.
+        // `router.tsx` se excluye aunque SI tenga test (`router.test.tsx` monta la
+        // tabla real): su cobertura seria 100% con solo importarlo, porque la tabla
+        // se evalua entera al cargar el modulo. Un 100% que no distingue una ruta
+        // probada de una que nadie visito engaña mas que ayudar; lo que da la
+        // garantia es el test, no el numero.
         'src/router.tsx',                   // tabla declarativa de rutas
         'src/shared/query/queryClient.ts',  // defaults de react-query
         'src/pages/HomePage.tsx',           // placeholder pre-design final

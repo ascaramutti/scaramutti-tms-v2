@@ -3,14 +3,21 @@ import type { UserRole } from '../../api'
 /**
  * Pantalla de aterrizaje post-login según el rol (unificación v1+v2).
  *
- * Detrás del gateway las dos apps comparten el origin: `/` es v1 (servicios/
- * viajes, FUERA de esta SPA) y `/cotizaciones` es v2. Cada rol aterriza donde
- * trabaja. Confirmado con el usuario (2026-06-12): dispatcher → v1; el resto
- * (incl. operations_manager) → cotizaciones.
+ * Detrás del gateway las dos apps comparten el origin: `/` es v1 y
+ * `/cotizaciones` es v2. Cada rol aterriza donde trabaja.
+ *
+ * `dispatcher` aterrizaba en v1 porque el control de viajes vivía allá; con el
+ * módulo recodificado en v2 aterriza en Operaciones, dentro de esta SPA. v1
+ * sigue en pie hasta el cutover de datos, pero deja de ser el destino de nadie:
+ * ningún rol aterriza fuera de la SPA.
  */
 export const COTIZACIONES_LANDING = '/cotizaciones'
 
-/** Raíz del dominio = v1. Navegación EXTERNA a esta SPA (window.location). */
+/**
+ * Raíz del dominio = v1. Ya no es landing de ningún rol, pero se conserva: es
+ * la referencia de "afuera de esta SPA" que usa `isExternalLanding`, y v1 sigue
+ * sirviendo el control de viajes hasta el cutover.
+ */
 export const V1_LANDING = '/'
 
 /**
@@ -19,6 +26,9 @@ export const V1_LANDING = '/'
  */
 export const ALMACEN_LANDING = '/cotizaciones/almacen'
 
+/** Módulo Operaciones. Cuelga del mismo prefijo, por la misma razón. */
+export const OPERACIONES_LANDING = '/cotizaciones/operaciones'
+
 // Los dos roles del módulo Almacén trabajan solo ahí, así que aterrizan en el
 // módulo y no en cotizaciones (matriz de permisos del contrato de Almacén).
 const ROLE_LANDING: Record<UserRole, string> = {
@@ -26,7 +36,7 @@ const ROLE_LANDING: Record<UserRole, string> = {
   sales: COTIZACIONES_LANDING,
   general_manager: COTIZACIONES_LANDING,
   operations_manager: COTIZACIONES_LANDING,
-  dispatcher: V1_LANDING,
+  dispatcher: OPERACIONES_LANDING,
   finance_manager: ALMACEN_LANDING,
   warehouse_keeper: ALMACEN_LANDING,
 }
@@ -41,6 +51,7 @@ const LANDING_LABEL: Record<string, string> = {
   [V1_LANDING]: 'Servicios',
   [COTIZACIONES_LANDING]: 'Cotizaciones',
   [ALMACEN_LANDING]: 'Almacén',
+  [OPERACIONES_LANDING]: 'Operaciones',
 }
 
 export function landingLabelFor(role: UserRole | undefined): string {

@@ -17,10 +17,12 @@ export const QUOTATION_ROLES: UserRole[] = [
 ]
 
 /**
- * Operaciones (servicios y viajes) vive en v1, otra app en la raíz del dominio,
- * que valida sus propias sesiones: acá la lista solo evita ofrecer un link a
- * quien no tiene cuenta allá. Los roles de almacén trabajan únicamente en su
- * módulo y quedan afuera.
+ * Operaciones (control de viajes). Vive DENTRO de esta SPA desde que el módulo
+ * se recodificó en v2: la lista decide qué esconde la UI (item de menú y
+ * pantalla de sin acceso), y la autoridad sigue siendo el backend.
+ *
+ * `dispatcher` entra acá y en ningún otro módulo: es su único lugar de trabajo.
+ * Los roles de almacén quedan afuera.
  */
 export const OPERATIONS_ROLES: UserRole[] = [
   'admin',
@@ -28,6 +30,23 @@ export const OPERATIONS_ROLES: UserRole[] = [
   'general_manager',
   'operations_manager',
   'dispatcher',
+]
+
+/**
+ * Excepción intramódulo: el reporte semanal de operaciones deja afuera al
+ * despachador. El reporte muestra precios por viaje, y el backend omite
+ * `price` y `currencyCode` para el despacho en todo el módulo. (Ojo: eso cubre
+ * los importes estructurados, no un precio que alguien escriba a mano en un
+ * texto libre; ese riesgo está aceptado en el contrato.)
+ *
+ * Espejo del `x-required-roles` de `GET /services/report`; la autoridad es el
+ * 403 del backend, esta lista solo decide qué esconde la UI.
+ */
+export const SERVICES_REPORT_ROLES: UserRole[] = [
+  'admin',
+  'sales',
+  'general_manager',
+  'operations_manager',
 ]
 
 /**

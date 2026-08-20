@@ -22,6 +22,7 @@ function renderLogin(initialPath = '/cotizaciones/login') {
             <Route path="/cotizaciones/login" element={<LoginPage />} />
             <Route path="/cotizaciones" element={<div>HOME</div>} />
             <Route path="/cotizaciones/almacen" element={<div>ALMACEN</div>} />
+            <Route path="/cotizaciones/operaciones" element={<div>OPERACIONES</div>} />
             <Route path="/clients" element={<div>CLIENTS</div>} />
           </Routes>
         </MemoryRouter>
@@ -112,7 +113,7 @@ describe('LoginPage', () => {
   })
 
   // ----- Landing por rol (unificación v1+v2) -----
-  it('login como dispatcher redirige a v1 (raíz del dominio, full page load)', async () => {
+  it('login como dispatcher aterriza en operaciones sin salir de la SPA', async () => {
     server.use(loginAsRoleResponse('dispatcher'))
     const assignSpy = vi.fn()
     vi.stubGlobal('location', { ...window.location, assign: assignSpy })
@@ -123,9 +124,10 @@ describe('LoginPage', () => {
     await user.type(screen.getByLabelText(/contraseña/i), 'Dispatch1234')
     await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
 
-    await waitFor(() => expect(assignSpy).toHaveBeenCalledWith('/'))
-    // No navegó dentro de la SPA:
-    expect(screen.queryByText('HOME')).not.toBeInTheDocument()
+    expect(await screen.findByText('OPERACIONES')).toBeInTheDocument()
+    // Antes salía a v1 con un full page load; ahora el control de viajes vive
+    // en esta SPA y lo navega el router.
+    expect(assignSpy).not.toHaveBeenCalled()
   })
 
   it.each(['finance_manager', 'warehouse_keeper'] as const)(
