@@ -985,6 +985,36 @@ export type FleetUnitRef = {
 export type FleetUnitResponse = FleetUnitRef & {
     brand?: string | null;
     model?: string | null;
+    /**
+     * null en las escoltas: no participan de la asignacion de viajes.
+     */
+    status?: 'AVAILABLE' | 'MAINTENANCE' | 'NOT_AVAILABLE' | null;
+    isActive: boolean;
+};
+
+/**
+ * Disponibilidad del recurso (unidad de flota o conductor), en mayusculas
+ * como el resto de los enums de la API. Donde el recurso puede no tenerla
+ * (las escoltas), la propiedad se declara admitiendo null.
+ *
+ */
+export type FleetResourceStatus = 'AVAILABLE' | 'MAINTENANCE' | 'NOT_AVAILABLE';
+
+/**
+ * Referencia minima a un conductor (public.drivers). El id es el que guarda la
+ * asignacion del servicio; el nombre sale del trabajador asociado.
+ *
+ */
+export type DriverRef = {
+    id: number;
+    fullName: string;
+};
+
+export type DriverResponse = DriverRef & {
+    licenseNumber: string;
+    licenseCategory?: string | null;
+    phone?: string | null;
+    status: FleetResourceStatus;
     isActive: boolean;
 };
 
@@ -1130,6 +1160,467 @@ export type WarehouseReportResponse = {
     totalPEN: number;
     totalUSD: number;
     totalCount: number;
+};
+
+/**
+ * Ciclo de vida del servicio:
+ * `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`;
+ * `CANCELLED` desde cualquiera de los tres no terminales; `DELETED` solo desde
+ * los dos pendientes. El alta siempre nace en `PENDING_ASSIGNMENT`; las transiciones
+ * las pide `POST /services/{id}/status`, que además REABRE un viaje cancelado o eliminado
+ * y lo devuelve al estado que tenía.
+ *
+ */
+export type ServiceStatus = 'PENDING_ASSIGNMENT' | 'PENDING_START' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DELETED';
+
+/**
+ * Ámbito del viaje. Dominio cerrado sin catálogo administrable: viaja como enum
+ * y la base de datos lo fija con una restricción, igual que el estado. No hay
+ * endpoint de ámbitos — el selector de la interfaz sale de este enum.
+ *
+ */
+export type TripScope = 'LOCAL' | 'PROVINCIA';
+
+/**
+ * Tipo de la entrada de bitácora, para que la interfaz la muestre con su
+ * etiqueta sin interpretar el texto.
+ *
+ * `ASSIGNMENT` cubre TANTO la asignación de los recursos principales COMO los
+ * refuerzos sumados con el viaje en ruta: los distingue el TEXTO de la entrada,
+ * cuya primera línea nombra la acción.
+ *
+ */
+export type ServiceEventType = 'CREATED' | 'ASSIGNMENT' | 'STATUS_CHANGE' | 'FIELD_EDIT' | 'NOTE';
+
+/**
+ * Entrada de la bitácora del servicio (una fila por acción).
+ */
+export type ServiceEventResponse = {
+    id: number;
+    eventType: ServiceEventType;
+    note: string;
+    createdBy: UserRef;
+    createdAt: string;
+};
+
+/**
+ * Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
+ *
+ * Los textos libres no pueden contener el byte NUL (`U+0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` los saltos y las tabulaciones sí son válidos.
+ *
+ */
+export type ServiceCreateRequest = {
+    clientId: number;
+    tripScope: TripScope;
+    /**
+     * Puede ser pasada (registro retroactivo). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400 (el formato ISO admite años que la columna no).
+     */
+    tentativeDate: string;
+    origin: string;
+    destination: string;
+    cargoTypeId: number;
+    weightKg: number;
+    lengthM?: number | null;
+    widthM?: number | null;
+    heightM?: number | null;
+    /**
+     * Mayor que cero: un viaje siempre tiene precio
+     */
+    price: number;
+    currencyId: number;
+    observations?: string | null;
+};
+
+/**
+ * Edición del servicio. El cliente, el ámbito del viaje y el tipo de carga NO
+ * viajan: son inmutables después del alta. `justification` es obligatoria: 10
+ * caracteres o más MEDIDOS SOBRE EL TEXTO RECORTADO (un texto corto rellenado con
+ * espacios se rechaza). Un cuerpo sin cambios reales responde 200 sin escribir nada.
+ *
+ * Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
+ *
+ * Los campos opcionales NO se comportan todos igual frente a `null`: `lengthM`,
+ * `widthM`, `heightM` y `observations` se asignan tal cual, así que mandarlos en
+ * null (o ausentes) los VACÍA — un cuerpo parcial borra lo que no incluye. Las
+ * fechas reales, en cambio, solo CORRIGEN un valor que el servicio ya tiene: ahí
+ * ausente o null significa sin cambio, porque una fecha real no se borra.
+ *
+ * Los textos libres no pueden contener el byte NUL (`U+0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` y `justification` los saltos y las tabulaciones sí son válidos.
+ *
+ */
+export type ServiceUpdateRequest = {
+    /**
+     * Puede ser pasada (registro retroactivo). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400 (el formato ISO admite años que la columna no).
+     */
+    tentativeDate: string;
+    origin: string;
+    destination: string;
+    weightKg: number;
+    lengthM?: number | null;
+    widthM?: number | null;
+    heightM?: number | null;
+    /**
+     * Mayor que cero: un viaje siempre tiene precio
+     */
+    price: number;
+    currencyId: number;
+    observations?: string | null;
+    /**
+     * Corrección del inicio real. Solo se admite si el servicio YA lo tiene: la
+     * condición es tener la fecha, no estar en un estado (en la práctica aparece al
+     * ponerse en ruta). Un viaje migrado SIN la fecha no se corrige por acá: ese saneo
+     * va en el script de cutover. Ausente o null = sin cambio. Entre 1900 y 2999: fuera
+     * de esa ventana es 400. ⚠️ La fecha la fija la transición a "en ruta"; en un viaje
+     * que todavía no arrancó, este campo responde 400.
+     *
+     */
+    startDateTime?: string | null;
+    /**
+     * Corrección del fin real. Solo se admite si el servicio YA lo tiene (misma
+     * condición que el inicio: la fecha, no el estado) y tiene que quedar posterior
+     * o igual al inicio. Las mismas consecuencias que el inicio para un viaje migrado
+     * sin la fecha. Ausente o null = sin cambio. Entre 1900 y 2999: fuera de esa ventana
+     * es 400. ⚠️ La fecha la fija la transición a "completado"; en un viaje que todavía no
+     * cerró, este campo responde 400.
+     *
+     */
+    endDateTime?: string | null;
+    /**
+     * El `minLength` cuenta el texto CRUDO; el patrón expresa el mínimo real, que es sobre el texto YA RECORTADO: sin él, un cliente generado aceptaría un texto corto rellenado con espacios que el servidor rechaza
+     */
+    justification: string;
+};
+
+/**
+ * Refuerzos de un viaje ya en ruta. Los tres recursos son opcionales por separado
+ * pero al menos uno tiene que venir: los tres ausentes (o los tres en null) es 400
+ * `COM-001`. Es una condición ENTRE campos, así que no se puede declarar en el
+ * esquema; la valida el servidor.
+ *
+ * El motivo es OBLIGATORIO, a diferencia de la nota de la asignación, y su mínimo
+ * se mide DESPUÉS de recortar los espacios de los bordes: diez espacios no son un
+ * motivo. El `pattern` dice exactamente eso (un no-espacio, ocho caracteres
+ * cualesquiera, un no-espacio, con espacios libres alrededor), para que un cliente
+ * generado no acepte lo que el servidor rechaza.
+ *
+ * El motivo entra en la bitácora junto con los recursos sumados y se anexa a la
+ * descripción de las filas de auditoría. Sus saltos de línea se APLASTAN al
+ * escribirlo en la bitácora (se ven como `⏎`), porque cada entrada tiene una línea
+ * por dato y un salto permitiría plantar una línea falsa con el formato del
+ * servidor. No puede contener el byte NUL (`U+0000`), que la columna no admite
+ * y se rechaza con 400.
+ *
+ * `force` ausente equivale a `false`.
+ *
+ */
+export type AddResourcesRequest = {
+    driverId?: number | null;
+    tractorId?: number | null;
+    trailerId?: number | null;
+    /**
+     * Por qué se suma el refuerzo. Obligatorio; 10 caracteres o más ya recortado.
+     */
+    reason: string;
+    /**
+     * true = suma el recurso pese al conflicto OPS-002 y lo deja registrado en la bitácora y en la auditoría. Ausente, null y false son lo mismo. NO abre el duplicado del mismo viaje (OPS-003), que es duro.
+     */
+    force?: boolean | null;
+};
+
+/**
+ * Conductor y tracto obligatorios, carreta opcional.
+ *
+ * La nota es libre y opcional (no tiene mínimo, a diferencia de la justificación de
+ * la edición): entra en la bitácora junto con los recursos asignados y se anexa a la
+ * descripción de las filas de auditoría. Una nota en blanco se trata como ausente. Sus
+ * saltos de línea se APLASTAN al escribirla en la bitácora (se ven como `⏎`), porque cada
+ * entrada tiene una línea por dato y un salto permitiría plantar una línea falsa con el
+ * formato del servidor. No puede contener el byte NUL (`U+0000`), que la columna no admite
+ * y se rechaza con 400.
+ *
+ * `force` ausente equivale a `false`.
+ *
+ */
+export type AssignResourcesRequest = {
+    driverId: number;
+    tractorId: number;
+    trailerId?: number | null;
+    note?: string | null;
+    /**
+     * true = asigna pese al conflicto OPS-002; queda registrado en la bitácora y en la auditoría. Ausente, null y false son lo mismo
+     */
+    force?: boolean | null;
+};
+
+export type ChangeStatusRequest = {
+    /**
+     * Estado al que se quiere IR, no el actual. Los dos pendientes no se piden: a "pendiente de inicio" se llega asignando recursos. `REOPENED` no es un estado sino una ACCIÓN: deshace una cancelación o una eliminación y devuelve el viaje al estado que tenía antes, que el servidor saca del rastro de auditoría.
+     */
+    target: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'DELETED' | 'REOPENED';
+    /**
+     * Inicio o fin real; ausente o null = ahora. Solo aplica al iniciar o finalizar: enviarlo al cancelar, eliminar o reabrir es 400 COM-001. Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400. Al finalizar debe ser posterior o igual al inicio, y al iniciar no puede quedar después de un fin ya registrado (RN-OP13).
+     */
+    dateTime?: string | null;
+    /**
+     * Opcional al iniciar o finalizar; OBLIGATORIA (10 caracteres o más) al cancelar, eliminar o reabrir (RN-OP7).
+     */
+    note?: string | null;
+    /**
+     * Solo al REABRIR: reabre pese al conflicto OPS-002 y lo deja registrado en la bitácora. Ausente, null y false son lo mismo (no forzar), para que un formulario que serializa el objeto entero siga andando. `true` en cualquiera de las otras cuatro transiciones es 400: ninguna moviliza recursos, y es la única bandera que autoriza pisar la reja de conflictos.
+     */
+    force?: boolean | null;
+};
+
+export type ServiceResourceConflictProblem = Problem & {
+    /**
+     * true solo en OPS-002
+     */
+    forcible?: boolean;
+    conflicts?: Array<{
+        resource: 'DRIVER' | 'TRACTOR' | 'TRAILER';
+        /**
+         * Nombre del conductor o placa de la unidad
+         */
+        resourceName: string;
+        serviceCode: string;
+        /**
+         * Estado del servicio que retiene el recurso. Solo estos dos: antes de
+         * asignar no hay recursos, y los terminales (completado, cancelado,
+         * eliminado) ya los liberaron.
+         *
+         */
+        serviceStatus: 'PENDING_START' | 'IN_PROGRESS';
+    }>;
+};
+
+/**
+ * Recurso sumado a un viaje que ya estaba en ruta (relevo de conductor, unidad de
+ * apoyo), con el motivo por el que se sumó y quién lo hizo.
+ *
+ * Una fila puede traer los tres recursos, uno solo o cualquier combinación: es el
+ * pedido que la creó, no un recurso suelto. Los que no participaron viajan en null.
+ *
+ */
+export type ServiceAdditionalResourceResponse = {
+    id: number;
+    driver?: DriverRef | null;
+    tractor?: FleetUnitRef | null;
+    trailer?: FleetUnitRef | null;
+    /**
+     * Por qué se sumó. Obligatorio al crearlo, así que nunca viaja vacío.
+     */
+    reason: string;
+    assignedBy: UserRef;
+    assignedAt: string;
+};
+
+/**
+ * Detalle del servicio con su bitácora. Los recursos asignados (conductor, tracto,
+ * carreta) viajan desde que existe el endpoint que los asigna: son null mientras el
+ * viaje esté pendiente de asignación, y la carreta puede seguir en null después,
+ * porque es opcional.
+ *
+ * Las fechas reales de inicio y fin SÍ viajan: las fija la transición de estado,
+ * pero la edición las corrige, y sin poder leerlas esa corrección sería imposible
+ * de pedir y de confirmar.
+ *
+ * Los REFUERZOS viajan en `additionalResources` desde que existe el endpoint que
+ * los suma: lista vacía mientras no haya ninguno, NUNCA null.
+ *
+ */
+export type ServiceDetailResponse = {
+    id: number;
+    code: string;
+    client: ClientRef;
+    origin: string;
+    destination: string;
+    tentativeDate: string;
+    tripScope: TripScope;
+    cargoType: CargoTypeRef;
+    weightKg: number;
+    lengthM?: number | null;
+    widthM?: number | null;
+    heightM?: number | null;
+    observations?: string | null;
+    /**
+     * Ausente para el rol de despacho
+     */
+    price?: number;
+    /**
+     * Ausente para el rol de despacho
+     */
+    currencyCode?: string;
+    status: ServiceStatus;
+    driver: DriverRef | null;
+    tractor: FleetUnitRef | null;
+    trailer: FleetUnitRef | null;
+    /**
+     * Inicio real. Lo fija la transición a "en ruta" y la edición lo corrige; null mientras el viaje no haya arrancado
+     */
+    startDateTime?: string | null;
+    /**
+     * Fin real. Lo fija la transición a "completado" y la edición lo corrige; null mientras el viaje no haya cerrado
+     */
+    endDateTime?: string | null;
+    /**
+     * Refuerzos sumados con el viaje en ruta, en orden cronológico ascendente. Lista vacía si no hay, nunca null.
+     */
+    additionalResources: Array<ServiceAdditionalResourceResponse>;
+    /**
+     * Bitácora en orden cronológico ascendente
+     */
+    events: Array<ServiceEventResponse>;
+    createdBy: UserRef;
+    createdAt: string;
+    /**
+     * Ultima actualizacion. Para el If-Match reenviar el header ETag tal cual, NO este valor
+     */
+    updatedAt: string;
+};
+
+export type ServicesReportRowResponse = {
+    serviceId: number;
+    code: string;
+    clientName: string;
+    tripScope: TripScope;
+    origin: string;
+    destination: string;
+    startDateTime: string;
+    endDateTime: string;
+    price: number;
+    currencyCode: string;
+    principalDriver: string;
+    /**
+     * Conductores sumados en ruta, con el motivo de cada relevo.
+     */
+    additionalDrivers: Array<{
+        name: string;
+        reason: string;
+    }>;
+};
+
+/**
+ * Una fila por moneda, sin conversión (mismo criterio que el reporte de almacén).
+ */
+export type ServicesReportTotalsResponse = {
+    currencyCode: string;
+    totalServices: number;
+    totalRevenue: number;
+};
+
+export type ServicesReportResponse = {
+    /**
+     * La semana que se está reportando. `end` es el MARTES inclusive, no el miércoles con el que se consulta la base: son dos fechas distintas separadas por un día.
+     */
+    weekCycle: {
+        /**
+         * Miércoles en que abrió (Lima)
+         */
+        start: string;
+        /**
+         * Martes en que cierra, INCLUSIVE (Lima)
+         */
+        end: string;
+    };
+    /**
+     * Si la semana ya cerró. La semana EN CURSO se puede consultar y devuelve `false`; lo que depende de esto es la exportación, no la lectura. Va UN solo campo y no dos: publicar además su negación deja dos formas de la misma verdad que pueden contradecirse.
+     */
+    closed: boolean;
+    /**
+     * Ordenadas por fecha de fin ascendente (el desempate por id las deja en un orden estable entre dos impresiones de la misma semana). Lista vacía si no hubo servicios completados en la semana, nunca null.
+     */
+    rows: Array<ServicesReportRowResponse>;
+    /**
+     * Una fila por cada moneda PRESENTE en la semana, en el orden en que aparecen en las filas. Lista vacía si no hubo servicios, nunca null: no se publica una fila en cero por cada moneda del catálogo.
+     */
+    totals: Array<ServicesReportTotalsResponse>;
+};
+
+/**
+ * La tira de indicadores que va arriba del listado. El cuerpo es IDÉNTICO para los cinco
+ * roles: no lleva un solo importe, así que la regla de precios no recorta nada acá.
+ *
+ */
+export type ServiceStatsResponse = {
+    /**
+     * Viajes esperando que se les asignen recursos. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek
+     */
+    pendingAssignment: number;
+    /**
+     * Viajes con recursos asignados que todavía no arrancaron. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek
+     */
+    pendingStart: number;
+    /**
+     * Viajes en ruta. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek
+     */
+    inProgress: number;
+    /**
+     * Completados con fecha de fin real dentro del ciclo operativo miércoles→martes de América/Lima (RN-OP14)
+     */
+    completedThisWeek: number;
+    /**
+     * Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan.
+     */
+    driversOnRoad: {
+        active: number;
+        total: number;
+    };
+    /**
+     * TRACTOS principales distintos en viajes en ruta, sobre el padrón de tractos de alta. Carretas y escoltas NO participan, pese al nombre del campo.
+     */
+    unitsOnRoad: {
+        active: number;
+        total: number;
+    };
+    /**
+     * El ciclo vigente. `end` es el MARTES inclusive, no el miércoles con el que se consulta.
+     */
+    weekCycle: {
+        /**
+         * Miércoles en que abrió el ciclo (Lima)
+         */
+        start: string;
+        /**
+         * Martes en que cierra, INCLUSIVE (Lima)
+         */
+        end: string;
+    };
+};
+
+/**
+ * Fila del listado. `price` y `currencyCode` están AUSENTES (no en null) para el
+ * rol `dispatcher`. Origen y destino viajan separados porque la tabla los muestra
+ * en dos líneas.
+ *
+ * `driver` y `tractor` son null mientras el viaje esté pendiente de asignación: la
+ * fila los trae desde que existe el endpoint que los asigna. La carreta no está acá
+ * (es opcional y la tabla no la muestra); vive en el detalle.
+ *
+ */
+export type ServiceSummaryResponse = {
+    id: number;
+    code: string;
+    client: ClientRef;
+    origin: string;
+    destination: string;
+    tentativeDate: string;
+    tripScope: TripScope;
+    status: ServiceStatus;
+    driver: DriverRef | null;
+    tractor: FleetUnitRef | null;
+    /**
+     * Ausente para el rol dispatcher
+     */
+    price?: number;
+    /**
+     * Ausente para el rol dispatcher
+     */
+    currencyCode?: string;
+    createdAt: string;
+};
+
+export type PageOfServiceSummary = PageMeta & {
+    content: Array<ServiceSummaryResponse>;
 };
 
 /**
@@ -2929,3 +3420,467 @@ export type ListFleetUnitsResponses = {
 };
 
 export type ListFleetUnitsResponse = ListFleetUnitsResponses[keyof ListFleetUnitsResponses];
+
+export type ListDriversData = {
+    body?: never;
+    path?: never;
+    query?: {
+        isActive?: boolean;
+    };
+    url: '/drivers';
+};
+
+export type ListDriversErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListDriversError = ListDriversErrors[keyof ListDriversErrors];
+
+export type ListDriversResponses = {
+    /**
+     * Conductores con su disponibilidad
+     */
+    200: Array<DriverResponse>;
+};
+
+export type ListDriversResponse = ListDriversResponses[keyof ListDriversResponses];
+
+export type ListServicesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        q?: string;
+        status?: ServiceStatus;
+        /**
+         * Filtra por cliente exacto
+         */
+        clientId?: number;
+        /**
+         * Fecha tentativa desde (inclusive). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400
+         */
+        dateFrom?: string;
+        /**
+         * Fecha tentativa hasta (inclusive). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400
+         */
+        dateTo?: string;
+        page?: number;
+        size?: number;
+    };
+    url: '/services';
+};
+
+export type ListServicesErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListServicesError = ListServicesErrors[keyof ListServicesErrors];
+
+export type ListServicesResponses = {
+    /**
+     * Página de servicios
+     */
+    200: PageOfServiceSummary;
+};
+
+export type ListServicesResponse = ListServicesResponses[keyof ListServicesResponses];
+
+export type CreateServiceData = {
+    body: ServiceCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/services';
+};
+
+export type CreateServiceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type CreateServiceError = CreateServiceErrors[keyof CreateServiceErrors];
+
+export type CreateServiceResponses = {
+    /**
+     * Servicio creado
+     */
+    201: ServiceDetailResponse;
+};
+
+export type CreateServiceResponse = CreateServiceResponses[keyof CreateServiceResponses];
+
+export type GetServiceStatsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/services/stats';
+};
+
+export type GetServiceStatsErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type GetServiceStatsError = GetServiceStatsErrors[keyof GetServiceStatsErrors];
+
+export type GetServiceStatsResponses = {
+    /**
+     * Contadores del tablero
+     */
+    200: ServiceStatsResponse;
+};
+
+export type GetServiceStatsResponse = GetServiceStatsResponses[keyof GetServiceStatsResponses];
+
+export type GetServicesReportData = {
+    body?: never;
+    path?: never;
+    query: {
+        /**
+         * Miércoles que abre la semana operativa, en fecha de Lima. Tiene que caer en miércoles (400 `COM-001` si no) y estar dentro de la ventana de negocio 1900-01-01 … 2999-12-31. Con las dos reglas juntas, los extremos REALMENTE aceptables son los miércoles de esos bordes: 1900-01-03 y 2999-12-25.
+         */
+        weekStart: string;
+    };
+    url: '/services/report';
+};
+
+export type GetServicesReportErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type GetServicesReportError = GetServicesReportErrors[keyof GetServicesReportErrors];
+
+export type GetServicesReportResponses = {
+    /**
+     * Filas + totales por moneda
+     */
+    200: ServicesReportResponse;
+};
+
+export type GetServicesReportResponse = GetServicesReportResponses[keyof GetServicesReportResponses];
+
+export type GetServiceData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/services/{id}';
+};
+
+export type GetServiceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetServiceError = GetServiceErrors[keyof GetServiceErrors];
+
+export type GetServiceResponses = {
+    /**
+     * Detalle del servicio
+     */
+    200: ServiceDetailResponse;
+};
+
+export type GetServiceResponse = GetServiceResponses[keyof GetServiceResponses];
+
+export type UpdateServiceData = {
+    body: ServiceUpdateRequest;
+    headers: {
+        'If-Match': string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/services/{id}';
+};
+
+export type UpdateServiceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type UpdateServiceError = UpdateServiceErrors[keyof UpdateServiceErrors];
+
+export type UpdateServiceResponses = {
+    /**
+     * Servicio actualizado (o sin cambios)
+     */
+    200: ServiceDetailResponse;
+};
+
+export type UpdateServiceResponse = UpdateServiceResponses[keyof UpdateServiceResponses];
+
+export type AssignServiceResourcesData = {
+    body: AssignResourcesRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/services/{id}/assignment';
+};
+
+export type AssignServiceResourcesErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * `OPS-002` (conflicto forzable), `OPS-006` (el estado no admite la acción), `OPS-004` (cancelado o eliminado) u `OPS-008` (conflicto de lock, transitorio)
+     */
+    409: ServiceResourceConflictProblem;
+};
+
+export type AssignServiceResourcesError = AssignServiceResourcesErrors[keyof AssignServiceResourcesErrors];
+
+export type AssignServiceResourcesResponses = {
+    /**
+     * Recursos asignados; el servicio queda pendiente de inicio
+     */
+    200: ServiceDetailResponse;
+};
+
+export type AssignServiceResourcesResponse = AssignServiceResourcesResponses[keyof AssignServiceResourcesResponses];
+
+export type ChangeServiceStatusData = {
+    body: ChangeStatusRequest;
+    headers?: {
+        /**
+         * Obligatorio cuando `target` es `CANCELLED`, `DELETED` o `REOPENED` (ausente o sin coincidir → 412 `COM-004`). Al iniciar y al finalizar es opcional, pero si se envía se evalúa igual: sin coincidir → 412.
+         */
+        'If-Match'?: string;
+    };
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/services/{id}/status';
+};
+
+export type ChangeServiceStatusErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Transición inválida (`OPS-001`), servicio ya cancelado o eliminado (`OPS-004`), recurso ya tomado por otro viaje al reabrir (`OPS-002`, forzable), viaje al que le faltan los datos de la etapa anterior (`OPS-009`: sin conductor y tracto al iniciar o al reabrir hacia un estado que los pide, sin fecha de inicio al cerrar, con un rastro que no dice de dónde venía al reabrir —o que apunta a un estado desconocido, o a uno del que no se vuelve—, o con recursos de refuerzo que todavía no se pueden verificar al reabrir), o conflicto transitorio de bloqueo (`OPS-008`: otra operación tiene el viaje tomado; se reintenta)
+     */
+    409: ServiceResourceConflictProblem;
+    /**
+     * Optimistic lock — el recurso fue modificado desde que se leyó
+     */
+    412: Problem;
+};
+
+export type ChangeServiceStatusError = ChangeServiceStatusErrors[keyof ChangeServiceStatusErrors];
+
+export type ChangeServiceStatusResponses = {
+    /**
+     * Estado actualizado
+     */
+    200: ServiceDetailResponse;
+};
+
+export type ChangeServiceStatusResponse = ChangeServiceStatusResponses[keyof ChangeServiceStatusResponses];
+
+export type AddServiceResourcesData = {
+    body: AddResourcesRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/services/{id}/resources';
+};
+
+export type AddServiceResourcesErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * En orden de PRECEDENCIA: `OPS-004` (cancelado o eliminado), `OPS-006` (el estado no admite la acción), `OPS-003` (el recurso ya participa de este mismo viaje; duro, no forzable) y `OPS-002` (tomado por otro viaje activo; forzable). Además `OPS-008` (conflicto de lock, transitorio) desde cualquier punto.
+     */
+    409: ServiceResourceConflictProblem;
+};
+
+export type AddServiceResourcesError = AddServiceResourcesErrors[keyof AddServiceResourcesErrors];
+
+export type AddServiceResourcesResponses = {
+    /**
+     * Refuerzos sumados; el viaje sigue en ruta
+     */
+    200: ServiceDetailResponse;
+};
+
+export type AddServiceResourcesResponse = AddServiceResourcesResponses[keyof AddServiceResourcesResponses];
+
+export type RemoveServiceResourceData = {
+    body?: never;
+    path: {
+        id: number;
+        /**
+         * Id de la fila de refuerzo: el que publica `additionalResources[].id` del detalle
+         */
+        assignmentId: number;
+    };
+    query?: never;
+    url: '/services/{id}/resources/{assignmentId}';
+};
+
+export type RemoveServiceResourceErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * `OPS-005` si el viaje no existe; `OPS-010` si el refuerzo no existe o no es de este viaje. El 404 del refuerzo se evalúa DESPUÉS de la guarda de estado: sobre un viaje cancelado o fuera de ruta manda el 409.
+     */
+    404: Problem;
+    /**
+     * En orden de PRECEDENCIA: `OPS-004` (cancelado o eliminado) y `OPS-006` (el estado no admite la acción). Además `OPS-008` (conflicto de lock, transitorio) desde cualquier punto.
+     */
+    409: Problem;
+};
+
+export type RemoveServiceResourceError = RemoveServiceResourceErrors[keyof RemoveServiceResourceErrors];
+
+export type RemoveServiceResourceResponses = {
+    /**
+     * Refuerzo dado de baja; el viaje sigue en ruta
+     */
+    200: ServiceDetailResponse;
+};
+
+export type RemoveServiceResourceResponse = RemoveServiceResourceResponses[keyof RemoveServiceResourceResponses];
