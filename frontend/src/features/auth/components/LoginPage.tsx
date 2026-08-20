@@ -6,7 +6,7 @@ import { LogIn } from 'lucide-react'
 import { loginSchema, type LoginFormInput } from '../schemas/login.schema'
 import { useLoginMutation } from '../hooks/useLoginMutation'
 import { useAuth } from '../../../shared/auth/AuthContext'
-import { isExternalLanding, landingPathFor } from '../../../shared/auth/roleLanding'
+import { landingPathFor } from '../../../shared/auth/roleLanding'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { withMinDuration } from '../../../shared/utils/withMinDuration'
@@ -24,24 +24,12 @@ interface LocationState {
 }
 
 /**
- * Redirect post-autenticación según el rol del usuario (Opción 2 del plan SSO).
- * El landing de v1 vive en otra SPA → navegación externa (window.location);
- * los landings internos usan el router.
+ * Redirect post-autenticación según el rol del usuario. Todos los landings
+ * viven en esta SPA, así que siempre navega el router.
  */
 function AuthenticatedLanding() {
   const { user } = useAuth()
-  const landing = landingPathFor(user?.role)
-
-  useEffect(() => {
-    if (isExternalLanding(landing)) {
-      window.location.assign(landing)
-    }
-  }, [landing])
-
-  if (isExternalLanding(landing)) {
-    return <div role="status">Redirigiendo…</div>
-  }
-  return <Navigate to={landing} replace />
+  return <Navigate to={landingPathFor(user?.role)} replace />
 }
 
 export function LoginPage() {
@@ -74,12 +62,6 @@ export function LoginPage() {
       const response = await withMinDuration(loginMutation.mutateAsync(values), MIN_LOADER_MS)
       setSession(response.token, response.refreshToken ?? null, response.user)
       const landing = landingPathFor(response.user.role)
-      if (isExternalLanding(landing)) {
-        // El rol trabaja en v1 (otra SPA): full page load, ignorando `from`
-        // (un deep-link a v2 no le sirve a un rol sin acceso al módulo).
-        window.location.assign(landing)
-        return
-      }
       const from = (location.state as LocationState | null)?.from ?? landing
       navigate(from, { replace: true })
     } catch (error) {

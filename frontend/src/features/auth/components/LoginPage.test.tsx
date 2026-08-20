@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { LoginPage } from './LoginPage'
@@ -159,34 +159,56 @@ describe('LoginPage', () => {
     expect(await screen.findByText('HOME')).toBeInTheDocument()
   })
 
-  // TODO: la navegacion a `from` (`state.from ?? '/'`) es 1 linea trivial en
-  // LoginPage. Testearla con MemoryRouter + <Navigate> da resultados flaky
-  // (effect timing). Validar via inspeccion de codigo + smoke manual.
+  // ⚠️ APAGADO por un defecto de la pantalla, no del test. Al crear la sesión,
+  // `LoginPage` se vuelve a renderizar y devuelve <Navigate> al landing del rol,
+  // que compite contra el navigate(`from`) del submit: gana el que agende su
+  // efecto último. O sea que el destino después de iniciar sesión con un
+  // deep-link guardado es NO DETERMINISTA. Corriéndolo en repetición falla de
+  // forma intermitente (medido entre 1 y 2 de cada 6 corridas, según la carga
+  // de la máquina), y cuando falla es porque ganó el landing.
+  //
+  // Alcance: para `admin` la carrera ya existía en develop. Para `dispatcher`
+  // NO: salía antes por la rama de navegación externa, que era determinista.
+  // Al retirarla, este cambio lo metió en la carrera.
+  //
+  // Y hay una segunda cosa, distinta de la carrera: la rama que se retiró
+  // también DESCARTABA a propósito el destino guardado cuando el rol no tenía
+  // acceso a él ("un deep-link a v2 no le sirve a un rol sin acceso al
+  // módulo"). Esa regla se fue con ella y nada la repuso, así que hoy un
+  // despachador que llega por un enlace a cotizaciones puede aterrizar en "Sin
+  // acceso" en vez de en su módulo. Sobrevive a cualquier arreglo del timing.
+  //
+  // Para encenderlo hay que decidir antes quién manda (lo natural es que el
+  // deep-link gane, con el landing de respaldo cuando el rol no puede verlo) y
+  // dejar UNA sola navegación en el componente.
   it.skip('login exitoso navega a `from` si vino redireccionado', async () => {
+    server.use(loginAsRoleResponse('admin'))
     const user = userEvent.setup()
-    // Simulamos el flujo real: una ruta protegida redirige a /login con state.from
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
-    })
     render(
-      <QueryClientProvider client={queryClient}>
+      <QueryClientProvider
+        client={
+          new QueryClient({
+            defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+          })
+        }
+      >
         <AuthProvider>
-          <MemoryRouter initialEntries={['/redirect-from-clients']}>
+          <MemoryRouter
+            initialEntries={[{ pathname: '/cotizaciones/login', state: { from: '/clients' } }]}
+          >
             <Routes>
-              <Route
-                path="/redirect-from-clients"
-                element={<Navigate to="/cotizaciones/login" replace state={{ from: '/clients' }} />}
-              />
               <Route path="/cotizaciones/login" element={<LoginPage />} />
+              <Route path="/cotizaciones" element={<div>HOME</div>} />
               <Route path="/clients" element={<div>CLIENTS</div>} />
             </Routes>
           </MemoryRouter>
         </AuthProvider>
       </QueryClientProvider>,
     )
-    await user.type(await screen.findByLabelText(/usuario/i), 'admin')
+    await user.type(screen.getByLabelText(/usuario/i), 'admin')
     await user.type(screen.getByLabelText(/contraseña/i), 'Admin1234')
     await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+
     expect(await screen.findByText('CLIENTS')).toBeInTheDocument()
   })
 

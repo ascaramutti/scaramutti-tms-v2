@@ -29,8 +29,6 @@ interface MenuItem {
   label: string
   /** Si se pasa, el item es navegable. Si no, disabled. */
   to?: string
-  /** Link externo a esta SPA (ej. v1). Ver SidebarNavItem.href. */
-  href?: string
   /** Si se pasa, solo los roles listados ven el item. Sin restricción → visible para todos. */
   allowedRoles?: UserRole[]
   /** Matcher custom de "activo" (ver SidebarNavItem.activeWhen). */
@@ -38,8 +36,9 @@ interface MenuItem {
 }
 
 interface MenuGroup {
-  /** Si tiene label se renderiza con `<SidebarSection>`; si no, como item suelto. */
-  label?: string
+  /** Encabezado de la sección. Obligatorio: un grupo sin título dejaría items
+   *  sueltos sin contexto, y ningún módulo lo necesita. */
+  label: string
   items: MenuItem[]
 }
 
@@ -206,35 +205,19 @@ export function Sidebar() {
 
       {/* Navegación principal */}
       <nav aria-label="Principal" className="flex flex-col gap-5">
-        {visibleGroups.map((group, idx) =>
-          group.label ? (
-            <SidebarSection key={group.label} label={group.label}>
-              {group.items.map((item) => (
-                <SidebarNavItem
-                  key={item.label}
-                  icon={item.icon}
-                  label={item.label}
-                  to={item.to}
-                  href={item.href}
-                  activeWhen={item.activeWhen}
-                />
-              ))}
-            </SidebarSection>
-          ) : (
-            <ul key={`group-${idx}`} className="flex flex-col gap-0.5 list-none p-0 m-0">
-              {group.items.map((item) => (
-                <SidebarNavItem
-                  key={item.label}
-                  icon={item.icon}
-                  label={item.label}
-                  to={item.to}
-                  href={item.href}
-                  activeWhen={item.activeWhen}
-                />
-              ))}
-            </ul>
-          ),
-        )}
+        {visibleGroups.map((group) => (
+          <SidebarSection key={group.label} label={group.label}>
+            {group.items.map((item) => (
+              <SidebarNavItem
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                to={item.to}
+                activeWhen={item.activeWhen}
+              />
+            ))}
+          </SidebarSection>
+        ))}
       </nav>
 
       {/* Footer fuera del <nav> (logout no es navegación) */}

@@ -1,24 +1,19 @@
 import type { UserRole } from '../../api'
 
 /**
- * Pantalla de aterrizaje post-login según el rol (unificación v1+v2).
+ * Pantalla de aterrizaje post-login según el rol.
  *
- * Detrás del gateway las dos apps comparten el origin: `/` es v1 y
- * `/cotizaciones` es v2. Cada rol aterriza donde trabaja.
+ * Cada rol aterriza donde trabaja. Hasta que el control de viajes se recodificó
+ * en v2, `dispatcher` salía a `/` (v1, otra SPA en la raíz del dominio) y por
+ * eso el aterrizaje sabía navegar hacia afuera con una recarga completa. Ahora
+ * **todos los landings viven dentro de esta SPA**, así que la navegación
+ * externa se retiró: era una rama que ya no podía ejecutarse.
  *
- * `dispatcher` aterrizaba en v1 porque el control de viajes vivía allá; con el
- * módulo recodificado en v2 aterriza en Operaciones, dentro de esta SPA. v1
- * sigue en pie hasta el cutover de datos, pero deja de ser el destino de nadie:
- * ningún rol aterriza fuera de la SPA.
+ * Si algún día un rol volviera a trabajar fuera de v2, hay que reponer esa
+ * navegación (está en el historial); no alcanza con apuntar el landing afuera,
+ * porque el router no puede navegar a otra app.
  */
 export const COTIZACIONES_LANDING = '/cotizaciones'
-
-/**
- * Raíz del dominio = v1. Ya no es landing de ningún rol, pero se conserva: es
- * la referencia de "afuera de esta SPA" que usa `isExternalLanding`, y v1 sigue
- * sirviendo el control de viajes hasta el cutover.
- */
-export const V1_LANDING = '/'
 
 /**
  * Módulo Almacén. Vive DENTRO de esta SPA: el prefijo `/cotizaciones` es el
@@ -29,9 +24,19 @@ export const ALMACEN_LANDING = '/cotizaciones/almacen'
 /** Módulo Operaciones. Cuelga del mismo prefijo, por la misma razón. */
 export const OPERACIONES_LANDING = '/cotizaciones/operaciones'
 
-// Los dos roles del módulo Almacén trabajan solo ahí, así que aterrizan en el
-// módulo y no en cotizaciones (matriz de permisos del contrato de Almacén).
-const ROLE_LANDING: Record<UserRole, string> = {
+/**
+ * Los tres destinos posibles. Tenerlos como unión (y no como `string` suelto)
+ * hace que el compilador exija una etiqueta por cada uno: sumar un módulo sin
+ * su nombre visible deja de ser un `undefined` en pantalla y pasa a no compilar.
+ */
+type Landing =
+  | typeof COTIZACIONES_LANDING
+  | typeof ALMACEN_LANDING
+  | typeof OPERACIONES_LANDING
+
+// Los roles del módulo Almacén trabajan solo ahí, y el despachador solo en
+// operaciones: cada uno aterriza en su módulo y no en cotizaciones.
+const ROLE_LANDING: Record<UserRole, Landing> = {
   admin: COTIZACIONES_LANDING,
   sales: COTIZACIONES_LANDING,
   general_manager: COTIZACIONES_LANDING,
@@ -41,29 +46,24 @@ const ROLE_LANDING: Record<UserRole, string> = {
   warehouse_keeper: ALMACEN_LANDING,
 }
 
-export function landingPathFor(role: UserRole | undefined): string {
+/**
+ * Los roles conocidos, derivados del mapa y no escritos a mano: un rol nuevo
+ * entra solo en los recorridos que verifican que todos aterrizan adentro.
+ */
+export const ALL_ROLES = Object.keys(ROLE_LANDING) as UserRole[]
+
+export function landingPathFor(role: UserRole | undefined): Landing {
   if (!role) return COTIZACIONES_LANDING
   return ROLE_LANDING[role] ?? COTIZACIONES_LANDING
 }
 
 /** Nombre visible de cada landing, para los links que ofrecen "ir a…". */
-const LANDING_LABEL: Record<string, string> = {
-  [V1_LANDING]: 'Servicios',
+const LANDING_LABEL: Record<Landing, string> = {
   [COTIZACIONES_LANDING]: 'Cotizaciones',
   [ALMACEN_LANDING]: 'Almacén',
   [OPERACIONES_LANDING]: 'Operaciones',
 }
 
 export function landingLabelFor(role: UserRole | undefined): string {
-  return LANDING_LABEL[landingPathFor(role)] ?? 'Servicios'
-}
-
-/**
- * Un landing fuera de /cotizaciones vive en otra SPA (v1): hay que navegar
- * con window.location (full page load), no con el router de React.
- * Match por segmento (no por prefijo crudo): un hipotético /cotizacionesX
- * NO es interno.
- */
-export function isExternalLanding(path: string): boolean {
-  return !(path === COTIZACIONES_LANDING || path.startsWith(`${COTIZACIONES_LANDING}/`))
+  return LANDING_LABEL[landingPathFor(role)]
 }
