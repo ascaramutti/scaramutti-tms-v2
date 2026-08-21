@@ -1,4 +1,5 @@
-import { createBrowserRouter, Navigate, type RouteObject } from 'react-router-dom'
+import { createBrowserRouter, type RouteObject } from 'react-router-dom'
+import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
 import { OPERATIONS_ROLES, QUOTATION_ROLES, WAREHOUSE_ROLES } from './shared/auth/moduleRoles'
 import { OPERACIONES_LANDING } from './shared/auth/roleLanding'
@@ -194,7 +195,8 @@ export const routes: RouteObject[] = [
       { path: '/cotizaciones/cuenta/cambiar-contrasena', element: <ChangePasswordPage /> },
     ],
   },
-  { path: '*', element: <Navigate to="/cotizaciones" replace /> },
+  // Cualquier ruta que no existe: decide según la sesión (ver LandingRedirect).
+  { path: '*', element: <LandingRedirect /> },
 ]
 
 export const router = createBrowserRouter(routes)
