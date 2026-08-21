@@ -132,7 +132,7 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByText('ALMACEN')).toBeInTheDocument()
   })
 
-  it('el dispatcher sigue saliendo a v1 (trabaja fuera de esta SPA)', async () => {
+  it('el dispatcher sale a operaciones, su módulo dentro de esta SPA', async () => {
     tokenStorage.setTokens('dispatcher-token', 'dispatcher-refresh')
     server.use(
       http.get(`${API}/auth/me`, () =>
@@ -140,7 +140,10 @@ describe('ProtectedRoute', () => {
       ),
     )
     renderProtected('/protegida', { allowedRoles: ['sales'], moduleName: 'Cotizaciones' })
-    expect(await screen.findByRole('link', { name: /ir a servicios/i })).toHaveAttribute('href', '/')
+    expect(await screen.findByRole('link', { name: /ir a operaciones/i })).toHaveAttribute(
+      'href',
+      '/cotizaciones/operaciones',
+    )
   })
 
   it('renderiza children si el rol coincide con allowedRoles', async () => {

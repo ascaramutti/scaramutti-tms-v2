@@ -13,6 +13,8 @@ interface EmptyStateProps {
 /**
  * Estado vacío genérico para listados. Distinto del estado de error: esto es
  * "no hay datos" (o "no hay resultados para el filtro"), no "falló la carga".
+ * También cubre "esta pantalla todavía no existe" en los módulos que se abren
+ * antes que su primera vista.
  */
 export function EmptyState({ icon: Icon = Inbox, title, description, action }: EmptyStateProps) {
   return (

@@ -4211,7 +4211,7 @@ components:
       description: |
         Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
 
-        Los textos libres no pueden contener el byte NUL (`\u0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` los saltos y las tabulaciones sí son válidos.
+        Los textos libres no pueden contener el byte NUL (`U+0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` los saltos y las tabulaciones sí son válidos.
       required: [clientId, tripScope, tentativeDate, origin, destination, cargoTypeId, weightKg, price, currencyId]
       properties:
         clientId:      { type: integer }
@@ -4244,7 +4244,7 @@ components:
         fechas reales, en cambio, solo CORRIGEN un valor que el servicio ya tiene: ahí
         ausente o null significa sin cambio, porque una fecha real no se borra.
 
-        Los textos libres no pueden contener el byte NUL (`\u0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` y `justification` los saltos y las tabulaciones sí son válidos.
+        Los textos libres no pueden contener el byte NUL (`U+0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` y `justification` los saltos y las tabulaciones sí son válidos.
       required: [tentativeDate, origin, destination, weightKg, price, currencyId, justification]
       properties:
         tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400 (el formato ISO admite años que la columna no).' }
@@ -4297,7 +4297,7 @@ components:
         descripción de las filas de auditoría. Sus saltos de línea se APLASTAN al
         escribirlo en la bitácora (se ven como `⏎`), porque cada entrada tiene una línea
         por dato y un salto permitiría plantar una línea falsa con el formato del
-        servidor. No puede contener el byte NUL (`\u0000`), que la columna no admite
+        servidor. No puede contener el byte NUL (`U+0000`), que la columna no admite
         y se rechaza con 400.
 
         `force` ausente equivale a `false`.
@@ -4327,7 +4327,7 @@ components:
         descripción de las filas de auditoría. Una nota en blanco se trata como ausente. Sus
         saltos de línea se APLASTAN al escribirla en la bitácora (se ven como `⏎`), porque cada
         entrada tiene una línea por dato y un salto permitiría plantar una línea falsa con el
-        formato del servidor. No puede contener el byte NUL (`\u0000`), que la columna no admite
+        formato del servidor. No puede contener el byte NUL (`U+0000`), que la columna no admite
         y se rechaza con 400.
 
         `force` ausente equivale a `false`.

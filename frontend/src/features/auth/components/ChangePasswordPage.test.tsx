@@ -28,6 +28,7 @@ function renderPage(initialPath = '/cotizaciones/cuenta/cambiar-contrasena') {
           <Routes>
             <Route path="/cotizaciones/cuenta/cambiar-contrasena" element={<ChangePasswordPage />} />
             <Route path="/cotizaciones" element={<div>HOME</div>} />
+            <Route path="/cotizaciones/operaciones" element={<div>OPERACIONES</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -147,9 +148,10 @@ describe('ChangePasswordPage', () => {
   })
 
   // ----- Landing por rol al salir (unificación v1+v2) -----
-  it('dispatcher: cambio exitoso redirige a v1 (raíz del dominio, full page load)', async () => {
+  it('dispatcher: cambio exitoso lo devuelve a operaciones, dentro de la SPA', async () => {
     // El dispatcher es el caso que motivó goToLanding: navegar a /cotizaciones
-    // lo dejaba en la vista "Sin acceso" (no tiene rol para el módulo).
+    // lo dejaba en la vista "Sin acceso" (no tiene rol para el módulo). Su
+    // landing dejó de estar en v1, pero sigue sin ser /cotizaciones.
     server.use(
       http.get(`${API}/auth/me`, () =>
         HttpResponse.json({ ...fakeUser, username: 'jdiaz', role: 'dispatcher' }),
@@ -172,8 +174,9 @@ describe('ChangePasswordPage', () => {
     await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
 
-    await waitFor(() => expect(assignSpy).toHaveBeenCalledWith('/'))
-    // No navegó dentro de la SPA:
+    expect(await screen.findByText('OPERACIONES')).toBeInTheDocument()
+    // Operaciones vive en esta SPA: navega el router, sin full page load.
+    expect(assignSpy).not.toHaveBeenCalled()
     expect(screen.queryByText('HOME')).not.toBeInTheDocument()
   })
 

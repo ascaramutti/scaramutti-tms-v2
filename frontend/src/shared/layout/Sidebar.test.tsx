@@ -58,8 +58,11 @@ describe('Sidebar - filtrado por rol', () => {
     )
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/comercial/i)).toBeInTheDocument()
-    // Cross-link a v1 (visible para todos)
-    expect(screen.getByRole('link', { name: /servicios \/ viajes/i })).toHaveAttribute('href', '/')
+    // Operaciones: Servicios es navegable dentro de la SPA
+    expect(screen.getByRole('link', { name: /^servicios$/i })).toHaveAttribute(
+      'href',
+      '/cotizaciones/operaciones',
+    )
     expect(screen.getByRole('link', { name: /cambiar contraseña/i })).toHaveAttribute(
       'href',
       '/cotizaciones/cuenta/cambiar-contrasena',
@@ -77,14 +80,14 @@ describe('Sidebar - filtrado por rol', () => {
     expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()
   })
 
-  it('dispatcher ve SOLO Cambiar contraseña (sección Comercial oculta)', async () => {
+  it('dispatcher ve Operaciones + Cambiar contraseña (sección Comercial oculta)', async () => {
     renderSidebarAs('dispatcher')
     await waitFor(() => {
       expect(screen.getByText(/usuario dispatcher/i)).toBeInTheDocument()
     })
     expect(screen.queryByText('Cotizaciones')).not.toBeInTheDocument()
-    // Pero SÍ ve el cross-link a v1 (es su lugar de trabajo)
-    expect(screen.getByRole('link', { name: /servicios \/ viajes/i })).toBeInTheDocument()
+    // Operaciones es su único lugar de trabajo, y ahora vive acá adentro.
+    expect(screen.getByRole('link', { name: /^servicios$/i })).toBeInTheDocument()
     expect(screen.queryByText('Clientes')).not.toBeInTheDocument()
     // La sección Comercial entera (con su <h2>) se oculta cuando queda sin items
     expect(screen.queryByText(/^comercial$/i)).not.toBeInTheDocument()
@@ -199,14 +202,17 @@ describe('Sidebar - módulo Almacén', () => {
   })
 
   it.each(['finance_manager', 'warehouse_keeper'] as const)(
-    '%s no ve el cross-link a v1 ni la sección Operaciones',
+    '%s no ve la sección Operaciones',
     async (role) => {
       renderSidebarAs(role)
       await waitFor(() => {
         expect(screen.getByText(`Usuario ${role}`)).toBeInTheDocument()
       })
-      // No tienen cuenta en v1: ofrecerles el link los dejaría en un login ajeno.
-      expect(screen.queryByText(/servicios \/ viajes/i)).not.toBeInTheDocument()
+      // Los roles de almacén trabajan solo en su módulo.
+      // Por texto y no por rol: si el item perdiera su destino se renderiza
+      // como <span> deshabilitado, y una búsqueda por rol de enlace lo daría
+      // por ausente estando visible en pantalla.
+      expect(screen.queryByText(/^servicios$/i)).not.toBeInTheDocument()
       // Sin items, la sección entera se oculta (no queda el <h2> huérfano).
       expect(screen.queryByText(/^operaciones$/i)).not.toBeInTheDocument()
     },
@@ -218,12 +224,15 @@ describe('Sidebar - módulo Almacén', () => {
     'general_manager',
     'operations_manager',
     'dispatcher',
-  ] as const)('%s sigue viendo el cross-link a v1', async (role) => {
+  ] as const)('%s ve la sección Operaciones', async (role) => {
     renderSidebarAs(role)
     await waitFor(() => {
       expect(screen.getByText(`Usuario ${role}`)).toBeInTheDocument()
     })
-    expect(screen.getByRole('link', { name: /servicios \/ viajes/i })).toHaveAttribute('href', '/')
+    expect(screen.getByRole('link', { name: /^servicios$/i })).toHaveAttribute(
+      'href',
+      '/cotizaciones/operaciones',
+    )
     expect(screen.getByText(/^operaciones$/i)).toBeInTheDocument()
   })
 
@@ -235,5 +244,54 @@ describe('Sidebar - módulo Almacén', () => {
     expect(screen.getByRole('link', { name: /^cotizaciones$/i })).not.toHaveAttribute(
       'aria-current',
     )
+  })
+})
+
+describe('Sidebar - módulo Operaciones', () => {
+  it('en operaciones se resalta Servicios y NO Cotizaciones', async () => {
+    // Los tres módulos cuelgan de /cotizaciones (el base de la SPA): sin el
+    // subárbol en NON_QUOTATION_SUBTREES, el prefijo marcaría Cotizaciones
+    // estando en Operaciones.
+    renderSidebarAs('admin', '/cotizaciones/operaciones')
+    const servicios = await screen.findByRole('link', { name: /^servicios$/i })
+    expect(servicios).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /^cotizaciones$/i })).not.toHaveAttribute(
+      'aria-current',
+    )
+  })
+
+  it('el detalle de un servicio sigue resaltando Servicios', async () => {
+    renderSidebarAs('admin', '/cotizaciones/operaciones/servicios/42')
+    const servicios = await screen.findByRole('link', { name: /^servicios$/i })
+    expect(servicios).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('una hermana de servicios no resalta Servicios', async () => {
+    // El día que Reportes tenga pantalla, el prefijo pelado marcaría Servicios
+    // estando en ella. Este caso fija que el matcher no lo hace.
+    renderSidebarAs('admin', '/cotizaciones/operaciones/reportes')
+    const servicios = await screen.findByRole('link', { name: /^servicios$/i })
+    expect(servicios).not.toHaveAttribute('aria-current')
+  })
+
+  it('Reportes de operaciones está deshabilitado y el despachador no lo ve', async () => {
+    // Sin pantalla todavía: se anuncia como deshabilitado, no como link. Y el
+    // contrato deja al despachador afuera del reporte semanal (ve precios).
+    renderSidebarAs('admin', '/cotizaciones/operaciones')
+    const reportes = await screen.findByText('Reportes de operaciones')
+    expect(reportes).toHaveAttribute('aria-disabled', 'true')
+    // Lo que de verdad llega a un lector de pantalla es este texto: sobre un
+    // <span> sin rol, `aria-disabled` no se anuncia. Se afirman los dos para
+    // que el día que el item pase a ser focusable no se pierda el aviso.
+    expect(reportes).toHaveTextContent(/próximamente/i)
+    expect(
+      screen.queryByRole('link', { name: /reportes de operaciones/i }),
+    ).not.toBeInTheDocument()
+  })
+
+  it('el despachador ve Servicios pero no el reporte', async () => {
+    renderSidebarAs('dispatcher', '/cotizaciones/operaciones')
+    expect(await screen.findByRole('link', { name: /^servicios$/i })).toBeInTheDocument()
+    expect(screen.queryByText('Reportes de operaciones')).not.toBeInTheDocument()
   })
 })

@@ -1,6 +1,8 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, type RouteObject } from 'react-router-dom'
+import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
-import { QUOTATION_ROLES, WAREHOUSE_ROLES } from './shared/auth/moduleRoles'
+import { OPERATIONS_ROLES, QUOTATION_ROLES, WAREHOUSE_ROLES } from './shared/auth/moduleRoles'
+import { OPERACIONES_LANDING } from './shared/auth/roleLanding'
 import { AppLayout } from './shared/layout/AppLayout'
 import { LoginPage } from './features/auth/components/LoginPage'
 import { ChangePasswordPage } from './features/auth/components/ChangePasswordPage'
@@ -20,12 +22,19 @@ import { WithdrawalDetailPage } from './features/warehouse/pages/WithdrawalDetai
 import { WithdrawalEditPage } from './features/warehouse/pages/WithdrawalEditPage'
 import { WarehouseReportsPage } from './features/warehouse/pages/WarehouseReportsPage'
 import { OpeningBalancesPage } from './features/warehouse/pages/OpeningBalancesPage'
+import { ServicesListPage } from './features/operations/pages/ServicesListPage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
 // con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
 // las rutas del módulo ya traían el prefijo /cotizaciones — solo login y cuenta
 // se movieron adentro. La raíz `/` del dominio pertenece a v1.
-export const router = createBrowserRouter([
+/**
+ * La tabla de rutas se exporta aparte del router para poder montarla en un
+ * router de memoria desde los tests: sin eso, cada test que necesita una ruta
+ * declara la suya propia y nadie verifica la de verdad (un rol equivocado o un
+ * typo en el path pasan a producción con la suite en verde).
+ */
+export const routes: RouteObject[] = [
   { path: '/cotizaciones/login', element: <LoginPage /> },
   {
     // Layout route: las rutas autenticadas comparten AppLayout (con sidebar).
@@ -172,8 +181,22 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // Módulo Operaciones (control de viajes). Cuelga del mismo prefijo que
+      // almacén y por la misma razón: /cotizaciones es el `base` de Vite, no el
+      // módulo comercial.
+      {
+        path: OPERACIONES_LANDING,
+        element: (
+          <ProtectedRoute allowedRoles={OPERATIONS_ROLES} moduleName="Operaciones">
+            <ServicesListPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: '/cotizaciones/cuenta/cambiar-contrasena', element: <ChangePasswordPage /> },
     ],
   },
-  { path: '*', element: <Navigate to="/cotizaciones" replace /> },
-])
+  // Cualquier ruta que no existe: decide según la sesión (ver LandingRedirect).
+  { path: '*', element: <LandingRedirect /> },
+]
+
+export const router = createBrowserRouter(routes)

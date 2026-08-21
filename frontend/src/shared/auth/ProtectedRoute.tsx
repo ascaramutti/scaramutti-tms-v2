@@ -1,7 +1,8 @@
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
+import { SessionLoading } from './SessionLoading'
 import { useAuth } from './AuthContext'
-import { isExternalLanding, landingLabelFor, landingPathFor } from './roleLanding'
+import { landingLabelFor, landingPathFor } from './roleLanding'
 import type { UserRole } from '../../api'
 
 interface ProtectedRouteProps {
@@ -14,8 +15,8 @@ interface ProtectedRouteProps {
 /**
  * Vista inline para rol sin permiso. NO redirige automáticamente: como el
  * landing de cada rol también está protegido, un redirect produciría un loop.
- * El link ofrece ir al módulo donde ese rol SÍ trabaja (su landing), que para
- * dispatcher es v1 (fuera de esta SPA) y para los roles de almacén es almacén.
+ * El link ofrece ir al módulo donde ese rol SÍ trabaja (su landing): almacén
+ * para sus dos roles, operaciones para el despachador.
  */
 const exitLinkClasses =
   'mt-6 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors'
@@ -36,17 +37,11 @@ function AccessDenied({ role, moduleName }: { role: UserRole | undefined; module
         <p className="mt-2 text-sm text-slate-500">
           Tu rol no tiene permisos para este módulo.
         </p>
-        {/* Ancla solo hacia afuera de la SPA (v1): adentro navega el router,
-            que evita recargar la app entera para cambiar de módulo. */}
-        {isExternalLanding(landing) ? (
-          <a href={landing} className={exitLinkClasses}>
-            {label}
-          </a>
-        ) : (
-          <Link to={landing} className={exitLinkClasses}>
-            {label}
-          </Link>
-        )}
+        {/* Todos los landings viven en esta SPA: navega el router, sin
+            recargar la app entera para cambiar de módulo. */}
+        <Link to={landing} className={exitLinkClasses}>
+          {label}
+        </Link>
       </div>
     </div>
   )
@@ -57,7 +52,7 @@ export function ProtectedRoute({ children, allowedRoles, moduleName }: Protected
   const location = useLocation()
 
   if (isLoading) {
-    return <div role="status">Cargando sesión…</div>
+    return <SessionLoading />
   }
 
   if (!isAuthenticated || !user) {

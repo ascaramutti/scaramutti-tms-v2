@@ -16,7 +16,12 @@ import { matchesPathPrefix } from './pathMatching'
 import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
-import { OPERATIONS_ROLES, QUOTATION_ROLES, WAREHOUSE_ROLES } from '../auth/moduleRoles'
+import {
+  OPERATIONS_ROLES,
+  QUOTATION_ROLES,
+  SERVICES_REPORT_ROLES,
+  WAREHOUSE_ROLES,
+} from '../auth/moduleRoles'
 import type { UserRole } from '../../api'
 
 interface MenuItem {
@@ -24,8 +29,6 @@ interface MenuItem {
   label: string
   /** Si se pasa, el item es navegable. Si no, disabled. */
   to?: string
-  /** Link externo a esta SPA (ej. v1). Ver SidebarNavItem.href. */
-  href?: string
   /** Si se pasa, solo los roles listados ven el item. Sin restricción → visible para todos. */
   allowedRoles?: UserRole[]
   /** Matcher custom de "activo" (ver SidebarNavItem.activeWhen). */
@@ -33,8 +36,9 @@ interface MenuItem {
 }
 
 interface MenuGroup {
-  /** Si tiene label se renderiza con `<SidebarSection>`; si no, como item suelto. */
-  label?: string
+  /** Encabezado de la sección. Obligatorio: un grupo sin título dejaría items
+   *  sueltos sin contexto, y ningún módulo lo necesita. */
+  label: string
   items: MenuItem[]
 }
 
@@ -43,9 +47,14 @@ interface MenuGroup {
  * entera) pero NO son el módulo comercial. Sin esta lista el prefijo marcaría
  * activo el item de Cotizaciones mientras el usuario está en otro módulo.
  */
-const NON_QUOTATION_SUBTREES = ['/cotizaciones/cuenta', '/cotizaciones/almacen']
+const NON_QUOTATION_SUBTREES = [
+  '/cotizaciones/cuenta',
+  '/cotizaciones/almacen',
+  '/cotizaciones/operaciones',
+]
 
 const WAREHOUSE_BASE = '/cotizaciones/almacen'
+const OPERATIONS_BASE = '/cotizaciones/operaciones'
 
 // Matriz de permisos del menú alineada con `x-required-roles` del contrato OpenAPI.
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
@@ -53,10 +62,26 @@ const MENU: MenuGroup[] = [
   {
     label: 'Operaciones',
     items: [
-      // Cross-link a v1 (servicios/viajes, otra SPA en la raíz del dominio).
-      // Los roles de almacén no tienen cuenta allá: el link los dejaría en un
-      // login ajeno.
-      { icon: Route, label: 'Servicios / Viajes', href: '/', allowedRoles: OPERATIONS_ROLES },
+      {
+        icon: Route,
+        label: 'Servicios',
+        to: OPERATIONS_BASE,
+        allowedRoles: OPERATIONS_ROLES,
+        // El detalle y el alta de un viaje van a colgar de acá cuando lleguen
+        // sus pantallas, y tienen que seguir marcando activo Servicios. El
+        // prefijo pelado no sirve: marcaría activo el item también en Reportes.
+        activeWhen: (pathname) =>
+          pathname === OPERATIONS_BASE ||
+          matchesPathPrefix(pathname, `${OPERATIONS_BASE}/servicios`),
+      },
+      {
+        // Sin `to` hasta que exista su pantalla: el item queda deshabilitado en
+        // vez de llevar a una ruta que no resuelve. Roles propios: el reporte
+        // deja afuera al despachador, a diferencia del resto del módulo.
+        icon: FileBarChart2,
+        label: 'Reportes de operaciones',
+        allowedRoles: SERVICES_REPORT_ROLES,
+      },
     ],
   },
   {
@@ -180,35 +205,19 @@ export function Sidebar() {
 
       {/* Navegación principal */}
       <nav aria-label="Principal" className="flex flex-col gap-5">
-        {visibleGroups.map((group, idx) =>
-          group.label ? (
-            <SidebarSection key={group.label} label={group.label}>
-              {group.items.map((item) => (
-                <SidebarNavItem
-                  key={item.label}
-                  icon={item.icon}
-                  label={item.label}
-                  to={item.to}
-                  href={item.href}
-                  activeWhen={item.activeWhen}
-                />
-              ))}
-            </SidebarSection>
-          ) : (
-            <ul key={`group-${idx}`} className="flex flex-col gap-0.5 list-none p-0 m-0">
-              {group.items.map((item) => (
-                <SidebarNavItem
-                  key={item.label}
-                  icon={item.icon}
-                  label={item.label}
-                  to={item.to}
-                  href={item.href}
-                  activeWhen={item.activeWhen}
-                />
-              ))}
-            </ul>
-          ),
-        )}
+        {visibleGroups.map((group) => (
+          <SidebarSection key={group.label} label={group.label}>
+            {group.items.map((item) => (
+              <SidebarNavItem
+                key={item.label}
+                icon={item.icon}
+                label={item.label}
+                to={item.to}
+                activeWhen={item.activeWhen}
+              />
+            ))}
+          </SidebarSection>
+        ))}
       </nav>
 
       {/* Footer fuera del <nav> (logout no es navegación) */}
