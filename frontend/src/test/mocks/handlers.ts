@@ -3,6 +3,7 @@ import { authHandlers } from './handlers/auth'
 import { cargoTypesHandlers } from './handlers/cargotypes'
 import { catalogsHandlers } from './handlers/catalogs'
 import { clientsHandlers } from './handlers/clients'
+import { operationsHandlers } from './handlers/operations'
 import { quotationsHandlers } from './handlers/quotations'
 import { sharedCatalogsHandlers } from './handlers/shared-catalogs'
 import { warehouseHandlers } from './handlers/warehouse'
@@ -18,5 +19,6 @@ export const handlers: HttpHandler[] = [
   ...cargoTypesHandlers,
   ...quotationsHandlers,
   ...warehouseHandlers,
+  ...operationsHandlers,
   ...sharedCatalogsHandlers,
 ]
