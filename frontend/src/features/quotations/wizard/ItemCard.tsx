@@ -4,7 +4,7 @@ import { AlertCircle, CheckCircle2, ChevronDown, ChevronUp, Trash2 } from 'lucid
 import { TextField } from '../../../shared/ui/TextField'
 import { cn } from '../../../shared/utils/cn'
 import { formatCurrency } from '../../../shared/utils/formatters'
-import { CargoTypeField } from './CargoTypeField'
+import { CargoTypeField } from '../../cargotypes/components/CargoTypeField'
 import { IntegralComponents } from './IntegralComponents'
 import { itemTotal } from './itemCalc'
 import { itemSchema, type ItemServiceKind, type WizardFormInput } from './quotation-wizard.schema'
