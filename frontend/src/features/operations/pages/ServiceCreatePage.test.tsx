@@ -393,8 +393,8 @@ describe('ServiceCreatePage', () => {
   it('un tipo de carga con medidas en cero deja los campos vacíos y no traba el alta', async () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const sink: { body?: ServiceCreateRequest } = {}
-    // El alta al vuelo de un tipo de carga guarda 0 en las dimensiones que se dejan
-    // vacías, así que el catálogo tiene ceros. Leídos como medida, el formulario los
+    // El catálogo tiene ceros heredados: filas de v1 y filas creadas por el alta al
+    // vuelo antes de que se arreglara. Leídos como medida, el formulario los
     // rechazaría por no ser mayores que cero y el viaje no se podría registrar.
     server.use(
       cargoTypesSearch([

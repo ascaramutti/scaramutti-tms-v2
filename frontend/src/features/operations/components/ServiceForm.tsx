@@ -69,11 +69,11 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
  * Una medida estándar del catálogo, como texto para el campo.
  *
  * El cero se trata como ausente, porque una carga no mide cero metros y el catálogo
- * tiene ceros donde debería haber nulos. Vienen de dos lados: de las filas migradas
- * de v1, y del alta al vuelo de un tipo de carga, cuyo cuerpo (capturado, no leído)
- * manda 0 en las dimensiones que se dejan vacías y en el peso que no se toca. Leer
- * esos ceros como medidas dejaba el formulario con campos que él mismo rechaza, y el
- * viaje no se podía registrar.
+ * tiene ceros donde debería haber nulos: filas migradas de v1, y filas creadas por el
+ * alta al vuelo ANTES de que se arreglara (hasta entonces mandaba 0 en las dimensiones
+ * que nadie tocaba). Ese alta ya manda null, así que la población deja de crecer, pero
+ * las filas viejas siguen ahí. Leer esos ceros como medidas dejaba el formulario con
+ * campos que él mismo rechaza, y el viaje no se podía registrar.
  */
 function toFieldText(value: number | null | undefined): string {
   return value == null || value === 0 ? '' : String(value)

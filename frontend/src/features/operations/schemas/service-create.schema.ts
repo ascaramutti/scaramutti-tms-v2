@@ -56,11 +56,13 @@ const placeSchema = (fieldLabel: string) =>
 /**
  * Los campos numéricos viajan por el formulario como TEXTO y se convierten acá.
  *
- * No es una vuelta de más: si el campo se registra como número, react-hook-form
- * relee el valor del input al validar y un campo vacío vuelve como cero. El efecto
- * era que llenar el largo hacía aparecer "el ancho debe ser mayor a 0" sobre dos
- * campos que nadie había tocado. Con texto, vacío es vacío y el schema decide qué
- * significa en cada caso.
+ * No es una vuelta de más. Registrado como número, el campo lleva una conversión de
+ * `''` a vacío que react-hook-form aplica también al valor por omisión, tal cual y
+ * sin que el usuario toque nada: con un valor por omisión que no es un string, esa
+ * guarda no lo atrapa y `Number()` lo vuelve cero. El efecto era que llenar el largo
+ * hacía aparecer "el ancho debe ser mayor a 0" sobre dos campos que nadie había
+ * tocado. Con texto no hay conversión que reciba un valor de otro tipo: vacío es
+ * vacío y el schema decide qué significa en cada caso.
  */
 /** Hasta dos decimales, que es lo que la columna guarda. */
 function hasAtMostTwoDecimals(value: string): boolean {
