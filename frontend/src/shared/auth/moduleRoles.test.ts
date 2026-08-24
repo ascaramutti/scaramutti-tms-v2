@@ -3,6 +3,7 @@ import {
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
   SERVICES_REPORT_ROLES,
+  SERVICE_CREATE_ROLES,
   WAREHOUSE_ROLES,
 } from './moduleRoles'
 import {
@@ -45,8 +46,8 @@ describe('roles por módulo', () => {
   })
 
   it('el reporte semanal deja afuera al despachador', () => {
-    // Es la única excepción intramódulo: el reporte muestra precios por viaje y
-    // el despacho no ve importes.
+    // Primera de las dos excepciones intramódulo: el reporte muestra precios por
+    // viaje y el despacho no ve importes.
     expect([...SERVICES_REPORT_ROLES].sort()).toEqual([
       'admin',
       'general_manager',
@@ -54,6 +55,18 @@ describe('roles por módulo', () => {
       'sales',
     ])
     expect(SERVICES_REPORT_ROLES).not.toContain('dispatcher')
+  })
+
+  it('registrar un servicio deja afuera al despachador', () => {
+    // Segunda excepción intramódulo, y por otro motivo que la del reporte: el alta
+    // obliga a mandar el precio, así que quien no puede verlo tampoco lo escribe.
+    expect([...SERVICE_CREATE_ROLES].sort()).toEqual([
+      'admin',
+      'general_manager',
+      'operations_manager',
+      'sales',
+    ])
+    expect(SERVICE_CREATE_ROLES).not.toContain('dispatcher')
   })
 })
 
