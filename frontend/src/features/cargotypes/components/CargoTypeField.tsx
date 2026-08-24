@@ -20,13 +20,32 @@ interface CargoTypeFieldProps {
   onChange: (cargoType: CargoTypeResponse | null) => void
   onBlur?: () => void
   error?: string
+  /**
+   * Si se ofrece el alta al vuelo. Por omisión sí, que es como se comportaba cuando
+   * el único consumidor era el asistente de cotizaciones. Las pantallas cuyo rol
+   * puede quedar sin permiso de alta lo pasan explícito: el servidor solo admite el
+   * `POST /cargo-types` a algunos roles, y ofrecer el botón al resto los manda a un
+   * 403. En falso el buscador sigue funcionando: se saca el botón, no el campo.
+   */
+  canCreate?: boolean
+  /** Bloquea el campo, p. ej. mientras el formulario se está enviando. */
+  disabled?: boolean
 }
 
 /**
  * Combobox de tipo de carga (búsqueda async, minLength 3) + creación al vuelo.
  * Mismo patrón que el buscador de cliente.
  */
-export function CargoTypeField({ id, value, valueName, onChange, onBlur, error }: CargoTypeFieldProps) {
+export function CargoTypeField({
+  id,
+  value,
+  valueName,
+  onChange,
+  onBlur,
+  error,
+  canCreate = true,
+  disabled = false,
+}: CargoTypeFieldProps) {
   const [query, setQuery] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const debouncedQuery = useDebouncedValue(query, 300)
@@ -53,13 +72,14 @@ export function CargoTypeField({ id, value, valueName, onChange, onBlur, error }
         onSelect={handleSelect}
         onClear={() => onChange(null)}
         onBlur={onBlur}
+        disabled={disabled}
         loading={isFetching}
         minChars={CARGO_TYPE_SEARCH_MIN_LENGTH}
         minCharsHint={`Ingresa al menos ${CARGO_TYPE_SEARCH_MIN_LENGTH} caracteres para buscar.`}
         emptyText="No se encontraron tipos de carga."
         error={error}
-        createLabel="Nuevo tipo de carga"
-        onCreateClick={() => setModalOpen(true)}
+        createLabel={canCreate ? 'Nuevo tipo de carga' : undefined}
+        onCreateClick={canCreate ? () => setModalOpen(true) : undefined}
       />
       {modalOpen && (
         <CargoTypeCreateModal

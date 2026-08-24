@@ -22,6 +22,8 @@ interface TextareaProps {
   value?: string
   /** Registro de react-hook-form: `register('fieldName')`. */
   register: UseFormRegisterReturn
+  /** Bloquea la escritura, p. ej. mientras el formulario se está enviando. */
+  disabled?: boolean
   /** Contenido extra junto al label (ej. el badge "🔒 interno"). */
   labelSlot?: ReactNode
   /** Saneo aplicado en `onChange` antes de pasar el valor a RHF (ej. `stripControlChars`). */
@@ -47,6 +49,7 @@ export function Textarea({
   register,
   labelSlot,
   sanitize,
+  disabled,
 }: TextareaProps) {
   const helperId = helperText ? `${id}-helper` : undefined
   const counterId = showCounter ? `${id}-counter` : undefined
@@ -84,12 +87,14 @@ export function Textarea({
         rows={rows}
         maxLength={maxLength}
         placeholder={placeholder}
+        disabled={disabled}
         aria-invalid={!!error}
         aria-describedby={describedBy}
         className={cn(
           'w-full resize-none rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400',
           'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500',
           error ? 'border-red-300 focus:ring-red-500 focus:border-red-500' : 'border-slate-300',
+          disabled && 'cursor-not-allowed bg-slate-50 text-slate-500',
         )}
         {...register}
         onChange={handleChange}

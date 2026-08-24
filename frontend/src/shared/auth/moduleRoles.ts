@@ -50,6 +50,23 @@ export const SERVICES_REPORT_ROLES: UserRole[] = [
 ]
 
 /**
+ * Segunda excepción intramódulo: registrar un viaje deja afuera al despachador.
+ * El cuerpo del alta obliga a mandar el precio, y quien no puede VER los importes
+ * tampoco puede escribirlos a ciegas, así que el backend le contesta 403 aunque
+ * sume otro rol. Lista propia y no la del reporte: hoy coinciden, pero son dos
+ * reglas distintas y compartirlas haría que mover una mueva la otra.
+ *
+ * Espejo del `x-required-roles` de `POST /services`; la autoridad es el 403 del
+ * backend, esta lista decide la ruta y el botón del listado.
+ */
+export const SERVICE_CREATE_ROLES: UserRole[] = [
+  'admin',
+  'sales',
+  'general_manager',
+  'operations_manager',
+]
+
+/**
  * Almacén: los cinco roles ven todas las pantallas del módulo y pueden registrar,
  * editar y anular entradas y retiros. `sales` y `dispatcher` quedan afuera.
  */

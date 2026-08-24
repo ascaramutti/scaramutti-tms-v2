@@ -10,6 +10,15 @@ interface ProtectedRouteProps {
   allowedRoles?: UserRole[]
   /** Nombre del módulo, para nombrarlo en la pantalla de sin acceso. */
   moduleName?: string
+  /**
+   * La acción en infinitivo ("registrar un servicio"), para las rutas cuyo permiso
+   * es más angosto que el de su módulo. Sin esto, a un rol que tiene el módulo pero
+   * no esa pantalla se le decía que no tenía acceso al módulo entero, y se le
+   * ofrecía volver justamente ahí. En infinitivo y sin artículo porque el título lo
+   * completa sin preposición: anteponerle una obligaría a elegir entre "a el" y "al"
+   * según el género de lo que venga.
+   */
+  actionName?: string
 }
 
 /**
@@ -21,7 +30,15 @@ interface ProtectedRouteProps {
 const exitLinkClasses =
   'mt-6 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors'
 
-function AccessDenied({ role, moduleName }: { role: UserRole | undefined; moduleName?: string }) {
+function AccessDenied({
+  role,
+  moduleName,
+  actionName,
+}: {
+  role: UserRole | undefined
+  moduleName?: string
+  actionName?: string
+}) {
   const landing = landingPathFor(role)
   const label = `Ir a ${landingLabelFor(role)}`
 
@@ -32,10 +49,16 @@ function AccessDenied({ role, moduleName }: { role: UserRole | undefined; module
     <div className="flex items-center justify-center px-4 py-24">
       <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-8 text-center max-w-md">
         <h1 className="text-xl font-semibold text-slate-900">
-          {moduleName ? `Sin acceso a ${moduleName}` : 'Sin acceso a este módulo'}
+          {actionName
+            ? `No puedes ${actionName}`
+            : moduleName
+              ? `Sin acceso a ${moduleName}`
+              : 'Sin acceso a este módulo'}
         </h1>
         <p className="mt-2 text-sm text-slate-500">
-          Tu rol no tiene permisos para este módulo.
+          {actionName
+            ? 'Tu rol no tiene permisos para esta acción.'
+            : 'Tu rol no tiene permisos para este módulo.'}
         </p>
         {/* Todos los landings viven en esta SPA: navega el router, sin
             recargar la app entera para cambiar de módulo. */}
@@ -47,7 +70,12 @@ function AccessDenied({ role, moduleName }: { role: UserRole | undefined; module
   )
 }
 
-export function ProtectedRoute({ children, allowedRoles, moduleName }: ProtectedRouteProps) {
+export function ProtectedRoute({
+  children,
+  allowedRoles,
+  moduleName,
+  actionName,
+}: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth()
   const location = useLocation()
 
@@ -60,7 +88,7 @@ export function ProtectedRoute({ children, allowedRoles, moduleName }: Protected
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    return <AccessDenied role={user.role} moduleName={moduleName} />
+    return <AccessDenied role={user.role} moduleName={moduleName} actionName={actionName} />
   }
 
   return <>{children}</>

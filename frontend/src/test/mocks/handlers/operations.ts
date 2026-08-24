@@ -3,6 +3,8 @@ import type {
   PageMeta,
   PageOfServiceSummary,
   Problem,
+  ServiceCreateRequest,
+  ServiceDetailResponse,
   ServiceStatsResponse,
   ServiceSummaryResponse,
 } from '../../../api'
@@ -251,4 +253,136 @@ export function serviceStatsError(status: number, problem: Partial<Problem> = {}
  * parámetro, que sí se tragaría `/services/stats`) el orden va a importar de
  * verdad.
  */
-export const operationsHandlers = [serviceStatsOk(), servicesPage([fakeServiceSummary()])]
+/**
+ * Fixture del detalle que devuelve el alta. Los valores no repiten los del resumen
+ * (otro id, otro código): si el test afirma el código de un servicio recién creado
+ * y el fixture compartiera el del listado, la aserción pasaría midiendo la fila
+ * equivocada.
+ */
+export function fakeServiceDetail(
+  overrides: Partial<ServiceDetailResponse> = {},
+): ServiceDetailResponse {
+  return {
+    id: 77,
+    code: 'SRV-0077',
+    client: { id: 12, name: 'IPH S.A.C.', ruc: '20123456789' },
+    origin: 'Piura',
+    destination: 'Lima — Callao',
+    tentativeDate: '2026-09-10',
+    tripScope: 'PROVINCIA',
+    cargoType: { id: 3, name: 'CARGA GENERAL' },
+    weightKg: 28000,
+    lengthM: 12.5,
+    widthM: null,
+    heightM: null,
+    observations: null,
+    price: 5800,
+    currencyCode: 'PEN',
+    status: 'PENDING_ASSIGNMENT',
+    driver: null,
+    tractor: null,
+    trailer: null,
+    startDateTime: null,
+    endDateTime: null,
+    additionalResources: [],
+    events: [],
+    createdBy: { id: 1, username: 'cscaramutti', fullName: 'Carlos Scaramutti' },
+    createdAt: '2026-08-24T15:00:00Z',
+    updatedAt: '2026-08-24T15:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Alta correcta: responde 201 con el detalle dado. */
+export function createServiceOk(service: ServiceDetailResponse = fakeServiceDetail()) {
+  return http.post(`${API}/services`, () => HttpResponse.json(service, { status: 201 }))
+}
+
+/**
+ * Captura el CUERPO del alta. Sin esto un test solo puede afirmar que la pantalla
+ * no explotó: lo que importa es qué se mandó, y un campo que viaja en null o que
+ * no viaja pasa desapercibido.
+ */
+export function createServiceCapture(
+  sink: { body?: ServiceCreateRequest },
+  service: ServiceDetailResponse = fakeServiceDetail(),
+) {
+  return http.post(`${API}/services`, async ({ request }) => {
+    sink.body = (await request.json()) as ServiceCreateRequest
+    return HttpResponse.json(service, { status: 201 })
+  })
+}
+
+/** Alta rechazada por repetida (409 `OPS-007`), el anti doble-click del contrato. */
+export function createServiceDuplicate(
+  detail = 'Ya se registró un servicio igual para este cliente hace instantes.',
+) {
+  return http.post(`${API}/services`, () =>
+    HttpResponse.json(
+      {
+        type: 'urn:tms:error:ops-007',
+        title: 'Conflict',
+        status: 409,
+        code: 'OPS-007',
+        detail,
+        traceId: 'test',
+      },
+      { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Alta rechazada con errores por campo (400), como los devuelve Bean Validation. */
+export function createServiceFieldErrors(errors: { field: string; message: string }[]) {
+  return http.post(`${API}/services`, () =>
+    HttpResponse.json(
+      {
+        type: 'urn:tms:error:com-001',
+        title: 'Bad Request',
+        status: 400,
+        code: 'COM-001',
+        detail: 'La solicitud tiene errores de validación.',
+        errors,
+        traceId: 'test',
+      },
+      { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Alta rechazada por el veto de precios (403 `COM-003`). */
+export function createServiceForbidden(
+  detail = 'Registrar un servicio exige poder ver los importes.',
+) {
+  return http.post(`${API}/services`, () =>
+    HttpResponse.json(
+      {
+        type: 'urn:tms:error:com-003',
+        title: 'Forbidden',
+        status: 403,
+        code: 'COM-003',
+        detail,
+        traceId: 'test',
+      },
+      { status: 403, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Alta que tarda, para observar el botón mientras el envío está en curso. */
+export function createServiceSlow(ms = 40, service: ServiceDetailResponse = fakeServiceDetail()) {
+  return http.post(`${API}/services`, async () => {
+    await delay(ms)
+    return HttpResponse.json(service, { status: 201 })
+  })
+}
+
+/**
+ * Handlers por defecto (camino feliz). El orden entre los tres es indistinto: cada
+ * uno responde un método y una ruta distintos, así que ninguno ensombrece a otro.
+ */
+export const operationsHandlers = [
+  serviceStatsOk(),
+  servicesPage([fakeServiceSummary()]),
+  createServiceOk(),
+]

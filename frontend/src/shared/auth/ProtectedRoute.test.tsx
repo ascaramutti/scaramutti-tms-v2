@@ -15,7 +15,7 @@ const API = 'http://localhost:8080/api/v1'
 
 function renderProtected(
   initialPath: string,
-  options?: { allowedRoles?: UserRole[]; moduleName?: string },
+  options?: { allowedRoles?: UserRole[]; moduleName?: string; actionName?: string },
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -33,6 +33,7 @@ function renderProtected(
                 <ProtectedRoute
                   allowedRoles={options?.allowedRoles}
                   moduleName={options?.moduleName}
+                  actionName={options?.actionName}
                 >
                   <div>CONTENIDO PROTEGIDO</div>
                 </ProtectedRoute>
@@ -150,5 +151,37 @@ describe('ProtectedRoute', () => {
     tokenStorage.setTokens('admin-token', 'admin-refresh')
     renderProtected('/protegida', { allowedRoles: ['admin', 'general_manager'] })
     expect(await screen.findByText('CONTENIDO PROTEGIDO')).toBeInTheDocument()
+  })
+
+  it('nombra la ACCIÓN cuando el permiso es más angosto que el del módulo', async () => {
+    // Un rol que tiene el módulo pero no esta pantalla. Sin esto se le decía que no
+    // tenía acceso al módulo entero y se le ofrecía volver justamente ahí.
+    tokenStorage.setTokens('fake-access', 'fake-refresh')
+    server.use(http.get(`${API}/auth/me`, () => HttpResponse.json({ ...fakeUser, role: 'dispatcher' })))
+    renderProtected('/protegida', {
+      allowedRoles: ['admin'],
+      actionName: 'registrar un servicio',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: 'No puedes registrar un servicio' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('Tu rol no tiene permisos para esta acción.')).toBeInTheDocument()
+    expect(screen.queryByText(/permisos para este módulo/i)).not.toBeInTheDocument()
+  })
+
+  it('la acción gana sobre el módulo cuando vienen las dos', async () => {
+    tokenStorage.setTokens('fake-access', 'fake-refresh')
+    server.use(http.get(`${API}/auth/me`, () => HttpResponse.json({ ...fakeUser, role: 'dispatcher' })))
+    renderProtected('/protegida', {
+      allowedRoles: ['admin'],
+      moduleName: 'Operaciones',
+      actionName: 'registrar un servicio',
+    })
+
+    expect(
+      await screen.findByRole('heading', { name: 'No puedes registrar un servicio' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Sin acceso a Operaciones' })).not.toBeInTheDocument()
   })
 })

@@ -1,7 +1,12 @@
 import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
-import { OPERATIONS_ROLES, QUOTATION_ROLES, WAREHOUSE_ROLES } from './shared/auth/moduleRoles'
+import {
+  OPERATIONS_ROLES,
+  QUOTATION_ROLES,
+  SERVICE_CREATE_ROLES,
+  WAREHOUSE_ROLES,
+} from './shared/auth/moduleRoles'
 import { OPERACIONES_LANDING } from './shared/auth/roleLanding'
 import { AppLayout } from './shared/layout/AppLayout'
 import { LoginPage } from './features/auth/components/LoginPage'
@@ -23,6 +28,7 @@ import { WithdrawalEditPage } from './features/warehouse/pages/WithdrawalEditPag
 import { WarehouseReportsPage } from './features/warehouse/pages/WarehouseReportsPage'
 import { OpeningBalancesPage } from './features/warehouse/pages/OpeningBalancesPage'
 import { ServicesListPage } from './features/operations/pages/ServicesListPage'
+import { ServiceCreatePage } from './features/operations/pages/ServiceCreatePage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
 // con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
@@ -189,6 +195,16 @@ export const routes: RouteObject[] = [
         element: (
           <ProtectedRoute allowedRoles={OPERATIONS_ROLES} moduleName="Operaciones">
             <ServicesListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // Roles propios: el alta obliga a mandar el precio, así que el despacho
+        // queda afuera aunque el resto del módulo sea suyo.
+        path: `${OPERACIONES_LANDING}/servicios/nuevo`,
+        element: (
+          <ProtectedRoute allowedRoles={SERVICE_CREATE_ROLES} actionName="registrar un servicio">
+            <ServiceCreatePage />
           </ProtectedRoute>
         ),
       },
