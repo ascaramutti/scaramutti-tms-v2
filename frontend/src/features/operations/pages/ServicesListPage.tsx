@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Plus } from 'lucide-react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { useAuth } from '../../../shared/auth/AuthContext'
+import { OPERACIONES_LANDING } from '../../../shared/auth/roleLanding'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { useLastGoodPage } from '../../../shared/hooks/useLastGoodPage'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
@@ -13,7 +16,7 @@ import {
   EMPTY_SERVICE_FILTERS,
   type ServiceFilters,
 } from '../schemas/service-filters.schema'
-import { canSeeServicePrices } from '../status/operationsPermissions'
+import { canCreateService, canSeeServicePrices } from '../status/operationsPermissions'
 
 /** Filas por página. El contrato admite hasta 100; 10 es lo que usan los listados del sistema. */
 const PAGE_SIZE = 10
@@ -31,6 +34,7 @@ const SEARCH_DEBOUNCE_MS = 300
  */
 export function ServicesListPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [filters, setFilters] = useState<ServiceFilters>(EMPTY_SERVICE_FILTERS)
   const [page, setPage] = useState(0)
 
@@ -64,6 +68,20 @@ export function ServicesListPage() {
         title="Servicios"
         description="Control de viajes · estado y recursos asignados de cada servicio."
         divider
+        action={
+          // Sin botón para el despacho: el alta exige el precio, que no puede ver,
+          // así que el camino terminaría en un 403 del servidor.
+          canCreateService(user?.role) ? (
+            <button
+              type="button"
+              onClick={() => navigate(`${OPERACIONES_LANDING}/servicios/nuevo`)}
+              className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+            >
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Nuevo servicio
+            </button>
+          ) : undefined
+        }
       />
 
       <ServicesKpiStrip

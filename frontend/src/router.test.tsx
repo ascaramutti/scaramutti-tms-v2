@@ -83,6 +83,27 @@ describe('router — módulo Operaciones', () => {
     )
   })
 
+  it('el alta de un servicio se abre para quien puede registrar', async () => {
+    renderRouteAs('sales', '/cotizaciones/operaciones/servicios/nuevo')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Registrar servicio' }),
+    ).toBeInTheDocument()
+  })
+
+  it('el despachador entra al módulo pero no al alta', async () => {
+    // Su rol tiene el módulo entero menos esta pantalla: el alta obliga a mandar el
+    // precio, que el servidor no le deja ver. La ruta usa una lista propia y este
+    // caso es lo que impide que alguien la reemplace por la del módulo.
+    renderRouteAs('dispatcher', '/cotizaciones/operaciones/servicios/nuevo')
+    expect(
+      await screen.findByRole('heading', { name: /no puedes registrar un servicio/i }),
+    ).toBeInTheDocument()
+    // Lo que se le niega es la acción, no el módulo: Operaciones es su lugar de
+    // trabajo y el botón de salida tiene que devolverlo ahí sin contradecirse.
+    expect(screen.queryByText(/no tiene permisos para este módulo/i)).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /ir a operaciones/i })).toBeInTheDocument()
+  })
+
   it('la ruta del módulo es exactamente donde aterriza el despachador', async () => {
     // El aterrizaje, el menú y la tabla de rutas comparten una sola constante.
     // Si alguna se desviara, este caso cae antes que el usuario.

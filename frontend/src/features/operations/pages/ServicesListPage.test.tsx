@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { ServicesListPage } from './ServicesListPage'
@@ -39,7 +39,14 @@ function renderServicios({ role = 'admin' as UserRole } = {}) {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <MemoryRouter initialEntries={['/cotizaciones/operaciones']}>
-          <ServicesListPage />
+          <Routes>
+            <Route path="/cotizaciones/operaciones" element={<ServicesListPage />} />
+            {/* Sustituta del alta: la pantalla real se prueba en su propio archivo. */}
+            <Route
+              path="/cotizaciones/operaciones/servicios/nuevo"
+              element={<div>Ruta del alta</div>}
+            />
+          </Routes>
         </MemoryRouter>
       </AuthProvider>
     </QueryClientProvider>,
@@ -52,6 +59,31 @@ function rowOf(textNode: HTMLElement): HTMLElement {
 }
 
 describe('ServicesListPage', () => {
+  // ----- Alta de un servicio -----
+  it.each(['admin', 'sales', 'general_manager', 'operations_manager'] as const)(
+    'ofrece registrar un servicio a %s',
+    async (role) => {
+      renderServicios({ role })
+      expect(await screen.findByRole('button', { name: /nuevo servicio/i })).toBeInTheDocument()
+    },
+  )
+
+  it('no le ofrece registrar al despacho, que no puede mandar el precio', async () => {
+    server.use(servicesPage([fakeDispatcherServiceSummary()]))
+    renderServicios({ role: 'dispatcher' })
+    // Esperar la tabla: sin eso, la ausencia del botón se afirma sobre una pantalla
+    // que todavía no terminó de renderizar y daría verde por vacía.
+    expect(await screen.findByText('SRV-0042')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /nuevo servicio/i })).not.toBeInTheDocument()
+  })
+
+  it('el botón lleva al alta', async () => {
+    const user = userEvent.setup()
+    renderServicios()
+    await user.click(await screen.findByRole('button', { name: /nuevo servicio/i }))
+    expect(await screen.findByText('Ruta del alta')).toBeInTheDocument()
+  })
+
   // ----- Render de la tabla -----
   it('muestra el spinner de la tabla durante la carga inicial', async () => {
     // Los indicadores resuelven de una: si tardaran, sus SEIS spinners estarían
@@ -257,16 +289,6 @@ describe('ServicesListPage', () => {
     const fila = rowOf(await screen.findByText('SRV-0042'))
     expect(fila).not.toHaveAttribute('role', 'button')
     expect(within(fila).queryByRole('button')).not.toBeInTheDocument()
-  })
-
-  it('no ofrece registrar un servicio todavía', async () => {
-    // El alta es de otra entrega: un botón que no lleva a ningún lado es peor
-    // que la ausencia del botón.
-    server.use(servicesPage([fakeServiceSummary()]))
-    renderServicios()
-    await screen.findByText('SRV-0042')
-    expect(screen.queryByRole('link', { name: /nuevo servicio/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /nuevo servicio/i })).not.toBeInTheDocument()
   })
 
   it('muestra el error del backend y permite reintentar', async () => {
