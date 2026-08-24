@@ -4,11 +4,11 @@ import { Modal } from '../../../shared/ui/Modal'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
-import { useCreateClient } from '../../clients/hooks/useCreateClient'
-import { createClientSchema, type CreateClientInput } from '../../clients/schemas/client.schema'
+import { useCreateClient } from '../hooks/useCreateClient'
+import { createClientSchema, type CreateClientInput } from '../schemas/client.schema'
 import type { ClientResponse } from '../../../api'
 
-interface CrearClienteModalProps {
+interface ClientCreateModalProps {
   /** Texto tipeado en el combobox, para precargar la razón social. */
   initialName?: string
   onClose: () => void
@@ -27,7 +27,7 @@ const SECONDARY =
  * `CLI-001`) se rutea al campo RUC con `handleApiFormError`. Se monta solo cuando
  * está abierto (form fresco con la razón social precargada del texto buscado).
  */
-export function CrearClienteModal({ initialName = '', onClose, onCreated }: CrearClienteModalProps) {
+export function ClientCreateModal({ initialName = '', onClose, onCreated }: ClientCreateModalProps) {
   const createClient = useCreateClient()
   const {
     register,

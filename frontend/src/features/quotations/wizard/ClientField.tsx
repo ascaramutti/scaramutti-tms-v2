@@ -3,7 +3,7 @@ import { useFormContext } from 'react-hook-form'
 import { Combobox, type ComboboxOption } from '../../../shared/ui/Combobox'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { CLIENT_SEARCH_MIN_LENGTH, useClientsSearch } from '../../clients/hooks/useClientsSearch'
-import { CrearClienteModal } from './CrearClienteModal'
+import { ClientCreateModal } from '../../clients/components/ClientCreateModal'
 import type { ClientResponse } from '../../../api'
 import type { WizardFormInput } from './quotation-wizard.schema'
 
@@ -140,7 +140,7 @@ export function ClientField({ selectedClient, onClientChange, readOnly = false }
         </div>
       </div>
       {modalOpen && (
-        <CrearClienteModal
+        <ClientCreateModal
           initialName={query}
           onClose={() => setModalOpen(false)}
           onCreated={(client) => {

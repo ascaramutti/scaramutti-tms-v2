@@ -4,14 +4,14 @@ import { Modal } from '../../../shared/ui/Modal'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
-import { useCreateCargoType } from '../../cargotypes/hooks/useCreateCargoType'
+import { useCreateCargoType } from '../hooks/useCreateCargoType'
 import {
   createCargoTypeSchema,
   type CreateCargoTypeInput,
-} from '../../cargotypes/schemas/cargo-type.schema'
+} from '../schemas/cargo-type.schema'
 import type { CargoTypeResponse } from '../../../api'
 
-interface CrearCargoTypeModalProps {
+interface CargoTypeCreateModalProps {
   /** Texto tipeado en el combobox, para precargar el nombre. */
   initialName?: string
   onClose: () => void
@@ -46,7 +46,7 @@ function requiredNum(value: string): number | undefined {
  * duplicado, `CGT-001`) se rutea al campo nombre con `handleApiFormError`. Permite
  * cargar todas las características del catálogo: solo nombre y peso son obligatorios.
  */
-export function CrearCargoTypeModal({ initialName = '', onClose, onCreated }: CrearCargoTypeModalProps) {
+export function CargoTypeCreateModal({ initialName = '', onClose, onCreated }: CargoTypeCreateModalProps) {
   const createCargoType = useCreateCargoType()
   const {
     register,

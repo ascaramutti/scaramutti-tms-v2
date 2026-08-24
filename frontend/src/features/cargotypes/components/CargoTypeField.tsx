@@ -4,15 +4,16 @@ import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import {
   CARGO_TYPE_SEARCH_MIN_LENGTH,
   useCargoTypesSearch,
-} from '../../cargotypes/hooks/useCargoTypesSearch'
-import { CrearCargoTypeModal } from './CrearCargoTypeModal'
+} from '../hooks/useCargoTypesSearch'
+import { CargoTypeCreateModal } from './CargoTypeCreateModal'
 import type { CargoTypeResponse } from '../../../api'
 
 interface CargoTypeFieldProps {
-  /** Id único del input (hay uno por ítem). */
+  /** Id único del input: puede haber varios en la misma pantalla. */
   id: string
-  /** Tipo de carga elegido (id) y su nombre (para el chip). El nombre vive en el
-   * form del ítem para sobrevivir el cambio de step. */
+  /** Tipo de carga elegido (id) y su nombre (para el chip). El componente no guarda
+   * el nombre: lo recibe, para poder mostrarlo sin volver a buscarlo cuando se
+   * remonta (el consumidor lo persiste junto al id). */
   value: number | null
   valueName?: string
   /** Pasa el tipo de carga COMPLETO (para precargar peso/dimensiones estándar) o null al limpiar. */
@@ -22,8 +23,8 @@ interface CargoTypeFieldProps {
 }
 
 /**
- * Combobox de tipo de carga (búsqueda async, minLength 3) + creación al vuelo, para
- * los ítems de tipo SERVICIO. Mismo patrón que el buscador de cliente.
+ * Combobox de tipo de carga (búsqueda async, minLength 3) + creación al vuelo.
+ * Mismo patrón que el buscador de cliente.
  */
 export function CargoTypeField({ id, value, valueName, onChange, onBlur, error }: CargoTypeFieldProps) {
   const [query, setQuery] = useState('')
@@ -61,7 +62,7 @@ export function CargoTypeField({ id, value, valueName, onChange, onBlur, error }
         onCreateClick={() => setModalOpen(true)}
       />
       {modalOpen && (
-        <CrearCargoTypeModal
+        <CargoTypeCreateModal
           initialName={query}
           onClose={() => setModalOpen(false)}
           onCreated={(cargoType) => {
