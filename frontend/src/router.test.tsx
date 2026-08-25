@@ -90,6 +90,38 @@ describe('router — módulo Operaciones', () => {
     ).toBeInTheDocument()
   })
 
+  it('un rol de almacén no entra al detalle de un viaje', async () => {
+    // El caso POSITIVO de abajo fija que el detalle use la lista del módulo y no
+    // una más chica; este fija que no use una más GRANDE. Sin él, ensanchar
+    // `allowedRoles` no rompe nada, y es la única de las tres rutas del módulo
+    // que va a ganar acciones de escritura en las próximas entregas.
+    renderRouteAs('warehouse_keeper', '/cotizaciones/operaciones/servicios/77')
+    expect(
+      await screen.findByRole('heading', { name: /sin acceso a operaciones/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('el despachador entra al DETALLE de un viaje, que es su trabajo diario', async () => {
+    // La contracara del caso de abajo, y el que más importa medir: el detalle usa
+    // la lista del módulo entero, no la del alta. Sin este caso, cambiarla por una
+    // más chica deja al despacho afuera de la única pantalla que mira todo el día
+    // y la suite entera sigue verde.
+    renderRouteAs('dispatcher', '/cotizaciones/operaciones/servicios/77')
+    expect(await screen.findByRole('heading', { level: 1, name: 'SRV-0077' })).toBeInTheDocument()
+  })
+
+  it('el alta le gana a la ruta con parámetro, aunque esté escrita después', async () => {
+    // "nuevo" también encaja en `/servicios/:id`. Gana la estática porque
+    // react-router rankea por especificidad y no por orden de declaración; si eso
+    // cambiara, el alta caería en el detalle, `Number('nuevo')` sería NaN y el
+    // usuario vería "No se encontró el servicio" al querer registrar.
+    renderRouteAs('sales', '/cotizaciones/operaciones/servicios/nuevo')
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Registrar servicio' }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('No se encontró el servicio')).not.toBeInTheDocument()
+  })
+
   it('el despachador entra al módulo pero no al alta', async () => {
     // Su rol tiene el módulo entero menos esta pantalla: el alta obliga a mandar el
     // precio, que el servidor no le deja ver. La ruta usa una lista propia y este

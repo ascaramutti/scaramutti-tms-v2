@@ -12,6 +12,7 @@ export const operationsKeys = {
   serviceLists: () => [...operationsKeys.services(), 'list'] as const,
   serviceList: (params: ServiceListParams) =>
     [...operationsKeys.serviceLists(), params] as const,
+  serviceDetail: (id: number) => [...operationsKeys.services(), 'detail', id] as const,
   // Rama aparte de `serviceList`: los indicadores no aceptan parámetros y tienen
   // otra vida de cache, así que invalidar un listado filtrado no debe tirar abajo
   // los contadores (ni al revés).
