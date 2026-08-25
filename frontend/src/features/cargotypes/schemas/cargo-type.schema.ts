@@ -49,9 +49,6 @@ const DECIMAL_TEXT = /^\d+(\.\d{1,2})?$/
  * Antes admitía el cero, y como además el campo arrancaba en 0 se podía crear un tipo
  * de carga sin escribir nada y quedaba pesando cero. Una carga que pesa cero no
  * existe: lo que ese cero decía en realidad era "no lo cargué".
- *
- * Por ahora la regla vive solo acá: el servidor todavía acepta el cero, y se alinea
- * en un cambio propio del backend.
  */
 const standardWeightSchema = numericText
   .refine((value) => value !== '', { message: 'Ingresa el peso estándar (kg).' })
@@ -64,14 +61,17 @@ const standardWeightSchema = numericText
   .transform(Number)
 
 /**
- * Dimensión estándar: opcional. Vacía significa "no la sé" y viaja como `null`.
+ * Dimensión estándar: opcional, y si se carga, mayor que cero.
  *
- * El cero escrito a mano se sigue admitiendo, porque el contrato del catálogo lo
- * declara válido (`minimum: 0`) y decidir que ahí un cero es imposible es una
- * decisión de contrato y de datos, no de este formulario. Lo que este cambio corrige
- * es el cero que NADIE escribió.
+ * Vacía significa "no la sé" y viaja como `null`. El cero se rechaza: una medida en
+ * cero no existe, y era otra forma de escribir lo mismo que el campo vacío ya dice.
+ * Es la misma regla que aplican las medidas de un servicio, y ahora también el
+ * servidor.
  */
 const standardDimensionSchema = numericText
+  .refine((value) => value === '' || Number(value) > 0, {
+    message: 'La medida debe ser mayor a 0.',
+  })
   .refine((value) => value === '' || Number(value) <= CARGO_TYPE_MAX, {
     message: 'Valor demasiado grande.',
   })

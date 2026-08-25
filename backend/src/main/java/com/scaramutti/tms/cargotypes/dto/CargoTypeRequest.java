@@ -19,8 +19,11 @@ import java.math.BigDecimal;
  *    problema (payloads gigantes), agregar @Size en un PR posterior.
  *  - standardWeight: requerido, > 0, hasta NUMERIC(10,2) (8 enteros + 2 decimales).
  *    Antes admitia el 0. Se reviso en 2026-08-25: un tipo de carga que pesa cero no
- *    existe, y ese 0 era casi siempre "no lo cargue" y no una medicion.
- *  - standardLength/Width/Height: opcionales, >= 0, mismo precision/scale.
+ *    existe. El camino era alcanzable porque el formulario arrancaba el campo en 0,
+ *    asi que se podia crear un tipo sin escribir nada.
+ *  - standardLength/Width/Height: opcionales, y si vienen, > 0. Una medida en cero no
+ *    existe: lo que ese 0 decia era "no la se", y para eso el campo se omite. Misma
+ *    regla que las medidas de un servicio (ServiceCreateRequest).
  *
  * `@Digits(integer=8, fraction=2)` previene overflow del NUMERIC(10,2) de Postgres:
  * sin esta validacion un payload con weight=1e10 devolveria 500 (SQL overflow).
@@ -43,17 +46,17 @@ public record CargoTypeRequest(
     BigDecimal standardWeight,
 
     @Schema(description = "Largo estandar (opcional)", example = "12.00", nullable = true)
-    @DecimalMin(value = "0", inclusive = true)
+    @DecimalMin(value = "0", inclusive = false)
     @Digits(integer = 8, fraction = 2)
     BigDecimal standardLength,
 
     @Schema(description = "Ancho estandar (opcional)", example = "2.50", nullable = true)
-    @DecimalMin(value = "0", inclusive = true)
+    @DecimalMin(value = "0", inclusive = false)
     @Digits(integer = 8, fraction = 2)
     BigDecimal standardWidth,
 
     @Schema(description = "Alto estandar (opcional)", example = "3.00", nullable = true)
-    @DecimalMin(value = "0", inclusive = true)
+    @DecimalMin(value = "0", inclusive = false)
     @Digits(integer = 8, fraction = 2)
     BigDecimal standardHeight
 ) {}

@@ -997,6 +997,85 @@ class CargoTypesResourceTest {
     }
 
     @Test
+    void create_withZeroDimension_returns400_COM001() {
+        // Una medida en cero se rechaza igual que el peso. Es la misma regla que ya
+        // aplican las medidas de un servicio (ServiceCreateRequest): un 0 no es una
+        // medida, es "no la se", y para eso el campo se omite.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM", null, "1000", "0", null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardLength"));
+    }
+
+    @Test
+    void create_withZeroDimensionWrittenWithDecimals_returns400_COM001() {
+        // "0.00" es el mismo cero: la regla mira el valor, no como se escribio.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM2", null, "1000", null, "0.00", null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWidth"));
+    }
+
+    @Test
+    void create_withZeroHeight_returns400_COM001() {
+        // El alto era el unico de los cuatro numericos sin caso propio: se podia
+        // revertir la regla en ese campo con la suite entera en verde.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM3", null, "1000", null, null, "0"))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardHeight"));
+    }
+
+    @Test
+    void create_withSmallestPositiveValues_returns201() {
+        // El borde que distingue "mayor que cero" de "rechaza todo lo chico".
+        String name = "ZTEST_SMALLEST";
+        try {
+            String token = login("admin", "Admin1234");
+
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body(body(name, null, "0.01", "0.01", "0.01", "0.01"))
+            .when()
+                .post("/cargo-types")
+            .then()
+                .statusCode(201)
+                // Los cuatro: si el minimo de cualquiera subiera, este caso lo caza.
+                .body("standardWeight", equalTo(0.01f))
+                .body("standardLength", equalTo(0.01f))
+                .body("standardWidth", equalTo(0.01f))
+                .body("standardHeight", equalTo(0.01f));
+        } finally {
+            cleanupCargoTypeByName(name);
+        }
+    }
+
+    @Test
     void create_withStandardWeightOverflow_returns400_COM001() {
         // Lock-in de @Digits(integer=8, fraction=2): valores con > 8 enteros
         // serian rechazados por Bean Validation con 400 limpio, en vez de

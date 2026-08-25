@@ -196,7 +196,15 @@ describe('CargoTypeCreateModal', () => {
     expect((screen.getByLabelText(/peso estándar/i) as HTMLInputElement).value).toBe('')
   })
 
-  it('un cero escrito a mano en una dimensión se guarda como 0, no como null', async () => {
+  it('los cuatro campos numéricos ofrecen 0.01 como mínimo, no 0', () => {
+    renderModal()
+    // El spinner del navegador no debe ofrecer el valor que el formulario rechaza.
+    for (const etiqueta of [/peso estándar/i, /largo estándar/i, /ancho estándar/i, /alto estándar/i]) {
+      expect(screen.getByLabelText(etiqueta)).toHaveAttribute('min', '0.01')
+    }
+  })
+
+  it('no deja enviar un cero escrito a mano en una dimensión', async () => {
     const user = userEvent.setup()
     const sink: { body?: CargoTypeRequest } = {}
     server.use(captureCreate(sink))
@@ -207,12 +215,10 @@ describe('CargoTypeCreateModal', () => {
     await user.type(screen.getByLabelText(/largo estándar/i), '0')
     await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
 
-    await vi.waitFor(() => expect(sink.body).toBeDefined())
-    // La otra mitad de la regla: lo que se corrige es el cero que NADIE escribió. El
-    // que alguien escribe es un dato, y el contrato del catálogo lo declara válido.
-    expect(sink.body?.standardLength).toBe(0)
-    expect(sink.body?.standardWidth).toBeNull()
-    expect(sink.body?.standardHeight).toBeNull()
+    // El cero se rechaza igual que en el peso: una medida en cero no existe, y el
+    // campo vacío ya dice "no la sé". El servidor aplica la misma regla.
+    expect(await screen.findByText('La medida debe ser mayor a 0.')).toBeInTheDocument()
+    expect(sink.body).toBeUndefined()
   })
 
   it('rechaza el peso en cero escrito a mano', async () => {

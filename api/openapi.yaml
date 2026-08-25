@@ -3514,9 +3514,14 @@ components:
     CargoTypeRequest:
       type: object
       description: |
-        El peso es obligatorio y mayor que cero: una carga que pesa cero no existe.
-        Hasta 2026-08-25 el cero se admitía a propósito; se revirtió porque en la
-        práctica no decía "no pesa" sino "no lo cargué".
+        Los cuatro numéricos son mayores que cero. El peso es obligatorio; las tres
+        medidas son opcionales, y si vienen, tampoco pueden ser cero: una medida en
+        cero no existe, y lo que ese cero decía era "no la sé", que se expresa
+        omitiendo el campo.
+
+        Hasta 2026-08-25 el cero se admitía en los cuatro. Se revirtió para que este
+        catálogo diga lo mismo que las medidas de un servicio, que ya lo rechazaban.
+        Los ítems de una cotización todavía lo admiten: esa parte queda pendiente.
 
         `CargoTypeResponse` conserva `minimum: 0` a propósito: las filas creadas antes
         de esta regla siguen existiendo y la salida tiene que poder describirlas.
@@ -3525,9 +3530,9 @@ components:
         name:           { type: string, minLength: 1, maxLength: 100 }
         description:    { type: [string, 'null'] }
         standardWeight: { type: number, format: double, exclusiveMinimum: 0 }
-        standardLength: { type: [number, 'null'], format: double, minimum: 0 }
-        standardWidth:  { type: [number, 'null'], format: double, minimum: 0 }
-        standardHeight: { type: [number, 'null'], format: double, minimum: 0 }
+        standardLength: { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        standardWidth:  { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        standardHeight: { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
 
     # -------- Catálogos: QuotationServiceType ------------------------------
     QuotationServiceKind:

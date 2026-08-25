@@ -101,10 +101,11 @@ describe('createCargoTypeSchema', () => {
 
   it('sigue aceptando lo que la columna sí guarda', () => {
     // El patrón nuevo no puede volverse tan estricto que rechace lo válido.
-    for (const value of ['1000', '0.5', '12.75', '99999999.99', '7']) {
+    for (const value of ['1000', '0.01', '0.5', '12.75', '99999999.99', '7']) {
       expect(createCargoTypeSchema.safeParse(validForm({ standardWeight: value })).success).toBe(true)
     }
-    for (const value of ['', '0', '12.5', '2.06']) {
+    // El vacío entra (es "no la sé"); el 0 ya no, y tiene su propio caso.
+    for (const value of ['', '12.5', '2.06', '0.01']) {
       expect(createCargoTypeSchema.safeParse(validForm({ standardLength: value })).success).toBe(true)
     }
   })
@@ -117,13 +118,18 @@ describe('createCargoTypeSchema', () => {
     expect(parsed.standardHeight).toBeNull()
   })
 
-  it('un cero ESCRITO a mano en una dimensión viaja como 0, no como null', () => {
-    // Es la otra mitad de la regla, y la que distingue este arreglo de uno que
-    // colapse todo a null: el contrato del catálogo declara el 0 válido, así que
-    // prohibirlo sería una decisión de contrato y de datos, no de este formulario.
-    const parsed = createCargoTypeSchema.parse(validForm({ standardLength: '0' }))
-    expect(parsed.standardLength).toBe(0)
-    expect(parsed.standardWidth).toBeNull()
+  it('rechaza un cero escrito a mano en una dimensión', () => {
+    // Antes se admitía, porque el contrato del catálogo lo declaraba válido. Esa
+    // decisión se revirtió: una medida en cero no existe, y el campo vacío ya dice
+    // "no la sé". El servidor aplica la misma regla.
+    expect(errorFor(validForm({ standardLength: '0' }), 'standardLength')).toBe(
+      'La medida debe ser mayor a 0.',
+    )
+  })
+
+  it('el campo vacío sigue siendo la forma de decir "no la sé"', () => {
+    const parsed = createCargoTypeSchema.parse(validForm({ standardLength: '' }))
+    expect(parsed.standardLength).toBeNull()
   })
 
   it('rechaza una dimensión negativa', () => {
