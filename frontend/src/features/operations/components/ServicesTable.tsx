@@ -20,6 +20,8 @@ interface ServicesTableProps {
   showPrice: boolean
   /** Cambia el texto del estado vacío: sin resultados no es lo mismo que sin datos. */
   hasActiveFilters: boolean
+  /** Abre el detalle del viaje de la fila. */
+  onRowClick: (service: ServiceSummaryResponse) => void
 }
 
 /**
@@ -43,8 +45,9 @@ function renderPrice(row: ServiceSummaryResponse) {
  * parámetro de ordenamiento), y el `caption` lo dice para que nadie lea la tabla
  * como ordenada por la fecha tentativa que sí se muestra.
  *
- * Las filas no son clickeables todavía: la pantalla de detalle no existe, y una
- * fila que navega a una ruta inexistente es peor que una fila inerte.
+ * La fila entera abre el detalle del viaje: es la acción única de la tabla, así
+ * que no lleva además una columna de botón que haría lo mismo. `DataTable` se
+ * encarga de que también se llegue por teclado.
  */
 export function ServicesTable({
   data,
@@ -60,6 +63,7 @@ export function ServicesTable({
   onRetry,
   showPrice,
   hasActiveFilters,
+  onRowClick,
 }: ServicesTableProps) {
   const columns: Column<ServiceSummaryResponse>[] = [
     {
@@ -152,6 +156,10 @@ export function ServicesTable({
         isError={isError}
         errorMessage={errorMessage}
         onRetry={onRetry}
+        onRowClick={onRowClick}
+        // Sin esto el nombre accesible de la fila es el texto de todas sus celdas
+        // pegado, que es lo que oye quien navega con lector de pantalla.
+        rowLabel={(service) => `Ver el servicio ${service.code} de ${service.client.name}`}
         emptyTitle={hasActiveFilters ? 'No se encontraron servicios' : 'Aún no hay servicios'}
         emptyDescription={
         hasActiveFilters

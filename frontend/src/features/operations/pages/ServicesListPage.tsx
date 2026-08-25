@@ -117,6 +117,9 @@ export function ServicesListPage() {
             : undefined
         }
         onRetry={() => void servicesQuery.refetch()}
+        onRowClick={(service) =>
+          navigate(`${OPERACIONES_LANDING}/servicios/${service.id}`)
+        }
         showPrice={canSeeServicePrices(user?.role)}
         hasActiveFilters={hasActiveFilters}
       />

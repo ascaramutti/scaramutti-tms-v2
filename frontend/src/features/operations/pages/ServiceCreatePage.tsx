@@ -8,10 +8,10 @@ import { ServiceForm } from '../components/ServiceForm'
 /**
  * Alta de un servicio.
  *
- * Al registrar vuelve al listado con el código que el servidor asignó, que es el
- * dato con el que después se busca el viaje. El destino natural sería el detalle
- * del servicio recién creado (el alta ya devuelve su cuerpo completo), y ahí va a
- * apuntar cuando esa pantalla exista: es el único lugar que hay que cambiar.
+ * Al registrar abre el detalle del viaje recién creado: es donde se le asignan
+ * recursos, que es lo próximo que alguien va a querer hacer con él, y evita
+ * buscarlo en un listado del que acaba de salir. El aviso sigue diciendo el código
+ * que asignó el servidor, que es el dato con el que después se lo busca.
  */
 export function ServiceCreatePage() {
   const navigate = useNavigate()
@@ -29,7 +29,7 @@ export function ServiceCreatePage() {
       <ServiceForm
         onCreated={(service) => {
           toast.success(`Servicio ${service.code} registrado.`)
-          navigate(OPERACIONES_LANDING)
+          navigate(`${OPERACIONES_LANDING}/servicios/${service.id}`)
         }}
         onCancel={() => navigate(OPERACIONES_LANDING)}
       />

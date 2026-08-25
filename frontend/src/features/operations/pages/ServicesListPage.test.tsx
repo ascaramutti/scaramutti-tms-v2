@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { ServicesListPage } from './ServicesListPage'
@@ -30,6 +30,12 @@ import {
   servicesSlow,
 } from '../../../test/mocks/handlers/operations'
 
+/** Sustituta del detalle que nombra el id de la ruta, para poder afirmar cuál abrió. */
+function DetalleStub() {
+  const { id } = useParams()
+  return <div>Detalle del servicio {id}</div>
+}
+
 function renderServicios({ role = 'admin' as UserRole } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   // La página vive dentro del layout autenticado: sesión sembrada en cache.
@@ -46,6 +52,10 @@ function renderServicios({ role = 'admin' as UserRole } = {}) {
               path="/cotizaciones/operaciones/servicios/nuevo"
               element={<div>Ruta del alta</div>}
             />
+            {/* Sustituta del detalle, que nombra el id recibido: sin eso, un test
+                de navegación no distingue "abrió el detalle correcto" de "abrió
+                alguno". */}
+            <Route path="/cotizaciones/operaciones/servicios/:id" element={<DetalleStub />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -281,13 +291,15 @@ describe('ServicesListPage', () => {
   })
 
   // ----- Interacción y navegación -----
-  it('la fila no es clickeable mientras no exista el detalle', async () => {
-    // La pantalla de detalle es de otra entrega: una fila que navega a una ruta
-    // inexistente es peor que una fila inerte.
+  it('la fila entera abre el detalle, sin un botón que haga lo mismo', async () => {
+    // Antes este caso afirmaba lo contrario (la fila inerte), porque la pantalla
+    // de detalle no existía y navegar a una ruta inexistente era peor que no
+    // navegar. Ya existe, así que la fila navega; lo que se sigue fijando es que
+    // la acción sea UNA, sin una columna de botón duplicando el mismo destino.
     server.use(servicesPage([fakeServiceSummary()]))
     renderServicios()
     const fila = rowOf(await screen.findByText('SRV-0042'))
-    expect(fila).not.toHaveAttribute('role', 'button')
+    expect(fila).toHaveAttribute('role', 'button')
     expect(within(fila).queryByRole('button')).not.toBeInTheDocument()
   })
 
@@ -656,6 +668,59 @@ describe('ServicesListPage', () => {
     expect(await screen.findByText('Fallo al listar')).toBeInTheDocument()
     const completados = screen.getByText('Completados (semana)').parentElement as HTMLElement
     expect(within(completados).getByText('11')).toBeInTheDocument()
+  })
+
+  // ----- Navegación al detalle -----
+  it('abre el detalle del viaje al hacer clic en su fila', async () => {
+    server.use(servicesPage([fakeServiceSummary({ id: 42 })]))
+    renderServicios()
+    await userEvent.click(await screen.findByText('SRV-0042'))
+
+    expect(await screen.findByText('Detalle del servicio 42')).toBeInTheDocument()
+  })
+
+  it('lleva al viaje de la fila en la que se hizo clic, no al primero', async () => {
+    // Con una sola fila, un id fijo pasaría el test igual. Dos filas obligan a que
+    // el id salga de la que se tocó.
+    server.use(
+      servicesPage([
+        fakeServiceSummary({ id: 42, code: 'SRV-0042' }),
+        fakeServiceSummary({ id: 91, code: 'SRV-0091' }),
+      ]),
+    )
+    renderServicios()
+    await userEvent.click(await screen.findByText('SRV-0091'))
+
+    expect(await screen.findByText('Detalle del servicio 91')).toBeInTheDocument()
+  })
+
+  it('cada fila se anuncia por el viaje que abre, no por su contenido entero', async () => {
+    // Sin rótulo, el nombre accesible de una fila clickeable es el texto de todas
+    // sus celdas concatenado, que es lo que oye quien navega con lector de
+    // pantalla.
+    server.use(servicesPage([fakeServiceSummary({ id: 42 })]))
+    renderServicios()
+    const fila = rowOf(await screen.findByText('SRV-0042'))
+
+    expect(fila).toHaveAccessibleName('Ver el servicio SRV-0042 de IPH S.A.C.')
+  })
+
+  it('también abre el detalle por teclado', async () => {
+    server.use(servicesPage([fakeServiceSummary({ id: 42 })]))
+    renderServicios()
+    const row = rowOf(await screen.findByText('SRV-0042'))
+    row.focus()
+    await userEvent.keyboard('{Enter}')
+
+    expect(await screen.findByText('Detalle del servicio 42')).toBeInTheDocument()
+  })
+
+  it('el despacho también entra al detalle: lo que no ve es el precio', async () => {
+    server.use(servicesPage([fakeDispatcherServiceSummary({ id: 42 })]))
+    renderServicios({ role: 'dispatcher' })
+    await userEvent.click(await screen.findByText('SRV-0042'))
+
+    expect(await screen.findByText('Detalle del servicio 42')).toBeInTheDocument()
   })
 
   // ----- Accesibilidad -----
