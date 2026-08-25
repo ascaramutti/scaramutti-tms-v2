@@ -5,6 +5,7 @@ import type {
   Problem,
   ServiceCreateRequest,
   ServiceDetailResponse,
+  ServiceEventResponse,
   ServiceStatsResponse,
   ServiceSummaryResponse,
 } from '../../../api'
@@ -245,14 +246,23 @@ export function serviceStatsError(status: number, problem: Partial<Problem> = {}
 }
 
 /**
- * Handlers por defecto (happy path).
- *
- * El orden entre estos dos es indistinto: MSW matchea la ruta exacta, y
- * `/services` no se traga `/services/stats`. Se listan de más específico a menos
- * por convención, y porque el día que exista `/services/:id` (un patrón CON
- * parámetro, que sí se tragaría `/services/stats`) el orden va a importar de
- * verdad.
+ * Fixture de una entrada de bitácora. `createdAt` cae en la misma ventana que el
+ * resto de los fixtures del módulo (21:00 en Lima ya es el día siguiente en UTC),
+ * así que un test que afirme su fecha detecta que se saque la zona del formateador.
  */
+export function fakeServiceEvent(
+  overrides: Partial<ServiceEventResponse> = {},
+): ServiceEventResponse {
+  return {
+    id: 1,
+    eventType: 'CREATED',
+    note: 'Servicio registrado',
+    createdBy: { id: 1, username: 'cscaramutti', fullName: 'Carlos Scaramutti' },
+    createdAt: '2026-08-24T02:00:00Z',
+    ...overrides,
+  }
+}
+
 /**
  * Fixture del detalle que devuelve el alta. Los valores no repiten los del resumen
  * (otro id, otro código): si el test afirma el código de un servicio recién creado
