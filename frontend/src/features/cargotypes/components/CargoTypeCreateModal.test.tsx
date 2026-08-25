@@ -61,7 +61,7 @@ describe('CargoTypeCreateModal', () => {
     })
   })
 
-  it('hoy manda 0 en las dimensiones vacías, que es la deuda que arrastra el catálogo', async () => {
+  it('manda null en las dimensiones que nadie tocó', async () => {
     const user = userEvent.setup()
     const sink: { body?: CargoTypeRequest } = {}
     server.use(captureCreate(sink))
@@ -72,14 +72,66 @@ describe('CargoTypeCreateModal', () => {
     await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
 
     await vi.waitFor(() => expect(sink.body).toBeDefined())
-    // Leyendo el código se esperaría null: el mapeo dice `?? null` y el valor por
-    // omisión es null. Pero el campo se registra como número y react-hook-form
-    // relee el input vacío del DOM como cero, así que lo que sale es 0. Queda
-    // afirmado para que el arreglo (que es de otro módulo y toca cotizaciones en
-    // producción) tenga que venir a cambiar este test a propósito.
-    expect(sink.body?.standardLength).toBe(0)
-    expect(sink.body?.standardWidth).toBe(0)
-    expect(sink.body?.standardHeight).toBe(0)
+    // Este es el caso que ensuciaba el catálogo: la conversión del registro recibía
+    // el valor por omisión del campo intacto y lo volvía cero, así que quedaba
+    // guardado como si alguien hubiera escrito 0.
+    expect(sink.body?.standardLength).toBeNull()
+    expect(sink.body?.standardWidth).toBeNull()
+    expect(sink.body?.standardHeight).toBeNull()
+  })
+
+  it('manda null en una dimensión que se escribió y se volvió a vaciar', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: CargoTypeRequest } = {}
+    server.use(captureCreate(sink))
+    renderModal()
+
+    await user.type(screen.getByLabelText('Nombre'), 'GRANEL')
+    await user.type(screen.getByLabelText(/peso estándar/i), '1000')
+    const largo = screen.getByLabelText(/largo estándar/i)
+    await user.type(largo, '5')
+    await user.clear(largo)
+    await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
+
+    await vi.waitFor(() => expect(sink.body).toBeDefined())
+    expect(sink.body?.standardLength).toBeNull()
+  })
+
+  it('manda null en una dimensión borrada tecla por tecla', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: CargoTypeRequest } = {}
+    server.use(captureCreate(sink))
+    renderModal()
+
+    await user.type(screen.getByLabelText('Nombre'), 'GRANEL')
+    await user.type(screen.getByLabelText(/peso estándar/i), '1000')
+    // Borrar de a una tecla no dispara los mismos eventos que vaciar de golpe, y el
+    // resultado tiene que ser el mismo.
+    await user.type(screen.getByLabelText(/largo estándar/i), '12{Backspace}{Backspace}')
+    await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
+
+    await vi.waitFor(() => expect(sink.body).toBeDefined())
+    expect(sink.body?.standardLength).toBeNull()
+  })
+
+  it('un campo cargado y otro intacto en el MISMO envío: uno con valor, el otro null', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: CargoTypeRequest } = {}
+    server.use(captureCreate(sink))
+    renderModal()
+
+    await user.type(screen.getByLabelText('Nombre'), 'GRANEL')
+    await user.type(screen.getByLabelText(/peso estándar/i), '1000')
+    await user.type(screen.getByLabelText(/largo estándar/i), '12.5')
+    // Ancho y alto no se tocan.
+    await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
+
+    await vi.waitFor(() => expect(sink.body).toBeDefined())
+    // Es la firma exacta del defecto: dos campos del mismo envío daban resultados
+    // distintos según por dónde había pasado el usuario.
+    expect(sink.body?.standardLength).toBe(12.5)
+    expect(sink.body?.standardWidth).toBeNull()
+    expect(sink.body?.standardHeight).toBeNull()
   })
 
   it('manda la descripción en null cuando quedó vacía', async () => {
@@ -122,7 +174,7 @@ describe('CargoTypeCreateModal', () => {
     expect(onCreated).not.toHaveBeenCalled()
   })
 
-  it('exige el nombre antes de llamar al servidor', async () => {
+  it('exige el nombre y el peso antes de llamar al servidor', async () => {
     const user = userEvent.setup()
     const sink: { body?: CargoTypeRequest } = {}
     server.use(captureCreate(sink))
@@ -130,7 +182,67 @@ describe('CargoTypeCreateModal', () => {
 
     await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
 
-    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    // Antes el peso arrancaba en 0 y este envío creaba un tipo de carga pesando
+    // cero sin que nadie escribiera nada.
+    const nombre = await screen.findByText('El nombre es obligatorio.')
+    const peso = screen.getByText('Ingresa el peso estándar (kg).')
+    expect(nombre).toHaveAttribute('role', 'alert')
+    expect(peso).toHaveAttribute('role', 'alert')
+    expect(sink.body).toBeUndefined()
+  })
+
+  it('el peso arranca vacío, no en cero', () => {
+    renderModal()
+    expect((screen.getByLabelText(/peso estándar/i) as HTMLInputElement).value).toBe('')
+  })
+
+  it('un cero escrito a mano en una dimensión se guarda como 0, no como null', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: CargoTypeRequest } = {}
+    server.use(captureCreate(sink))
+    renderModal()
+
+    await user.type(screen.getByLabelText('Nombre'), 'GRANEL')
+    await user.type(screen.getByLabelText(/peso estándar/i), '1000')
+    await user.type(screen.getByLabelText(/largo estándar/i), '0')
+    await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
+
+    await vi.waitFor(() => expect(sink.body).toBeDefined())
+    // La otra mitad de la regla: lo que se corrige es el cero que NADIE escribió. El
+    // que alguien escribe es un dato, y el contrato del catálogo lo declara válido.
+    expect(sink.body?.standardLength).toBe(0)
+    expect(sink.body?.standardWidth).toBeNull()
+    expect(sink.body?.standardHeight).toBeNull()
+  })
+
+  it('rechaza el peso en cero escrito a mano', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: CargoTypeRequest } = {}
+    server.use(captureCreate(sink))
+    renderModal()
+
+    await user.type(screen.getByLabelText('Nombre'), 'GRANEL')
+    await user.type(screen.getByLabelText(/peso estándar/i), '0')
+    await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
+
+    // Una carga que pesa cero no existe: ese cero decía "no lo cargué".
+    expect(await screen.findByText('El peso estándar debe ser mayor a 0.')).toBeInTheDocument()
+    expect(sink.body).toBeUndefined()
+  })
+
+  it('rechaza el peso que se escribió y se volvió a vaciar', async () => {
+    const user = userEvent.setup()
+    const sink: { body?: CargoTypeRequest } = {}
+    server.use(captureCreate(sink))
+    renderModal()
+
+    await user.type(screen.getByLabelText('Nombre'), 'GRANEL')
+    const peso = screen.getByLabelText(/peso estándar/i)
+    await user.type(peso, '77')
+    await user.clear(peso)
+    await user.click(screen.getByRole('button', { name: /crear tipo de carga/i }))
+
+    expect(await screen.findByText('Ingresa el peso estándar (kg).')).toBeInTheDocument()
     expect(sink.body).toBeUndefined()
   })
 })

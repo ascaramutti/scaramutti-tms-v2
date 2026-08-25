@@ -8,6 +8,7 @@ import { useCreateCargoType } from '../hooks/useCreateCargoType'
 import {
   createCargoTypeSchema,
   type CreateCargoTypeInput,
+  type CreateCargoTypeValues,
 } from '../schemas/cargo-type.schema'
 import type { CargoTypeResponse } from '../../../api'
 
@@ -32,19 +33,17 @@ const PRIMARY =
 const SECONDARY =
   'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
-/** Empty → `null` (dimensiones estándar opcionales). */
-function nullableNum(value: string): number | null {
-  return value === '' ? null : Number(value)
-}
-/** Empty → `undefined` (peso requerido: zod muestra el mensaje). */
-function requiredNum(value: string): number | undefined {
-  return value === '' ? undefined : Number(value)
-}
-
 /**
  * Modal de creación de tipo de carga al vuelo. `POST /cargo-types`; un 409 (nombre
  * duplicado, `CGT-001`) se rutea al campo nombre con `handleApiFormError`. Permite
- * cargar todas las características del catálogo: solo nombre y peso son obligatorios.
+ * cargar todas las características del catálogo: solo el nombre y el peso son
+ * obligatorios, y obligatorio acá significa presente Y mayor que cero.
+ *
+ * Lo usan el asistente de cotizaciones y el alta de servicios. Los campos numéricos
+ * arrancan VACÍOS y viajan como texto hasta que el schema los convierte; el porqué
+ * está en `cargo-type.schema.ts`, y se resume en que la conversión que hacía el
+ * registro recibía también el valor por omisión, y convertía en cero un campo que
+ * nadie había tocado.
  */
 export function CargoTypeCreateModal({ initialName = '', onClose, onCreated }: CargoTypeCreateModalProps) {
   const createCargoType = useCreateCargoType()
@@ -53,15 +52,15 @@ export function CargoTypeCreateModal({ initialName = '', onClose, onCreated }: C
     handleSubmit,
     setError,
     formState: { errors, isSubmitting },
-  } = useForm<CreateCargoTypeInput>({
+  } = useForm<CreateCargoTypeInput, unknown, CreateCargoTypeValues>({
     resolver: zodResolver(createCargoTypeSchema),
     defaultValues: {
       name: initialName,
       description: '',
-      standardWeight: 0,
-      standardLength: null,
-      standardWidth: null,
-      standardHeight: null,
+      standardWeight: '',
+      standardLength: '',
+      standardWidth: '',
+      standardHeight: '',
     },
   })
 
@@ -71,9 +70,9 @@ export function CargoTypeCreateModal({ initialName = '', onClose, onCreated }: C
         name: values.name,
         description: values.description || null,
         standardWeight: values.standardWeight,
-        standardLength: values.standardLength ?? null,
-        standardWidth: values.standardWidth ?? null,
-        standardHeight: values.standardHeight ?? null,
+        standardLength: values.standardLength,
+        standardWidth: values.standardWidth,
+        standardHeight: values.standardHeight,
       })
       onCreated(cargoType)
     } catch (error) {
@@ -107,42 +106,42 @@ export function CargoTypeCreateModal({ initialName = '', onClose, onCreated }: C
           id="cargo-weight"
           label="Peso estándar (kg)"
           type="number"
-          min={0}
+          min={0.01}
           step={0.01}
           error={errors.standardWeight?.message}
           disabled={isSubmitting}
-          register={register('standardWeight', { setValueAs: requiredNum })}
+          register={register('standardWeight')}
         />
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <TextField
             id="cargo-length"
-            label="Largo estándar (m)"
+            label="Largo estándar (m, opcional)"
             type="number"
             min={0}
             step={0.01}
             error={errors.standardLength?.message}
             disabled={isSubmitting}
-            register={register('standardLength', { setValueAs: nullableNum })}
+            register={register('standardLength')}
           />
           <TextField
             id="cargo-width"
-            label="Ancho estándar (m)"
+            label="Ancho estándar (m, opcional)"
             type="number"
             min={0}
             step={0.01}
             error={errors.standardWidth?.message}
             disabled={isSubmitting}
-            register={register('standardWidth', { setValueAs: nullableNum })}
+            register={register('standardWidth')}
           />
           <TextField
             id="cargo-height"
-            label="Alto estándar (m)"
+            label="Alto estándar (m, opcional)"
             type="number"
             min={0}
             step={0.01}
             error={errors.standardHeight?.message}
             disabled={isSubmitting}
-            register={register('standardHeight', { setValueAs: nullableNum })}
+            register={register('standardHeight')}
           />
         </div>
         <div className="flex justify-end gap-2 pt-2">
