@@ -585,7 +585,7 @@ class CargoTypesResourceTest {
     // Calco de POST /clients (PR #15) con 3 simplificaciones:
     //  - 1 solo codigo de duplicado (CGT-001 sobre name)
     //  - Sin patterns regex
-    //  - Numericos con @DecimalMin("0") + @Digits(8,2)
+    //  - Numericos con @DecimalMin("0", inclusive=false) + @Digits(8,2)
 
     private void cleanupCargoTypeByName(String nameUpper) {
         QuarkusTransaction.requiringNew().run(() ->
@@ -974,24 +974,102 @@ class CargoTypesResourceTest {
     // ---------- Boundary numericos (decisiones distintivas del PR) ---------
 
     @Test
-    void create_withZeroStandardWeight_returns201() {
-        // Lock-in de @DecimalMin(value="0", inclusive=true): un cargo type con
-        // standardWeight=0 es valido. Si en el futuro se cambia a inclusive=false
-        // este test debe fallar (decision explicita del PR).
-        String name = "ZTEST_ZEROWEIGHT";
+    void create_withZeroStandardWeight_returns400_COM001() {
+        // Lock-in de @DecimalMin(value="0", inclusive=false).
+        //
+        // Este test afirmaba lo CONTRARIO: hasta 2026-08-25 el peso 0 era valido a
+        // proposito. El ejemplo que lo justificaba ("DOCUMENTO" sin peso) esta en la
+        // bitacora del proyecto, que no se versiona: buscarlo en el repo no lo
+        // encuentra. La decision se revirtio porque una carga que pesa cero no existe,
+        // y el camino era alcanzable porque el formulario arrancaba el campo en 0.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZEROWEIGHT", null, "0", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWeight"));
+    }
+
+    @Test
+    void create_withZeroDimension_returns400_COM001() {
+        // Una medida en cero se rechaza igual que el peso. Es la misma regla que ya
+        // aplican las medidas de un servicio (ServiceCreateRequest): un 0 no es una
+        // medida, es "no la se", y para eso el campo se omite.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM", null, "1000", "0", null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardLength"));
+    }
+
+    @Test
+    void create_withZeroDimensionWrittenWithDecimals_returns400_COM001() {
+        // "0.00" es el mismo cero: la regla mira el valor, no como se escribio.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM2", null, "1000", null, "0.00", null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWidth"));
+    }
+
+    @Test
+    void create_withZeroHeight_returns400_COM001() {
+        // El alto era el unico de los cuatro numericos sin caso propio: se podia
+        // revertir la regla en ese campo con la suite entera en verde.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM3", null, "1000", null, null, "0"))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardHeight"));
+    }
+
+    @Test
+    void create_withSmallestPositiveValues_returns201() {
+        // El borde que distingue "mayor que cero" de "rechaza todo lo chico".
+        String name = "ZTEST_SMALLEST";
         try {
             String token = login("admin", "Admin1234");
 
             given()
                 .header("Authorization", "Bearer " + token)
                 .contentType(ContentType.JSON)
-                .body(body(name, null, "0", null, null, null))
+                .body(body(name, null, "0.01", "0.01", "0.01", "0.01"))
             .when()
                 .post("/cargo-types")
             .then()
                 .statusCode(201)
-                // BigDecimal "0" se serializa sin decimal → JSON parser lo lee como Integer 0.
-                .body("standardWeight", equalTo(0));
+                // Los cuatro: si el minimo de cualquiera subiera, este caso lo caza.
+                .body("standardWeight", equalTo(0.01f))
+                .body("standardLength", equalTo(0.01f))
+                .body("standardWidth", equalTo(0.01f))
+                .body("standardHeight", equalTo(0.01f));
         } finally {
             cleanupCargoTypeByName(name);
         }

@@ -135,6 +135,20 @@ export type PageOfCargoType = PageMeta & {
     content: Array<CargoTypeResponse>;
 };
 
+/**
+ * Los cuatro numéricos son mayores que cero. El peso es obligatorio; las tres
+ * medidas son opcionales, y si vienen, tampoco pueden ser cero: una medida en
+ * cero no existe, y lo que ese cero decía era "no la sé", que se expresa
+ * omitiendo el campo.
+ *
+ * Hasta 2026-08-25 el cero se admitía en los cuatro. Se revirtió para que este
+ * catálogo diga lo mismo que las medidas de un servicio, que ya lo rechazaban.
+ * Los ítems de una cotización todavía lo admiten: esa parte queda pendiente.
+ *
+ * `CargoTypeResponse` conserva `minimum: 0` a propósito: las filas creadas antes
+ * de esta regla siguen existiendo y la salida tiene que poder describirlas.
+ *
+ */
 export type CargoTypeRequest = {
     name: string;
     description?: string | null;
