@@ -585,7 +585,7 @@ class CargoTypesResourceTest {
     // Calco de POST /clients (PR #15) con 3 simplificaciones:
     //  - 1 solo codigo de duplicado (CGT-001 sobre name)
     //  - Sin patterns regex
-    //  - Numericos con @DecimalMin("0") + @Digits(8,2)
+    //  - Numericos con @DecimalMin("0", inclusive=false) + @Digits(8,2)
 
     private void cleanupCargoTypeByName(String nameUpper) {
         QuarkusTransaction.requiringNew().run(() ->
@@ -974,27 +974,26 @@ class CargoTypesResourceTest {
     // ---------- Boundary numericos (decisiones distintivas del PR) ---------
 
     @Test
-    void create_withZeroStandardWeight_returns201() {
-        // Lock-in de @DecimalMin(value="0", inclusive=true): un cargo type con
-        // standardWeight=0 es valido. Si en el futuro se cambia a inclusive=false
-        // este test debe fallar (decision explicita del PR).
-        String name = "ZTEST_ZEROWEIGHT";
-        try {
-            String token = login("admin", "Admin1234");
+    void create_withZeroStandardWeight_returns400_COM001() {
+        // Lock-in de @DecimalMin(value="0", inclusive=false).
+        //
+        // Este test afirmaba lo CONTRARIO: hasta 2026-08-25 el peso 0 era valido a
+        // proposito. El ejemplo que lo justificaba ("DOCUMENTO" sin peso) esta en la
+        // bitacora del proyecto, que no se versiona: buscarlo en el repo no lo
+        // encuentra. La decision se revirtio porque una carga que pesa cero no existe,
+        // y el camino era alcanzable porque el formulario arrancaba el campo en 0.
+        String token = login("admin", "Admin1234");
 
-            given()
-                .header("Authorization", "Bearer " + token)
-                .contentType(ContentType.JSON)
-                .body(body(name, null, "0", null, null, null))
-            .when()
-                .post("/cargo-types")
-            .then()
-                .statusCode(201)
-                // BigDecimal "0" se serializa sin decimal → JSON parser lo lee como Integer 0.
-                .body("standardWeight", equalTo(0));
-        } finally {
-            cleanupCargoTypeByName(name);
-        }
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZEROWEIGHT", null, "0", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWeight"));
     }
 
     @Test

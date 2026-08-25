@@ -3114,11 +3114,18 @@ components:
 
     CargoTypeRequest:
       type: object
+      description: |
+        El peso es obligatorio y mayor que cero: una carga que pesa cero no existe.
+        Hasta 2026-08-25 el cero se admitía a propósito; se revirtió porque en la
+        práctica no decía "no pesa" sino "no lo cargué".
+
+        `CargoTypeResponse` conserva `minimum: 0` a propósito: las filas creadas antes
+        de esta regla siguen existiendo y la salida tiene que poder describirlas.
       required: [name, standardWeight]
       properties:
         name:           { type: string, minLength: 1, maxLength: 100 }
         description:    { type: [string, 'null'] }
-        standardWeight: { type: number, format: double, minimum: 0 }
+        standardWeight: { type: number, format: double, exclusiveMinimum: 0 }
         standardLength: { type: [number, 'null'], format: double, minimum: 0 }
         standardWidth:  { type: [number, 'null'], format: double, minimum: 0 }
         standardHeight: { type: [number, 'null'], format: double, minimum: 0 }

@@ -17,7 +17,9 @@ import java.math.BigDecimal;
  *    El mapper hace trim+uppercase antes de pasar al service.
  *  - description: opcional, sin maxLength (la BD es TEXT). Si llega a ser
  *    problema (payloads gigantes), agregar @Size en un PR posterior.
- *  - standardWeight: requerido, >= 0, hasta NUMERIC(10,2) (8 enteros + 2 decimales).
+ *  - standardWeight: requerido, > 0, hasta NUMERIC(10,2) (8 enteros + 2 decimales).
+ *    Antes admitia el 0. Se reviso en 2026-08-25: un tipo de carga que pesa cero no
+ *    existe, y ese 0 era casi siempre "no lo cargue" y no una medicion.
  *  - standardLength/Width/Height: opcionales, >= 0, mismo precision/scale.
  *
  * `@Digits(integer=8, fraction=2)` previene overflow del NUMERIC(10,2) de Postgres:
@@ -36,7 +38,7 @@ public record CargoTypeRequest(
 
     @Schema(description = "Peso estandar (kg o ton segun convencion del negocio)", example = "10.50")
     @NotNull
-    @DecimalMin(value = "0", inclusive = true)
+    @DecimalMin(value = "0", inclusive = false)
     @Digits(integer = 8, fraction = 2)
     BigDecimal standardWeight,
 
