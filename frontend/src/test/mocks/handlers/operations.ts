@@ -832,6 +832,100 @@ export function addConflictThenOk(
   })
 }
 
+/** Bajas de refuerzo observadas, con los DOS ids del path. */
+export interface RemoveResourceCaptureSink {
+  calls?: { id: string; assignmentId: string }[]
+}
+
+/** Baja exitosa: devuelve el detalle que queda y su ETag (200, no 204). */
+export function removeResourceOk(
+  service: ServiceDetailResponse = fakeServiceDetail({
+    status: 'IN_PROGRESS',
+    additionalResources: [],
+  }),
+  etag: string = ETAG_AFTER_WRITE,
+) {
+  return http.delete(`${API}/services/:id/resources/:assignmentId`, () =>
+    HttpResponse.json(service, { status: 200, headers: { ETag: etag } }),
+  )
+}
+
+/** Captura los dos ids del path de la baja. */
+export function removeResourceCapture(
+  sink: RemoveResourceCaptureSink,
+  service: ServiceDetailResponse = fakeServiceDetail({
+    status: 'IN_PROGRESS',
+    additionalResources: [],
+  }),
+) {
+  sink.calls = []
+  return http.delete(`${API}/services/:id/resources/:assignmentId`, ({ params }) => {
+    sink.calls = [
+      ...(sink.calls ?? []),
+      { id: params.id as string, assignmentId: params.assignmentId as string },
+    ]
+    return HttpResponse.json(service, { status: 200, headers: { ETag: ETAG_AFTER_WRITE } })
+  })
+}
+
+/** Baja lenta, para medir el doble clic. */
+export function removeResourceSlow(sink: RemoveResourceCaptureSink, ms = 40) {
+  sink.calls = []
+  return http.delete(`${API}/services/:id/resources/:assignmentId`, async ({ params }) => {
+    sink.calls = [
+      ...(sink.calls ?? []),
+      { id: params.id as string, assignmentId: params.assignmentId as string },
+    ]
+    await delay(ms)
+    return HttpResponse.json(
+      fakeServiceDetail({ status: 'IN_PROGRESS', additionalResources: [] }),
+      { status: 200, headers: { ETag: ETAG_AFTER_WRITE } },
+    )
+  })
+}
+
+/**
+ * 404 `OPS-010`: el refuerzo no existe, o existe pero es de OTRO viaje. Los dos casos
+ * responden lo MISMO a propósito, para que el 404 no sea un canal para averiguar qué
+ * refuerzos hay vivos en viajes que quien pregunta podría no poder leer.
+ */
+export function removeResourceNotFound(
+  detail = 'El recurso adicional no existe o no pertenece a este servicio.',
+) {
+  return http.delete(`${API}/services/:id/resources/:assignmentId`, () =>
+    HttpResponse.json(
+      {
+        type: 'urn:tms:error:ops-010',
+        title: 'Not found',
+        status: 404,
+        detail,
+        instance: '/api/v1/services/77/resources/51',
+        code: 'OPS-010',
+        traceId: '9a8b7c6d-5e4f-3a2b-1c0d-9e8f7a6b5c4d',
+      },
+      { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Un 409 sobre la baja (el estado no la admite, o el viaje está cerrado). */
+export function removeResourceConflict(code: string, detail: string) {
+  return http.delete(`${API}/services/:id/resources/:assignmentId`, () =>
+    HttpResponse.json(
+      {
+        type: `urn:tms:error:${code.toLowerCase()}`,
+        title: 'Conflict',
+        status: 409,
+        detail,
+        instance: '/api/v1/services/77/resources/51',
+        code,
+        traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e',
+      },
+      { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
 /** Camino feliz por defecto del módulo. */
 export const operationsHandlers = [
   serviceStatsOk(),

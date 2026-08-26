@@ -3,8 +3,10 @@ import { Plus, Truck } from 'lucide-react'
 import type { ServiceDetailResponse } from '../../../../api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { formatDateTime } from '../../../../shared/utils/formatters'
+import { describeAdditionalResource } from '../../status/resourcePresentation'
 import { AddResourcesModal } from '../resources/AddResourcesModal'
 import { AssignResourcesModal } from '../resources/AssignResourcesModal'
+import { RemoveResourceDialog } from '../resources/RemoveResourceDialog'
 import { DetailCard, Field } from './DetailCard'
 
 interface ServiceResourcesProps {
@@ -36,6 +38,10 @@ interface ServiceResourcesProps {
 export function ServiceResources({ service, canOperate }: ServiceResourcesProps) {
   const [isAssignOpen, setIsAssignOpen] = useState(false)
   const [isAddOpen, setIsAddOpen] = useState(false)
+  // Qué refuerzo se está por quitar. Se guarda la FILA y no solo su id porque el
+  // diálogo repite de cuál se trata, que es lo que evita el clic errado.
+  const [resourceToRemove, setResourceToRemove] =
+    useState<ServiceDetailResponse['additionalResources'][number] | null>(null)
   const canAssign = canOperate && service.status === 'PENDING_ASSIGNMENT'
   // Los refuerzos solo existen sobre un viaje EN RUTA: son el relevo de un conductor
   // que agotó su descanso o la unidad que sale a un varado, y ninguna de las dos
@@ -81,6 +87,16 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         serviceCode={service.code}
       />
 
+      {resourceToRemove && (
+        <RemoveResourceDialog
+          isOpen
+          onClose={() => setResourceToRemove(null)}
+          serviceId={service.id}
+          serviceCode={service.code}
+          resource={resourceToRemove}
+        />
+      )}
+
       <DetailCard
         title="Refuerzos"
         headingId="service-additional-heading"
@@ -107,19 +123,26 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
           <ul className="mt-3 space-y-3">
             {service.additionalResources.map((resource) => (
               <li key={resource.id} className="border-l-2 border-slate-200 pl-4">
-                {/* Las dos PLACAS van rotuladas: seguidas y sin rótulo no dicen
-                    cuál es el tracto y cuál la carreta, y una sola se lee como
-                    tracto aunque sea la carreta. El conductor no lo necesita: un
-                    nombre no se confunde con una placa. */}
-                <p className="text-sm text-slate-900">
-                  {[
-                    resource.driver && resource.driver.fullName,
-                    resource.tractor && `Tracto ${resource.tractor.plate}`,
-                    resource.trailer && `Carreta ${resource.trailer.plate}`,
-                  ]
-                    .filter((value): value is string => !!value)
-                    .join(' · ') || '—'}
-                </p>
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm text-slate-900">
+                    {describeAdditionalResource(resource)}
+                  </p>
+                  {canReinforce && (
+                    <button
+                      type="button"
+                      onClick={() => setResourceToRemove(resource)}
+                      // El nombre accesible incluye A QUIÉN quita: tres botones
+                      // "Quitar" idénticos son indistinguibles para un lector de
+                      // pantalla, que es justo donde el clic errado no tiene vuelta.
+                      aria-label={`Quitar refuerzo: ${describeAdditionalResource(resource)}`}
+                      // `-m-1 p-1` agranda el objetivo de clic sin correr la fila:
+                      // el texto solo mide 16px de alto.
+                      className="-m-1 shrink-0 rounded p-1 text-xs font-medium text-red-700 hover:text-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                    >
+                      Quitar
+                    </button>
+                  )}
+                </div>
                 <p className="mt-0.5 text-sm text-slate-700">{resource.reason}</p>
                 <p className="mt-0.5 text-xs text-slate-500">
                   {resource.assignedBy.fullName} · {formatDateTime(resource.assignedAt)}
