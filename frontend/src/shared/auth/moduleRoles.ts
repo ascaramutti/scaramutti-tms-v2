@@ -67,6 +67,32 @@ export const SERVICE_CREATE_ROLES: UserRole[] = [
 ]
 
 /**
+ * Tercera excepción intramódulo, y la única que deja afuera a ventas en vez de al
+ * despachador: OPERAR el viaje. Ventas registra y edita el servicio; moverlo por su
+ * ciclo de vida es del despacho y de la gerencia (D-OPS-15).
+ *
+ * A diferencia de las dos listas de arriba, ésta SÍ se comparte entre endpoints, y el
+ * criterio es que detrás hay UNA regla y no varias que coinciden: asignar recursos,
+ * sumar y quitar refuerzos y transicionar el estado declaran la misma lista, y el día
+ * que la regla se mueva se mueve para los cuatro a la vez. (Verificable: son las
+ * únicas cuatro rutas de `ServiceResource.java` con este `@RolesAllowed`.) Las otras
+ * dos listas del módulo llegan al mismo reparto por caminos distintos, y por eso no
+ * se comparten.
+ *
+ * Ojo con lo que esta lista NO decide: dentro de la transición de estado el reparto no
+ * es plano (el despacho no cancela ni elimina, y reabrir es solo de admin y gerencia
+ * general). Acá se decide quién puede LLAMAR; qué puede pedir cada uno es otra capa.
+ *
+ * Espejo del `x-required-roles`; la autoridad es el 403 del backend.
+ */
+export const SERVICE_OPERATE_ROLES: UserRole[] = [
+  'admin',
+  'general_manager',
+  'operations_manager',
+  'dispatcher',
+]
+
+/**
  * Almacén: los cinco roles ven todas las pantallas del módulo y pueden registrar,
  * editar y anular entradas y retiros. `sales` y `dispatcher` quedan afuera.
  */

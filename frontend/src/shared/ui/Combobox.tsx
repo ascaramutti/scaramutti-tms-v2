@@ -148,6 +148,14 @@ export function Combobox({
       }
     } else if (event.key === 'Escape') {
       event.preventDefault()
+      // El Escape lo consume la capa MÁS INTERNA que esté abierta. Sin esto, dentro
+      // de un modal el mismo Escape cierra el desplegable y el modal a la vez, y el
+      // formulario a medio llenar se pierde: el modal escucha en `document` y el
+      // evento le llega igual después de que este handler corra.
+      //
+      // Solo se frena con el desplegable ABIERTO (esta rama ya lo garantiza), así que
+      // el segundo Escape sí llega al modal y lo cierra.
+      event.stopPropagation()
       setIsOpen(false)
       setHighlighted(-1)
     }
@@ -226,11 +234,29 @@ export function Combobox({
         )}
 
         {open && (
-          <ul
-            id={listboxId}
-            role="listbox"
-            className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg"
-          >
+          <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+            {/* El aviso de "sin resultados" va FUERA del listbox: ese rol exige al
+                menos un hijo con rol de opción, y un texto no lo es. Adentro, axe
+                marca dos violaciones (una crítica) cada vez que el desplegable se
+                abre sin coincidencias, que es un estado corriente y no un borde. */}
+            {options.length === 0 && !loading && (
+              // `status` y no un párrafo mudo porque este texto quedó fuera del
+              // listbox, que es lo único que el input referencia: sin región viva no
+              // hay ningún camino declarado por el que anunciarlo. (Cuánto lo anuncia
+              // cada lector al insertarse junto con su texto no se mide desde acá.)
+              //
+              // Y no se muestra MIENTRAS carga: la condición anterior era solo
+              // "no hay opciones", así que durante el pedido del catálogo la
+              // pantalla afirmaba que no había ninguna.
+              <p role="status" className="px-3.5 py-3 text-sm text-slate-500">
+                {emptyText}
+              </p>
+            )}
+            {/* El listbox queda montado aunque no tenga opciones, y es a propósito:
+                `aria-controls` del input lo referencia y necesita un destino vivo.
+                Un listbox vacío no es violación (axe lo reporta como incompleto);
+                un `aria-controls` colgado sí lo es. */}
+            <ul id={listboxId} role="listbox">
             {options.map((option, index) => (
               <li key={option.id} role="option" aria-selected={index === highlighted}>
                 <button
@@ -248,9 +274,6 @@ export function Combobox({
                 </button>
               </li>
             ))}
-            {options.length === 0 && (
-              <li className="px-3.5 py-3 text-sm text-slate-500">{emptyText}</li>
-            )}
             {hasCreate && onCreateClick && (
               <li role="option" aria-selected={highlighted === options.length}>
                 <button
@@ -271,7 +294,8 @@ export function Combobox({
                 </button>
               </li>
             )}
-          </ul>
+            </ul>
+          </div>
         )}
       </div>
       {showHint && (
