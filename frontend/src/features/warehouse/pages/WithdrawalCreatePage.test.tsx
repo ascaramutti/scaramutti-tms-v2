@@ -26,6 +26,7 @@ import {
 } from '../../../test/mocks/handlers/warehouse'
 import {
   fakeFleetUnit,
+  fleetUnitsByKind,
   fleetUnitsError,
   fleetUnitsList,
   workersSearchCapture,
@@ -185,10 +186,30 @@ describe('WithdrawalCreatePage', () => {
     const user = userEvent.setup()
     renderRegistro()
     await user.click(screen.getByLabelText(/unidad de flota/i))
+    expect(screen.getByLabelText(/unidad de flota/i)).toHaveAttribute(
+      'placeholder',
+      'Tracto, carreta o escolta (opcional)…',
+    )
     expect(await screen.findByText('Tracto ABC-123')).toBeInTheDocument()
     expect(screen.getByText('Carreta XY-9876')).toBeInTheDocument()
     expect(screen.getByText('Escolta ES-100')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /nueva unidad/i })).not.toBeInTheDocument()
+  })
+
+  it('pide la flota entera: solo las vigentes y sin acotar el subtipo', async () => {
+    const sink: ProductsCaptureSink = {}
+    server.use(fleetUnitsByKind([fakeFleetUnit()], sink))
+    const user = userEvent.setup()
+    renderRegistro()
+    await user.click(screen.getByLabelText(/unidad de flota/i))
+
+    await waitFor(() => expect(sink.calls).toHaveLength(1))
+    expect(sink.params?.get('isActive')).toBe('true')
+    // El retiro se carga a cualquier clase de unidad, así que este campo NO manda
+    // subtipo. Se mide sobre la consulta y no sobre lo que se ve en pantalla: un
+    // `kind` de más devolvería una lista más corta, y con un catálogo de un solo
+    // subtipo la pantalla se vería igual.
+    expect(sink.params?.has('kind')).toBe(false)
   })
 
   it('avisa cuando la carga de unidades falla; el retiro se registra sin unidad', async () => {
@@ -196,7 +217,16 @@ describe('WithdrawalCreatePage', () => {
     const user = userEvent.setup()
     renderRegistro()
     await user.click(screen.getByLabelText(/unidad de flota/i))
-    expect(await screen.findByText(/no se pudieron cargar las unidades/i)).toBeInTheDocument()
+    // Texto EXACTO, no parcial: con un `toMatch` del arranque, un mensaje que se
+    // quedara en "no se pudieron cargar las unidades" pasaría igual, y lo que hay
+    // que proteger es la segunda mitad, la que dice que el retiro se puede cargar
+    // igual. Acá esa frase es cierta, y por eso este es el consumidor donde se
+    // clava el literal.
+    expect(
+      await screen.findByText(
+        'No se pudieron cargar las unidades de flota. El retiro se puede registrar sin unidad.',
+      ),
+    ).toBeInTheDocument()
     expect(screen.getByLabelText('Cantidad')).toBeEnabled()
   })
 

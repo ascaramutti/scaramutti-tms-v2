@@ -68,10 +68,11 @@ export const warehouseKeys = {
   withdrawalList: (params: WarehouseWithdrawalListParams) =>
     [...warehouseKeys.withdrawalLists(), params] as const,
   withdrawalDetail: (id: number) => [...warehouseKeys.withdrawals(), 'detail', id] as const,
-  // Catálogos COMPARTIDOS con operaciones (public.workers / fleet_units), no del
-  // schema almacén, pero se consultan desde acá: el combobox de "quién recibe" y el
-  // de unidad de flota. Rama propia para no cruzarlos con nada del almacén.
+  // Catálogo COMPARTIDO con operaciones (public.workers), no del schema almacén,
+  // pero se consulta desde acá: el combobox de "quién recibe". Rama propia para no
+  // cruzarlo con nada del almacén. La flota NO está acá aunque este módulo la use:
+  // vive en `shared/catalogs/queryKeys` porque la comparte con otro módulo, y
+  // colgarla de esta rama haría que invalidar almacén le tirara el cache al otro.
   workerSearches: () => [...warehouseKeys.all, 'workers', 'search'] as const,
   workerSearch: (q: string) => [...warehouseKeys.workerSearches(), q] as const,
-  fleetUnits: () => [...warehouseKeys.all, 'fleet-units'] as const,
 }

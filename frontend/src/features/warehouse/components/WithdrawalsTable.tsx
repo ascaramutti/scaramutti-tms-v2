@@ -2,7 +2,7 @@ import type { WarehouseWithdrawalResponse } from '../../../api'
 import { Badge } from '../../../shared/ui/Badge'
 import { DataTable, type Column } from '../../../shared/ui/DataTable'
 import { formatDateOnly, formatQuantity } from '../../../shared/utils/formatters'
-import { fleetUnitLabel } from '../utils/fleetUnit'
+import { fleetUnitLabel } from '../../../shared/catalogs/fleetUnit'
 
 interface WithdrawalsTableProps {
   data: WarehouseWithdrawalResponse[]
