@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   OPERATIONS_ROLES,
+  SERVICE_OPERATE_ROLES,
   QUOTATION_ROLES,
   SERVICES_REPORT_ROLES,
   SERVICE_CREATE_ROLES,
@@ -86,5 +87,31 @@ describe('aterrizaje vs permisos del módulo', () => {
       const landing = landingPathFor(role)
       expect(ROLES_DEL_LANDING[landing]).toContain(role)
     }
+  })
+})
+
+describe('SERVICE_OPERATE_ROLES', () => {
+  it('son los cuatro que operan el viaje', () => {
+    // Escritos a mano y no derivados de otra lista: el esperado no puede salir de lo
+    // que se está probando.
+    expect([...SERVICE_OPERATE_ROLES].sort()).toEqual([
+      'admin',
+      'dispatcher',
+      'general_manager',
+      'operations_manager',
+    ])
+  })
+
+  it('deja afuera a ventas, que sí entra al módulo', () => {
+    // Es exactamente la diferencia con `OPERATIONS_ROLES`, y la razón de que esta
+    // lista exista: ventas ve el detalle entero y no opera el viaje.
+    expect(SERVICE_OPERATE_ROLES).not.toContain('sales')
+    expect(OPERATIONS_ROLES).toContain('sales')
+  })
+
+  it('no comparte el arreglo con la lista de registrar', () => {
+    // Dos reglas distintas que hoy ni siquiera coinciden: registrar deja afuera al
+    // despacho y operar deja afuera a ventas.
+    expect(SERVICE_OPERATE_ROLES).not.toBe(SERVICE_CREATE_ROLES)
   })
 })

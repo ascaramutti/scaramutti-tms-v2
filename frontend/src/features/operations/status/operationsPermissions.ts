@@ -1,5 +1,5 @@
 import type { UserRole } from '../../../api'
-import { SERVICE_CREATE_ROLES } from '../../../shared/auth/moduleRoles'
+import { SERVICE_CREATE_ROLES, SERVICE_OPERATE_ROLES } from '../../../shared/auth/moduleRoles'
 
 /**
  * Roles que ven los importes de un servicio. Espeja la lista positiva del
@@ -29,6 +29,18 @@ const SERVICE_PRICE_ROLES: readonly UserRole[] = [
  */
 export function canSeeServicePrices(role: UserRole | undefined): boolean {
   return role !== undefined && SERVICE_PRICE_ROLES.includes(role)
+}
+
+/**
+ * `true` si el rol puede operar el viaje: asignar recursos, sumar y quitar refuerzos
+ * y moverlo de estado.
+ *
+ * Decide si la pantalla ofrece los botones. La garantía es del servidor; acá se evita
+ * mostrarle a ventas un camino que termina en 403. Ventas igual ve las fichas con los
+ * recursos: se le saca la acción, no el dato.
+ */
+export function canOperateService(role: UserRole | undefined): boolean {
+  return role !== undefined && SERVICE_OPERATE_ROLES.includes(role)
 }
 
 /**

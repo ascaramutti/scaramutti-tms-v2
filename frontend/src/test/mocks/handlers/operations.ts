@@ -1,12 +1,17 @@
 import { http, HttpResponse, delay } from 'msw'
 import type {
+  AssignResourcesRequest,
+  DriverResponse,
   PageMeta,
   PageOfServiceSummary,
   Problem,
   ServiceCreateRequest,
   ServiceDetailResponse,
+  ServiceAdditionalResourceResponse,
   ServiceEventResponse,
+  ServiceResourceConflictProblem,
   ServiceStatsResponse,
+  ServiceStatus,
   ServiceSummaryResponse,
 } from '../../../api'
 
@@ -448,9 +453,292 @@ export function createServiceSlow(ms = 40, service: ServiceDetailResponse = fake
  * tragaría `/services/stats` como si "stats" fuera un id, así que el de los
  * indicadores tiene que registrarse antes. MSW resuelve por orden de registro.
  */
+
+
+// ----- Recursos del viaje (asignación, refuerzos y baja) -----
+
+/**
+ * ETag de una respuesta de ESCRITURA. Distinto del de la lectura a propósito: el
+ * detalle que devuelve una escritura trae su propia versión, y guardar la vieja
+ * dejaría al próximo `If-Match` pidiendo con una versión que la base ya no tiene.
+ */
+export const ETAG_AFTER_WRITE = '"2026-08-27T09:05:12.100450Z"'
+
+/**
+ * Fixture de un refuerzo del viaje. Sus recursos son DISTINTOS de los principales y
+ * del otro refuerzo: si la pantalla pintara un refuerzo donde va el principal, o uno
+ * donde va el otro, el valor cambia y algún caso lo ve.
+ */
+export function fakeAdditionalResource(
+  overrides: Partial<ServiceAdditionalResourceResponse> = {},
+): ServiceAdditionalResourceResponse {
+  return {
+    id: 51,
+    driver: { id: 8, fullName: 'Ana Ríos Chávez' },
+    tractor: { kind: 'TRACTOR', id: 11, plate: 'V1B-911' },
+    trailer: null,
+    // Ni 10 ni 500 caracteres: son los dos literales de los mensajes de validación, y
+    // con cualquiera de ellos un contador no se distinguiría de un límite impreso.
+    reason: 'Relevo por descanso reglamentario del conductor principal, coordinado con la garita.',
+    assignedBy: { id: 2, username: 'jvega', fullName: 'Jorge Vega' },
+    assignedAt: '2026-08-24T02:00:00Z',
+    ...overrides,
+  }
+}
+
+/** Fixture de conductor (`public.drivers`). */
+export function fakeDriver(overrides: Partial<DriverResponse> = {}): DriverResponse {
+  return {
+    id: 4,
+    fullName: 'Juan Pérez Huamán',
+    licenseNumber: 'Q12345678',
+    licenseCategory: 'A-IIIC',
+    phone: '987654321',
+    status: 'AVAILABLE',
+    isActive: true,
+    ...overrides,
+  }
+}
+
+/**
+ * Padrón por defecto. Los tres traen un `status` DISTINTO, y no por adorno: el
+ * contrato dice que la disponibilidad no prohíbe asignar, así que un campo que
+ * filtrara por disponible se llevaría dos de los tres y el fixture lo delata.
+ */
+export const DRIVERS = [
+  fakeDriver(),
+  fakeDriver({ id: 8, fullName: 'Ana Ríos Chávez', licenseNumber: 'Q22222222', status: 'MAINTENANCE' }),
+  fakeDriver({
+    id: 15,
+    fullName: 'Luis Quispe Mamani',
+    licenseNumber: 'Q33333333',
+    status: 'NOT_AVAILABLE',
+  }),
+]
+
+/** Responde el padrón de conductores. */
+export function driversList(content: DriverResponse[] = DRIVERS) {
+  return http.get(`${API}/drivers`, () => HttpResponse.json(content))
+}
+
+/** Captura los query params del padrón de conductores. */
+export function driversCapture(sink: ServicesCaptureSink, content: DriverResponse[] = DRIVERS) {
+  sink.calls = []
+  return http.get(`${API}/drivers`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    sink.params = params
+    sink.calls = [...(sink.calls ?? []), params]
+    return HttpResponse.json(content)
+  })
+}
+
+/** Responde un error en el padrón de conductores. */
+export function driversError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/drivers`, () => problemResponse(status, problem))
+}
+
+/** Cuerpos de los pedidos de asignación observados, EN ORDEN. */
+export interface AssignCaptureSink {
+  bodies?: AssignResourcesRequest[]
+}
+
+/** Asignación exitosa: devuelve el detalle y su ETag. */
+export function assignResourcesOk(
+  service: ServiceDetailResponse = fakeServiceDetail({ status: 'PENDING_START' }),
+  etag: string = ETAG_AFTER_WRITE,
+) {
+  return http.post(`${API}/services/:id/assignment`, () =>
+    HttpResponse.json(service, { status: 200, headers: { ETag: etag } }),
+  )
+}
+
+/**
+ * Captura los cuerpos de la asignación. Guarda el HISTORIAL y no el último: sin él,
+ * afirmar el reintento forzado no distingue "mandó dos veces" de "mandó una sola y
+ * el primer intento nunca salió".
+ */
+export function assignResourcesCapture(
+  sink: AssignCaptureSink,
+  service: ServiceDetailResponse = fakeServiceDetail({ status: 'PENDING_START' }),
+  etag: string = ETAG_AFTER_WRITE,
+) {
+  sink.bodies = []
+  return http.post(`${API}/services/:id/assignment`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), (await request.json()) as AssignResourcesRequest]
+    return HttpResponse.json(service, { status: 200, headers: { ETag: etag } })
+  })
+}
+
+/** Asignación lenta, para medir el doble envío. */
+export function assignResourcesSlow(sink: AssignCaptureSink, ms = 40) {
+  sink.bodies = []
+  return http.post(`${API}/services/:id/assignment`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), (await request.json()) as AssignResourcesRequest]
+    await delay(ms)
+    return HttpResponse.json(fakeServiceDetail({ status: 'PENDING_START' }), {
+      status: 200,
+      headers: { ETag: ETAG_AFTER_WRITE },
+    })
+  })
+}
+
+/** Un recurso tomado por otro viaje, tal como lo publica el `Problem` del 409. */
+export const DRIVER_CONFLICT = {
+  resource: 'DRIVER',
+  resourceName: 'Juan Pérez Huamán',
+  serviceCode: 'SRV-0042',
+  serviceStatus: 'IN_PROGRESS',
+} as const
+
+/**
+ * Tres conflictos, uno por clase de recurso, con TRES nombres, TRES códigos de viaje
+ * y los DOS estados que el contrato admite. Con tres filas iguales, una tabla que
+ * repitiera la primera en las tres pasaría igual.
+ */
+export const THREE_CONFLICTS = [
+  DRIVER_CONFLICT,
+  {
+    resource: 'TRACTOR',
+    resourceName: 'T7A-701',
+    serviceCode: 'SRV-0100',
+    serviceStatus: 'PENDING_START',
+  },
+  {
+    resource: 'TRAILER',
+    resourceName: 'R3C-303',
+    serviceCode: 'SRV-0311',
+    serviceStatus: 'IN_PROGRESS',
+  },
+] as const
+
+type ResourceConflicts = NonNullable<ServiceResourceConflictProblem['conflicts']>
+
+function conflictProblem(
+  detail: string,
+  conflicts: ResourceConflicts,
+): ServiceResourceConflictProblem {
+  return {
+    type: 'urn:tms:error:ops-002',
+    title: 'Resource conflict',
+    status: 409,
+    detail,
+    instance: '/api/v1/services/77/assignment',
+    code: 'OPS-002',
+    traceId: '3f2a1b0c-9d8e-7f6a-5b4c-3d2e1f0a9b8c',
+    forcible: true,
+    conflicts,
+  }
+}
+
+/** 409 `OPS-002`: FORZABLE, con `forcible` y `conflicts` aplanados junto a `code`. */
+export function assignResourcesConflict(
+  conflicts: ResourceConflicts = [DRIVER_CONFLICT],
+  detail = 'El conductor Juan Pérez Huamán ya está asignado al servicio SRV-0042 (en ruta).',
+) {
+  return http.post(`${API}/services/:id/assignment`, () =>
+    HttpResponse.json(conflictProblem(detail, conflicts), {
+      status: 409,
+      headers: { 'Content-Type': 'application/problem+json' },
+    }),
+  )
+}
+
+/**
+ * Rechaza el primer intento con el conflicto forzable y acepta el segundo. Es el
+ * handler que sostiene el caso central de la pantalla: el reintento con `force`.
+ */
+export function assignConflictThenOk(
+  sink: AssignCaptureSink,
+  service: ServiceDetailResponse = fakeServiceDetail({ status: 'PENDING_START' }),
+) {
+  sink.bodies = []
+  return http.post(`${API}/services/:id/assignment`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), (await request.json()) as AssignResourcesRequest]
+    if (sink.bodies.length === 1) {
+      return HttpResponse.json(
+        conflictProblem(
+          'El conductor Juan Pérez Huamán ya está asignado al servicio SRV-0042 (en ruta).',
+          [DRIVER_CONFLICT],
+        ),
+        { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+      )
+    }
+    return HttpResponse.json(service, { status: 200, headers: { ETag: ETAG_AFTER_WRITE } })
+  })
+}
+
+/** Un `Problem` PELADO del módulo: sin `forcible` ni `conflicts`. */
+export function serviceOperationProblem(
+  path: 'assignment' | 'resources',
+  code: string,
+  detail: string,
+  status = 409,
+) {
+  return http.post(`${API}/services/:id/${path}`, () =>
+    HttpResponse.json(
+      {
+        type: `urn:tms:error:${code.toLowerCase()}`,
+        title: 'Conflict',
+        status,
+        detail,
+        instance: `/api/v1/services/77/${path}`,
+        code,
+        traceId: '7c6b5a49-3d2e-1f0a-9b8c-7d6e5f4a3b2c',
+      },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** La asignación se cae por red, sin cuerpo que mostrar. */
+export function assignResourcesNetworkError() {
+  return http.post(`${API}/services/:id/assignment`, () => HttpResponse.error())
+}
+
+/**
+ * Un detalle por estado, con el CEBO de las acciones puesto: sin recursos asignados
+ * (cebo del botón de asignar) y con DOS refuerzos vivos (cebo de los de refuerzo).
+ *
+ * Son formas que el servidor no emite: un viaje completado sin conductor no existe.
+ * Se arman así a propósito. Si la visibilidad de un botón se decidiera por el DATO en
+ * vez de por el ESTADO, los casos de ausencia pasarían igual sin medir nada: "no se
+ * ofrece quitar un refuerzo" sería cierto solo porque no hay refuerzos.
+ *
+ * El código cambia por estado para que montar el fixture equivocado se note.
+ */
+export function fakeBaitedServiceDetail(status: ServiceStatus): ServiceDetailResponse {
+  const codeByStatus: Record<ServiceStatus, string> = {
+    PENDING_ASSIGNMENT: 'SRV-0701',
+    PENDING_START: 'SRV-0702',
+    IN_PROGRESS: 'SRV-0703',
+    COMPLETED: 'SRV-0704',
+    CANCELLED: 'SRV-0705',
+    DELETED: 'SRV-0706',
+  }
+  return fakeServiceDetail({
+    status,
+    code: codeByStatus[status],
+    driver: null,
+    tractor: null,
+    trailer: null,
+    additionalResources: [
+      fakeAdditionalResource(),
+      fakeAdditionalResource({
+        id: 52,
+        driver: { id: 15, fullName: 'Luis Quispe Mamani' },
+        tractor: null,
+        trailer: { kind: 'TRAILER', id: 9, plate: 'Z9D-909' },
+        reason: 'Se suma una carreta de apoyo para redistribuir la carga en el km 214.',
+      }),
+    ],
+  })
+}
+
+/** Camino feliz por defecto del módulo. */
 export const operationsHandlers = [
   serviceStatsOk(),
   serviceDetailOk(),
   servicesPage([fakeServiceSummary()]),
   createServiceOk(),
+  driversList(),
 ]

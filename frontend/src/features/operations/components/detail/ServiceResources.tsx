@@ -1,9 +1,18 @@
+import { useState } from 'react'
+import { Truck } from 'lucide-react'
 import type { ServiceDetailResponse } from '../../../../api'
+import { PRIMARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { formatDateTime } from '../../../../shared/utils/formatters'
+import { AssignResourcesModal } from '../resources/AssignResourcesModal'
 import { DetailCard, Field } from './DetailCard'
 
 interface ServiceResourcesProps {
   service: ServiceDetailResponse
+  /**
+   * `true` si el rol puede operar el viaje. Se calcula en la página, que ya tiene la
+   * sesión, y baja como prop para que esta ficha siga siendo de presentación.
+   */
+  canOperate: boolean
 }
 
 /**
@@ -14,22 +23,50 @@ interface ServiceResourcesProps {
  * la carreta puede seguir en null después porque es opcional: hay carga que no la
  * lleva. El guion dice eso, no que falte un dato.
  *
- * Los refuerzos se muestran y no se administran: sumarlos y darlos de baja son
- * otros dos endpoints, que llegan en su propio cambio. Una fila de refuerzo es un
- * PEDIDO y no un recurso suelto: puede traer los tres a la vez, uno solo o
- * cualquier combinación, y por eso se lista completa en vez de una línea por
- * recurso.
+ * Una fila de refuerzo es un PEDIDO y no un recurso suelto: puede traer los tres a
+ * la vez, uno solo o cualquier combinación, y por eso se lista completa en vez de una
+ * línea por recurso.
+ *
+ * La acción de asignar se ofrece SOLO desde "pendiente de asignación", que es el
+ * único estado desde el que el servidor la acepta. En los demás no se muestra
+ * deshabilitada sino que no se muestra: un botón gris no explica por qué está gris, y
+ * el estado del viaje ya está en el encabezado de la pantalla.
  */
-export function ServiceResources({ service }: ServiceResourcesProps) {
+export function ServiceResources({ service, canOperate }: ServiceResourcesProps) {
+  const [isAssignOpen, setIsAssignOpen] = useState(false)
+  const canAssign = canOperate && service.status === 'PENDING_ASSIGNMENT'
+
   return (
     <div className="space-y-4">
-      <DetailCard title="Recursos asignados" headingId="service-resources-heading">
+      <DetailCard
+        title="Recursos asignados"
+        headingId="service-resources-heading"
+        action={
+          canAssign ? (
+            <button
+              type="button"
+              onClick={() => setIsAssignOpen(true)}
+              className={PRIMARY_BUTTON}
+            >
+              <Truck className="mr-2 h-4 w-4" aria-hidden="true" />
+              Asignar recursos
+            </button>
+          ) : undefined
+        }
+      >
         <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           <Field label="Conductor" value={service.driver?.fullName ?? '—'} />
           <Field label="Tracto" value={service.tractor?.plate ?? '—'} />
           <Field label="Carreta" value={service.trailer?.plate ?? '—'} />
         </dl>
       </DetailCard>
+
+      <AssignResourcesModal
+        isOpen={isAssignOpen}
+        onClose={() => setIsAssignOpen(false)}
+        serviceId={service.id}
+        serviceCode={service.code}
+      />
 
       <DetailCard title="Refuerzos" headingId="service-additional-heading">
         {service.additionalResources.length === 0 ? (

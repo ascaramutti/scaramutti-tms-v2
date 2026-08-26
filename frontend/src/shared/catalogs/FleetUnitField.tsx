@@ -36,6 +36,13 @@ interface FleetUnitFieldProps {
    * default lo dejaría sin decir ninguna de las dos cosas justo cuando importa.
    */
   loadErrorText: string
+  /**
+   * Mensaje de validación del formulario, cuando la unidad es obligatoria. Lo pinta
+   * el `Combobox`, que además marca el campo como inválido y se lo ata al input; por
+   * eso NO comparte camino con `loadErrorText`, que es un aviso sobre el catálogo y
+   * no sobre lo que el usuario eligió.
+   */
+  error?: string
 }
 
 function toOption(
@@ -59,9 +66,9 @@ function toOption(
  * (RN-WH9).
  * Componente controlado.
  *
- * Vive en `shared/` y no en un módulo porque la misma flota la va a elegir, además
- * del retiro de almacén, la asignación de recursos a un viaje, que necesita acotar
- * el subtipo y decir lo suyo cuando el catálogo no carga.
+ * Vive en `shared/` y no en un módulo porque la misma flota la eligen el retiro de
+ * almacén y la asignación de recursos a un viaje, que acota el subtipo y dice lo suyo
+ * cuando el catálogo no carga.
  */
 export function FleetUnitField({
   id,
@@ -72,6 +79,7 @@ export function FleetUnitField({
   onSelectedChange,
   placeholder,
   loadErrorText,
+  error,
 }: FleetUnitFieldProps) {
   const [query, setQuery] = useState('')
   const { data, isLoading, isError } = useFleetUnits({ kind })
@@ -81,7 +89,7 @@ export function FleetUnitField({
     const term = query.trim().toLowerCase()
     const matches = term
       ? units.filter((unit) =>
-          [fleetUnitLabel(unit), unit.plate, unit.brand ?? '', unit.model ?? '']
+          [fleetUnitLabel(unit), unit.plate, unit.brand, unit.model]
             .join(' ')
             .toLowerCase()
             .includes(term),
@@ -110,6 +118,7 @@ export function FleetUnitField({
         onClear={() => onSelectedChange(null)}
         loading={isLoading}
         emptyText="No se encontraron unidades."
+        error={error}
       />
       {isError && (
         <p role="alert" className="mt-1 text-xs text-amber-700">

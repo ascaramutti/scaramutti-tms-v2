@@ -22,8 +22,8 @@ interface UseFleetUnitsOptions {
  * filtra en cliente.
  *
  * `isActive: true` no se parametriza porque una unidad dada de baja no se puede
- * ASIGNAR a un retiro, y la asignación a un viaje va a tener la misma
- * restricción. Queda un caso conocido en
+ * ASIGNAR: ni a un retiro de almacén ni a un viaje de operaciones. Queda un caso
+ * conocido en
  * contra: el filtro del listado de retiros usa el mismo campo para BUSCAR, y ahí
  * una unidad de baja es legítima (un retiro viejo cargado a un tracto que después
  * se dio de baja hoy no se puede volver a filtrar). Se deja así por ahora; el día

@@ -16,19 +16,30 @@ interface DetailCardProps {
   title: string
   /** Id del encabezado, para el `aria-labelledby` de la sección. */
   headingId: string
+  /**
+   * Acción de la ficha, alineada con su encabezado.
+   *
+   * Va acá y no en una barra del encabezado de la pantalla porque cada acción muta
+   * la ficha en la que está, así que el resultado aparece donde el usuario estaba
+   * mirando. La ficha sin acción no cambia: el encabezado sigue ocupando su línea.
+   */
+  action?: ReactNode
   children: ReactNode
 }
 
 /** Tarjeta con su encabezado, anunciada como sección propia. */
-export function DetailCard({ title, headingId, children }: DetailCardProps) {
+export function DetailCard({ title, headingId, action, children }: DetailCardProps) {
   return (
     <section
       className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
       aria-labelledby={headingId}
     >
-      <h2 id={headingId} className="text-sm font-semibold text-slate-900">
-        {title}
-      </h2>
+      <div className="flex items-start justify-between gap-3">
+        <h2 id={headingId} className="text-sm font-semibold text-slate-900">
+          {title}
+        </h2>
+        {action}
+      </div>
       {children}
     </section>
   )

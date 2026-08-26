@@ -3,6 +3,7 @@ import type { UserRole } from '../../../api'
 import {
   canCreateCatalogEntry,
   canCreateService,
+  canOperateService,
   canSeeServicePrices,
 } from './operationsPermissions'
 
@@ -73,5 +74,29 @@ describe('canCreateCatalogEntry', () => {
 
   it('sin sesión resuelta todavía, no se ofrece el atajo', () => {
     expect(canCreateCatalogEntry(undefined)).toBe(false)
+  })
+})
+
+describe('canOperateService', () => {
+  it.each(['admin', 'general_manager', 'operations_manager', 'dispatcher'] as const)(
+    '%s opera el viaje',
+    (role) => {
+      expect(canOperateService(role)).toBe(true)
+    },
+  )
+
+  it('ventas no opera el viaje', () => {
+    // El único rol para el que la diferencia importa: entra al módulo y ve el detalle
+    // entero, pero registra y edita, no opera.
+    expect(canOperateService('sales')).toBe(false)
+  })
+
+  it('finanzas y almacén no operan el viaje', () => {
+    expect(canOperateService('finance_manager')).toBe(false)
+    expect(canOperateService('warehouse_keeper')).toBe(false)
+  })
+
+  it('sin rol no opera el viaje', () => {
+    expect(canOperateService(undefined)).toBe(false)
   })
 })

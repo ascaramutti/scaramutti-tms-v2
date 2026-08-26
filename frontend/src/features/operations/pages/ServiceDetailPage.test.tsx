@@ -214,6 +214,30 @@ describe('ServiceDetailPage', () => {
     expect(screen.queryByText('Acordado')).not.toBeInTheDocument()
   })
 
+  it('al despacho le ofrece asignar los recursos del viaje', async () => {
+    server.use(serviceDetailOk())
+    renderDetail({ role: 'dispatcher' })
+    await screen.findByText('SRV-0077')
+
+    // Es el único caso que ata `canOperateService` con el botón: los tests de la
+    // ficha reciben el permiso ya resuelto como prop, así que miden la plomería y
+    // no la política. Sin esto, cablear la prop a `true` no rompe nada.
+    expect(
+      await screen.findByRole('button', { name: /asignar recursos/i }),
+    ).toBeInTheDocument()
+  })
+
+  it('a ventas no le ofrece asignar, y le deja la ficha entera', async () => {
+    server.use(serviceDetailOk())
+    renderDetail({ role: 'sales' })
+    await screen.findByText('SRV-0077')
+
+    // La otra dirección, y con un rol que SÍ entra a la pantalla: se le saca la
+    // acción, no el dato.
+    expect(screen.queryByRole('button', { name: /asignar recursos/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Recursos asignados' })).toBeInTheDocument()
+  })
+
   it('a quien sí puede verlo le muestra el importe con su moneda', async () => {
     server.use(serviceDetailOk())
     renderDetail({ role: 'sales' })
