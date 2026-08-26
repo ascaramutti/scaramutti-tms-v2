@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { Truck } from 'lucide-react'
+import { Plus, Truck } from 'lucide-react'
 import type { ServiceDetailResponse } from '../../../../api'
-import { PRIMARY_BUTTON } from '../../../../shared/ui/buttonStyles'
+import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { formatDateTime } from '../../../../shared/utils/formatters'
+import { AddResourcesModal } from '../resources/AddResourcesModal'
 import { AssignResourcesModal } from '../resources/AssignResourcesModal'
 import { DetailCard, Field } from './DetailCard'
 
@@ -34,7 +35,12 @@ interface ServiceResourcesProps {
  */
 export function ServiceResources({ service, canOperate }: ServiceResourcesProps) {
   const [isAssignOpen, setIsAssignOpen] = useState(false)
+  const [isAddOpen, setIsAddOpen] = useState(false)
   const canAssign = canOperate && service.status === 'PENDING_ASSIGNMENT'
+  // Los refuerzos solo existen sobre un viaje EN RUTA: son el relevo de un conductor
+  // que agotó su descanso o la unidad que sale a un varado, y ninguna de las dos
+  // cosas ocurre sobre un viaje que todavía no salió o que ya terminó.
+  const canReinforce = canOperate && service.status === 'IN_PROGRESS'
 
   return (
     <div className="space-y-4">
@@ -46,7 +52,7 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
             <button
               type="button"
               onClick={() => setIsAssignOpen(true)}
-              className={PRIMARY_BUTTON}
+              className={`${PRIMARY_BUTTON} shrink-0`}
             >
               <Truck className="mr-2 h-4 w-4" aria-hidden="true" />
               Asignar recursos
@@ -68,7 +74,29 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         serviceCode={service.code}
       />
 
-      <DetailCard title="Refuerzos" headingId="service-additional-heading">
+      <AddResourcesModal
+        isOpen={isAddOpen}
+        onClose={() => setIsAddOpen(false)}
+        serviceId={service.id}
+        serviceCode={service.code}
+      />
+
+      <DetailCard
+        title="Refuerzos"
+        headingId="service-additional-heading"
+        action={
+          canReinforce ? (
+            <button
+              type="button"
+              onClick={() => setIsAddOpen(true)}
+              className={`${SECONDARY_BUTTON} shrink-0`}
+            >
+              <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
+              Agregar refuerzo
+            </button>
+          ) : undefined
+        }
+      >
         {service.additionalResources.length === 0 ? (
           // Es el caso NORMAL, no un borde: ninguno de los 905 viajes migrados
           // tiene refuerzos, así que esto es lo que se va a ver casi siempre.

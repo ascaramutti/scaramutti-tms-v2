@@ -1,5 +1,6 @@
 import { http, HttpResponse, delay } from 'msw'
 import type {
+  AddResourcesRequest,
   AssignResourcesRequest,
   DriverResponse,
   PageMeta,
@@ -731,6 +732,103 @@ export function fakeBaitedServiceDetail(status: ServiceStatus): ServiceDetailRes
         reason: 'Se suma una carreta de apoyo para redistribuir la carga en el km 214.',
       }),
     ],
+  })
+}
+
+/** Cuerpos de los pedidos de refuerzo observados, EN ORDEN. */
+export interface AddResourcesCaptureSink {
+  bodies?: AddResourcesRequest[]
+}
+
+/** Refuerzo sumado: devuelve el detalle y su ETag. */
+export function addResourcesOk(
+  service: ServiceDetailResponse = fakeServiceDetail({
+    status: 'IN_PROGRESS',
+    additionalResources: [fakeAdditionalResource()],
+  }),
+  etag: string = ETAG_AFTER_WRITE,
+) {
+  return http.post(`${API}/services/:id/resources`, () =>
+    HttpResponse.json(service, { status: 200, headers: { ETag: etag } }),
+  )
+}
+
+/** Captura los cuerpos del alta de refuerzos, con historial. */
+export function addResourcesCapture(
+  sink: AddResourcesCaptureSink,
+  service: ServiceDetailResponse = fakeServiceDetail({
+    status: 'IN_PROGRESS',
+    additionalResources: [fakeAdditionalResource()],
+  }),
+) {
+  sink.bodies = []
+  return http.post(`${API}/services/:id/resources`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), (await request.json()) as AddResourcesRequest]
+    return HttpResponse.json(service, { status: 200, headers: { ETag: ETAG_AFTER_WRITE } })
+  })
+}
+
+/**
+ * 409 `OPS-003`: el recurso ya participa de ESTE viaje. DURO, y el `Problem` viaja
+ * PELADO, sin `forcible` ni `conflicts`. Es la forma real, y por eso el caso negativo
+ * se prueba contra ella y no contra un `forcible: false`, que el backend nunca manda.
+ */
+export function addResourcesDuplicate(
+  detail = 'El conductor Ana Ríos Chávez ya participa de este servicio.',
+) {
+  return http.post(`${API}/services/:id/resources`, () =>
+    HttpResponse.json(
+      {
+        type: 'urn:tms:error:ops-003',
+        title: 'Duplicate resource',
+        status: 409,
+        detail,
+        instance: '/api/v1/services/77/resources',
+        code: 'OPS-003',
+        traceId: '8e7d6c5b-4a39-2817-0f6e-5d4c3b2a1908',
+      },
+      { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** 409 `OPS-002` sobre el alta de refuerzos: forzable, con su detalle. */
+export function addResourcesConflict(
+  conflicts: ResourceConflicts = [DRIVER_CONFLICT],
+  detail = 'El conductor Ana Ríos Chávez ya está asignado al servicio SRV-0042 (en ruta).',
+) {
+  return http.post(`${API}/services/:id/resources`, () =>
+    HttpResponse.json(
+      { ...conflictProblem(detail, conflicts), instance: '/api/v1/services/77/resources' },
+      { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Rechaza el primer alta de refuerzo con el conflicto forzable y acepta la segunda. */
+export function addConflictThenOk(
+  sink: AddResourcesCaptureSink,
+  service: ServiceDetailResponse = fakeServiceDetail({
+    status: 'IN_PROGRESS',
+    additionalResources: [fakeAdditionalResource()],
+  }),
+) {
+  sink.bodies = []
+  return http.post(`${API}/services/:id/resources`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), (await request.json()) as AddResourcesRequest]
+    if (sink.bodies.length === 1) {
+      return HttpResponse.json(
+        {
+          ...conflictProblem(
+            'El conductor Ana Ríos Chávez ya está asignado al servicio SRV-0042 (en ruta).',
+            [DRIVER_CONFLICT],
+          ),
+          instance: '/api/v1/services/77/resources',
+        },
+        { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+      )
+    }
+    return HttpResponse.json(service, { status: 200, headers: { ETag: ETAG_AFTER_WRITE } })
   })
 }
 

@@ -1,10 +1,13 @@
 import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ServiceStatus } from '../../../../api'
 import { ServiceResources } from './ServiceResources'
-import { fakeBaitedServiceDetail } from '../../../../test/mocks/handlers/operations'
+import { server } from '../../../../test/mocks/server'
+import { driversList, fakeBaitedServiceDetail } from '../../../../test/mocks/handlers/operations'
+import { fakeFleetUnit, fleetUnitsByKind } from '../../../../test/mocks/handlers/shared-catalogs'
 
 /**
  * Cada caso monta SU fixture: compartir un objeto entre casos y mutarlo es la forma
@@ -31,6 +34,10 @@ function expectCardsRendered() {
 
 function assignButton() {
   return screen.queryByRole('button', { name: /asignar recursos/i })
+}
+
+function addButton() {
+  return screen.queryByRole('button', { name: /agregar refuerzo/i })
 }
 
 describe('ServiceResources · el botón de asignar', () => {
@@ -87,10 +94,117 @@ describe('ServiceResources · el botón de asignar', () => {
   })
 })
 
+describe('ServiceResources · el botón de agregar refuerzo', () => {
+  it('se ofrece con el viaje en ruta', () => {
+    renderResources('IN_PROGRESS')
+    expectCardsRendered()
+    expect(addButton()).toBeInTheDocument()
+  })
+
+  it('no se ofrece con el viaje pendiente de asignación, aunque ya tenga refuerzos', () => {
+    // El fixture cebo llega CON dos refuerzos vivos, que es el dato que produciría el
+    // botón si la guarda mirara la lista en vez del estado. Sin ese cebo, la ausencia
+    // se explicaría sola por no haber refuerzos y no mediría la guarda.
+    const service = renderResources('PENDING_ASSIGNMENT')
+    expect(service.additionalResources).toHaveLength(2)
+    expect(screen.getByText(/Ana Ríos Chávez/)).toBeInTheDocument()
+    expect(addButton()).not.toBeInTheDocument()
+  })
+
+  it('no se ofrece con el viaje pendiente de inicio', () => {
+    // Ya tiene recursos pero todavía no salió: un refuerzo refuerza a un viaje EN RUTA.
+    renderResources('PENDING_START')
+    expectCardsRendered()
+    expect(addButton()).not.toBeInTheDocument()
+  })
+
+  it('no se ofrece con el viaje completado', () => {
+    renderResources('COMPLETED')
+    expectCardsRendered()
+    expect(addButton()).not.toBeInTheDocument()
+  })
+
+  it('no se ofrece con el viaje cancelado', () => {
+    renderResources('CANCELLED')
+    expectCardsRendered()
+    expect(addButton()).not.toBeInTheDocument()
+  })
+
+  it('no se ofrece con el viaje eliminado', () => {
+    renderResources('DELETED')
+    expectCardsRendered()
+    expect(addButton()).not.toBeInTheDocument()
+  })
+
+  it('vive dentro de la ficha de refuerzos, no en la de recursos', () => {
+    renderResources('IN_PROGRESS')
+    const card = screen.getByRole('region', { name: 'Refuerzos' })
+    expect(within(card).getByRole('button', { name: /agregar refuerzo/i })).toBeInTheDocument()
+  })
+})
+
+describe('ServiceResources · las acciones nunca conviven', () => {
+  // Cuenta las DOS acciones de ficha por estado (asignar y agregar refuerzo): una que
+  // se filtre a un estado ajeno mueve el número aunque su afirmación puntual siga
+  // verde. Los botones de quitar quedan afuera del conteo a propósito: van por fila y
+  // los cuenta su propio archivo.
+  it('pendiente de asignación ofrece una sola acción', () => {
+    renderResources('PENDING_ASSIGNMENT')
+    expect(screen.getAllByRole('button', { name: /asignar recursos|agregar refuerzo/i })).toHaveLength(1)
+  })
+
+  it('en ruta ofrece una sola acción, y es la otra', () => {
+    renderResources('IN_PROGRESS')
+    const actions = screen.getAllByRole('button', { name: /asignar recursos|agregar refuerzo/i })
+    expect(actions).toHaveLength(1)
+    expect(actions[0]).toHaveAccessibleName(/agregar refuerzo/i)
+  })
+
+  it('completado no ofrece ninguna', () => {
+    renderResources('COMPLETED')
+    expectCardsRendered()
+    expect(screen.queryAllByRole('button', { name: /asignar recursos|agregar refuerzo/i })).toHaveLength(0)
+  })
+})
+
+describe('ServiceResources · cada botón abre SU modal', () => {
+  // Sin estos dos casos nadie hace click, así que cruzar los `onClick` de los dos
+  // botones sobrevive: los dos estados nunca coexisten y el modal equivocado no se
+  // vería en ninguna pantalla.
+  it('asignar recursos abre el modal de asignación', async () => {
+    server.use(fleetUnitsByKind([fakeFleetUnit()]), driversList())
+    const user = userEvent.setup()
+    renderResources('PENDING_ASSIGNMENT')
+
+    await user.click(screen.getByRole('button', { name: /asignar recursos/i }))
+
+    expect(await screen.findByRole('dialog', { name: 'Asignar recursos' })).toBeInTheDocument()
+  })
+
+  it('agregar refuerzo abre el modal de refuerzos', async () => {
+    server.use(fleetUnitsByKind([fakeFleetUnit()]), driversList())
+    const user = userEvent.setup()
+    renderResources('IN_PROGRESS')
+
+    await user.click(screen.getByRole('button', { name: /agregar refuerzo/i }))
+
+    // Los dos títulos son distintos justamente para que abrir el equivocado se vea.
+    expect(await screen.findByRole('dialog', { name: 'Agregar refuerzo' })).toBeInTheDocument()
+  })
+})
+
 describe('ServiceResources · quién ve la acción', () => {
   it('el rol que opera el viaje la ve', () => {
     renderResources('PENDING_ASSIGNMENT', true)
     expect(assignButton()).toBeInTheDocument()
+  })
+
+  it('el rol que no opera el viaje no ve tampoco la de refuerzos', () => {
+    renderResources('IN_PROGRESS', false)
+    expectCardsRendered()
+    expect(addButton()).not.toBeInTheDocument()
+    // Y sigue viendo los refuerzos que ya existen: se le saca la acción, no el dato.
+    expect(screen.getByText(/Ana Ríos Chávez/)).toBeInTheDocument()
   })
 
   it('el rol que no opera el viaje no la ve, y sigue viendo los datos', () => {
