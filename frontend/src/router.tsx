@@ -28,6 +28,7 @@ import { WithdrawalEditPage } from './features/warehouse/pages/WithdrawalEditPag
 import { WarehouseReportsPage } from './features/warehouse/pages/WarehouseReportsPage'
 import { OpeningBalancesPage } from './features/warehouse/pages/OpeningBalancesPage'
 import { ServicesListPage } from './features/operations/pages/ServicesListPage'
+import { ServiceDetailPage } from './features/operations/pages/ServiceDetailPage'
 import { ServiceCreatePage } from './features/operations/pages/ServiceCreatePage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
@@ -205,6 +206,19 @@ export const routes: RouteObject[] = [
         element: (
           <ProtectedRoute allowedRoles={SERVICE_CREATE_ROLES} actionName="registrar un servicio">
             <ServiceCreatePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // Los cinco roles del módulo: el detalle se LEE, y el despacho lo lee sin
+        // los importes porque el servidor se los omite (RN-OP8). Va DESPUÉS del
+        // alta: react-router rankea por especificidad y la ruta estática gana
+        // igual, pero leído de arriba abajo el archivo no invita a dudarlo. Hay
+        // un test que lo fija.
+        path: `${OPERACIONES_LANDING}/servicios/:id`,
+        element: (
+          <ProtectedRoute allowedRoles={OPERATIONS_ROLES} moduleName="Operaciones">
+            <ServiceDetailPage />
           </ProtectedRoute>
         ),
       },

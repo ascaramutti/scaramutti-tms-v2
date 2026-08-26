@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { delay, http, HttpResponse } from 'msw'
@@ -44,6 +44,12 @@ const NOW = new Date('2026-08-24T17:00:00Z') // 24/08 12:00 en Lima
 const TODAY_IN_LIMA = '2026-08-24'
 const API_URL = 'http://localhost:8080/api/v1'
 
+/** Sustituta del detalle que nombra el id de la ruta, para afirmar a cuál se abrió. */
+function DetalleStub() {
+  const { id } = useParams()
+  return <div>Detalle del servicio {id}</div>
+}
+
 function renderCreatePage({
   role = 'admin' as UserRole,
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
@@ -58,6 +64,10 @@ function renderCreatePage({
             <Route path="/cotizaciones/operaciones/servicios/nuevo" element={<ServiceCreatePage />} />
             {/* Destino del alta y del cancelar: se afirma que se llega, no que se navega. */}
             <Route path="/cotizaciones/operaciones" element={<div>Listado de servicios</div>} />
+            {/* Sustituta del detalle, que nombra el id recibido: sin eso, el test
+                no distingue "abrió el detalle del viaje recién creado" de "abrió
+                alguno". */}
+            <Route path="/cotizaciones/operaciones/servicios/:id" element={<DetalleStub />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -457,15 +467,19 @@ describe('ServiceCreatePage', () => {
   })
 
   // ----- Después de registrar -----
-  it('registrado, avisa con el código asignado y vuelve al listado', async () => {
+  it('registrado, avisa con el código asignado y abre el detalle del viaje nuevo', async () => {
+    // Al detalle y no al listado: es donde se le asignan recursos, que es lo
+    // próximo que alguien hace con un viaje recién registrado, y evita buscarlo
+    // en una lista de la que acaba de salir. El id del fixture no es el del
+    // listado, así que el test distingue a cuál se llegó.
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
     const success = vi.spyOn(toast, 'success')
-    server.use(createServiceOk(fakeServiceDetail({ code: 'SRV-0077' })))
+    server.use(createServiceOk(fakeServiceDetail({ id: 77, code: 'SRV-0077' })))
     renderCreatePage()
     await screen.findByLabelText('Fecha tentativa')
     await fillAndSubmit(user)
 
-    expect(await screen.findByText('Listado de servicios')).toBeInTheDocument()
+    expect(await screen.findByText('Detalle del servicio 77')).toBeInTheDocument()
     // El código lo asigna el servidor: es el dato con el que después se busca el viaje.
     expect(success).toHaveBeenCalledWith('Servicio SRV-0077 registrado.')
   })
@@ -483,11 +497,12 @@ describe('ServiceCreatePage', () => {
     renderCreatePage({ queryClient })
     await screen.findByLabelText('Fecha tentativa')
     await fillAndSubmit(user)
-    await screen.findByText('Listado de servicios')
+    await screen.findByText(/Detalle del servicio/)
 
     // Son dos ramas distintas del cache y hacen falta las dos: el viaje nace
     // pendiente de asignación, así que mueve las filas Y el contador de pendientes.
-    // Sin esto, el usuario vuelve a un listado y a un tablero que no se movieron.
+    // Sin esto, el listado y el tablero que el usuario visite después siguen sin
+    // el viaje que acaba de registrar.
     expect(invalidadas).toContainEqual(operationsKeys.serviceLists())
     expect(invalidadas).toContainEqual(operationsKeys.serviceStats())
   })

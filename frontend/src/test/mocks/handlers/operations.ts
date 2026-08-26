@@ -5,6 +5,7 @@ import type {
   Problem,
   ServiceCreateRequest,
   ServiceDetailResponse,
+  ServiceEventResponse,
   ServiceStatsResponse,
   ServiceSummaryResponse,
 } from '../../../api'
@@ -245,16 +246,26 @@ export function serviceStatsError(status: number, problem: Partial<Problem> = {}
 }
 
 /**
- * Handlers por defecto (happy path).
- *
- * El orden entre estos dos es indistinto: MSW matchea la ruta exacta, y
- * `/services` no se traga `/services/stats`. Se listan de más específico a menos
- * por convención, y porque el día que exista `/services/:id` (un patrón CON
- * parámetro, que sí se tragaría `/services/stats`) el orden va a importar de
- * verdad.
+ * Fixture de una entrada de bitácora. `createdAt` cae en la misma ventana que el
+ * del resumen (21:00 en Lima ya es el día siguiente en UTC), así que un test que
+ * afirme su fecha detecta que se saque la zona del formateador.
  */
+export function fakeServiceEvent(
+  overrides: Partial<ServiceEventResponse> = {},
+): ServiceEventResponse {
+  return {
+    id: 1,
+    eventType: 'CREATED',
+    note: 'Servicio registrado',
+    createdBy: { id: 1, username: 'cscaramutti', fullName: 'Carlos Scaramutti' },
+    createdAt: '2026-08-24T02:00:00Z',
+    ...overrides,
+  }
+}
+
 /**
- * Fixture del detalle que devuelve el alta. Los valores no repiten los del resumen
+ * Fixture del detalle: lo devuelven tanto el alta como `GET /services/{id}`. Los
+ * valores no repiten los del resumen
  * (otro id, otro código): si el test afirma el código de un servicio recién creado
  * y el fixture compartiera el del listado, la aserción pasaría midiendo la fila
  * equivocada.
@@ -287,14 +298,68 @@ export function fakeServiceDetail(
     additionalResources: [],
     events: [],
     createdBy: { id: 1, username: 'cscaramutti', fullName: 'Carlos Scaramutti' },
+    // Las dos fechas de auditoría son DISTINTAS a propósito: compartiendo valor,
+    // mostrar una bajo el rótulo de la otra sería un no-op y ningún test lo vería.
+    //
+    // `updatedAt` lleva los microsegundos con el cero final YA RECORTADO, que es
+    // como los serializa Jackson. El ETag del header trae el mismo instante con el
+    // cero puesto: ese es el near-miss que hace fallar un `If-Match` armado desde
+    // el cuerpo.
     createdAt: '2026-08-24T15:00:00Z',
-    updatedAt: '2026-08-24T15:00:00Z',
+    updatedAt: '2026-08-26T13:20:00.39289Z',
     ...overrides,
   }
 }
 
-/** Alta correcta: responde 201 con el detalle dado. */
-export function createServiceOk(service: ServiceDetailResponse = fakeServiceDetail()) {
+/**
+ * ETag por defecto del detalle. Es el `updatedAt` del cuerpo CASI igual: mismo
+ * instante, pero con los microsegundos completos y entre comillas.
+ *
+ * El parecido es el punto. El error que el contrato advierte es armar el
+ * `If-Match` desde el cuerpo, y ese error solo se caza con dos valores que se
+ * parezcan: Jackson recorta el cero final de los microsegundos, así que el cuerpo
+ * dice `.39289Z` donde el header dice `.392890Z` y el servidor contesta un 412
+ * espurio. Con dos fechas distintas, un test que solo compare "son diferentes"
+ * pasaría sin medir nada.
+ */
+export const DEFAULT_SERVICE_ETAG = '"2026-08-26T13:20:00.392890Z"'
+
+/** Detalle de un servicio, con su ETag en el header. */
+export function serviceDetailOk(
+  service: ServiceDetailResponse = fakeServiceDetail(),
+  etag: string = DEFAULT_SERVICE_ETAG,
+) {
+  return http.get(`${API}/services/:id`, () => HttpResponse.json(service, { headers: { ETag: etag } }))
+}
+
+/** Detalle SIN el header ETag (un gateway que no lo expone). */
+export function serviceDetailWithoutEtag(service: ServiceDetailResponse = fakeServiceDetail()) {
+  return http.get(`${API}/services/:id`, () => HttpResponse.json(service))
+}
+
+/** Detalle que falla (Problem RFC 7807). */
+export function serviceDetailError(status: number, problem: Partial<Problem> = {}) {
+  return http.get(`${API}/services/:id`, () => problemResponse(status, problem))
+}
+
+/** Detalle que tarda, para observar el estado de carga. */
+export function serviceDetailSlow(ms = 40, service: ServiceDetailResponse = fakeServiceDetail()) {
+  return http.get(`${API}/services/:id`, async () => {
+    await delay(ms)
+    return HttpResponse.json(service, { headers: { ETag: DEFAULT_SERVICE_ETAG } })
+  })
+}
+
+/**
+ * Alta correcta: responde 201 con el detalle dado.
+ *
+ * Por defecto iguala `updatedAt` a `createdAt`: el fixture base los separa a
+ * propósito para el detalle, pero un viaje recién creado no puede haberse
+ * actualizado dos días después.
+ */
+export function createServiceOk(
+  service: ServiceDetailResponse = fakeServiceDetail({ updatedAt: fakeServiceDetail().createdAt }),
+) {
   return http.post(`${API}/services`, () => HttpResponse.json(service, { status: 201 }))
 }
 
@@ -378,11 +443,14 @@ export function createServiceSlow(ms = 40, service: ServiceDetailResponse = fake
 }
 
 /**
- * Handlers por defecto (camino feliz). El orden entre los tres es indistinto: cada
- * uno responde un método y una ruta distintos, así que ninguno ensombrece a otro.
+ * Handlers por defecto (camino feliz). Son CUATRO y ahora el orden IMPORTA, a
+ * diferencia de cuando eran tres: `/services/:id` es un patrón CON parámetro y se
+ * tragaría `/services/stats` como si "stats" fuera un id, así que el de los
+ * indicadores tiene que registrarse antes. MSW resuelve por orden de registro.
  */
 export const operationsHandlers = [
   serviceStatsOk(),
+  serviceDetailOk(),
   servicesPage([fakeServiceSummary()]),
   createServiceOk(),
 ]
