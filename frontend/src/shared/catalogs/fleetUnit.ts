@@ -1,4 +1,4 @@
-import type { FleetUnitKind, FleetUnitResponse } from '../../../api'
+import type { FleetUnitKind, FleetUnitResponse } from '../../api'
 
 /** Etiqueta en español de cada subtipo de unidad, para no mostrar el enum crudo. */
 const KIND_LABEL: Record<FleetUnitKind, string> = {

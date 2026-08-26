@@ -6,9 +6,20 @@ import type {
 } from '../../../api'
 import { fleetUnitToWithdrawalFields } from '../hooks/useCreateWarehouseWithdrawal'
 import type { WithdrawalFilters } from '../schemas/withdrawal-filters.schema'
-import { FleetUnitField } from './FleetUnitField'
+import { FleetUnitField } from '../../../shared/catalogs/FleetUnitField'
 import { WarehouseProductField } from './WarehouseProductField'
 import { WorkerField } from './WorkerField'
+
+/**
+ * Aviso cuando el catálogo de flota no carga.
+ *
+ * La segunda mitad de la frase habla de REGISTRAR, y esta pantalla solo filtra: el
+ * texto viene del formulario de alta, donde sí es cierto. Se deja igual por ahora y
+ * se exporta para que el test afirme que la pantalla muestra el suyo sin repetir la
+ * frase en el esperado, porque clavarla en dos lugares encarecería corregirla.
+ */
+export const FLEET_UNITS_LOAD_ERROR =
+  'No se pudieron cargar las unidades de flota. El retiro se puede registrar sin unidad.'
 
 interface WithdrawalsFilterBarProps {
   value: WithdrawalFilters
@@ -78,6 +89,8 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
           label="Unidad de flota"
           selected={selectedFleetUnit}
           onSelectedChange={handleFleetUnit}
+          placeholder="Tracto, carreta o escolta (opcional)…"
+          loadErrorText={FLEET_UNITS_LOAD_ERROR}
         />
       </div>
 

@@ -86,21 +86,28 @@ export function fleetUnitsList(content: FleetUnitResponse[]) {
   return http.get(`${API}/fleet-units`, () => HttpResponse.json(content))
 }
 
-/** Captura los query params del listado de unidades de flota. */
-export function fleetUnitsCapture(
-  sink: ProductsCaptureSink,
-  content: FleetUnitResponse[] = [fakeFleetUnit()],
-) {
-  sink.calls = []
-  return http.get(`${API}/fleet-units`, ({ request }) => {
-    const params = new URL(request.url).searchParams
-    sink.params = params
-    sink.calls = [...(sink.calls ?? []), params]
-    return HttpResponse.json(content)
-  })
-}
-
 /** Responde un error en el listado de unidades de flota. */
 export function fleetUnitsError(status: number, problem: Partial<Problem> = {}) {
   return http.get(`${API}/fleet-units`, () => problemResponse(status, problem))
+}
+
+/**
+ * Filtra por `kind` como lo hace el backend: sin el parámetro devuelve los tres
+ * subtipos, y con él solo ese.
+ *
+ * Los demás handlers de flota ignoran el parámetro y devuelven siempre la misma
+ * lista, así que contra ellos un consumidor que se olvidara de mandar `kind`
+ * pasaría igual. Este es el único que distingue.
+ */
+export function fleetUnitsByKind(content: FleetUnitResponse[], sink?: ProductsCaptureSink) {
+  if (sink) sink.calls = []
+  return http.get(`${API}/fleet-units`, ({ request }) => {
+    const params = new URL(request.url).searchParams
+    if (sink) {
+      sink.params = params
+      sink.calls = [...(sink.calls ?? []), params]
+    }
+    const kind = params.get('kind')
+    return HttpResponse.json(kind ? content.filter((unit) => unit.kind === kind) : content)
+  })
 }
