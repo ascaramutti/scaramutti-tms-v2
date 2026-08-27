@@ -12,6 +12,7 @@ import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import type { ServiceDetailResponse, UserRole } from '../../../api'
 import { fakeUser } from '../../../test/mocks/handlers/auth'
 import { server } from '../../../test/mocks/server'
+import { SERVICE_STATUS_PRESENTATION } from '../status/serviceStatusPresentation'
 import {
   fakeServiceDetail,
   fakeServiceEvent,
@@ -651,5 +652,109 @@ describe('ServiceDetailPage', () => {
     await screen.findByText('SRV-0077')
 
     expect(await axe(container)).toHaveNoViolations()
+  })
+})
+
+describe('ServiceDetailPage, las acciones de estado', () => {
+  it('ofrece iniciar junto al badge de un viaje pendiente de inicio', async () => {
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'PENDING_START' })))
+    renderDetail()
+
+    expect(await screen.findByRole('button', { name: /Iniciar viaje/ })).toBeInTheDocument()
+    expect(screen.getByText('Pendiente de inicio')).toBeInTheDocument()
+  })
+
+  it('ofrece finalizar en un viaje en ruta', async () => {
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    renderDetail()
+
+    expect(await screen.findByRole('button', { name: /Finalizar viaje/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Iniciar viaje/ })).not.toBeInTheDocument()
+  })
+
+  it.each(['COMPLETED', 'CANCELLED', 'DELETED'] as const)(
+    'no ofrece acciones de estado en %s, y el badge sigue estando',
+    async (status) => {
+      server.use(serviceDetailOk(fakeServiceDetail({ status })))
+      renderDetail()
+
+      await screen.findByText('SRV-0077')
+      expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
+      // El badge NO se va con los botones: el usuario tiene que seguir sabiendo en qué
+      // estado quedó el viaje.
+      expect(screen.getByText(SERVICE_STATUS_PRESENTATION[status].label)).toBeInTheDocument()
+    },
+  )
+
+  it('a ventas le saca las acciones pero no los datos', async () => {
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    renderDetail({ role: 'sales' })
+
+    await screen.findByText('SRV-0077')
+    expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
+    // La segunda mitad es la que importa: sin ella, esconderle la pantalla entera a
+    // ventas pasaría verde.
+    expect(screen.getByText('En ruta')).toBeInTheDocument()
+    expect(screen.getByText('Bitácora')).toBeInTheDocument()
+  })
+
+  it('al despacho le ofrece finalizar el viaje', async () => {
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    renderDetail({ role: 'dispatcher' })
+
+    expect(await screen.findByRole('button', { name: /Finalizar viaje/ })).toBeInTheDocument()
+  })
+
+  it('no desplaza ni duplica las acciones de recursos', async () => {
+    // Lo que NO cambió: la barra nueva se suma al encabezado y las acciones de recursos
+    // siguen donde estaban. Montarla encima, o dejarla duplicada al reordenar el
+    // layout, es la mutación más barata de cometer y la que ninguna suite de delta ve.
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'PENDING_ASSIGNMENT' })))
+    renderDetail()
+
+    expect(await screen.findAllByRole('button', { name: /Asignar recursos/ })).toHaveLength(1)
+  })
+
+  it('pone el estado y sus acciones en una fila propia, fuera del encabezado', async () => {
+    // Es el defecto que se corrigió: dentro del slot de acción del `PageHeader`, el
+    // bloque se acomoda al lado del título mientras entra y baja cuando no, así que la
+    // pantalla se veía distinta según el ancho de la ventana. Se afirma la ESTRUCTURA
+    // porque el ancho no existe en jsdom: un caso que solo mire "los botones están"
+    // pasa igual con el layout viejo puesto.
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    const { container } = renderDetail()
+
+    await screen.findByText('SRV-0077')
+    const header = container.querySelector('header')
+    const actions = screen.getByRole('group', { name: 'Acciones del viaje' })
+
+    expect(header).not.toBeNull()
+    expect(header).not.toContainElement(actions)
+    expect(header).not.toContainElement(screen.getByText('En ruta'))
+  })
+
+  it('alinea el estado a la izquierda y las acciones a la derecha, en la misma fila', async () => {
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    renderDetail()
+
+    const badge = await screen.findByText('En ruta')
+    const actions = screen.getByRole('group', { name: 'Acciones del viaje' })
+    const row = badge.parentElement
+
+    // Comparten fila, y esa fila los separa a los extremos. `flex-wrap` es lo que deja
+    // que los botones bajen en anchos chicos sin pisar al badge.
+    expect(row).toContainElement(actions)
+    expect(row?.className).toContain('justify-between')
+    expect(row?.className).toContain('flex-wrap')
+  })
+
+  it('abre el diálogo de iniciar desde el encabezado', async () => {
+    const user = userEvent.setup()
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'PENDING_START' })))
+    renderDetail()
+
+    await user.click(await screen.findByRole('button', { name: /Iniciar viaje/ }))
+
+    expect(await screen.findByRole('dialog', { name: 'Iniciar viaje' })).toBeInTheDocument()
   })
 })

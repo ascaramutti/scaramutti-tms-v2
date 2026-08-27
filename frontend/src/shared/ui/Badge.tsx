@@ -9,6 +9,7 @@ export type BadgeVariant =
   | 'danger'
   | 'slate'
   | 'teal'
+  | 'violet'
 
 interface BadgeProps {
   children: ReactNode
@@ -23,6 +24,7 @@ const VARIANT_CLASSES: Record<BadgeVariant, string> = {
   danger: 'bg-rose-100 text-rose-700',
   slate: 'bg-slate-100 text-slate-700',
   teal: 'bg-teal-100 text-teal-700',
+  violet: 'bg-violet-100 text-violet-700',
 }
 
 /**
