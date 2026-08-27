@@ -23,7 +23,12 @@ export default defineConfig({
     // dependen de la zona, no que todo helper de fechas del sistema sea correcto
     // fuera de Lima. Lo que gana el cambio es que de aca en adelante cualquier test
     // de fecha se mide contra una zona que no es la de la operacion.
-    env: { TZ: 'Asia/Tokyo' },
+    //
+    // `FORCE_TZ` es la vía de escape. Sin ella, fijar la zona acá haría que
+    // `TZ=America/Lima npm test` ya no corriera en la zona de la operación, en silencio
+    // y justo el día que haga falta reproducir un problema de fechas como lo ve la
+    // oficina. Se comprobó que el valor de acá pisa al del entorno en los workers.
+    env: { TZ: process.env.FORCE_TZ ?? 'Asia/Tokyo' },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

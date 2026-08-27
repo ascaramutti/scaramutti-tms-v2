@@ -748,6 +748,34 @@ describe('ServiceDetailPage, las acciones de estado', () => {
     expect(row?.className).toContain('flex-wrap')
   })
 
+  it('tampoco las duplica en el estado donde conviven más botones', async () => {
+    // "En ruta" es el caso apretado: el encabezado ofrece dos acciones de estado y la
+    // ficha de recursos las suyas. El estado anterior tiene un solo botón de cada lado,
+    // así que no distingue un layout que se pisa de uno que no.
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    renderDetail()
+
+    expect(await screen.findAllByRole('button', { name: /Agregar refuerzo/ })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Finalizar viaje/ })).toHaveLength(1)
+    expect(screen.getAllByRole('button', { name: /Cancelar viaje/ })).toHaveLength(1)
+  })
+
+  it('ofrece cancelar también en un viaje sin recursos asignados', async () => {
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'PENDING_ASSIGNMENT' })))
+    renderDetail()
+
+    expect(await screen.findByRole('button', { name: /Cancelar viaje/ })).toBeInTheDocument()
+  })
+
+  it('al despacho no le ofrece cancelar, pero sí finalizar', async () => {
+    // Las dos mitades: sin la segunda, esconderle toda la barra al despacho pasaría.
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    renderDetail({ role: 'dispatcher' })
+
+    expect(await screen.findByRole('button', { name: /Finalizar viaje/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cancelar viaje/ })).not.toBeInTheDocument()
+  })
+
   it('abre el diálogo de iniciar desde el encabezado', async () => {
     const user = userEvent.setup()
     server.use(serviceDetailOk(fakeServiceDetail({ status: 'PENDING_START' })))

@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { axe } from 'vitest-axe'
 import { ServiceProgressModal } from './ServiceProgressModal'
+import { STATUS_NOTE_MAX_LENGTH } from '../../schemas/service-status.schema'
 import { server } from '../../../../test/mocks/server'
 import {
   DEFAULT_SERVICE_ETAG,
@@ -18,7 +19,8 @@ import {
   type ChangeStatusCaptureSink,
 } from '../../../../test/mocks/handlers/operations'
 import type { ServiceWithEtag } from '../../hooks/useService'
-import type { ServiceStatusTransition } from '../../status/serviceStatusTransitions'
+import type { ServiceProgressTransition } from '../../status/serviceStatusTransitions'
+import { operationsKeys } from '../../queryKeys'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -30,13 +32,23 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
  * 25/08 02:30 UTC = 24/08 21:30 en Lima y 25/08 11:30 en Tokio: tres valores distintos,
  * en dos días distintos.
  */
+/** Lejos de Lima y del signo opuesto: en los instantes que estos casos usan, las
+ * dos zonas están en días distintos, así que un error de zona no puede disfrazarse
+ * de un error de minutos.
+ *
+ * Respeta `FORCE_TZ`, igual que el config: el pin de acá existe por si alguien saca
+ * la línea de allá, no para anular la vía de escape. Sin esto,
+ * `FORCE_TZ=America/Lima npm test` dejaba corriendo en Tokio justo a los archivos
+ * que uno querría ver en Lima, y el guardián de abajo pasaba por el pin y no por
+ * la zona real. */
+const TEST_TIME_ZONE = process.env.FORCE_TZ ?? 'Asia/Tokyo'
 const ORIGINAL_TZ = process.env.TZ
 const NOW = new Date('2026-08-25T02:30:00Z')
 const NOW_IN_LIMA = '2026-08-24T21:30'
 const NOW_AS_INSTANT = '2026-08-25T02:30:00.000Z'
 
 beforeAll(() => {
-  process.env.TZ = 'Asia/Tokyo'
+  process.env.TZ = TEST_TIME_ZONE
 })
 
 afterAll(() => {
@@ -61,7 +73,7 @@ function serviceInCache(overrides: Partial<ServiceWithEtag> = {}): ServiceWithEt
 }
 
 function renderModal(
-  transition: ServiceStatusTransition = 'IN_PROGRESS',
+  transition: ServiceProgressTransition = 'IN_PROGRESS',
   service: ServiceWithEtag = serviceInCache(),
 ) {
   const onClose = vi.fn()
@@ -116,16 +128,47 @@ describe('ServiceProgressModal, la forma', () => {
     expect(field).not.toHaveValue('2026-08-25T02:30')
   })
 
-  it('topa el selector en el ahora de Lima', () => {
+  it('topa el selector en el ahora de Lima y lo mueve al minuto', () => {
     renderModal('IN_PROGRESS')
 
-    expect(screen.getByLabelText('Fecha y hora de inicio')).toHaveAttribute('max', NOW_IN_LIMA)
+    const field = screen.getByLabelText('Fecha y hora de inicio')
+    expect(field).toHaveAttribute('max', NOW_IN_LIMA)
+    // Y el par del caso que afirma el `aria-invalid` con el error puesto: sin esto, el
+    // campo puede nacer anunciado como inválido y nadie lo nota.
+    expect(field).not.toHaveAttribute('aria-invalid')
+    // El paso explícito. Hoy coincide con el default del control, así que lo que este
+    // caso ata es que la precisión la fije este formulario y no un default ajeno.
+    expect(field).toHaveAttribute('step', '60')
   })
 
-  it('deja la nota opcional', () => {
+  it('no se monta cuando está cerrado', () => {
+    // El formulario congela sus valores al montar, y el suyo incluye la hora actual:
+    // montado de entrada, precargaría la hora en que se abrió la pantalla.
+    render(<ServiceProgressModal isOpen={false} onClose={vi.fn()} transition="IN_PROGRESS" service={serviceInCache()} />)
+
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('deja la nota opcional y topada en el máximo', () => {
     renderModal('IN_PROGRESS')
 
-    expect(screen.getByLabelText(/Nota \(opcional\)/)).toBeInTheDocument()
+    const note = screen.getByLabelText(/Nota \(opcional\)/)
+    expect(note).toBeInTheDocument()
+    // El tope duro del campo, que es lo que impide llegar al rechazo del schema. El
+    // `.max()` está medido aparte, pero nada ataba que el campo lo aplicara.
+    expect(note).toHaveAttribute('maxlength', String(STATUS_NOTE_MAX_LENGTH))
+  })
+
+  it('anuncia junto al campo en qué zona se interpreta la hora', () => {
+    // Es el dato del que depende que el registro quede bien, y sin la asociación un
+    // lector de pantalla lee el rótulo y el valor, y nada más.
+    renderModal('IN_PROGRESS')
+
+    const field = screen.getByLabelText('Fecha y hora de inicio')
+    const describedIds = (field.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean)
+    const texts = describedIds.map((id) => document.getElementById(id)?.textContent ?? '')
+
+    expect(texts.join(' ')).toContain('Hora de Perú')
   })
 })
 
@@ -260,14 +303,28 @@ describe('ServiceProgressModal, la validación', () => {
     await user.click(screen.getByRole('button', { name: 'Iniciar viaje' }))
 
     await waitFor(() => expect(field).toHaveAttribute('aria-invalid', 'true'))
-    // Se comparan los ids: "hay un mensaje rojo en la pantalla" no es lo mismo que
-    // "el mensaje pertenece a ESTE campo", y un lector de pantalla solo anuncia lo
-    // segundo.
-    const describedBy = field.getAttribute('aria-describedby')
-    expect(describedBy).toBeTruthy()
-    const message = document.getElementById(describedBy as string)
+    // Se recorren los ids de la descripción: "hay un mensaje rojo en la pantalla" no
+    // es lo mismo que "el mensaje pertenece a ESTE campo", y un lector de pantalla
+    // solo anuncia lo segundo. Se recorre la lista y no se toma el atributo entero
+    // porque el campo describe también su texto de ayuda: afirmar sobre un id único
+    // ataría el caso a que la descripción tenga exactamente un elemento.
+    const describedIds = (field.getAttribute('aria-describedby') ?? '').split(' ').filter(Boolean)
+    const described = describedIds.map((id) => document.getElementById(id))
+    const message = described.find((element) => element?.getAttribute('role') === 'alert')
     expect(message).toHaveTextContent('La fecha no puede estar en el futuro')
-    expect(message).toHaveAttribute('role', 'alert')
+  })
+
+  it('limpia los caracteres de control al pegarlos en la nota', async () => {
+    // Es la capa que corre mientras se escribe, y el gemelo de cancelar ya la tenía
+    // medida. Sin ella, pegar un texto con un control invisible lo rechaza el schema
+    // con un mensaje sobre un carácter que el usuario no puede ver ni encontrar.
+    const { user } = renderModal('IN_PROGRESS')
+
+    const note = screen.getByLabelText(/Nota \(opcional\)/)
+    await user.click(note)
+    await user.paste('salió\u0000 con escolta')
+
+    expect(note).toHaveValue('salió con escolta')
   })
 
   it('acepta la fecha precargada sin tocarla', async () => {
@@ -319,7 +376,36 @@ describe('ServiceProgressModal, los errores', () => {
 
     await user.click(screen.getByRole('button', { name: 'Iniciar viaje' }))
 
-    expect(await screen.findByRole('button', { name: 'Actualizar datos' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Descartar y recargar' })).toBeInTheDocument()
+  })
+
+  it('al recargar vuelve a pedir el detalle, además de cerrar', async () => {
+    // La otra mitad de la acción, que es la que el nombre del botón promete: sin la
+    // invalidación, la pantalla queda con la versión vieja y la transición siguiente
+    // vuelve a dar 412 sin que nadie haya tocado nada.
+    server.use(changeStatusError(412, { detail: 'El viaje cambió mientras tanto.' }))
+    const { user, queryClient } = renderModal('IN_PROGRESS')
+    const invalidate = vi.spyOn(queryClient, 'invalidateQueries')
+
+    await user.click(screen.getByRole('button', { name: 'Iniciar viaje' }))
+    await user.click(await screen.findByRole('button', { name: 'Descartar y recargar' }))
+
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: operationsKeys.serviceDetail(serviceInCache().id),
+    })
+  })
+
+  it('al recargar cierra el diálogo', async () => {
+    // Sin esto, apretar el botón no producía ningún cambio visible: el mismo cartel
+    // rojo y el mismo formulario, y el usuario tenía que adivinar que ya podía
+    // reintentar.
+    server.use(changeStatusError(412, { detail: 'El viaje cambió mientras tanto.' }))
+    const { user, onClose } = renderModal('IN_PROGRESS')
+
+    await user.click(screen.getByRole('button', { name: 'Iniciar viaje' }))
+    await user.click(await screen.findByRole('button', { name: 'Descartar y recargar' }))
+
+    expect(onClose).toHaveBeenCalled()
   })
 
   it('no ofrece recargar ante un conflicto de estado', async () => {
@@ -330,7 +416,7 @@ describe('ServiceProgressModal, los errores', () => {
     await user.click(screen.getByRole('button', { name: 'Iniciar viaje' }))
 
     await screen.findByText('No se puede pasar de "Completado" a "En ruta"')
-    expect(screen.queryByRole('button', { name: 'Actualizar datos' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Descartar y recargar' })).not.toBeInTheDocument()
   })
 
   it('usa el mensaje propio solo cuando el servidor no manda nada', async () => {
@@ -405,6 +491,15 @@ describe('ServiceProgressModal, accesibilidad', () => {
     // pasó algo; cambiar el texto sin deshabilitar deja pasar el doble envío.
     const pending = await screen.findByRole('button', { name: /Iniciando/ })
     expect(pending).toBeDisabled()
+    // Y el formulario entero se congela, no solo el botón: un campo que sigue
+    // aceptando texto mientras el pedido viaja promete una edición que no se guarda.
+    expect(screen.getByLabelText(/Nota \(opcional\)/)).toBeDisabled()
+    const dateField = screen.getByLabelText('Fecha y hora de inicio')
+    expect(dateField).toBeDisabled()
+    // Y se VE apagado, con las mismas clases que el textarea de al lado: medir solo el
+    // atributo dejaba pasar un campo que no acepta escritura pero conserva aspecto de
+    // editable, que es el síntoma que esta línea existe para evitar.
+    expect(dateField).toHaveClass('bg-slate-50')
   })
 
   it('arranca con el foco en el campo de fecha', async () => {

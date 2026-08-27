@@ -1026,6 +1026,19 @@ export function changeStatusConflict(code: 'OPS-001' | 'OPS-004' | 'OPS-009', de
   )
 }
 
+/**
+ * Un 200 con el cuerpo vacío, que es lo que devolvería un gateway mal configurado.
+ *
+ * Existe para que la guarda del hook tenga quien la mate: sin ella, el cuerpo vacío
+ * llega al cache y deja ahí un "viaje" sin código, sin estado y sin cliente, que
+ * revienta al renderizarlo, lejos de donde se originó.
+ */
+export function changeStatusEmptyBody() {
+  return http.post(`${API}/services/:id/status`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
 /** Falla de red: ni cuerpo ni status, que es el camino del mensaje de respaldo. */
 export function changeStatusNetworkError() {
   return http.post(`${API}/services/:id/status`, () => HttpResponse.error())

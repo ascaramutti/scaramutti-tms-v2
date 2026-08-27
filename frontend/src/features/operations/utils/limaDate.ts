@@ -1,6 +1,7 @@
 /** Zona de toda la operación de la empresa. Perú no tiene horario de verano, pero se
- * ancla al nombre de la zona y nunca a un `-05:00` literal: el país sí tuvo cambios de
- * hora en 1990 y 1994, y una zona con nombre sobrevive a que vuelva a pasar. */
+ * ancla al nombre de la zona y nunca a un `-05:00` literal: el país sí los tuvo, y el
+ * de 1994 lo fija un caso de esta suite. Una zona con nombre sobrevive a que vuelva a
+ * pasar. */
 const LIMA_TIME_ZONE = 'America/Lima'
 
 /** `en-CA` formatea la fecha como `YYYY-MM-DD`, que es justo lo que el contrato pide. */
@@ -129,9 +130,14 @@ export function isFutureInLima(wallClock: string): boolean {
  *
  * La segunda pasada existe para el caso en que la corrección aterrice del otro lado de
  * un cambio de hora, donde el desplazamiento medido en el primer intento ya no es el que
- * rige en el instante corregido. Hoy en Perú no puede pasar; el módulo está escrito para
- * que siga siendo correcto si vuelve a pasar, que es la misma razón por la que ancla al
- * nombre de la zona.
+ * rige en el instante corregido. Perú tuvo esos saltos en 1990 y 1994, y por eso el
+ * módulo ancla al nombre de la zona en vez de a un desfase fijo.
+ *
+ * Lo que devuelve es siempre un instante REAL. En la hora que un adelanto de relojes se
+ * saltea —esa hora de pared no existió— no hay instante que le corresponda, y ahí elige
+ * el de antes del salto: `1994-01-01T00:00` sale como las 23:00 del 31 de diciembre. No
+ * es un caso alcanzable registrando un viaje de hoy; queda escrito para que nadie lo lea
+ * como que la ida y la vuelta coinciden siempre.
  */
 export function limaInputToIsoInstant(wallClock: string): string {
   const target = wallClockAsUtcMillis(wallClock)

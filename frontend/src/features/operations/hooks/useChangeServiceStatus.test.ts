@@ -11,9 +11,11 @@ import {
   ETAG_AFTER_WRITE,
   changeStatusCapture,
   changeStatusConflict,
+  changeStatusEmptyBody,
   changeStatusError,
   changeStatusWithoutEtag,
   fakeServiceDetail,
+  serviceDetailCounted,
   type ChangeStatusCaptureSink,
 } from '../../../test/mocks/handlers/operations'
 import type { ServiceWithEtag } from './useService'
@@ -122,12 +124,50 @@ describe('useChangeServiceStatus, lo que deja en el cache', () => {
     result.current.mutate({ ifMatch: DEFAULT_SERVICE_ETAG, body: BODY })
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true))
-    // Las dos mitades: que se haya invalidado, y que NO haya quedado un cuerpo sin
-    // versión pisando al que sí la tenía.
+    // Las dos mitades: que se haya invalidado, y que el cuerpo sin versión NO haya
+    // pisado al que sí la tenía.
     expect(invalidate).toHaveBeenCalledWith({
       queryKey: operationsKeys.serviceDetail(SERVICE_ID),
     })
-    expect(detail()?._etag).not.toBe(null)
+    // Se afirma el valor que TIENE que estar, no la ausencia del valor malo: escribir
+    // el cuerpo sin `_etag` deja el campo en `undefined`, y `undefined` no es `null`,
+    // así que la forma negativa pasaba con la degradación puesta. Lo que se conserva
+    // es el detalle anterior, entero, hasta que la invalidación traiga el nuevo.
+    expect(detail()?._etag).toBe(DEFAULT_SERVICE_ETAG)
+    expect(detail()?.status).toBe(fakeServiceDetail().status)
+  })
+
+  it('no vuelve a pedir el detalle: lo escribe desde su propia respuesta', async () => {
+    // Es la promesa del hook: invalidar en vez de escribir cuesta una consulta y abre
+    // una ventana en la que la pantalla muestra el estado viejo.
+    //
+    // Lo que caza el cambio es la aserción del ESTADO: invalidando, el cache se queda
+    // con el detalle viejo y nunca llega el nuevo. El contador de pedidos acompaña, y
+    // se deja escrito lo que puede y lo que no: acá no hay observador montado de esa
+    // query, y react-query solo refetchea las activas, así que el contador no sube ni
+    // con la invalidación puesta. Sirve como cota, no como verdugo.
+    const detailSink: { calls?: number } = {}
+    server.use(serviceDetailCounted(detailSink), changeStatusCapture({}))
+    const { result, detail } = setup()
+
+    result.current.mutate({ ifMatch: DEFAULT_SERVICE_ETAG, body: BODY })
+
+    await waitFor(() => expect(result.current.isSuccess).toBe(true))
+    expect(detail()?.status).toBe('IN_PROGRESS')
+    expect(detailSink.calls).toBe(0)
+  })
+
+  it('rechaza una respuesta sin cuerpo en vez de guardarla', async () => {
+    server.use(changeStatusEmptyBody())
+    const { result, detail } = setup()
+
+    result.current.mutate({ ifMatch: DEFAULT_SERVICE_ETAG, body: BODY })
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    // Las dos mitades: que haya fallado, y que no haya escrito basura ANTES de fallar.
+    // Sin la guarda, el cache se queda con un objeto que solo tiene `_etag`.
+    expect(detail()?.code).toBe(fakeServiceDetail().code)
+    expect(detail()?._etag).toBe(DEFAULT_SERVICE_ETAG)
   })
 
   it('invalida el listado y los indicadores, y nada más', async () => {

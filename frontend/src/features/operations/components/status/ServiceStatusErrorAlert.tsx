@@ -4,7 +4,9 @@ interface ServiceStatusErrorAlertProps {
   error: unknown
   /** Qué decir cuando el servidor no mandó cuerpo (red caída, 5xx pelado). */
   fallback: string
-  /** Vuelve a pedir el detalle del viaje. Solo se ofrece ante un 412. */
+  /** Vuelve a pedir el detalle del viaje y cierra el diálogo. Solo se ofrece ante un
+   * 412, y el texto del botón nombra las dos cosas: lo que se pierde al apretarlo es lo
+   * que el usuario acababa de escribir. */
   onRefresh: () => void
 }
 
@@ -26,8 +28,8 @@ export function ServiceStatusErrorAlert({
   onRefresh,
 }: ServiceStatusErrorAlertProps) {
   return (
-    <div className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
-      <p role="alert" className="text-sm text-red-700">
+    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
+      <p className="text-sm text-red-700">
         {getApiErrorMessage(error, fallback)}
       </p>
       {isPreconditionFailedError(error) && (
@@ -36,7 +38,7 @@ export function ServiceStatusErrorAlert({
           onClick={onRefresh}
           className="mt-2 inline-flex items-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
         >
-          Actualizar datos
+          Descartar y recargar
         </button>
       )}
     </div>

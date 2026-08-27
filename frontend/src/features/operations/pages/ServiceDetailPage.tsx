@@ -20,15 +20,15 @@ const SECONDARY_LINK =
   'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
 
 /**
- * Detalle de un viaje, en lectura.
+ * Detalle de un viaje: lo que se sabe de él, y las acciones que lo mueven.
  *
  * Entran los cinco roles del módulo. El despacho lo ve sin los importes: el
  * servidor se los OMITE (RN-OP8), y la pantalla no arma la tarjeta del precio para
  * no dejar una ficha con guiones donde los demás ven un número.
  *
  * Desde acá se asignan los recursos del viaje y se lo mueve de estado. Las cinco
- * transiciones son un mismo endpoint; de ellas, iniciar y finalizar ya se ofrecen
- * junto al badge del encabezado, y cancelar, eliminar y reabrir llegan en su propio
+ * transiciones son un mismo endpoint; de ellas, iniciar, finalizar y cancelar ya se
+ * ofrecen junto al badge del encabezado, y eliminar y reabrir llegan en su propio
  * cambio. Ventas entra a la pantalla pero no opera el viaje, así que ve las fichas
  * sin las acciones.
  */

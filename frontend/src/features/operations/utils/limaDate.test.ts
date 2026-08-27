@@ -97,10 +97,20 @@ describe('isPastInLima', () => {
  * alguien saca esa línea del config, sin esto los casos de abajo pasarían a medir la
  * zona de quien los corra, y bajo Lima ninguno podría fallar.
  */
+/** Lejos de Lima y del signo opuesto: en los instantes que estos casos usan, las dos
+ * zonas están en días distintos, así que un error de zona no puede disfrazarse de un
+ * error de minutos.
+ *
+ * Respeta `FORCE_TZ`, igual que el config: el pin de acá existe por si alguien saca la
+ * línea de allá, no para anular la vía de escape. Sin esto,
+ * `FORCE_TZ=America/Lima npm test` dejaba corriendo en Tokio justo a los archivos que
+ * uno querría ver en Lima, y el guardián de abajo pasaba por el pin y no por la zona
+ * real. */
+const TEST_TIME_ZONE = process.env.FORCE_TZ ?? 'Asia/Tokyo'
 const ORIGINAL_TZ = process.env.TZ
 
 beforeAll(() => {
-  process.env.TZ = 'Asia/Tokyo'
+  process.env.TZ = TEST_TIME_ZONE
 })
 
 afterAll(() => {
@@ -164,12 +174,19 @@ describe('limaInputToIsoInstant', () => {
   it('da el mismo instante desde cualquier zona del proceso', () => {
     // Incluye a Lima a propósito: es la única zona donde el cálculo ingenuo acierta,
     // así que su presencia deja escrito que las otras tres son las que miden.
-    for (const timeZone of ['Asia/Tokyo', 'Pacific/Honolulu', 'UTC', 'America/Lima']) {
-      process.env.TZ = timeZone
+    //
+    // El `finally` no es adorno: sin él, una aserción que falle en la segunda zona deja
+    // el proceso ahí, y los `describe` siguientes se caen en cascada bajo una zona que
+    // nadie eligió. Serían rojos que parecen del código y son del armado.
+    try {
+      for (const timeZone of ['Asia/Tokyo', 'Pacific/Honolulu', 'UTC', 'America/Lima']) {
+        process.env.TZ = timeZone
 
-      expect(limaInputToIsoInstant('2026-08-24T21:30')).toBe('2026-08-25T02:30:00.000Z')
+        expect(limaInputToIsoInstant('2026-08-24T21:30')).toBe('2026-08-25T02:30:00.000Z')
+      }
+    } finally {
+      process.env.TZ = TEST_TIME_ZONE
     }
-    process.env.TZ = 'Asia/Tokyo'
   })
 
   it('conserva los minutos', () => {
@@ -191,6 +208,14 @@ describe('limaInputToIsoInstant', () => {
     // bucle se puede recortar a una vuelta sin que nada se ponga en rojo.
     expect(limaInputToIsoInstant('1994-01-01T01:00')).toBe('1994-01-01T05:00:00.000Z')
     expect(limaInputToIsoInstant('1994-01-01T01:00')).not.toBe('1994-01-01T06:00:00.000Z')
+  })
+
+  it('devuelve un instante real para una hora de pared que no existió', () => {
+    // El 1 de enero de 1994 los relojes saltaron de las 23:59 a la 01:00, así que las
+    // 00:00 de ese día nunca ocurrieron en Lima. No hay instante que les corresponda:
+    // el resultado es el de antes del salto, y el caso lo fija para que nadie lea la
+    // conversión como una ida y vuelta que siempre coincide.
+    expect(limaInputToIsoInstant('1994-01-01T00:00')).toBe('1994-01-01T04:00:00.000Z')
   })
 
   it('acepta el valor con segundos que devuelven algunos navegadores', () => {

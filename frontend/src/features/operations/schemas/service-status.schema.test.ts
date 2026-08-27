@@ -1,7 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  CANCEL_REASON_MIN_LENGTH,
   STATUS_NOTE_MAX_LENGTH,
+  cancelServiceFormSchema,
   serviceProgressFormSchema,
+  toCancelServiceRequest,
   toServiceProgressRequest,
 } from './service-status.schema'
 
@@ -10,10 +13,20 @@ import {
  * cuenta y la que usa la zona del navegador dan lo mismo, así que estos casos solo
  * distinguen una de otra si el proceso corre en otra parte.
  */
+/** Lejos de Lima y del signo opuesto: en los instantes que estos casos usan, las
+ * dos zonas están en días distintos, así que un error de zona no puede disfrazarse
+ * de un error de minutos.
+ *
+ * Respeta `FORCE_TZ`, igual que el config: el pin de acá existe por si alguien saca
+ * la línea de allá, no para anular la vía de escape. Sin esto,
+ * `FORCE_TZ=America/Lima npm test` dejaba corriendo en Tokio justo a los archivos
+ * que uno querría ver en Lima, y el guardián de abajo pasaba por el pin y no por
+ * la zona real. */
+const TEST_TIME_ZONE = process.env.FORCE_TZ ?? 'Asia/Tokyo'
 const ORIGINAL_TZ = process.env.TZ
 
 beforeAll(() => {
-  process.env.TZ = 'Asia/Tokyo'
+  process.env.TZ = TEST_TIME_ZONE
 })
 
 afterAll(() => {
@@ -168,5 +181,96 @@ describe('toServiceProgressRequest', () => {
     const body = toServiceProgressRequest({ dateTime: NOW_IN_LIMA, note: '' }, 'IN_PROGRESS')
 
     expect('force' in body).toBe(false)
+  })
+
+  it('limpia los caracteres de control aunque el schema ya los rechace', () => {
+    // Igual que en la cancelación: por la aplicación no llega, y por eso esta segunda
+    // reja se mide sola.
+    const body = toServiceProgressRequest(
+      { dateTime: NOW_IN_LIMA, note: 'salió\u0000 con escolta' },
+      'IN_PROGRESS',
+    )
+
+    expect(body.note).toBe('salió con escolta')
+  })
+})
+
+describe('cancelServiceFormSchema', () => {
+  function parseCancel(note: string) {
+    return cancelServiceFormSchema.safeParse({ note })
+  }
+
+  it('rechaza un motivo de un caracter menos que el mínimo', () => {
+    const result = parseCancel('x'.repeat(CANCEL_REASON_MIN_LENGTH - 1))
+
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0]?.path).toEqual(['note'])
+    expect(result.error?.issues[0]?.message).toBe('El motivo debe tener al menos 10 caracteres')
+  })
+
+  it('acepta un motivo de exactamente el mínimo', () => {
+    // El vecino del caso anterior. Con uno solo, un mínimo escrito de más pasa igual.
+    expect(parseCancel('x'.repeat(CANCEL_REASON_MIN_LENGTH)).success).toBe(true)
+  })
+
+  it('acepta un motivo de exactamente el máximo', () => {
+    expect(parseCancel('x'.repeat(STATUS_NOTE_MAX_LENGTH)).success).toBe(true)
+  })
+
+  it('rechaza un motivo de un caracter más que el máximo', () => {
+    // El mínimo no reemplaza al máximo: son dos bordes y cada uno necesita su par.
+    expect(parseCancel('x'.repeat(STATUS_NOTE_MAX_LENGTH + 1)).success).toBe(false)
+  })
+
+  it('no acepta un motivo hecho solo de espacios', () => {
+    // Doce espacios pasan un mínimo de diez medido antes del recorte, así que este
+    // largo es el que distingue las dos implementaciones.
+    expect(parseCancel(' '.repeat(12)).success).toBe(false)
+  })
+
+  it('exige el motivo', () => {
+    expect(parseCancel('').success).toBe(false)
+  })
+
+  it('rechaza los caracteres de control', () => {
+    // El motivo es el único texto obligatorio de la entrega: siempre viaja, y va a una
+    // columna de texto de PostgreSQL, que no admite el byte NUL. La nota del avance ya
+    // tenía su caso y este se había quedado sin el suyo, que es el hueco clásico de
+    // copiar la regla y no el caso.
+    expect(parseCancel('reprogramó\u0000 la obra').success).toBe(false)
+  })
+})
+
+describe('toCancelServiceRequest', () => {
+  const VALID_REASON = 'El cliente reprogramó la obra'
+
+  it('manda el destino y el motivo recortado', () => {
+    const body = toCancelServiceRequest({ note: `  ${VALID_REASON}  ` })
+
+    expect(body.target).toBe('CANCELLED')
+    expect(body.note).toBe(VALID_REASON)
+  })
+
+  it('omite la fecha en vez de mandarla en null', () => {
+    // Las dos formas funcionan (el servidor mira el valor, no la presencia de la
+    // clave), así que la elección es por cuerpo mínimo. Se afirma sobre la CLAVE
+    // porque `toBeUndefined()` no distingue "no está" de "está en null".
+    const body = toCancelServiceRequest({ note: VALID_REASON })
+
+    expect('dateTime' in body).toBe(false)
+  })
+
+  it('no manda la bandera de forzado', () => {
+    expect('force' in toCancelServiceRequest({ note: VALID_REASON })).toBe(false)
+  })
+
+  it('limpia los caracteres de control aunque el schema ya los rechace', () => {
+    // Se le pasa el valor SIN pasar por el schema, a propósito: por la aplicación esto
+    // no llega nunca (el schema lo corta antes), y por eso la limpieza del mapper no
+    // tenía quien la matara. Es la segunda reja de la misma regla y se mide aparte,
+    // porque el día que alguien arme el cuerpo por otro camino es la única que queda.
+    const body = toCancelServiceRequest({ note: 'reprogramó\u0000 la obra' })
+
+    expect(body.note).toBe('reprogramó la obra')
   })
 })

@@ -38,8 +38,18 @@ export function canSeeServicePrices(role: UserRole | undefined): boolean {
  * Decide si la pantalla ofrece los botones. La garantía es del servidor; acá se evita
  * mostrarle a ventas un camino que termina en 403. Ventas igual ve las fichas con los
  * recursos: se le saca la acción, no el dato.
+ *
+ * Declara que estrecha el tipo (`role is UserRole`) y no un `boolean` a secas, para que
+ * quien pregunte primero por acá no tenga que volver a contemplar el rol ausente. Sin
+ * eso, esa segunda guarda hay que escribirla igual para que compile, y la forma natural
+ * de escribirla —"sin rol, no vetado"— dice que quien no tiene rol puede todo, que es
+ * el default exacto contra el que este módulo está construido.
+ *
+ * Lo que el predicado NO dice: en la rama FALSA el tipo queda en `undefined`, y eso no
+ * es cierto, porque ventas también da `false`. Quien necesite el rol ahí tiene que
+ * preguntarle a la lista, no a esta función.
  */
-export function canOperateService(role: UserRole | undefined): boolean {
+export function canOperateService(role: UserRole | undefined): role is UserRole {
   return role !== undefined && SERVICE_OPERATE_ROLES.includes(role)
 }
 

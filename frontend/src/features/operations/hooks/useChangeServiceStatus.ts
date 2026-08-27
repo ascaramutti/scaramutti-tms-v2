@@ -4,7 +4,8 @@ import { operationsKeys } from '../queryKeys'
 import { writeServiceDetail } from './serviceDetailCache'
 
 interface ChangeServiceStatusVariables {
-  /** ETag OPACO del header de la respuesta anterior (no el `updatedAt` del cuerpo). */
+  /** ETag del header de la respuesta anterior, que se reenvía TAL CUAL. No se arma con
+   * el `updatedAt` del cuerpo: el porqué está en `useService`. */
   ifMatch: string | null
   body: ChangeStatusRequest
 }
@@ -29,7 +30,9 @@ interface ChangeServiceStatusVariables {
  *
  * Se invalidan el listado y los indicadores, y nada más. Cambiar de estado mueve la fila
  * de la tabla y los contadores del tablero, que se agrupan justamente por estado. El
- * detalle no se invalida: se ESCRIBE con la respuesta, que ya lo trae completo.
+ * detalle no se invalida: se ESCRIBE con la respuesta, que ya lo trae completo. La
+ * excepción la decide `writeServiceDetail`, que sí invalida cuando la respuesta llega
+ * sin ETag, para no dejar guardada una versión que no existe.
  */
 export function useChangeServiceStatus(serviceId: number) {
   const queryClient = useQueryClient()
@@ -41,7 +44,12 @@ export function useChangeServiceStatus(serviceId: number) {
         body,
         throwOnError: true,
       })
-      if (!data) {
+      // Se pregunta por el `id` y no por el objeto entero, y la diferencia está
+      // medida: ante un 200 con el cuerpo vacío el cliente generado no entrega `null`
+      // sino `{}`, así que un `if (!data)` no dispara y el objeto sin un solo campo
+      // llega igual al cache. Ahí adentro deja un viaje sin código y sin estado, que
+      // revienta al renderizarlo, lejos de acá.
+      if (!data?.id) {
         throw new Error('Respuesta vacía del backend en POST /services/{id}/status')
       }
       return { data, headers }
