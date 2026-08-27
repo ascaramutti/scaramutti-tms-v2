@@ -1039,6 +1039,31 @@ export function changeStatusEmptyBody() {
   )
 }
 
+/**
+ * Un 200 con el cuerpo vacío en los otros tres endpoints que escriben el detalle.
+ *
+ * Existe por lo mismo que su hermano de la transición: los cuatro hooks del módulo
+ * guardan la respuesta en el MISMO lugar y con la MISMA función, así que a los cuatro
+ * les cabe el mismo daño si el cuerpo vacío pasa de largo.
+ */
+export function assignResourcesEmptyBody() {
+  return http.post(`${API}/services/:id/assignment`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
+export function addResourcesEmptyBody() {
+  return http.post(`${API}/services/:id/resources`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
+export function removeResourceEmptyBody() {
+  return http.delete(`${API}/services/:id/resources/:assignmentId`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
 /** Falla de red: ni cuerpo ni status, que es el camino del mensaje de respaldo. */
 export function changeStatusNetworkError() {
   return http.post(`${API}/services/:id/status`, () => HttpResponse.error())

@@ -16,6 +16,7 @@ import {
   fakeAdditionalResource,
   fakeServiceDetail,
   type AddResourcesCaptureSink,
+  addResourcesEmptyBody,
 } from '../../../test/mocks/handlers/operations'
 import type { ServiceWithEtag } from './useService'
 
@@ -144,5 +145,23 @@ describe('useAddServiceResources', () => {
     // el mismo 409, y lo único que los separa es el código y la bandera.
     expect(problem?.code).toBe('OPS-002')
     expect(problem?.forcible).toBe(true)
+  })
+})
+
+describe('useAddServiceResources, la respuesta vacía', () => {
+  it('la rechaza en vez de guardarla en el cache', async () => {
+    // El cliente generado hace `data ?? {}`, así que un 200 con el cuerpo vacío no
+    // llega como null: llega como un objeto sin un solo campo. Sin la guarda, ese
+    // objeto se escribe en el detalle y deja un viaje sin código y sin estado, que
+    // revienta al renderizarlo lejos de acá.
+    server.use(addResourcesEmptyBody())
+    const { result, detail } = setup()
+
+    result.current.mutate(BODY)
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    // El valor que TIENE que seguir estando, no su mera presencia: un objeto parcial
+    // que conservara `code` con el ETag pisado pasaría un `toBeDefined()`.
+    expect(detail()?._etag).toBe(DEFAULT_SERVICE_ETAG)
   })
 })

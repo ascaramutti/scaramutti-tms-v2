@@ -24,7 +24,10 @@ export function useAddServiceResources(serviceId: number) {
         body,
         throwOnError: true,
       })
-      if (!data) {
+      // Por el `id` y no por el objeto: el cliente generado hace `data ?? {}`, así
+      // que ante un 200 con cuerpo vacío `!data` no dispara y el objeto sin un solo
+      // campo llega al cache, donde revienta al renderizarlo lejos de acá.
+      if (!data?.id) {
         throw new Error('Respuesta vacía del backend en POST /services/{id}/resources')
       }
       return { data, headers }
