@@ -7,6 +7,21 @@ interface ResourceConflictAlertProps {
   error: ServiceOperationError
   /** Rótulo del botón que reintenta forzando. Solo se usa si el conflicto es forzable. */
   forceLabel: string
+  /**
+   * Qué queda después de forzar, cuando forzar deja algo que el usuario debería saber.
+   *
+   * Se anuncia por el `aria-describedby` del botón, o sea al enfocarlo: la región viva es
+   * el párrafo del encabezado (ver abajo), y este texto es hermano suyo, no hijo, así que
+   * no se lee solo al aparecer.
+   *
+   * Va DENTRO del recuadro igual, por dos razones que se ven al sacarlo: aparece antes que
+   * el botón en el orden de lectura, o sea antes de la acción que explica, y comparte el
+   * fondo del aviso en vez de quedar en el registro tipográfico de la letra chica.
+   *
+   * Solo lo pasa quien lo necesita: al asignar recursos no aplica, porque ahí el usuario
+   * todavía puede elegir otro.
+   */
+  forceConsequence?: string
   onForce: () => void
   isPending: boolean
 }
@@ -27,6 +42,13 @@ interface ResourceConflictAlertProps {
  */
 const CONFLICT_HEADING = 'Uno o más recursos ya están asignados a otro viaje.'
 
+/*
+ * Id fijo y no generado: el párrafo al que apunta solo se renderiza cuando llega
+ * `forceConsequence`, y un solo llamador la pasa (`grep -rn "forceConsequence="`). Si un
+ * segundo la pasara, este id habría que generarlo.
+ */
+const FORCE_CONSEQUENCE_ID = 'force-consequence'
+
 /**
  * El aviso de un conflicto de recursos: qué recurso choca y en qué viaje, y el botón
  * de forzar cuando corresponde.
@@ -45,6 +67,7 @@ const CONFLICT_HEADING = 'Uno o más recursos ya están asignados a otro viaje.'
 export function ResourceConflictAlert({
   error,
   forceLabel,
+  forceConsequence,
   onForce,
   isPending,
 }: ResourceConflictAlertProps) {
@@ -57,7 +80,10 @@ export function ResourceConflictAlert({
             lector recita las cuatro cabeceras y las N filas seguidas, que es
             justamente el detalle que se pierde. La tabla queda al lado, navegable con
             los comandos de tabla, y el botón fuera de la región viva. */}
-        <p role="alert" className="text-sm text-amber-900">
+        <p
+          role="alert"
+          className={`text-sm text-amber-900${forceConsequence ? ' font-medium' : ''}`}
+        >
           {error.conflicts.length > 0 ? CONFLICT_HEADING : error.detail}
         </p>
 
@@ -98,14 +124,22 @@ export function ResourceConflictAlert({
         )}
 
         {error.forcible && (
-          <button
-            type="button"
-            onClick={onForce}
-            disabled={isPending}
-            className="mt-3 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
-          >
-            {forceLabel}
-          </button>
+          <>
+            {forceConsequence && (
+              <p id={FORCE_CONSEQUENCE_ID} className="mt-3 text-sm text-amber-900">
+                {forceConsequence}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={onForce}
+              disabled={isPending}
+              aria-describedby={forceConsequence ? FORCE_CONSEQUENCE_ID : undefined}
+              className="mt-3 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+            >
+              {forceLabel}
+            </button>
+          </>
         )}
       </div>
     </div>

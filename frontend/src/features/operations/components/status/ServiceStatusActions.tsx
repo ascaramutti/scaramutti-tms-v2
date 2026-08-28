@@ -1,14 +1,15 @@
 import { useState } from 'react'
-import { CheckCircle2, Play, XCircle } from 'lucide-react'
+import { CheckCircle2, Play, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import type { UserRole } from '../../../../api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import type { ServiceWithEtag } from '../../hooks/useService'
 import {
   SERVICE_STATUS_TRANSITION_PRESENTATION,
   availableServiceStatusTransitions,
+  isExitTransition,
   type ServiceStatusTransition,
 } from '../../status/serviceStatusTransitions'
-import { CancelServiceModal } from './CancelServiceModal'
+import { ServiceExitModal } from './ServiceExitModal'
 import { ServiceProgressModal } from './ServiceProgressModal'
 
 interface ServiceStatusActionsProps {
@@ -20,17 +21,25 @@ const TRANSITION_ICONS: Record<ServiceStatusTransition, typeof Play> = {
   IN_PROGRESS: Play,
   COMPLETED: CheckCircle2,
   CANCELLED: XCircle,
+  DELETED: Trash2,
+  REOPENED: RotateCcw,
 }
 
 /**
- * Cancelar se ofrece en gris y no en rojo. El rojo está reservado para el botón que
- * confirma dentro del diálogo, que es donde la acción de verdad ocurre; acá, junto al
- * botón de avanzar, teñiría de alarma un encabezado que se mira todo el tiempo.
+ * Las dos salidas se ofrecen en gris: sacan el viaje del circuito, pero no son la acción
+ * principal de una pantalla que se mira todo el tiempo, y en rojo teñirían de alarma el
+ * encabezado entero. El rojo queda para el botón que confirma dentro del diálogo, que es
+ * donde la acción de verdad ocurre.
+ *
+ * Reabrir no sigue esa regla porque no destruye nada: repara. Es primario en los dos
+ * lugares, y en la pantalla de un viaje que ya salió del circuito no compite con nada.
  */
 const TRANSITION_BUTTON_STYLES: Record<ServiceStatusTransition, string> = {
   IN_PROGRESS: PRIMARY_BUTTON,
   COMPLETED: PRIMARY_BUTTON,
   CANCELLED: SECONDARY_BUTTON,
+  DELETED: SECONDARY_BUTTON,
+  REOPENED: PRIMARY_BUTTON,
 }
 
 /**
@@ -78,20 +87,26 @@ export function ServiceStatusActions({ service, role }: ServiceStatusActionsProp
         </div>
       )}
 
-      {/* Cada transición abre SU diálogo. El de avanzar recibe un tipo que no admite
-          cancelar, así que cruzarlos no compila. */}
-      {openTransition === 'CANCELLED' ? (
-        <CancelServiceModal isOpen onClose={() => setOpenTransition(null)} service={service} />
-      ) : (
-        openTransition !== null && (
+      {/* Dos diálogos, no cinco: los que avanzan el viaje piden fecha y nota, y los que
+          lo sacan del circuito o lo devuelven piden versión y motivo. Cada uno recibe un
+          tipo que no admite las transiciones del otro, así que cruzarlos no compila. */}
+      {openTransition !== null &&
+        (isExitTransition(openTransition) ? (
+          <ServiceExitModal
+            isOpen
+            onClose={() => setOpenTransition(null)}
+            transition={openTransition}
+            service={service}
+            role={role}
+          />
+        ) : (
           <ServiceProgressModal
             isOpen
             onClose={() => setOpenTransition(null)}
             transition={openTransition}
             service={service}
           />
-        )
-      )}
+        ))}
     </>
   )
 }

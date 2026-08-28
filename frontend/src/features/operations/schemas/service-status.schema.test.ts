@@ -1,10 +1,10 @@
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
-  CANCEL_REASON_MIN_LENGTH,
+  SERVICE_EXIT_REASON_MIN_LENGTH,
   STATUS_NOTE_MAX_LENGTH,
-  cancelServiceFormSchema,
+  serviceExitFormSchema,
   serviceProgressFormSchema,
-  toCancelServiceRequest,
+  toServiceExitRequest,
   toServiceProgressRequest,
 } from './service-status.schema'
 
@@ -195,13 +195,13 @@ describe('toServiceProgressRequest', () => {
   })
 })
 
-describe('cancelServiceFormSchema', () => {
+describe('serviceExitFormSchema', () => {
   function parseCancel(note: string) {
-    return cancelServiceFormSchema.safeParse({ note })
+    return serviceExitFormSchema.safeParse({ note })
   }
 
   it('rechaza un motivo de un caracter menos que el mínimo', () => {
-    const result = parseCancel('x'.repeat(CANCEL_REASON_MIN_LENGTH - 1))
+    const result = parseCancel('x'.repeat(SERVICE_EXIT_REASON_MIN_LENGTH - 1))
 
     expect(result.success).toBe(false)
     expect(result.error?.issues[0]?.path).toEqual(['note'])
@@ -210,7 +210,7 @@ describe('cancelServiceFormSchema', () => {
 
   it('acepta un motivo de exactamente el mínimo', () => {
     // El vecino del caso anterior. Con uno solo, un mínimo escrito de más pasa igual.
-    expect(parseCancel('x'.repeat(CANCEL_REASON_MIN_LENGTH)).success).toBe(true)
+    expect(parseCancel('x'.repeat(SERVICE_EXIT_REASON_MIN_LENGTH)).success).toBe(true)
   })
 
   it('acepta un motivo de exactamente el máximo', () => {
@@ -241,11 +241,11 @@ describe('cancelServiceFormSchema', () => {
   })
 })
 
-describe('toCancelServiceRequest', () => {
+describe('toServiceExitRequest', () => {
   const VALID_REASON = 'El cliente reprogramó la obra'
 
   it('manda el destino y el motivo recortado', () => {
-    const body = toCancelServiceRequest({ note: `  ${VALID_REASON}  ` })
+    const body = toServiceExitRequest({ note: `  ${VALID_REASON}  ` }, 'CANCELLED')
 
     expect(body.target).toBe('CANCELLED')
     expect(body.note).toBe(VALID_REASON)
@@ -255,13 +255,28 @@ describe('toCancelServiceRequest', () => {
     // Las dos formas funcionan (el servidor mira el valor, no la presencia de la
     // clave), así que la elección es por cuerpo mínimo. Se afirma sobre la CLAVE
     // porque `toBeUndefined()` no distingue "no está" de "está en null".
-    const body = toCancelServiceRequest({ note: VALID_REASON })
+    const body = toServiceExitRequest({ note: VALID_REASON }, 'CANCELLED')
 
     expect('dateTime' in body).toBe(false)
   })
 
   it('no manda la bandera de forzado', () => {
-    expect('force' in toCancelServiceRequest({ note: VALID_REASON })).toBe(false)
+    expect('force' in toServiceExitRequest({ note: VALID_REASON }, 'CANCELLED')).toBe(false)
+  })
+
+  it.each(['CANCELLED', 'DELETED', 'REOPENED'] as const)('manda el destino %s', (target) => {
+    expect(toServiceExitRequest({ note: VALID_REASON }, target).target).toBe(target)
+  })
+
+  it('manda la bandera de forzado SOLO al reabrir y solo cuando se pidió', () => {
+    // Es la única bandera que autoriza al servidor a pisar la reja de conflictos, así que
+    // no viaja por defecto: ausente y `false` son lo mismo para él, y un cuerpo mínimo no
+    // deja lugar a que alguien lea la clave como que acá se puede forzar siempre.
+    const forzado = toServiceExitRequest({ note: VALID_REASON }, 'REOPENED', true)
+    const sinForzar = toServiceExitRequest({ note: VALID_REASON }, 'REOPENED', false)
+
+    expect(forzado.force).toBe(true)
+    expect('force' in sinForzar).toBe(false)
   })
 
   it('limpia los caracteres de control aunque el schema ya los rechace', () => {
@@ -269,7 +284,7 @@ describe('toCancelServiceRequest', () => {
     // no llega nunca (el schema lo corta antes), y por eso la limpieza del mapper no
     // tenía quien la matara. Es la segunda reja de la misma regla y se mide aparte,
     // porque el día que alguien arme el cuerpo por otro camino es la única que queda.
-    const body = toCancelServiceRequest({ note: 'reprogramó\u0000 la obra' })
+    const body = toServiceExitRequest({ note: 'reprogramó\u0000 la obra' }, 'CANCELLED')
 
     expect(body.note).toBe('reprogramó la obra')
   })

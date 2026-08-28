@@ -1064,6 +1064,27 @@ export function removeResourceEmptyBody() {
   )
 }
 
+/**
+ * El 409 forzable en el camino de la REAPERTURA, que es la única transición que mueve
+ * recursos: los que el viaje conservaba y que otro viaje se llevó mientras estuvo fuera
+ * del circuito.
+ *
+ * Mismo cuerpo que su gemelo de la asignación, otro endpoint. Se escribe aparte y no se
+ * parametriza aquel: quien lea el de asignación tiene que seguir viendo a qué endpoint
+ * responde sin ir a mirar un argumento.
+ */
+export function changeStatusResourceConflict(
+  conflicts: readonly ResourceConflicts[number][],
+  detail = 'El conductor Juan Pérez Huamán ya está asignado al servicio SRV-0042 (en ruta).',
+) {
+  return http.post(`${API}/services/:id/status`, () =>
+    HttpResponse.json(
+      { ...conflictProblem(detail, [...conflicts]), instance: `${API}/services/77/status` },
+      { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
 /** Falla de red: ni cuerpo ni status, que es el camino del mensaje de respaldo. */
 export function changeStatusNetworkError() {
   return http.post(`${API}/services/:id/status`, () => HttpResponse.error())
