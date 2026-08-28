@@ -2,6 +2,7 @@ import { http, HttpResponse, delay } from 'msw'
 import type {
   AddResourcesRequest,
   AssignResourcesRequest,
+  ChangeStatusRequest,
   DriverResponse,
   PageMeta,
   PageOfServiceSummary,
@@ -934,3 +935,152 @@ export const operationsHandlers = [
   createServiceOk(),
   driversList(),
 ]
+
+// ---------- Cambio de estado (POST /services/:id/status) ----------------------
+
+/**
+ * Lo que el cambio de estado dejó en el camino.
+ *
+ * Guarda el HISTORIAL de las dos cosas y no la última, por el mismo motivo que la
+ * asignación: sin él, "no se mandó una segunda vez" no se distingue de "no se mandó
+ * ninguna", y el `If-Match` ausente no se distingue de un handler que nunca corrió.
+ */
+export interface ChangeStatusCaptureSink {
+  bodies?: ChangeStatusRequest[]
+  ifMatches?: (string | null)[]
+  urls?: string[]
+}
+
+function pushChangeStatusCall(sink: ChangeStatusCaptureSink, request: Request, body: unknown) {
+  sink.bodies = [...(sink.bodies ?? []), body as ChangeStatusRequest]
+  sink.ifMatches = [...(sink.ifMatches ?? []), request.headers.get('If-Match')]
+  sink.urls = [...(sink.urls ?? []), request.url]
+}
+
+/**
+ * Transición exitosa, capturando cuerpo, `If-Match` y URL.
+ *
+ * El detalle que devuelve tiene por defecto un estado DISTINTO del fixture base: si
+ * devolviera el mismo, un test que afirme "la pantalla muestra el estado nuevo" pasaría
+ * verde aunque la mutación no hubiera hecho nada.
+ */
+export function changeStatusCapture(
+  sink: ChangeStatusCaptureSink,
+  service: ServiceDetailResponse = fakeServiceDetail({ status: 'IN_PROGRESS' }),
+  etag: string = ETAG_AFTER_WRITE,
+) {
+  sink.bodies = []
+  sink.ifMatches = []
+  sink.urls = []
+  return http.post(`${API}/services/:id/status`, async ({ request }) => {
+    pushChangeStatusCall(sink, request, await request.json())
+    return HttpResponse.json(service, { status: 200, headers: { ETag: etag } })
+  })
+}
+
+/** Transición lenta, para ver el botón en vuelo y medir el doble envío. */
+export function changeStatusSlow(sink: ChangeStatusCaptureSink, ms = 40) {
+  sink.bodies = []
+  sink.ifMatches = []
+  sink.urls = []
+  return http.post(`${API}/services/:id/status`, async ({ request }) => {
+    pushChangeStatusCall(sink, request, await request.json())
+    await delay(ms)
+    return HttpResponse.json(fakeServiceDetail({ status: 'IN_PROGRESS' }), {
+      status: 200,
+      headers: { ETag: ETAG_AFTER_WRITE },
+    })
+  })
+}
+
+/**
+ * Transición exitosa que NO expone el header `ETag`, como haría un gateway mal
+ * configurado. El cliente tiene que invalidar el detalle en vez de guardarlo sin versión.
+ */
+export function changeStatusWithoutEtag(sink: ChangeStatusCaptureSink) {
+  sink.bodies = []
+  sink.ifMatches = []
+  sink.urls = []
+  return http.post(`${API}/services/:id/status`, async ({ request }) => {
+    pushChangeStatusCall(sink, request, await request.json())
+    return HttpResponse.json(fakeServiceDetail({ status: 'IN_PROGRESS' }))
+  })
+}
+
+/** Error de la transición: 412 COM-004, 400 COM-001 (RN-OP13), 403 COM-003, 500. */
+export function changeStatusError(status: number, problem: Partial<Problem> = {}) {
+  return http.post(`${API}/services/:id/status`, () => problemResponse(status, problem))
+}
+
+/**
+ * Los 409 de estado del endpoint.
+ *
+ * Se arman SIN `forcible` y SIN `conflicts` a propósito. Esas dos claves pertenecen al
+ * conflicto de recursos, que ninguna de estas transiciones produce, y un fixture que las
+ * trajera invitaría a reusar el aviso de la asignación, que ofrece un botón de forzar
+ * que el servidor acá rechaza.
+ */
+export function changeStatusConflict(code: 'OPS-001' | 'OPS-004' | 'OPS-009', detail: string) {
+  return http.post(`${API}/services/:id/status`, () =>
+    problemResponse(409, { type: `urn:tms:error:${code.toLowerCase()}`, title: 'Conflict', detail }),
+  )
+}
+
+/**
+ * Un 200 con el cuerpo vacío, que es lo que devolvería un gateway mal configurado.
+ *
+ * Existe para que la guarda del hook tenga quien la mate: sin ella, el cuerpo vacío
+ * llega al cache y deja ahí un "viaje" sin código, sin estado y sin cliente, que
+ * revienta al renderizarlo, lejos de donde se originó.
+ */
+export function changeStatusEmptyBody() {
+  return http.post(`${API}/services/:id/status`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
+/**
+ * Un 200 con el cuerpo vacío en los otros tres endpoints que escriben el detalle.
+ *
+ * Existe por lo mismo que su hermano de la transición: los cuatro hooks del módulo
+ * guardan la respuesta en el MISMO lugar y con la MISMA función, así que a los cuatro
+ * les cabe el mismo daño si el cuerpo vacío pasa de largo.
+ */
+export function assignResourcesEmptyBody() {
+  return http.post(`${API}/services/:id/assignment`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
+export function addResourcesEmptyBody() {
+  return http.post(`${API}/services/:id/resources`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
+export function removeResourceEmptyBody() {
+  return http.delete(`${API}/services/:id/resources/:assignmentId`, () =>
+    HttpResponse.json(null, { headers: { ETag: ETAG_AFTER_WRITE } }),
+  )
+}
+
+/** Falla de red: ni cuerpo ni status, que es el camino del mensaje de respaldo. */
+export function changeStatusNetworkError() {
+  return http.post(`${API}/services/:id/status`, () => HttpResponse.error())
+}
+
+/**
+ * Detalle que cuenta cuántas veces se pidió, para afirmar que una transición exitosa
+ * NO lo vuelve a pedir (lo escribe desde su propia respuesta).
+ */
+export function serviceDetailCounted(
+  sink: { calls?: number },
+  service: ServiceDetailResponse = fakeServiceDetail(),
+  etag: string = DEFAULT_SERVICE_ETAG,
+) {
+  sink.calls = 0
+  return http.get(`${API}/services/:id`, () => {
+    sink.calls = (sink.calls ?? 0) + 1
+    return HttpResponse.json(service, { headers: { ETag: etag } })
+  })
+}

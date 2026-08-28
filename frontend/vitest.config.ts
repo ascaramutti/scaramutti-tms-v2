@@ -11,6 +11,24 @@ export default defineConfig({
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
     css: false,
+    // La zona del proceso se fija, y se fija LEJOS de la de la operacion. Corriendo
+    // bajo `America/Lima`, un calculo hecho con la zona del navegador da el mismo
+    // resultado que el correcto, asi que un test de fechas no distingue el codigo
+    // bueno del malo y pasa por el motivo equivocado. Tokio es UTC+9, del signo
+    // opuesto a Lima y a catorce horas: en los instantes que estos tests usan, las
+    // dos zonas estan en dias distintos.
+    //
+    // Se midio antes de fijarla: la suite entera pasa con `TZ=Asia/Tokyo`. Ojo con
+    // lo que ese verde significa y lo que no: prueba que los tests de hoy no
+    // dependen de la zona, no que todo helper de fechas del sistema sea correcto
+    // fuera de Lima. Lo que gana el cambio es que de aca en adelante cualquier test
+    // de fecha se mide contra una zona que no es la de la operacion.
+    //
+    // `FORCE_TZ` es la vía de escape. Sin ella, fijar la zona acá haría que
+    // `TZ=America/Lima npm test` ya no corriera en la zona de la operación, en silencio
+    // y justo el día que haga falta reproducir un problema de fechas como lo ve la
+    // oficina. Se comprobó que el valor de acá pisa al del entorno en los workers.
+    env: { TZ: process.env.FORCE_TZ ?? 'Asia/Tokyo' },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html'],

@@ -16,6 +16,7 @@ import {
   removeResourceNotFound,
   removeResourceOk,
   type RemoveResourceCaptureSink,
+  removeResourceEmptyBody,
 } from '../../../test/mocks/handlers/operations'
 import type { ServiceWithEtag } from './useService'
 
@@ -136,5 +137,23 @@ describe('useRemoveServiceResource', () => {
     // una consulta por algo que no cambió.
     expect(detail()?.additionalResources).toHaveLength(2)
     expect(invalidate).not.toHaveBeenCalled()
+  })
+})
+
+describe('useRemoveServiceResource, la respuesta vacía', () => {
+  it('la rechaza en vez de guardarla en el cache', async () => {
+    // El cliente generado hace `data ?? {}`, así que un 200 con el cuerpo vacío no
+    // llega como null: llega como un objeto sin un solo campo. Sin la guarda, ese
+    // objeto se escribe en el detalle y deja un viaje sin código y sin estado, que
+    // revienta al renderizarlo lejos de acá.
+    server.use(removeResourceEmptyBody())
+    const { result, detail } = setup()
+
+    result.current.mutate(ASSIGNMENT_ID)
+
+    await waitFor(() => expect(result.current.isError).toBe(true))
+    // El valor que TIENE que seguir estando, no su mera presencia: un objeto parcial
+    // que conservara `code` con el ETag pisado pasaría un `toBeDefined()`.
+    expect(detail()?._etag).toBe(DEFAULT_SERVICE_ETAG)
   })
 })

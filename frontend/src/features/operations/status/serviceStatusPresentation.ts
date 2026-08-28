@@ -23,10 +23,18 @@ interface ServiceStatusPresentation {
  * Tipado como `Record<ServiceStatus, ...>` para que TS exija cubrir los 6 estados:
  * agregar uno al contrato rompe la compilación acá y en ningún lado más.
  */
+/**
+ * El color acompaña al texto, nunca lo reemplaza, pero tiene que dejar distinguir dos
+ * estados de un vistazo. El verde se reserva para el final feliz: "en ruta" usaba un
+ * verde vecino del de "completado" y en una pastilla chica se leían igual.
+ *
+ * La progresión queda: gris sin recursos, azul listo para salir, violeta en movimiento,
+ * verde terminado, y rojo y ámbar para las dos salidas malas.
+ */
 export const SERVICE_STATUS_PRESENTATION: Record<ServiceStatus, ServiceStatusPresentation> = {
   PENDING_ASSIGNMENT: { label: 'Pendiente de asignación', badgeVariant: 'slate' },
   PENDING_START: { label: 'Pendiente de inicio', badgeVariant: 'info' },
-  IN_PROGRESS: { label: 'En ruta', badgeVariant: 'teal' },
+  IN_PROGRESS: { label: 'En ruta', badgeVariant: 'violet' },
   COMPLETED: { label: 'Completado', badgeVariant: 'success' },
   CANCELLED: { label: 'Cancelado', badgeVariant: 'danger' },
   DELETED: { label: 'Eliminado', badgeVariant: 'warning' },
