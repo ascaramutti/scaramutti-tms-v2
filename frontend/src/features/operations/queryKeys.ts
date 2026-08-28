@@ -21,4 +21,8 @@ export const operationsKeys = {
   // porque hoy lo pide solo operaciones: la flota se mudó a compartida cuando la
   // pidió un segundo módulo, y este catálogo todavía tiene uno.
   drivers: () => [...operationsKeys.all, 'drivers'] as const,
+  // Monedas SIN filtrar, que es lo que necesita la edición de un viaje. Key propia y no
+  // la de `catalogs`: ahí vive el catálogo de las vigentes, y compartir la key haría que
+  // una lista sirviera por la otra según cuál se pidió primero.
+  serviceCurrencies: () => [...operationsKeys.all, 'currencies', 'all'] as const,
 }

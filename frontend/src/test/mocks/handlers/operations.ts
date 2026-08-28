@@ -978,6 +978,41 @@ export function changeStatusCapture(
   })
 }
 
+/**
+ * Edición exitosa, capturando cuerpo, `If-Match` y URL.
+ *
+ * Reusa el mismo sumidero que las transiciones: los dos endpoints mandan un cuerpo y una
+ * versión, y lo que se afirma de ellos es lo mismo.
+ */
+export function updateServiceCapture(
+  sink: ChangeStatusCaptureSink,
+  service: ServiceDetailResponse = fakeServiceDetail(),
+  etag: string = ETAG_AFTER_WRITE,
+) {
+  sink.bodies = []
+  sink.ifMatches = []
+  sink.urls = []
+  return http.put(`${API}/services/:id`, async ({ request }) => {
+    pushChangeStatusCall(sink, request, await request.json())
+    return HttpResponse.json(service, { status: 200, headers: { ETag: etag } })
+  })
+}
+
+/** Edición rechazada, con el `code` del problema en el cuerpo. */
+export function updateServiceError(status: number, problem: Partial<Problem> = {}) {
+  return http.put(`${API}/services/:id`, () =>
+    HttpResponse.json(
+      { status, title: 'Error', ...problem },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Edición que responde 200 con el cuerpo vacío, que el cliente entrega como `{}`. */
+export function updateServiceEmptyBody() {
+  return http.put(`${API}/services/:id`, () => HttpResponse.json({}, { status: 200 }))
+}
+
 /** Transición lenta, para ver el botón en vuelo y medir el doble envío. */
 export function changeStatusSlow(sink: ChangeStatusCaptureSink, ms = 40) {
   sink.bodies = []

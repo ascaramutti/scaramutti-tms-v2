@@ -71,7 +71,7 @@ const WALL_CLOCK_LENGTH = 16
  * una `T`. Armarlo por partes también deja el resultado a salvo de que el separador
  * cambie entre motores.
  */
-function formatLimaWallClock(instant: Date): string {
+export function formatLimaWallClock(instant: Date): string {
   const parts: Record<string, string> = {}
   for (const part of LIMA_DATE_TIME_FORMATTER.formatToParts(instant)) {
     parts[part.type] = part.value
