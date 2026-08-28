@@ -43,12 +43,14 @@ describe('serviceCreateFormSchema', () => {
   it('rechaza un origen con salto de línea, que el servidor tampoco admite', () => {
     // El input de una línea ya descarta el salto al pegar, así que esta regla es el
     // backstop: cubre lo que llegue por cualquier otro camino.
-    expect(errorFor(validForm({ origin: 'Piura\nCentro' }), 'origin')).toMatch(/una sola línea/i)
+    expect(errorFor(validForm({ origin: 'Piura\nCentro' }), 'origin')).toBe(
+      'El origen va en una sola línea, sin saltos',
+    )
   })
 
   it('rechaza una tabulación en el destino', () => {
-    expect(errorFor(validForm({ destination: 'Lima\tCallao' }), 'destination')).toMatch(
-      /una sola línea/i,
+    expect(errorFor(validForm({ destination: 'Lima\tCallao' }), 'destination')).toBe(
+      'El destino va en una sola línea, sin saltos',
     )
   })
 
@@ -129,9 +131,16 @@ describe('serviceCreateFormSchema', () => {
     expect(parsed.heightM).toBeNull()
   })
 
-  it('rechaza una medida en cero cuando sí se escribió', () => {
+  it('rechaza una medida en cero cuando sí se escribió, y nombra la que falló', () => {
     // Vacío significa "no la sé"; cero significa "mide cero", que no existe.
+    //
+    // Las tres, y no solo una: las tres líneas del schema son idénticas salvo la
+    // etiqueta, así que el defecto probable no es que falte la regla sino que una llame
+    // a la fábrica con el nombre de otra. Con un solo caso, el usuario ve "el ancho
+    // debe ser mayor a 0" sobre el campo del alto y nada falla.
+    expect(errorFor(validForm({ lengthM: '0' }), 'lengthM')).toBe('El largo debe ser mayor a 0')
     expect(errorFor(validForm({ widthM: '0' }), 'widthM')).toBe('El ancho debe ser mayor a 0')
+    expect(errorFor(validForm({ heightM: '0' }), 'heightM')).toBe('El alto debe ser mayor a 0')
   })
 
   it('convierte a número las medidas cargadas', () => {
