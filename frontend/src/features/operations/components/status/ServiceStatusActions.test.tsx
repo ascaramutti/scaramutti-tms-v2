@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ServiceStatus, UserRole } from '../../../../api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
+import { REOPEN_AVAILABLE_NOTE } from '../../status/serviceStatusTransitions'
 import { ServiceStatusActions } from './ServiceStatusActions'
 import { server } from '../../../../test/mocks/server'
 import {
@@ -62,17 +63,44 @@ describe('ServiceStatusActions, qué ofrece', () => {
     expect(screen.queryByRole('button', { name: /Iniciar viaje/ })).not.toBeInTheDocument()
   })
 
-  it.each(['COMPLETED', 'CANCELLED', 'DELETED'] as const)(
-    'no monta ni el contenedor en %s',
-    (status) => {
-      renderActions(status, 'admin')
+  it('no monta ni el contenedor en un viaje completado', () => {
+    // El único estado que no ofrece nada a nadie. Las dos mitades: sin la del grupo, un
+    // contenedor vacío pasa igual y deja en el encabezado un espacio que nada explica.
+    renderActions('COMPLETED', 'admin')
 
-      // Las dos mitades: sin la del grupo, un contenedor vacío pasa igual y deja en el
-      // encabezado un espacio que nada explica.
+    expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it.each(['CANCELLED', 'DELETED'] as const)('ofrece reabrir en %s', (status) => {
+    // Estos dos dejaron de ser el final del camino.
+    renderActions(status, 'admin')
+
+    expect(screen.getByRole('button', { name: /Reabrir viaje/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Cancelar viaje/ })).not.toBeInTheDocument()
+  })
+
+  it.each(['CANCELLED', 'DELETED'] as const)(
+    'a la jefatura de operaciones no le ofrece reabrir en %s',
+    (status) => {
+      renderActions(status, 'operations_manager')
+
       expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button')).not.toBeInTheDocument()
     },
   )
+
+  it('ofrece eliminar donde el viaje todavía no salió', () => {
+    renderActions('PENDING_START', 'admin')
+    expect(screen.getByRole('button', { name: /Eliminar viaje/ })).toBeInTheDocument()
+  })
+
+  it('no ofrece eliminar un viaje en ruta', () => {
+    // Lo que ya ocurrió se cancela; lo que nunca fue se elimina.
+    renderActions('IN_PROGRESS', 'admin')
+
+    expect(screen.queryByRole('button', { name: /Eliminar viaje/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Cancelar viaje/ })).toBeInTheDocument()
+  })
 
   it('muestra los botones en el orden de la tabla, con el avance primero', () => {
     // La tabla declara que su orden es el de la barra; sin este caso el componente
@@ -97,6 +125,18 @@ describe('ServiceStatusActions, qué ofrece', () => {
     // error real, porque borra la jerarquía entre avanzar el viaje y matarlo.
     expect(screen.getByRole('button', { name: /Cancelar viaje/ }).className).toBe(SECONDARY_BUTTON)
     expect(screen.getByRole('button', { name: /Finalizar viaje/ }).className).toBe(PRIMARY_BUTTON)
+  })
+
+  it('ofrece las dos salidas en gris y la reapertura en primario', () => {
+    // Eliminar acompaña a cancelar: las dos sacan el viaje del circuito y ninguna es la
+    // acción principal de esa pantalla. Reabrir sí lo es, porque en un viaje que ya salió
+    // del circuito no compite con nada.
+    const { unmount } = renderActions('PENDING_START', 'admin')
+    expect(screen.getByRole('button', { name: /Eliminar viaje/ }).className).toBe(SECONDARY_BUTTON)
+    unmount()
+
+    renderActions('CANCELLED', 'admin')
+    expect(screen.getByRole('button', { name: /Reabrir viaje/ }).className).toBe(PRIMARY_BUTTON)
   })
 
   it('agrupa los botones con un nombre', () => {
@@ -159,18 +199,40 @@ describe('ServiceStatusActions, la apertura', () => {
 
     // Con el modal cableado al destino equivocado, el título delataría el cruce.
     expect(await screen.findByRole('dialog', { name: 'Finalizar viaje' })).toBeInTheDocument()
+    // Y es el de AVANZAR: el título sale de la misma tabla en los dos diálogos, así que
+    // solo el formulario distingue cuál se abrió.
+    expect(screen.getByLabelText(/Fecha y hora/)).toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Motivo/)).not.toBeInTheDocument()
   })
 
-  it('abre el diálogo de cancelar, que es otro componente', async () => {
+  it('el diálogo de salida vuelve a abrirse en blanco', async () => {
+    // El motivo de un intento anterior reenviado por descuido queda en la bitácora del
+    // viaje. Lo que hoy lo garantiza es que la barra desmonta el modal al cerrarlo.
     const user = userEvent.setup()
     renderActions('IN_PROGRESS', 'admin')
 
     await user.click(screen.getByRole('button', { name: /Cancelar viaje/ }))
+    await user.type(await screen.findByLabelText(/^Motivo/), 'motivo de la vez pasada')
+    await user.click(screen.getByRole('button', { name: 'Volver' }))
+    await user.click(screen.getByRole('button', { name: /Cancelar viaje/ }))
 
-    expect(await screen.findByRole('dialog', { name: 'Cancelar viaje' })).toBeInTheDocument()
-    // Y es el de cancelar de verdad, no el de avanzar con otro título: pide motivo y
-    // no pide fecha.
-    expect(screen.getByLabelText(/Motivo de la cancelación/)).toBeInTheDocument()
+    expect(await screen.findByLabelText(/^Motivo/)).toHaveValue('')
+  })
+
+  it.each([
+    ['IN_PROGRESS', /Cancelar viaje/, 'Cancelar viaje'],
+    ['PENDING_START', /Eliminar viaje/, 'Eliminar viaje'],
+    ['CANCELLED', /Reabrir viaje/, 'Reabrir viaje'],
+  ] as const)('abre el diálogo de salida desde %s', async (status, boton, titulo) => {
+    const user = userEvent.setup()
+    renderActions(status, 'admin')
+
+    await user.click(screen.getByRole('button', { name: boton }))
+
+    expect(await screen.findByRole('dialog', { name: titulo })).toBeInTheDocument()
+    // Y es el de salida de verdad, no el de avanzar con otro título: pide motivo y no
+    // pide fecha.
+    expect(screen.getByLabelText(/^Motivo/)).toBeInTheDocument()
     expect(screen.queryByLabelText(/Fecha y hora/)).not.toBeInTheDocument()
   })
 
@@ -226,11 +288,32 @@ describe('ServiceStatusActions, la apertura', () => {
     expect(await screen.findByRole('dialog', { name: 'Iniciar viaje' })).toBeInTheDocument()
 
     // `rerender` toma un solo argumento: reusa el wrapper del render original.
-    rerender(<ServiceStatusActions service={serviceWithStatus('CANCELLED')} role="admin" />)
+    rerender(<ServiceStatusActions service={serviceWithStatus('COMPLETED')} role="admin" />)
 
     // La barra sí desaparece (no hay nada que ofrecer), pero el diálogo sigue ahí.
     expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Iniciar viaje' })).toBeInTheDocument()
+  })
+
+  it('le pasa al diálogo el rol de quien mira, no uno fijo', async () => {
+    // Las dos mitades: con solo la negativa, cablear `role="operations_manager"` pasaría;
+    // con solo la positiva, pasaría `role="admin"`. Y lo que está en juego es el arreglo
+    // de la ronda anterior: con un rol fijo, la jefatura de operaciones vuelve a leer que
+    // puede reabrir un viaje que su rol no la deja reabrir.
+    const user = userEvent.setup()
+    const { unmount } = renderActions('PENDING_START', 'operations_manager')
+
+    await user.click(screen.getByRole('button', { name: /Cancelar viaje/ }))
+    const sinPermiso = await screen.findByRole('dialog', { name: 'Cancelar viaje' })
+    expect(
+      within(sinPermiso).queryByText(new RegExp(REOPEN_AVAILABLE_NOTE)),
+    ).not.toBeInTheDocument()
+    unmount()
+
+    renderActions('PENDING_START', 'admin')
+    await user.click(screen.getByRole('button', { name: /Cancelar viaje/ }))
+    const conPermiso = await screen.findByRole('dialog', { name: 'Cancelar viaje' })
+    expect(within(conPermiso).getByText(new RegExp(REOPEN_AVAILABLE_NOTE))).toBeInTheDocument()
   })
 
   it('no monta el diálogo hasta que se lo abre', () => {

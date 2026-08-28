@@ -2,7 +2,10 @@ import { z } from 'zod'
 import type { ChangeStatusRequest } from '../../../api'
 import { NO_CONTROL, stripControlChars } from '../../../shared/utils/sanitizeText'
 import { isFutureInLima, limaInputToIsoInstant } from '../utils/limaDate'
-import type { ServiceProgressTransition } from '../status/serviceStatusTransitions'
+import type {
+  ServiceExitTransition,
+  ServiceProgressTransition,
+} from '../status/serviceStatusTransitions'
 
 /** Tope del texto libre, igual al que declara el contrato para `note`. */
 export const STATUS_NOTE_MAX_LENGTH = 500
@@ -83,39 +86,51 @@ export function toServiceProgressRequest(
  * hoy los dos valen lo mismo por coincidencia, pero son reglas de dos contratos
  * distintos y una constante compartida las acoplaría sin que nadie lo note.
  */
-export const CANCEL_REASON_MIN_LENGTH = 10
+export const SERVICE_EXIT_REASON_MIN_LENGTH = 10
 
 /**
- * Cancelar: solo el motivo, obligatorio.
+ * Las tres salidas del circuito (cancelar, eliminar y reabrir) piden lo mismo: el motivo,
+ * obligatorio.
  *
- * No lleva fecha, y no es que sea opcional: mandarla es un rechazo del servidor.
- * Cancelar no fecha el viaje sino la decisión, y esa marca la pone el servidor.
+ * Ninguna lleva fecha, y no es que sea opcional: mandarla es un rechazo del servidor. No
+ * fechan el viaje sino la decisión, y esa marca la pone el servidor.
  */
-export const cancelServiceFormSchema = z.object({
+export const serviceExitFormSchema = z.object({
   note: z
     .string()
     .trim()
     .min(
-      CANCEL_REASON_MIN_LENGTH,
-      `El motivo debe tener al menos ${CANCEL_REASON_MIN_LENGTH} caracteres`,
+      SERVICE_EXIT_REASON_MIN_LENGTH,
+      `El motivo debe tener al menos ${SERVICE_EXIT_REASON_MIN_LENGTH} caracteres`,
     )
     .max(STATUS_NOTE_MAX_LENGTH, `Máximo ${STATUS_NOTE_MAX_LENGTH} caracteres`)
     .regex(NO_CONTROL, 'El texto tiene caracteres no permitidos'),
 })
 
-export type CancelServiceFormValues = z.infer<typeof cancelServiceFormSchema>
+export type ServiceExitFormValues = z.infer<typeof serviceExitFormSchema>
 
 /**
- * El cuerpo de la cancelación.
+ * El cuerpo de una salida del circuito.
  *
  * La clave `dateTime` se OMITE en vez de mandarse en null. Las dos formas funcionan (el
  * servidor mira el valor y no la presencia de la clave, para que un formulario que
  * serialice el objeto entero siga andando), así que la elección es por cuerpo mínimo:
  * lo que no se manda no puede interpretarse mal más adelante.
+ *
+ * `force` se omite cuando es falsa: ausente y `false` son lo mismo para el servidor, y el
+ * cuerpo mínimo no deja lugar a que alguien lea la clave como que acá se puede forzar
+ * siempre. Quién puede pedirla no lo decide esta función, que acepta el destino y la
+ * bandera por separado: lo decide el llamador, donde el botón de forzar solo existe al
+ * reabrir. Mandarla en `true` en cualquier otra transición es un rechazo del servidor.
  */
-export function toCancelServiceRequest(values: CancelServiceFormValues): ChangeStatusRequest {
-  return {
-    target: 'CANCELLED',
+export function toServiceExitRequest(
+  values: ServiceExitFormValues,
+  target: ServiceExitTransition,
+  force = false,
+): ChangeStatusRequest {
+  const body: ChangeStatusRequest = {
+    target,
     note: stripControlChars(values.note).trim(),
   }
+  return force ? { ...body, force: true } : body
 }

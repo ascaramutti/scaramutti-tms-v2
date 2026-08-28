@@ -672,16 +672,24 @@ describe('ServiceDetailPage, las acciones de estado', () => {
     expect(screen.queryByRole('button', { name: /Iniciar viaje/ })).not.toBeInTheDocument()
   })
 
-  it.each(['COMPLETED', 'CANCELLED', 'DELETED'] as const)(
-    'no ofrece acciones de estado en %s, y el badge sigue estando',
+  it('no ofrece acciones de estado en un viaje completado, y el badge sigue estando', async () => {
+    // El único estado sin salidas. El badge NO se va con los botones: el usuario tiene
+    // que seguir sabiendo en qué estado quedó el viaje.
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'COMPLETED' })))
+    renderDetail()
+
+    await screen.findByText('SRV-0077')
+    expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
+    expect(screen.getByText(SERVICE_STATUS_PRESENTATION.COMPLETED.label)).toBeInTheDocument()
+  })
+
+  it.each(['CANCELLED', 'DELETED'] as const)(
+    'ofrece reabrir en %s, que dejó de ser el final del camino',
     async (status) => {
       server.use(serviceDetailOk(fakeServiceDetail({ status })))
       renderDetail()
 
-      await screen.findByText('SRV-0077')
-      expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
-      // El badge NO se va con los botones: el usuario tiene que seguir sabiendo en qué
-      // estado quedó el viaje.
+      expect(await screen.findByRole('button', { name: /Reabrir viaje/ })).toBeInTheDocument()
       expect(screen.getByText(SERVICE_STATUS_PRESENTATION[status].label)).toBeInTheDocument()
     },
   )

@@ -26,11 +26,10 @@ const SECONDARY_LINK =
  * servidor se los OMITE (RN-OP8), y la pantalla no arma la tarjeta del precio para
  * no dejar una ficha con guiones donde los demás ven un número.
  *
- * Desde acá se asignan los recursos del viaje y se lo mueve de estado. Las cinco
- * transiciones son un mismo endpoint; de ellas, iniciar, finalizar y cancelar ya se
- * ofrecen junto al badge del encabezado, y eliminar y reabrir llegan en su propio
- * cambio. Ventas entra a la pantalla pero no opera el viaje, así que ve las fichas
- * sin las acciones.
+ * Desde acá se asignan los recursos del viaje y se lo mueve de estado: las cinco
+ * transiciones son un mismo endpoint, y se ofrecen junto al badge, cada una desde los
+ * estados que la admiten. Ventas entra a la pantalla pero no opera el viaje, así que ve
+ * las fichas sin las acciones.
  */
 export function ServiceDetailPage() {
   const { id } = useParams()
