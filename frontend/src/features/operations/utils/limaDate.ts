@@ -71,7 +71,7 @@ const WALL_CLOCK_LENGTH = 16
  * una `T`. Armarlo por partes también deja el resultado a salvo de que el separador
  * cambie entre motores.
  */
-function formatLimaWallClock(instant: Date): string {
+export function formatLimaWallClock(instant: Date): string {
   const parts: Record<string, string> = {}
   for (const part of LIMA_DATE_TIME_FORMATTER.formatToParts(instant)) {
     parts[part.type] = part.value
@@ -111,6 +111,8 @@ export function nowInLimaForInput(): string {
  * navegadores que devuelven el valor del input con segundos, y `"…T14:00:30"` es mayor
  * como cadena que `"…T14:00"` aunque sea el mismo minuto que el usuario eligió.
  */
+export const FUTURE_DATE_MESSAGE = 'La fecha no puede estar en el futuro'
+
 export function isFutureInLima(wallClock: string): boolean {
   return wallClock.slice(0, WALL_CLOCK_LENGTH) > nowInLimaForInput()
 }

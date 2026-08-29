@@ -339,6 +339,29 @@ export function serviceDetailOk(
   return http.get(`${API}/services/:id`, () => HttpResponse.json(service, { headers: { ETag: etag } }))
 }
 
+/**
+ * El detalle respondiendo distinto en cada llamada, para medir un recargado.
+ *
+ * Igual que el de almacén: sin una secuencia, "se volvió a pedir el viaje" no se
+ * distingue de "no se pidió nada", porque las dos veces llega el mismo cuerpo.
+ */
+export function serviceDetailSequence(
+  responses: { service: ServiceDetailResponse; etag: string }[],
+) {
+  let call = 0
+  return http.get(`${API}/services/:id`, () => {
+    const current = responses[call]
+    // Revienta en vez de repetir la última: con la respuesta amortiguada, "se pidió dos
+    // veces" y "se pidió cinco" dan el mismo resultado, y un remonte de más pasa
+    // desapercibido justo en los casos que existen para medir cuántas veces se pide.
+    if (!current) {
+      throw new Error(`El detalle se pidió ${call + 1} veces y la secuencia tiene ${responses.length}`)
+    }
+    call += 1
+    return HttpResponse.json(current.service, { headers: { ETag: current.etag } })
+  })
+}
+
 /** Detalle SIN el header ETag (un gateway que no lo expone). */
 export function serviceDetailWithoutEtag(service: ServiceDetailResponse = fakeServiceDetail()) {
   return http.get(`${API}/services/:id`, () => HttpResponse.json(service))
@@ -976,6 +999,44 @@ export function changeStatusCapture(
     pushChangeStatusCall(sink, request, await request.json())
     return HttpResponse.json(service, { status: 200, headers: { ETag: etag } })
   })
+}
+
+/**
+ * Edición exitosa, capturando cuerpo, `If-Match` y URL.
+ *
+ * Reusa el mismo sumidero que las transiciones: los dos endpoints mandan un cuerpo y una
+ * versión, y lo que se afirma de ellos es lo mismo.
+ */
+export function updateServiceCapture(
+  sink: ChangeStatusCaptureSink,
+  // OJO con el default: devuelve el viaje con su `updatedAt` base, o sea que la pantalla
+  // lo lee como "el servidor no escribió nada" (RN-OP10). Para medir un guardado real hay
+  // que pasar una respuesta con la versión movida.
+  service: ServiceDetailResponse = fakeServiceDetail(),
+  etag: string = ETAG_AFTER_WRITE,
+) {
+  sink.bodies = []
+  sink.ifMatches = []
+  sink.urls = []
+  return http.put(`${API}/services/:id`, async ({ request }) => {
+    pushChangeStatusCall(sink, request, await request.json())
+    return HttpResponse.json(service, { status: 200, headers: { ETag: etag } })
+  })
+}
+
+/** Edición rechazada, con el `code` del problema en el cuerpo. */
+export function updateServiceError(status: number, problem: Partial<Problem> = {}) {
+  return http.put(`${API}/services/:id`, () =>
+    HttpResponse.json(
+      { status, title: 'Error', ...problem },
+      { status, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Edición que responde 200 con el cuerpo vacío, que el cliente entrega como `{}`. */
+export function updateServiceEmptyBody() {
+  return http.put(`${API}/services/:id`, () => HttpResponse.json({}, { status: 200 }))
 }
 
 /** Transición lenta, para ver el botón en vuelo y medir el doble envío. */

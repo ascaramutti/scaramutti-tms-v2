@@ -230,6 +230,24 @@ export const SERVICE_EXIT_FAILURE_MESSAGE: Record<ServiceExitTransition, string>
 }
 
 /**
+ * Si el viaje admite que le corrijan los datos.
+ *
+ * Los dos estados que salieron del circuito son inmutables y el servidor los rechaza con
+ * `OPS-004`. Todos los demás se editan, el completado incluido: corregir un viaje ya
+ * cerrado es justamente para lo que existe el endpoint.
+ *
+ * Se escribe como la lista de lo que NO se edita y no al revés, por lo mismo que los
+ * vetos de las transiciones: un estado nuevo nace editable, que es la respuesta correcta
+ * para cualquier estado del circuito, en vez de nacer bloqueado sin que nadie lo decida.
+ */
+export function isServiceEditable(status: ServiceStatus): boolean {
+  return !SERVICE_EXITED_STATUSES.includes(status)
+}
+
+/** Los estados desde los que un viaje ya no se opera: salió del circuito. */
+const SERVICE_EXITED_STATUSES: readonly ServiceStatus[] = ['CANCELLED', 'DELETED']
+
+/**
  * Que hay vuelta atrás, dicho solo a quien la tiene.
  *
  * Cuelga del permiso y no de una frase fija, y esa es toda la decisión: la jefatura de

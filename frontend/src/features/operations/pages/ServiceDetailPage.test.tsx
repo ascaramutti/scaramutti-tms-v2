@@ -672,14 +672,17 @@ describe('ServiceDetailPage, las acciones de estado', () => {
     expect(screen.queryByRole('button', { name: /Iniciar viaje/ })).not.toBeInTheDocument()
   })
 
-  it('no ofrece acciones de estado en un viaje completado, y el badge sigue estando', async () => {
-    // El único estado sin salidas. El badge NO se va con los botones: el usuario tiene
-    // que seguir sabiendo en qué estado quedó el viaje.
+  it('no ofrece transiciones en un viaje completado, y el badge sigue estando', async () => {
+    // El único estado del circuito sin salidas. Corregirlo SÍ se ofrece: el contrato dice
+    // que un viaje ya cerrado se edita. El badge NO se va con los botones: el usuario
+    // tiene que seguir sabiendo en qué estado quedó el viaje.
     server.use(serviceDetailOk(fakeServiceDetail({ status: 'COMPLETED' })))
     renderDetail()
 
     await screen.findByText('SRV-0077')
-    expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
+    const barra = screen.getByRole('group', { name: 'Acciones del viaje' })
+    expect(within(barra).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(barra).getByRole('link', { name: 'Editar' })).toBeInTheDocument()
     expect(screen.getByText(SERVICE_STATUS_PRESENTATION.COMPLETED.label)).toBeInTheDocument()
   })
 
@@ -694,16 +697,33 @@ describe('ServiceDetailPage, las acciones de estado', () => {
     },
   )
 
-  it('a ventas le saca las acciones pero no los datos', async () => {
+  it('a ventas le saca las transiciones, pero corrige el viaje y ve los datos', async () => {
+    // Ventas registra y corrige viajes, y no los opera: no los inicia, no los finaliza y
+    // no los saca del circuito. Las tres mitades, porque cada una tapa un error distinto:
+    // sin la primera, dejarle operar pasaría; sin la segunda, quitarle también la edición
+    // pasaría; sin la tercera, esconderle la pantalla entera pasaría.
     server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
     renderDetail({ role: 'sales' })
 
     await screen.findByText('SRV-0077')
-    expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
-    // La segunda mitad es la que importa: sin ella, esconderle la pantalla entera a
-    // ventas pasaría verde.
+    const barra = screen.getByRole('group', { name: 'Acciones del viaje' })
+    expect(within(barra).queryByRole('button')).not.toBeInTheDocument()
+    expect(within(barra).getByRole('link', { name: 'Editar' })).toBeInTheDocument()
     expect(screen.getByText('En ruta')).toBeInTheDocument()
     expect(screen.getByText('Bitácora')).toBeInTheDocument()
+  })
+
+  it('al despacho no le ofrece corregir el viaje', async () => {
+    // El cuerpo de la edición obliga a mandar el precio, que es justo lo que a ese rol se
+    // le oculta: el servidor le contestaría 403. Sí sigue operando el viaje, que es lo
+    // suyo, y por eso se afirman las dos cosas.
+    server.use(serviceDetailOk(fakeServiceDetail({ status: 'IN_PROGRESS' })))
+    renderDetail({ role: 'dispatcher' })
+
+    await screen.findByText('SRV-0077')
+    const barra = screen.getByRole('group', { name: 'Acciones del viaje' })
+    expect(within(barra).queryByRole('link', { name: 'Editar' })).not.toBeInTheDocument()
+    expect(within(barra).getByRole('button', { name: /Finalizar viaje/ })).toBeInTheDocument()
   })
 
   it('al despacho le ofrece finalizar el viaje', async () => {

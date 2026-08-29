@@ -50,16 +50,24 @@ export const SERVICES_REPORT_ROLES: UserRole[] = [
 ]
 
 /**
- * Segunda excepción intramódulo: registrar un viaje deja afuera al despachador.
- * El cuerpo del alta obliga a mandar el precio, y quien no puede VER los importes
- * tampoco puede escribirlos a ciegas, así que el backend le contesta 403 aunque
- * sume otro rol. Lista propia y no la del reporte: hoy coinciden, pero son dos
- * reglas distintas y compartirlas haría que mover una mueva la otra.
+ * Segunda excepción intramódulo: quien ESCRIBE el precio de un viaje. Deja afuera al
+ * despachador.
  *
- * Espejo del `x-required-roles` de `POST /services`; la autoridad es el 403 del
- * backend, esta lista decide la ruta y el botón del listado.
+ * Se llama por la regla y no por uno de sus usos, y esa es toda la decisión del nombre:
+ * la lista gobierna el alta Y la edición, que son los dos endpoints cuyo cuerpo obliga a
+ * mandar el precio. Quien no puede VER los importes tampoco puede escribirlos a ciegas,
+ * así que el backend le contesta 403 al despacho aunque sume otro rol. Con un nombre que
+ * nombrara solo el alta, el próximo que la mueva no vería que también decide quién
+ * corrige.
+ *
+ * Lista propia y no la del reporte: hoy coinciden, pero son dos reglas distintas sobre
+ * los precios que llegan al mismo reparto por caminos separados, y compartirlas haría
+ * que mover una mueva la otra.
+ *
+ * Espejo del `x-required-roles` de `POST /services` y de `PUT /services/{id}`; la
+ * autoridad es el 403 del backend, esta lista decide las rutas y los botones.
  */
-export const SERVICE_CREATE_ROLES: UserRole[] = [
+export const SERVICE_PRICE_WRITE_ROLES: UserRole[] = [
   'admin',
   'sales',
   'general_manager',

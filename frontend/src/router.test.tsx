@@ -136,6 +136,26 @@ describe('router — módulo Operaciones', () => {
     expect(screen.getByRole('link', { name: /ir a operaciones/i })).toBeInTheDocument()
   })
 
+  it('ventas entra a la edición de un viaje', async () => {
+    // La mitad POSITIVA, que es la que ancla el elemento: sin ella, vaciar los roles o
+    // apuntar la ruta a la pantalla de detalle sobrevive, porque el caso del despacho
+    // seguiría viendo el mismo mensaje de permiso.
+    renderRouteAs('sales', '/cotizaciones/operaciones/servicios/77/editar')
+    expect(await screen.findByRole('heading', { level: 1, name: /Editar SRV-/ })).toBeInTheDocument()
+  })
+
+  it('el despachador tampoco entra a la edición', async () => {
+    // Mismo motivo que el alta y misma lista: el cuerpo de la edición obliga a mandar el
+    // precio que a ese rol se le oculta, así que el servidor le contestaría 403. Sin este
+    // caso, cambiar la lista de la ruta por la del módulo sobrevive y el despacho llega
+    // por enlace directo a un formulario que no puede guardar.
+    renderRouteAs('dispatcher', '/cotizaciones/operaciones/servicios/77/editar')
+    expect(
+      await screen.findByRole('heading', { name: /no puedes editar un servicio/i }),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/no tiene permisos para este módulo/i)).not.toBeInTheDocument()
+  })
+
   it('la ruta del módulo es exactamente donde aterriza el despachador', async () => {
     // El aterrizaje, el menú y la tabla de rutas comparten una sola constante.
     // Si alguna se desviara, este caso cae antes que el usuario.
