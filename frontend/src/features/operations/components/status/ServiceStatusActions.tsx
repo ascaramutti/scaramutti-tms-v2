@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { CheckCircle2, Play, RotateCcw, Trash2, XCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { CheckCircle2, Pencil, Play, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import type { UserRole } from '../../../../api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import type { ServiceWithEtag } from '../../hooks/useService'
@@ -9,6 +10,9 @@ import {
   isExitTransition,
   type ServiceStatusTransition,
 } from '../../status/serviceStatusTransitions'
+import { OPERACIONES_LANDING } from '../../../../shared/auth/roleLanding'
+import { canEditService } from '../../status/operationsPermissions'
+import { isServiceEditable } from '../../status/serviceStatusTransitions'
 import { ServiceExitModal } from './ServiceExitModal'
 import { ServiceProgressModal } from './ServiceProgressModal'
 
@@ -50,12 +54,16 @@ const TRANSITION_BUTTON_STYLES: Record<ServiceStatusTransition, string> = {
  * Un botón gris no explica por qué está gris, y el badge de al lado ya dice en qué
  * estado está el viaje.
  *
- * Sin transiciones disponibles no se renderiza nada, ni siquiera el contenedor: un grupo
- * vacío deja en el encabezado un espacio que nada explica.
+ * Sin nada que ofrecer no se renderiza nada, ni siquiera el contenedor: un grupo vacío
+ * deja en el encabezado un espacio que nada explica.
  */
 export function ServiceStatusActions({ service, role }: ServiceStatusActionsProps) {
   const [openTransition, setOpenTransition] = useState<ServiceStatusTransition | null>(null)
   const transitions = availableServiceStatusTransitions(service.status, role)
+  // Editar no es una transición: no mueve el viaje, corrige lo que dice. Va en la misma
+  // fila porque es lo que el usuario busca en el mismo momento, pero sale de su propio
+  // permiso y de su propia condición de estado.
+  const showsEdit = canEditService(role) && isServiceEditable(service.status)
 
   return (
     <>
@@ -64,13 +72,22 @@ export function ServiceStatusActions({ service, role }: ServiceStatusActionsProp
           usuario lo canceló, y el detalle se refrescó), colgarlo de acá lo haría
           desvanecerse bajo el cursor, con el error adentro y sin que nada lo explique.
           Se cierra cuando el usuario lo cierra. */}
-      {transitions.length > 0 && (
+      {(transitions.length > 0 || showsEdit) && (
         <div
           role="group"
           aria-label="Acciones del viaje"
           className="flex flex-wrap items-center gap-2"
         >
-            {transitions.map((transition) => {
+          {showsEdit && (
+            <Link
+              to={`${OPERACIONES_LANDING}/servicios/${service.id}/editar`}
+              className={SECONDARY_BUTTON}
+            >
+              <Pencil size={16} className="mr-2" aria-hidden />
+              Editar
+            </Link>
+          )}
+          {transitions.map((transition) => {
             const Icon = TRANSITION_ICONS[transition]
             return (
               <button

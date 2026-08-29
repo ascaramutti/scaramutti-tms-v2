@@ -1,7 +1,9 @@
 import { z } from 'zod'
 import type { ChangeStatusRequest } from '../../../api'
 import { NO_CONTROL, stripControlChars } from '../../../shared/utils/sanitizeText'
-import { isFutureInLima, limaInputToIsoInstant } from '../utils/limaDate'
+import { REAL_DATE_TIME_MIN } from './service-edit.schema'
+import { SERVICE_DATE_MAX, SERVICE_DATE_MIN } from './service-fields.schema'
+import { FUTURE_DATE_MESSAGE, isFutureInLima, limaInputToIsoInstant } from '../utils/limaDate'
 import type {
   ServiceExitTransition,
   ServiceProgressTransition,
@@ -40,7 +42,18 @@ export const serviceProgressFormSchema = z.object({
      * Se mide contra el reloj de Lima y no contra el del navegador: quien registra el
      * viaje desde otro país sigue anotando la hora a la que salió el camión en Perú.
      */
-    .refine((wallClock) => !isFutureInLima(wallClock), 'La fecha no puede estar en el futuro'),
+    .refine((wallClock) => !isFutureInLima(wallClock), FUTURE_DATE_MESSAGE)
+    /*
+     * Y la ventana que la columna admite, la misma que aplica la edición sobre estas dos
+     * fechas. Por arriba no hace falta (el patrón de arriba exige cuatro dígitos y el
+     * futuro ya está cerrado), pero por abajo no había nada: un año de una cifra pasa el
+     * patrón, no es futuro, y sale del formulario para volver como un 400 sobre el
+     * formulario entero. Fijar y corregir el mismo dato tienen que rechazar lo mismo.
+     */
+    .refine(
+      (wallClock) => wallClock >= REAL_DATE_TIME_MIN,
+      `La fecha debe estar entre ${SERVICE_DATE_MIN} y ${SERVICE_DATE_MAX}`,
+    ),
   // El `.trim()` de acá es redundante: el builder recorta igual antes de mandar, y se
   // midió que borrarlo no mueve ninguna aserción. Se deja por simetría con el motivo de
   // la cancelación, donde el mismo `.trim()` SÍ decide (ahí corre antes del mínimo, así

@@ -16,11 +16,11 @@ interface UpdateServiceVariables {
  * Corrige los datos de un viaje.
  *
  * A diferencia de las transiciones de estado, acá el `If-Match` lo EXIGE el contrato, y
- * el tipo generado lo declara obligatorio. Sin ETag se manda vacío y el servidor contesta
- * 412, que es lo que dice para el header ausente o que no coincide, y esa es la conducta
- * buscada: que el servidor deje de exponer el header es un problema de configuración y no
- * un estado del viaje, así que la pantalla sigue ofreciendo guardar. Un 412 explica lo que
- * pasa; un botón que no hace nada, no.
+ * el tipo generado lo declara obligatorio. Sin ETag se manda vacío, con lo que el servidor
+ * contesta 412: es el respaldo para quien llegue por otro camino, porque la pantalla ya no
+ * ofrece guardar en ese estado (avisa que falta la versión y deshabilita el botón, en vez
+ * de dejar que el usuario llene el formulario para chocar contra un 412 que le hablaría de
+ * un conflicto inexistente).
  *
  * Se invalidan el listado y los indicadores, y nada más. Editar mueve datos que la tabla
  * muestra y por los que filtra (la fecha tentativa, el origen, el destino, el importe), y

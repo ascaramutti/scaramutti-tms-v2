@@ -4,7 +4,7 @@ import {
   SERVICE_OPERATE_ROLES,
   QUOTATION_ROLES,
   SERVICES_REPORT_ROLES,
-  SERVICE_CREATE_ROLES,
+  SERVICE_PRICE_WRITE_ROLES,
   WAREHOUSE_ROLES,
 } from './moduleRoles'
 import {
@@ -58,16 +58,17 @@ describe('roles por módulo', () => {
     expect(SERVICES_REPORT_ROLES).not.toContain('dispatcher')
   })
 
-  it('registrar un servicio deja afuera al despachador', () => {
-    // Segunda excepción intramódulo, y por otro motivo que la del reporte: el alta
-    // obliga a mandar el precio, así que quien no puede verlo tampoco lo escribe.
-    expect([...SERVICE_CREATE_ROLES].sort()).toEqual([
+  it('escribir el precio de un viaje deja afuera al despachador', () => {
+    // Segunda excepción intramódulo, y por otro motivo que la del reporte: el cuerpo del
+    // alta Y el de la edición obligan a mandar el precio, así que quien no puede verlo
+    // tampoco lo escribe. La lista gobierna los dos endpoints y sus dos rutas.
+    expect([...SERVICE_PRICE_WRITE_ROLES].sort()).toEqual([
       'admin',
       'general_manager',
       'operations_manager',
       'sales',
     ])
-    expect(SERVICE_CREATE_ROLES).not.toContain('dispatcher')
+    expect(SERVICE_PRICE_WRITE_ROLES).not.toContain('dispatcher')
   })
 })
 
@@ -109,9 +110,9 @@ describe('SERVICE_OPERATE_ROLES', () => {
     expect(OPERATIONS_ROLES).toContain('sales')
   })
 
-  it('no comparte el arreglo con la lista de registrar', () => {
+  it('no comparte el arreglo con la lista de operar', () => {
     // Dos reglas distintas que hoy ni siquiera coinciden: registrar deja afuera al
     // despacho y operar deja afuera a ventas.
-    expect(SERVICE_OPERATE_ROLES).not.toBe(SERVICE_CREATE_ROLES)
+    expect(SERVICE_OPERATE_ROLES).not.toBe(SERVICE_PRICE_WRITE_ROLES)
   })
 })

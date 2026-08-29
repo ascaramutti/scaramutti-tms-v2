@@ -71,6 +71,17 @@ describe('serviceProgressFormSchema, la fecha', () => {
     expect(result.error?.issues[0]?.message).toBe('La fecha no puede estar en el futuro')
   })
 
+  it('rechaza un año fuera de la ventana que la columna admite', () => {
+    // La misma ventana que aplica la edición sobre estas dos fechas. Por arriba no hace
+    // falta (el patrón exige cuatro dígitos y el futuro ya está cerrado); por abajo no
+    // había nada, y un año de una cifra salía del formulario para volver como un 400
+    // sobre el formulario entero. Fijar y corregir el mismo dato rechazan lo mismo.
+    const result = parseProgress({ dateTime: '0005-01-01T10:00' })
+
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0]?.message).toBe('La fecha debe estar entre 1900-01-01 y 2999-12-31')
+  })
+
   it('acepta una hora que en Lima ya pasó', () => {
     expect(parseProgress({ dateTime: '2026-08-24T19:30' }).success).toBe(true)
   })

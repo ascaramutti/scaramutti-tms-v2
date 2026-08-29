@@ -4,7 +4,7 @@ import { ProtectedRoute } from './shared/auth/ProtectedRoute'
 import {
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
-  SERVICE_CREATE_ROLES,
+  SERVICE_PRICE_WRITE_ROLES,
   WAREHOUSE_ROLES,
 } from './shared/auth/moduleRoles'
 import { OPERACIONES_LANDING } from './shared/auth/roleLanding'
@@ -29,6 +29,7 @@ import { WarehouseReportsPage } from './features/warehouse/pages/WarehouseReport
 import { OpeningBalancesPage } from './features/warehouse/pages/OpeningBalancesPage'
 import { ServicesListPage } from './features/operations/pages/ServicesListPage'
 import { ServiceDetailPage } from './features/operations/pages/ServiceDetailPage'
+import { ServiceEditPage } from './features/operations/pages/ServiceEditPage'
 import { ServiceCreatePage } from './features/operations/pages/ServiceCreatePage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
@@ -204,8 +205,21 @@ export const routes: RouteObject[] = [
         // queda afuera aunque el resto del módulo sea suyo.
         path: `${OPERACIONES_LANDING}/servicios/nuevo`,
         element: (
-          <ProtectedRoute allowedRoles={SERVICE_CREATE_ROLES} actionName="registrar un servicio">
+          <ProtectedRoute allowedRoles={SERVICE_PRICE_WRITE_ROLES} actionName="registrar un servicio">
             <ServiceCreatePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // Roles propios, igual que el alta y por la misma razón: el cuerpo de la edición
+        // obliga a mandar el precio, que es justo lo que al despacho se le oculta, así
+        // que ese rol recibiría un 403. Va ANTES de `:id` por legibilidad, igual que el
+        // alta: react-router rankea por especificidad y `editar` no es un id válido, pero
+        // el archivo se lee de arriba abajo.
+        path: `${OPERACIONES_LANDING}/servicios/:id/editar`,
+        element: (
+          <ProtectedRoute allowedRoles={SERVICE_PRICE_WRITE_ROLES} actionName="editar un servicio">
+            <ServiceEditPage />
           </ProtectedRoute>
         ),
       },

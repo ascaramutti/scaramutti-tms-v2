@@ -111,6 +111,8 @@ export function nowInLimaForInput(): string {
  * navegadores que devuelven el valor del input con segundos, y `"…T14:00:30"` es mayor
  * como cadena que `"…T14:00"` aunque sea el mismo minuto que el usuario eligió.
  */
+export const FUTURE_DATE_MESSAGE = 'La fecha no puede estar en el futuro'
+
 export function isFutureInLima(wallClock: string): boolean {
   return wallClock.slice(0, WALL_CLOCK_LENGTH) > nowInLimaForInput()
 }

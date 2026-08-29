@@ -1,5 +1,5 @@
 import type { UserRole } from '../../../api'
-import { SERVICE_CREATE_ROLES, SERVICE_OPERATE_ROLES } from '../../../shared/auth/moduleRoles'
+import { SERVICE_PRICE_WRITE_ROLES, SERVICE_OPERATE_ROLES } from '../../../shared/auth/moduleRoles'
 
 /**
  * Roles que ven los importes de un servicio. Espeja la lista positiva del
@@ -76,7 +76,19 @@ const CATALOG_CREATE_ROLES: readonly UserRole[] = [
  * mostrarle al despacho un camino que termina en un 403.
  */
 export function canCreateService(role: UserRole | undefined): boolean {
-  return role !== undefined && SERVICE_CREATE_ROLES.includes(role)
+  return role !== undefined && SERVICE_PRICE_WRITE_ROLES.includes(role)
+}
+
+/**
+ * `true` si el rol puede corregir los datos de un viaje.
+ *
+ * Misma lista que el alta, y no por coincidencia: el cuerpo de los dos endpoints obliga a
+ * mandar el precio, así que a quien no puede VERLO se le contesta 403 en vez de dejarlo
+ * escribir a ciegas un valor que no lee. La constante se llama por esa regla y no por uno
+ * de sus dos usos, para que quien la mueva vea los dos.
+ */
+export function canEditService(role: UserRole | undefined): boolean {
+  return role !== undefined && SERVICE_PRICE_WRITE_ROLES.includes(role)
 }
 
 /**

@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MemoryRouter } from 'react-router-dom'
 import type { ServiceStatus, UserRole } from '../../../../api'
 import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { REOPEN_AVAILABLE_NOTE } from '../../status/serviceStatusTransitions'
@@ -28,8 +29,12 @@ function serviceWithStatus(status: ServiceStatus): ServiceWithEtag {
 
 function renderActions(status: ServiceStatus, role: UserRole | undefined) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  // El router hace falta porque la barra lleva un enlace (editar), no solo botones: sin
+  // él, `Link` revienta al leer un contexto que no existe.
   const wrapper = ({ children }: { children: ReactNode }) => (
-    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>{children}</MemoryRouter>
+    </QueryClientProvider>
   )
   return render(<ServiceStatusActions service={serviceWithStatus(status)} role={role} />, {
     wrapper,
@@ -63,18 +68,42 @@ describe('ServiceStatusActions, qué ofrece', () => {
     expect(screen.queryByRole('button', { name: /Iniciar viaje/ })).not.toBeInTheDocument()
   })
 
-  it('no monta ni el contenedor en un viaje completado', () => {
-    // El único estado que no ofrece nada a nadie. Las dos mitades: sin la del grupo, un
-    // contenedor vacío pasa igual y deja en el encabezado un espacio que nada explica.
+  it('en un viaje completado no queda ninguna transición, pero sí se corrige', () => {
+    // El único estado del circuito que no admite ninguna transición. Editar SÍ, y es
+    // deliberado: corregir los datos de un viaje ya cerrado es para lo que existe el
+    // endpoint. Por eso acá se afirma la ausencia de BOTONES y la presencia del enlace,
+    // que son cosas distintas.
     renderActions('COMPLETED', 'admin')
+
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    // El destino y no solo la presencia: con el `to` apuntando al detalle, el enlace
+    // devuelve al usuario a donde ya estaba y la pantalla queda inalcanzable.
+    expect(screen.getByRole('link', { name: 'Editar' })).toHaveAttribute(
+      'href',
+      '/cotizaciones/operaciones/servicios/77/editar',
+    )
+  })
+
+  it('no monta ni el contenedor cuando no hay nada que ofrecer', () => {
+    // Sin permiso de edición y sin transiciones no queda nada: ni el grupo, para no dejar
+    // en el encabezado un espacio que nada explica. El despacho es el único rol que da ese
+    // cruce en un viaje completado: lo opera pero no lo corrige, porque el cuerpo de la
+    // edición pide el precio que no puede ver.
+    renderActions('COMPLETED', 'dispatcher')
 
     expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Editar' })).not.toBeInTheDocument()
   })
 
-  it.each(['CANCELLED', 'DELETED'] as const)('ofrece reabrir en %s', (status) => {
-    // Estos dos dejaron de ser el final del camino.
+  it.each(['CANCELLED', 'DELETED'] as const)('ofrece reabrir en %s, pero no corregir', (status) => {
+    // Estos dos dejaron de ser el final del camino. Corregir NO se ofrece: un viaje fuera
+    // del circuito es inmutable, y ofrecer la entrada para explicar después que no se
+    // puede es justo lo que la pantalla de edición evita. Sin esta mitad, borrar la
+    // condición de estado del enlace pasa verde, porque acá la barra ya existe por el
+    // botón de reabrir.
     renderActions(status, 'admin')
+    expect(screen.queryByRole('link', { name: 'Editar' })).not.toBeInTheDocument()
 
     expect(screen.getByRole('button', { name: /Reabrir viaje/ })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Cancelar viaje/ })).not.toBeInTheDocument()
@@ -282,15 +311,20 @@ describe('ServiceStatusActions, la apertura', () => {
     // el detalle se refresca. Con el diálogo colgado de la condición de la barra, se
     // desvanecía bajo el cursor, con el error adentro y sin nada que lo explicara.
     const user = userEvent.setup()
-    const { rerender } = renderActions('PENDING_START', 'admin')
+    // Con el DESPACHO y no con admin: es el único rol que en un viaje completado se queda
+    // sin transiciones Y sin edición, o sea el único escenario donde la barra entera
+    // desaparece. Con admin la barra sobrevive por el enlace de editar, y entonces colgar
+    // el diálogo de la condición de la barra pasaría verde: el caso mediría otra cosa.
+    const { rerender } = renderActions('PENDING_START', 'dispatcher')
 
     await user.click(screen.getByRole('button', { name: /Iniciar viaje/ }))
     expect(await screen.findByRole('dialog', { name: 'Iniciar viaje' })).toBeInTheDocument()
 
     // `rerender` toma un solo argumento: reusa el wrapper del render original.
-    rerender(<ServiceStatusActions service={serviceWithStatus('COMPLETED')} role="admin" />)
+    rerender(<ServiceStatusActions service={serviceWithStatus('COMPLETED')} role="dispatcher" />)
 
-    // La barra sí desaparece (no hay nada que ofrecer), pero el diálogo sigue ahí.
+    // La barra entera desaparece (no hay nada que ofrecerle al despacho en un completado),
+    // pero el diálogo sigue ahí, que es lo que este caso protege.
     expect(screen.queryByRole('group', { name: 'Acciones del viaje' })).not.toBeInTheDocument()
     expect(screen.getByRole('dialog', { name: 'Iniciar viaje' })).toBeInTheDocument()
   })

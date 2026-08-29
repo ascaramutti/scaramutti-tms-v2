@@ -1,9 +1,17 @@
 import { z } from 'zod'
 import type { CurrencyResponse, ServiceDetailResponse, ServiceUpdateRequest } from '../../../api'
-import { formatLimaWallClock, limaInputToIsoInstant } from '../utils/limaDate'
+import { NO_CONTROL } from '../../../shared/utils/sanitizeText'
+import {
+  FUTURE_DATE_MESSAGE,
+  formatLimaWallClock,
+  isFutureInLima,
+  limaInputToIsoInstant,
+} from '../utils/limaDate'
 import {
   MEASURE_MAX,
   PRICE_MAX,
+  SERVICE_DATE_MAX,
+  SERVICE_DATE_MIN,
   currencySchema,
   observationsSchema,
   optionalMeasureSchema,
@@ -38,8 +46,44 @@ export const JUSTIFICATION_MIN_LENGTH = 10
  * Viaja como reloj de pared de Lima y se convierte al instante recién al mandar, igual
  * que en las transiciones de estado: quien corrige desde otro país está escribiendo la
  * hora que marcaba el reloj en Perú.
+ *
+ * Se acota a la misma ventana que la fecha tentativa, que es la que la columna admite: un
+ * año de una cifra entra en un `datetime-local` y vuelve como 400 sobre el formulario
+ * entero. Por arriba la ventana ya no decide nada por sí sola (todo lo que supera el 2999
+ * también es futuro, y esa guarda lo ataja igual): lo que aporta es que el usuario lea el
+ * mensaje correcto, el de la ventana y no el del futuro.
  */
-const realDateTimeSchema = () => z.string().trim()
+/** La ventana de la columna, escrita como reloj de pared para comparar con el campo. */
+export const REAL_DATE_TIME_MIN = `${SERVICE_DATE_MIN}T00:00`
+export const REAL_DATE_TIME_MAX = `${SERVICE_DATE_MAX}T23:59`
+
+const realDateTimeSchema = () =>
+  z
+    .string()
+    .trim()
+    .refine(
+      (value) => value === '' || (value >= REAL_DATE_TIME_MIN && value <= REAL_DATE_TIME_MAX),
+      { message: `La fecha debe estar entre ${SERVICE_DATE_MIN} y ${SERVICE_DATE_MAX}` },
+    )
+    /*
+     * Y no puede estar en el FUTURO, con el mismo helper que usan los diálogos que fijan
+     * estas dos fechas. Que corregirlas fuera más permisivo que ponerlas dejaba la regla
+     * con una puerta de atrás: no se podía iniciar un viaje mañana, pero sí iniciarlo hoy
+     * y después corregir el inicio a mañana. Es el error de tipeo que dejó en el sistema
+     * anterior tres viajes que "terminan" meses después de empezar.
+     *
+     * Se mide contra el reloj de Lima y no contra el del navegador, por lo mismo que allá:
+     * quien corrige desde otro país está anotando la hora que marcaba el reloj en Perú.
+     *
+     * Un viaje que YA traiga una fecha real inválida abre el formulario en rojo, y eso
+     * bloquea corregirle cualquier otro campo hasta enmendar la fecha o dejarla en blanco.
+     * Es deliberado y no lleva un texto que lo explique: enmendar esas filas es trabajo de
+     * migración, que se hace por script, y no un camino que la aplicación tenga que
+     * acompañar.
+     */
+    .refine((value) => value === '' || !isFutureInLima(value), {
+      message: FUTURE_DATE_MESSAGE,
+    })
 
 /**
  * Edición de un viaje. Espeja `ServiceUpdateRequest`.
@@ -71,7 +115,11 @@ export const serviceEditFormSchema = z
       .string()
       .trim()
       .min(JUSTIFICATION_MIN_LENGTH, `Explica el cambio en al menos ${JUSTIFICATION_MIN_LENGTH} caracteres`)
-      .max(JUSTIFICATION_MAX_LENGTH, `Máximo ${JUSTIFICATION_MAX_LENGTH} caracteres`),
+      .max(JUSTIFICATION_MAX_LENGTH, `Máximo ${JUSTIFICATION_MAX_LENGTH} caracteres`)
+      // El mismo `NO_CONTROL` que las observaciones, y por lo mismo: el contrato pone a
+      // la justificación entre los textos libres donde el byte NUL es 400, y la columna
+      // no lo admite. Los saltos y las tabulaciones sí son válidos acá.
+      .regex(NO_CONTROL, 'No se permiten caracteres de control.'),
   })
   .refine(
     (values) =>
@@ -114,10 +162,14 @@ export function toServiceEditFormValues(
     origin: service.origin,
     destination: service.destination,
     weightKg: String(service.weightKg),
-    lengthM: service.lengthM === null ? '' : String(service.lengthM),
-    widthM: service.widthM === null ? '' : String(service.widthM),
-    heightM: service.heightM === null ? '' : String(service.heightM),
-    price: service.price === undefined ? '' : String(service.price),
+    // `== null` y no `=== null`: el contrato no las pone entre las obligatorias, así que
+    // el campo puede llegar AUSENTE. Con la comparación estricta, un `undefined` abría el
+    // campo con el texto "undefined" y el formulario nacía inválido sin que nadie tocara
+    // nada.
+    lengthM: service.lengthM == null ? '' : String(service.lengthM),
+    widthM: service.widthM == null ? '' : String(service.widthM),
+    heightM: service.heightM == null ? '' : String(service.heightM),
+    price: service.price == null ? '' : String(service.price),
     currencyId: resolveCurrencyId(service.currencyCode, currencies),
     observations: service.observations ?? '',
     startDateTime: toWallClockOrEmpty(service.startDateTime),
@@ -135,9 +187,10 @@ export function toServiceEditFormValues(
  *
  * REVIENTA si el código no está en el catálogo, en vez de caer a un id vacío: el
  * formulario abriría sin moneda seleccionada y el usuario guardaría con otra sin notar
- * que la cambió. Es el mismo criterio con que la flota mapea su estado por nombre. Que
- * el catálogo llegue completo, dadas de baja incluidas, es lo que hace que este camino
- * no se dispare por un viaje viejo perfectamente válido.
+ * que la cambió. Quien llama lo atrapa y muestra un aviso con reintentar, porque un
+ * `throw` en pleno render desmontaría la aplicación entera. Que el catálogo llegue
+ * completo, dadas de baja incluidas, es lo que hace que este camino no se dispare por un
+ * viaje viejo perfectamente válido.
  */
 function resolveCurrencyId(
   code: string | undefined,
@@ -150,9 +203,20 @@ function resolveCurrencyId(
   return found.id
 }
 
-/** Un instante del servidor, como reloj de pared de Lima; vacío si el viaje no lo tiene. */
+/**
+ * Un instante del servidor, como reloj de pared de Lima; vacío si el viaje no lo tiene.
+ *
+ * La fecha ilegible se rechaza con un mensaje propio y no se deja reventar al formateador:
+ * `Intl` tira `RangeError: Invalid time value`, que es texto del motor y en inglés, y ese
+ * mensaje termina en pantalla porque quien atrapa el error muestra lo que dice.
+ */
 function toWallClockOrEmpty(instant: string | null | undefined): string {
-  return instant ? formatLimaWallClock(new Date(instant)) : ''
+  if (!instant) return ''
+  const date = new Date(instant)
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`La fecha ${instant} del viaje no se pudo leer`)
+  }
+  return formatLimaWallClock(date)
 }
 
 /**
