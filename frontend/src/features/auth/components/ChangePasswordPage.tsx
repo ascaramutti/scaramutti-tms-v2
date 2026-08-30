@@ -10,7 +10,7 @@ import {
 } from '../schemas/change-password.schema'
 import { useChangePasswordMutation } from '../hooks/useChangePasswordMutation'
 import { useAuth } from '../../../shared/auth/AuthContext'
-import { isExternalLanding, landingPathFor } from '../../../shared/auth/roleLanding'
+import { landingPathFor } from '../../../shared/auth/roleLanding'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { withMinDuration } from '../../../shared/utils/withMinDuration'
@@ -29,16 +29,11 @@ export function ChangePasswordPage() {
   const { user } = useAuth()
   const mutation = useChangePasswordMutation()
 
-  // Cambiar contraseña es la única pantalla de v2 accesible para TODOS los
-  // roles: al salir (éxito o cancelar), cada rol vuelve a SU lugar de trabajo
-  // (dispatcher → v1; sin esto caía en la vista "Sin acceso" de cotizaciones).
+  // Cambiar contraseña es la única pantalla accesible para TODOS los roles: al
+  // salir (éxito o cancelar), cada rol vuelve a SU lugar de trabajo. Sin esto,
+  // los que no trabajan en cotizaciones caían en la vista "Sin acceso".
   const goToLanding = () => {
-    const landing = landingPathFor(user?.role)
-    if (isExternalLanding(landing)) {
-      window.location.assign(landing)
-      return
-    }
-    navigate(landing, { replace: true })
+    navigate(landingPathFor(user?.role), { replace: true })
   }
 
   const {

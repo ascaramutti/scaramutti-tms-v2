@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { WithdrawalsListPage } from './WithdrawalsListPage'
+import { FLEET_UNITS_LOAD_ERROR } from '../components/WithdrawalsFilterBar'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
@@ -27,6 +28,8 @@ import {
 import {
   fakeFleetUnit,
   fakeWorker,
+  fleetUnitsByKind,
+  fleetUnitsError,
   fleetUnitsList,
   workersSearchCapture,
 } from '../../../test/mocks/handlers/shared-catalogs'
@@ -272,6 +275,68 @@ describe('WithdrawalsListPage', () => {
     const listbox = await screen.findByRole('listbox')
     await user.click(await within(listbox).findByText('Tracto ABC-123'))
     await waitFor(() => expect(sink.params?.get('tractorId')).toBe('5'))
+  })
+
+  it('el filtro de unidad pide la flota entera: solo las vigentes y sin acotar el subtipo', async () => {
+    const fleetSink: ProductsCaptureSink = {}
+    server.use(
+      fleetUnitsByKind(
+        [
+          fakeFleetUnit({ kind: 'TRACTOR', id: 5, plate: 'ABC-123' }),
+          fakeFleetUnit({ kind: 'TRAILER', id: 9, plate: 'XY-9876' }),
+          fakeFleetUnit({ kind: 'ESCORT', id: 3, plate: 'ES-100' }),
+        ],
+        fleetSink,
+      ),
+    )
+    const user = userEvent.setup()
+    renderRetiros()
+    // El listado por defecto trae varias filas del mismo producto: se espera a que
+    // haya alguna, no a que haya exactamente una.
+    await screen.findAllByText('Filtro de aceite XYZ')
+    await user.click(screen.getByLabelText('Unidad de flota'))
+
+    await waitFor(() => expect(fleetSink.calls).toHaveLength(1))
+    expect(fleetSink.params?.get('isActive')).toBe('true')
+    // El filtro ofrece las tres clases de unidad, así que NO manda subtipo. Se mide
+    // sobre la consulta y además sobre lo que llega: un subtipo de más dejaría al
+    // filtro sin dos de sus tres opciones.
+    expect(fleetSink.params?.has('kind')).toBe(false)
+    const listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByText('Tracto ABC-123')).toBeInTheDocument()
+    expect(within(listbox).getByText('Carreta XY-9876')).toBeInTheDocument()
+    expect(within(listbox).getByText('Escolta ES-100')).toBeInTheDocument()
+  })
+
+  it('avisa cuando la carga de unidades falla, sin bloquear el resto de los filtros', async () => {
+    server.use(fleetUnitsError(500))
+    const user = userEvent.setup()
+    renderRetiros()
+    await screen.findAllByText('Filtro de aceite XYZ')
+    await user.click(screen.getByLabelText('Unidad de flota'))
+
+    // Se compara contra la MISMA constante que la pantalla le pasa al campo, y no
+    // contra la frase repetida acá, para no dejarla clavada en dos lugares: el
+    // texto de esta pantalla está mal (habla de registrar en una pantalla que
+    // filtra) y clavarlo encarecería corregirlo. Lo que el caso mide es el tránsito
+    // de la constante hasta el aviso, así que muere si la prop viaja cambiada o
+    // cruzada con el placeholder. Que la prop FALTE ya no lo caza este test sino el
+    // compilador, porque es obligatoria.
+    const alert = await screen.findByRole('alert')
+    expect(alert.textContent).toBe(FLEET_UNITS_LOAD_ERROR)
+    expect(screen.getByLabelText('Recibido por')).toBeEnabled()
+  })
+
+  it('el filtro de unidad ofrece su propio texto de ayuda', async () => {
+    const user = userEvent.setup()
+    renderRetiros()
+    await screen.findAllByText('Filtro de aceite XYZ')
+    await user.click(screen.getByLabelText('Unidad de flota'))
+
+    expect(screen.getByLabelText('Unidad de flota')).toHaveAttribute(
+      'placeholder',
+      'Tracto, carreta o escolta (opcional)…',
+    )
   })
 
   it('el filtro de unidad resuelve por (kind, id): con ids colisionados filtra el campo correcto', async () => {

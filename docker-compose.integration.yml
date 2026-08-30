@@ -3,8 +3,12 @@
 # Replica la topología unificada v1+v2 en la máquina de desarrollo:
 #   gateway (:8085) → v1 (front+back) + v2 (front+back) → DB dev del host
 #
-# - Usa los MISMOS container_name que prod para validar gateway/nginx.conf
-#   tal cual se despliega (sin variantes de configuración).
+# - Usa los MISMOS container_name que docker-compose.prod.yml (la topología
+#   anterior), para que gateway/nginx.conf se pruebe sin variantes de ESTE
+#   compose.
+#   ⚠️ La configuración que corre en Azure es gateway/default.conf.template,
+#   NO este nginx.conf: son dos variantes del mismo ruteo y un cambio va en
+#   las dos. Ver gateway/README.md.
 # - La DB es la dev existente del host (scaramutti-tms-db-dev, :5432),
 #   alcanzada vía host.docker.internal. Ya tiene ambos schemas + usuarios.
 # - Requiere el repo v1 como hermano: ../scaramutti-tms
@@ -14,7 +18,7 @@
 # ==========================================
 
 services:
-  # --- Gateway (mismo nginx.conf que prod) ---
+  # --- Gateway (nginx.conf: la variante LOCAL, no la de Azure) ---
   gateway:
     image: nginx:alpine
     container_name: scaramutti-tms-gateway-prod

@@ -3,10 +3,12 @@ package com.scaramutti.tms.shared.util;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -41,5 +43,70 @@ class DateUtilsTest {
     void toOffsetDateTime_withUnexpectedType_throws() {
         assertThrows(IllegalStateException.class, () -> DateUtils.toOffsetDateTime("no soy fecha"));
         assertThrows(IllegalStateException.class, () -> DateUtils.toOffsetDateTime(null));
+    }
+
+    @Test
+    void toLocalDate_withLocalDate_returnsSameInstance() {
+        LocalDate date = LocalDate.of(2026, 5, 10);
+        assertSame(date, DateUtils.toLocalDate(date));
+    }
+
+    /**
+     * La rama que existe SOLO por si el driver cambia de tipo: sin este caso, el día que
+     * empiece a devolver {@code java.sql.Date} nadie habría ejecutado nunca la conversión.
+     */
+    @Test
+    void toLocalDate_withSqlDate_convertsWithoutShiftingTheDay() {
+        java.sql.Date sqlDate = java.sql.Date.valueOf(LocalDate.of(2026, 5, 10));
+        assertEquals(LocalDate.of(2026, 5, 10), DateUtils.toLocalDate(sqlDate));
+    }
+
+    /**
+     * Un {@code Timestamp} NO es una fecha: hereda de {@code java.util.Date} por otra rama, así
+     * que colarlo acá sería perder la hora en silencio. Tiene que fallar.
+     */
+    @Test
+    void toLocalDate_withTimestamp_throws() {
+        java.sql.Timestamp ts = java.sql.Timestamp.from(Instant.parse("2026-05-10T18:56:17Z"));
+        assertThrows(IllegalStateException.class, () -> DateUtils.toLocalDate(ts));
+    }
+
+    @Test
+    void toLocalDate_withUnexpectedType_throws() {
+        assertThrows(IllegalStateException.class, () -> DateUtils.toLocalDate("no soy fecha"));
+        assertThrows(IllegalStateException.class, () -> DateUtils.toLocalDate(null));
+    }
+
+    /**
+     * Las dos operaciones de {@code toStorableUtc} solo se pueden medir ACA. Por HTTP son
+     * invisibles: {@code timestamptz} preserva el instante escriba con el huso que escriba, y
+     * ningun test de endpoint manda precision sub-segundo. Sin estos dos casos, el metodo entero
+     * es indistinguible de {@code return value;}.
+     */
+    @Test
+    void toStorableUtc_normalizesTheOffsetToUtc() {
+        OffsetDateTime stored = DateUtils.toStorableUtc(
+            OffsetDateTime.parse("2026-07-10T00:12:00-05:00"));
+
+        assertEquals(ZoneOffset.UTC, stored.getOffset());
+        assertEquals("2026-07-10T05:12Z", stored.toString());
+    }
+
+    /**
+     * PostgreSQL guarda microsegundos y REDONDEA; Java trunca. Sin el truncado, una marca con
+     * nanos vuelve del GET distinta de la que devolvio el POST, y la auditoria afirma un valor que
+     * la columna nunca tuvo.
+     */
+    @Test
+    void toStorableUtc_truncatesToTheMicrosecondsThatTheColumnStores() {
+        OffsetDateTime stored = DateUtils.toStorableUtc(
+            OffsetDateTime.parse("2026-07-10T05:12:00.123456789Z"));
+
+        assertEquals(123456000, stored.getNano());
+    }
+
+    @Test
+    void toStorableUtc_keepsNullAsNull() {
+        assertNull(DateUtils.toStorableUtc(null));
     }
 }

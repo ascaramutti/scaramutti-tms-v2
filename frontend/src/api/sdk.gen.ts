@@ -2,7 +2,7 @@
 
 import type { Client, Options as Options2, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses } from './types.gen';
+import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -550,6 +550,10 @@ export const listWarehouseOpeningBalances = <ThrowOnError extends boolean = fals
  * falsearía el saldo corrido).
  * - Producto inexistente o inactivo → `400 WH-004`.
  *
+ * Registrarlo queda restringido a `admin`: fija la línea base del kardex, es
+ * inmutable y no tiene anulación, así que un error solo se corrige en base de
+ * datos. Consultar las aperturas sigue abierto a los roles del módulo.
+ *
  */
 export const createWarehouseOpeningBalance = <ThrowOnError extends boolean = false>(options: Options<CreateWarehouseOpeningBalanceData, ThrowOnError>) => (options.client ?? client).post<CreateWarehouseOpeningBalanceResponses, CreateWarehouseOpeningBalanceErrors, ThrowOnError>({
     responseType: 'json',
@@ -823,10 +827,621 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * la direccion de una unidad es el par `(kind, id)`. `kind` omitido = los
  * tres subtipos.
  *
+ * Lo consumen los dos modulos: almacen elige la unidad destino del retiro
+ * (los tres subtipos) y operaciones elige tracto y carreta al asignar un
+ * viaje (`?kind=TRACTOR` / `?kind=TRAILER`), por eso la respuesta incluye
+ * `status` (disponibilidad). Las escoltas no participan de la asignacion de
+ * viajes: su `status` viaja en null. Ademas de quienes asignan recursos,
+ * `sales` puede consultarlos: registra y edita servicios.
+ *
  */
 export const listFleetUnits = <ThrowOnError extends boolean = false>(options?: Options<ListFleetUnitsData, ThrowOnError>) => (options?.client ?? client).get<ListFleetUnitsResponses, ListFleetUnitsErrors, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/fleet-units',
+    ...options
+});
+
+/**
+ * Listar conductores (combobox de asignacion del viaje)
+ *
+ * Catalogo compartido `public.drivers`: quien puede conducir, con su licencia
+ * y su disponibilidad. El nombre sale del trabajador asociado, y el `id` que
+ * devuelve es el que guarda la asignacion del servicio. Solo lectura desde
+ * v2, sin creacion al vuelo: el alta de conductores pertenece a la futura
+ * gestion de flota y personal. Sin paginar: plantilla chica. Ademas de
+ * quienes asignan recursos, `sales` puede consultarlos: registra y edita
+ * servicios.
+ *
+ */
+export const listDrivers = <ThrowOnError extends boolean = false>(options?: Options<ListDriversData, ThrowOnError>) => (options?.client ?? client).get<ListDriversResponses, ListDriversErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/drivers',
+    ...options
+});
+
+/**
+ * Listar servicios con filtros
+ *
+ * Búsqueda `q` de 3 caracteres o más sobre código, cliente (nombre/RUC), origen
+ * y destino, **multi-palabra**: `q` se tokeniza por espacios y cada palabra debe
+ * matchear en algún campo ("IPH piura" encuentra al cliente IPH con destino
+ * Piura). Los filtros se combinan entre sí. Orden fijo por fecha de creación
+ * descendente: no hay parámetro de ordenamiento.
+ *
+ * Las palabras de menos de 3 caracteres se descartan del término (no acotan la
+ * búsqueda y sí multiplican su costo); si ninguna palabra llega a 3, la respuesta
+ * es 400. El término admite hasta 200 caracteres y hasta 8 palabras de 3 caracteres o más.
+ *
+ * Los servicios eliminados (`DELETED`) NO aparecen salvo pedirlos explícitamente
+ * con `status=DELETED`.
+ *
+ * Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` de cada fila
+ * (ausentes, no null): opera los viajes, no ve lo que se cobra por ellos.
+ *
+ * Un `status` que no exista responde 400 `COM-001` con el detalle.
+ *
+ * Un filtro enviado VACÍO (`?clientId=`, como lo serializa un formulario con el
+ * campo sin elegir) se trata como OMITIDO, no como error.
+ *
+ * Las fechas se admiten entre 1900-01-01 y 2999-12-31, y el término de búsqueda
+ * no admite caracteres de control, salvo los que separan palabras (salto de línea,
+ * tabulación): fuera de eso la respuesta es 400.
+ *
+ */
+export const listServices = <ThrowOnError extends boolean = false>(options?: Options<ListServicesData, ThrowOnError>) => (options?.client ?? client).get<ListServicesResponses, ListServicesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services',
+    ...options
+});
+
+/**
+ * Crear servicio
+ *
+ * El servicio nace en `PENDING_ASSIGNMENT` y el backend le asigna el código:
+ * `SRV-` seguido del id del servicio, rellenado con ceros a la izquierda hasta
+ * un mínimo de 4 dígitos; a partir del id 10000 el código crece a 5 o más
+ * dígitos y **nunca se trunca**.
+ *
+ * La fecha tentativa PUEDE ser pasada (registro retroactivo); la interfaz
+ * avisa, el servidor no bloquea. Cliente, tipo de carga o moneda inexistentes
+ * o inactivos → 400 `COM-001`. El alta escribe la primera línea de la bitácora
+ * y su registro de auditoría.
+ *
+ * Registrar exige poder VER los importes: el cuerpo obliga a mandar el precio, así que a un
+ * usuario con el rol de despacho (aunque sume otro que sí registra) se le contesta 403
+ * `COM-003` en vez de dejarlo escribir a ciegas un valor que no puede leer. Es el mismo veto
+ * que aplica la edición.
+ *
+ * Contra el doble-click: un alta con el mismo cliente, la misma ruta y el mismo
+ * usuario dentro de los 30 segundos previos responde 409 `OPS-007`. No es una
+ * restricción de unicidad — dos viajes iguales separados en el tiempo se
+ * registran sin problema, y el código permite al cliente distinguir este 409
+ * benigno de un conflicto real.
+ *
+ */
+export const createService = <ThrowOnError extends boolean = false>(options: Options<CreateServiceData, ThrowOnError>) => (options.client ?? client).post<CreateServiceResponses, CreateServiceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Indicadores del tablero operativo
+ *
+ * RN-OP14 — `completedThisWeek` y `weekCycle` usan el ciclo operativo de la empresa:
+ * **miércoles a martes, hora de América/Lima**. Los otros tres contadores
+ * (`pendingAssignment`, `pendingStart`, `inProgress`) son GLOBALES: cuentan todos los viajes
+ * en ese estado, sin ventana de tiempo. La ventana de la consulta es SEMIABIERTA
+ * —desde el miércoles 00:00 de Lima inclusive hasta el miércoles siguiente 00:00 de Lima
+ * exclusive— para que no se pierda ningún instante del martes: la columna guarda
+ * microsegundos, y un tope escrito como `23:59:59.999` deja fuera los últimos 999.
+ *
+ * ⚠️ `weekCycle.end` es el **MARTES, inclusive** (la etiqueta que la pantalla imprime), NO el
+ * miércoles exclusivo con el que se consulta. Son dos cosas distintas y se confunden.
+ *
+ * Los contadores de recursos miden lo MISMO que el tablero del sistema anterior, para que el
+ * número no cambie de significado con el cambio de sistema: `driversOnRoad` = conductores
+ * PRINCIPALES distintos en servicios en ruta **(los refuerzos NO cuentan)** sobre el total de
+ * conductores de alta; `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
+ * tampoco) sobre el total de tractos de alta. **Las carretas y las escoltas no participan de
+ * ningún indicador**, aunque el nombre del campo diga "units".
+ *
+ * En ambos objetos, `active` = el numerador (los que están en ruta AHORA) y `total` = el
+ * denominador (el padrón vigente de ese recurso).
+ *
+ * NINGUNO de los dos números mira la disponibilidad del catálogo, solo el alta: un tracto en
+ * mantenimiento sigue contando en el padrón, y un conductor en ruta cuenta en `active` aunque
+ * figure NO DISPONIBLE, que es justamente como tiene que estar.
+ *
+ * **Desviación consciente respecto del sistema anterior**: el numerador también exige que el
+ * recurso esté de alta. Allá no lo hacía, así que un conductor dado de baja mientras su viaje
+ * seguía en ruta producía un "6 de 5" en pantalla — una fracción imposible se lee como
+ * sistema roto, y lo que la paridad tiene que preservar es el SIGNIFICADO del número.
+ *
+ * `DELETED` y `CANCELLED` no entran en ningún contador. Un `COMPLETED` sin fecha de fin real
+ * no cae en ninguna semana y no se compensa con otra fecha: ese dato lo sanea el cutover, y
+ * taparlo escondería justo lo que hay que ver.
+ *
+ */
+export const getServiceStats = <ThrowOnError extends boolean = false>(options?: Options<GetServiceStatsData, ThrowOnError>) => (options?.client ?? client).get<GetServiceStatsResponses, GetServiceStatsErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/stats',
+    ...options
+});
+
+/**
+ * Reporte de servicios completados de una semana operativa
+ *
+ * Servicios completados dentro de UNA semana operativa (miércoles→martes,
+ * hora de América/Lima, RN-OP14). Se pide de a una semana y NUNCA por rango
+ * libre: un reporte que mezcla semanas no sirve para el cálculo de bonos,
+ * que es para lo que se usa.
+ *
+ * `weekStart` es el MIÉRCOLES que abre la semana. Si la fecha no cae en
+ * miércoles → 400 `COM-001`: se rechaza en vez de ajustarla, para que un
+ * error de quien llama se vea en vez de taparse.
+ *
+ * La semana EN CURSO se puede consultar: `closed` dice si ya cerró. Lo que
+ * depende de eso es la EXPORTACIÓN, que solo tiene sentido sobre una semana
+ * cerrada — un archivo de bonos de una semana abierta se lee como
+ * definitivo sin serlo.
+ *
+ * Totales POR MONEDA sin conversión.
+ *
+ * RN-OP8 — es un reporte de facturación: `dispatcher` recibe 403. El veto
+ * MANDA sobre la lista de roles de abajo: un usuario que sume `dispatcher`
+ * y otro rol la cumple y recibe 403 igual, siempre que `weekStart` sea
+ * legible. El parseo del parámetro corre ANTES que el veto, así que ese
+ * mismo usuario con una fecha mal formada recibe 400, no 403.
+ *
+ * Este endpoint NO exporta: publica `closed` para que la pantalla apague el
+ * botón. El formato de la exportación, y si la genera el cliente o el
+ * servidor, está SIN RESOLVER y va en su propio cambio.
+ *
+ * Una fila migrada sin fecha de inicio o sin conductor aborta el reporte en vez
+ * de publicarse incompleta: es un documento de facturación y un nulo silencioso
+ * ahí se paga. Sale con el mismo Problem que el resto del proyecto
+ * (`COM-500`, con el `detail` nombrando el viaje). Lo que NO está declarado es
+ * el status: ningún endpoint de esta spec declara el 500, así que el cliente
+ * generado no lo va a tipar, pero el cuerpo sí es el Problem de la casa.
+ *
+ * La `duración` por viaje no viaja como campo: la calcula el cliente con
+ * `startDateTime` y `endDateTime`, que por eso son ambos obligatorios.
+ *
+ */
+export const getServicesReport = <ThrowOnError extends boolean = false>(options: Options<GetServicesReportData, ThrowOnError>) => (options.client ?? client).get<GetServicesReportResponses, GetServicesReportErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/report',
+    ...options
+});
+
+/**
+ * Detalle del servicio
+ *
+ * Incluye la bitácora (`events`) en orden cronológico ascendente. Devuelve el
+ * header `ETag`, que es la versión del recurso y es lo que hay que mandar en el
+ * `If-Match` de la edición y de las transiciones de estado. Reenviarlo TAL CUAL,
+ * copiado del header: las comillas son parte del valor, y reconstruirlo a mano
+ * desde el cuerpo es la forma habitual de terminar con un 412 inexplicable.
+ *
+ * Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` (ausentes, no
+ * null), igual que en el listado: opera los viajes, no ve lo que se cobra por ellos.
+ *
+ * Los REFUERZOS viajan en `additionalResources`: lista vacía mientras el viaje no
+ * tenga ninguno, NUNCA null.
+ *
+ */
+export const getService = <ThrowOnError extends boolean = false>(options: Options<GetServiceData, ThrowOnError>) => (options.client ?? client).get<GetServiceResponses, GetServiceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/{id}',
+    ...options
+});
+
+/**
+ * Editar servicio (justificación obligatoria)
+ *
+ * Editables: origen, destino, fecha tentativa, peso, dimensiones, precio, moneda,
+ * observaciones y las fechas reales de inicio y fin. El cliente, el ámbito del
+ * viaje y el tipo de carga NO viajan en el cuerpo: son inmutables después del alta
+ * (si se equivocaron, el viaje se crea de nuevo; si nunca debió existir, se
+ * elimina).
+ *
+ * Las fechas reales solo se CORRIGEN acá, no se fijan: cada una es editable
+ * únicamente si el servicio YA LA TIENE; mandarla antes es un 400 `COM-001`. La
+ * condición es tener la fecha, no estar en un estado: en la práctica el inicio
+ * aparece al ponerse en ruta y el fin al completarse. Es MÁS ESTRICTA que la matriz
+ * del sistema anterior: un viaje migrado SIN la fecha no se corrige por acá, porque
+ * la transición que la fija ya ocurrió; ese saneo va en el script de cutover.
+ * Ausente o en null = sin cambio, porque una fecha real no se borra. Al
+ * corregirlas rige `fin >= inicio`. Cerrar el viaje sigue siendo la transición de
+ * estado, no este endpoint.
+ *
+ * ⚠️ Las fechas las FIJA la transición de estado (`POST /services/{id}/status`):
+ * el inicio al pasar a "en ruta" y el fin al completar. Antes de eso un viaje
+ * nacido del alta las tiene vacías y estos dos campos le responden 400, porque
+ * acá se corrigen y no se fijan. También traen fecha las filas que ya vengan con
+ * ella desde el sistema anterior.
+ *
+ * La moneda inexistente es 400 siempre. La ACTIVA solo se exige si se la cambia (a diferencia del alta,
+ * que la exige siempre): un viaje cuya moneda se dio de baja después se sigue
+ * editando, porque retirar una moneda cierra su uso hacia adelante y no congela
+ * lo ya emitido.
+ *
+ * Un cuerpo sin cambios reales responde 200 y NO escribe nada: ni auditoría, ni
+ * bitácora, ni la fecha de actualización (con lo cual el `ETag` tampoco se mueve).
+ *
+ * El servicio cancelado o eliminado es inmutable → 409 `OPS-004`. El completado SÍ
+ * se edita: es la corrección de datos de un viaje ya cerrado.
+ * El ESTADO no se toca por acá: lo mueve `POST /services/{id}/status`, que además es el
+ * único que puede REABRIR un viaje cancelado o eliminado. Un viaje que ya salió de esa
+ * forma es inmutable para este endpoint hasta que lo reabran.
+ *
+ * Cada campo cambiado deja su fila en la auditoría, y la edición entera deja UNA
+ * entrada de bitácora que enumera los cambios y cierra con la justificación.
+ *
+ * En esa entrada el precio y la moneda se NOMBRAN pero no se muestran
+ * (`Precio: (no se muestra)`), y un valor ausente —antes o después del cambio— se escribe `(vacío)`: la bitácora viaja dentro del detalle y al detalle
+ * entra `dispatcher`, al que la regla del negocio le oculta siempre lo que se
+ * cobra. Los valores quedan en la auditoría, que hoy no expone ningún endpoint.
+ * La `justification` es texto libre y viaja entera (salvo por los saltos de línea, que
+ * la bitácora muestra como `⏎` para que nadie pueda plantar ahí una línea con el
+ * formato del servidor; el texto exacto queda en la auditoría). Quien la escribe puede
+ * volcar ahí el importe y el despacho lo leería. Lo mismo con el valor ANTERIOR de
+ * CUALQUIER texto libre (`observations`, `origin`, `destination`), que la bitácora
+ * publica al editarlo: limpiar un dato sensible de uno de esos campos lo deja grabado
+ * en la bitácora de forma PERMANENTE, porque ningún endpoint la edita ni la borra.
+ * Riesgo ACEPTADO (decisión del dueño, 2026-08-07): el servidor no divulga los
+ * importes que él guarda, pero no filtra lo que una persona escribe.
+ *
+ * Editar exige además poder VER los importes: el cuerpo obliga a mandar el precio, así que
+ * a un usuario con el rol de despacho (aunque sume otro que sí edita) se le contesta 403
+ * `COM-003` en vez de dejarlo escribir a ciegas un valor que no puede leer.
+ *
+ * El 403 del veto de precios se contesta antes que el 404 y después de los 400 de formato:
+ * editar un servicio inexistente sin poder ver los importes devuelve 403, no 404.
+ *
+ * Los 400 no caen todos en el mismo lugar: los de FORMATO del cuerpo (campos obligatorios,
+ * largos, precisión, ventana de fechas, byte NUL, justificación) se contestan antes que
+ * cualquier precondición del recurso, y los de NEGOCIO (moneda inactiva, fecha real que el
+ * servicio no tiene, fin anterior al inicio) después del `If-Match`.
+ *
+ * El 409 `OPS-004` se contesta ANTES que el 412: un `If-Match` viejo no tapa la razón
+ * real. Es deliberado y sigue el criterio del módulo de almacén, donde el recurso anulado
+ * también se contesta antes que la versión; cotizaciones, en cambio, verifica la versión
+ * primero.
+ *
+ * Concurrencia: `If-Match` con el `ETag` del detalle, copiado tal cual del header.
+ * Ausente o sin coincidir → 412 `COM-004`. La fila se lee bajo lock, así que dos
+ * ediciones simultáneas se serializan; si CUALQUIER sentencia de esa transacción se rinde por lock (la espera agotada, un
+ * abrazo mortal, un fallo de serialización) → 409 `OPS-008`, transitorio: se resuelve reintentando (el `OPS-004`, en cambio, no se
+ * destraba reintentando: el viaje está cancelado o eliminado, y de ahí solo vuelve con `POST /services/{id}/status` y
+ * `target: REOPENED`).
+ *
+ */
+export const updateService = <ThrowOnError extends boolean = false>(options: Options<UpdateServiceData, ThrowOnError>) => (options.client ?? client).put<UpdateServiceResponses, UpdateServiceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Asignar recursos principales (el servicio pasa a pendiente de inicio)
+ *
+ * Conductor y tracto obligatorios, carreta opcional; solo desde
+ * `PENDING_ASSIGNMENT`, y al asignar el servicio pasa a `PENDING_START`.
+ *
+ * El estado que no admite la acción se parte en dos códigos, igual que en la
+ * edición: `PENDING_START`, `IN_PROGRESS` y `COMPLETED` responden 409 `OPS-006`
+ * (el estado no admite ESTA acción, que no es un cambio de estado), y los dos
+ * terminales inmutables, `CANCELLED` y `DELETED`, responden 409 `OPS-004`, el
+ * mismo código con el que los rechaza el PUT.
+ *
+ * Si un recurso ya participa de OTRO servicio en `PENDING_START` o `IN_PROGRESS`,
+ * sea como recurso principal o como refuerzo (se revisan AMBAS fuentes), responde
+ * 409 `OPS-002` con `forcible: true` y el detalle en `conflicts`. El texto del error nombra
+ * al primero y cuenta cuántos RECURSOS distintos quedan en conflicto; la lista completa
+ * viaja en `conflicts`. Reintentar con
+ * `force: true` lo asigna igual y deja constancia en la bitácora y en la auditoría:
+ * el conflicto avisa, no prohíbe. Mandar `force: true` sin que haya conflicto
+ * asigna normal y NO deja registrado que se forzara nada.
+ *
+ * Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+ * disponibilidad NO se valida: un tracto en mantenimiento se puede asignar igual,
+ * porque esa es una decisión operativa y el catálogo de estados existe para ordenar
+ * la lista de la pantalla, no para prohibir.
+ *
+ * Los 400 no caen todos en el mismo lugar, igual que en la edición: los de FORMATO del
+ * cuerpo (obligatorios, tope de la nota, byte NUL, ids no positivos) se contestan ANTES que
+ * cualquier precondición del recurso, así que un id de viaje inexistente con un cuerpo
+ * inválido responde 400 y no 404. Los de NEGOCIO (recurso inexistente o dado de baja) se
+ * contestan DESPUÉS del 404 y del 409 del estado.
+ *
+ * Sin `If-Match`: acá la protección es el estado, no la versión (solo se asigna
+ * desde un único estado, que la propia operación abandona). La fila se lee bajo
+ * lock y los recursos pedidos se serializan entre sí, así que dos asignaciones
+ * simultáneas no pueden colarse sin ver el conflicto; si CUALQUIER sentencia de esa
+ * transacción se rinde por lock → 409 `OPS-008`, TRANSITORIO, se resuelve
+ * reintentando.
+ *
+ */
+export const assignServiceResources = <ThrowOnError extends boolean = false>(options: Options<AssignServiceResourcesData, ThrowOnError>) => (options.client ?? client).post<AssignServiceResourcesResponses, AssignServiceResourcesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/{id}/assignment',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Transicionar estado (iniciar / finalizar / cancelar / eliminar / reabrir)
+ *
+ * RN-OP1 — transiciones válidas: pendiente de inicio → en ruta, en ruta →
+ * completado, cancelado desde los tres estados no terminales, y eliminado
+ * SOLO desde los dos pendientes, mas la REAPERTURA, que es el unico arco
+ * que sale de un terminal y va al estado que el rastro registre (ver mas
+ * abajo). El resto → 409 `OPS-001`. El paso de
+ * pendiente de asignación a pendiente de inicio NO se pide acá: es efecto
+ * de asignar recursos.
+ *
+ * Eliminar y cancelar son cosas distintas: `DELETED` etiqueta el registro
+ * que nunca debió existir (error de digitación) y lo saca de listados e
+ * indicadores; `CANCELLED` es un viaje real que se abortó. Un servicio en
+ * ruta o completado no se elimina: se cancela o se corrige. Nada se borra
+ * de la base de datos.
+ *
+ * ⚠️ Un viaje con recursos de REFUERZO todavía no se reabre hacia un estado
+ * que los retiene: sus adicionales también vuelven a quedar tomados y la
+ * verificación de disponibilidad hoy solo alcanza a los tres principales.
+ * Responde 409 `OPS-009` y **no es forzable**. El endpoint de refuerzos YA
+ * existe, así que este límite es ALCANZABLE: sumar un refuerzo, cancelar y
+ * querer reabrir deja al viaje sin poder volver. No lo sostiene una regla de
+ * negocio sino el presupuesto de esperas de bloqueo, y se levanta en su propio
+ * cambio, no con el endpoint de refuerzos. Lo que SÍ evita el callejón es dar de
+ * baja los refuerzos con `DELETE /services/{id}/resources/{assignmentId}` ANTES
+ * de cancelar, porque la guarda cuenta filas vivas; sobre un viaje ya cancelado
+ * no hay salida, ya que para quitarlos hay que estar en ruta. Reabrir hacia "pendiente de
+ * asignación" no lo tiene, porque ese estado no retiene nada.
+ *
+ * Cada transición que AVANZA exige los datos que la etapa anterior tenía
+ * que haber dejado: iniciar pide conductor y tracto (la carreta es opcional, hay
+ * carga que no la lleva) y finalizar pide la fecha de inicio. Falta alguno
+ * → 409 `OPS-009`.
+ *
+ * Esas dos son inalcanzables por esta API: a "pendiente de inicio" solo se
+ * llega asignando, que exige conductor y tracto, y pasar a "en ruta"
+ * SIEMPRE deja registrado el inicio (si `dateTime` no viene, se usa el
+ * momento de la llamada). O sea que ahí un `OPS-009` significa que la fila
+ * entró sin pasar por la aplicación —data migrada o escritura directa— y
+ * el dato hay que sanearlo, no reintentarlo. Las otras dos causas del
+ * mismo código nacen al reabrir (sin rastro de dónde venía, o con recursos
+ * de refuerzo) y tampoco se reintentan.
+ *
+ * `REOPENED` deshace una cancelación o una eliminación. No lleva estado
+ * de destino: el servidor lo saca de la auditoría, así que un viaje
+ * cancelado en ruta vuelve a en ruta y no a foja cero. Si no hay rastro
+ * de dónde venía (viajes migrados del sistema anterior) responde 409
+ * `OPS-009`, porque devolverlo a un estado por defecto lo pondría en uno
+ * que quizás nunca tuvo. Un viaje completado NO se reabre: terminar no es
+ * un error que haya que deshacer, y sus datos se corrigen editando. Es la
+ * transición más acotada: solo `admin` y `general_manager`, y pide motivo
+ * e `If-Match` igual que las dos que deshace.
+ *
+ * El 403 del veto se resuelve ANTES de tocar la base, así que un rol vetado recibe el mismo
+ * 403 exista o no el viaje. Los 400 de forma del cuerpo corren todavía antes, en el mapeo del
+ * pedido: un rol vetado que además manda un motivo corto recibe 400 y no 403. No filtra nada
+ * —esos 400 solo miran el cuerpo— pero conviene saber el orden al construir la pantalla.
+ *
+ * El motivo se mide DESPUÉS de recortar: diez espacios no son diez caracteres. Y ningún texto
+ * libre puede llevar el byte NUL, que PostgreSQL no admite dentro de un texto: es 400, no 500.
+ *
+ * Precedencia entre los rechazos: primero se resuelve el DESTINO (de ahí salen los `OPS-009`
+ * de la reapertura), después el estado de la fila (`OPS-004`), después el arco (`OPS-001`) y
+ * recién ahí la versión (412). O sea que un `If-Match` viejo sobre un viaje ya cancelado
+ * recibe `OPS-004` y no 412: recargar no arregla que desde ese estado no se pueda llegar al
+ * pedido. Los datos de la etapa anterior (`OPS-009`) se miran DESPUÉS del 412, porque ahí
+ * recargar sí sirve.
+ *
+ * Reabrir hacia un estado que RETIENE recursos (pendiente de inicio o en
+ * ruta) vuelve a mirar conflictos: cancelar no limpia el conductor ni el
+ * tracto, pero un viaje cancelado deja de retenerlos, así que en el medio
+ * otro viaje se los puede haber llevado. Si eso pasó → 409 `OPS-002`
+ * forzable, igual que al asignar, y al reabrir con `force` la bitácora
+ * deja una línea por cada recurso que se pisó. Sin ese chequeo, dos viajes
+ * activos terminarían compartiendo un conductor sin que nadie lo haya
+ * decidido.
+ *
+ * ⚠️ La `note` es texto libre y viaja entera a la bitácora (salvo por los saltos de línea,
+ * que se muestran como `⏎` para que nadie pueda plantar ahí una línea con el formato del
+ * servidor). Al cancelar, eliminar y reabrir es OBLIGATORIA, la escriben roles que SÍ ven
+ * los importes, y la bitácora la lee todo el que pueda leer el detalle del viaje, incluido
+ * el despacho, que no ve precios. Quien la escribe puede volcar ahí un importe y el despacho
+ * lo leería, de forma PERMANENTE (ningún endpoint la edita ni la borra). Riesgo ACEPTADO
+ * (decisión del dueño, 2026-08-07, la misma que rige para la `justification` del PUT): el
+ * servidor no divulga los importes que él guarda, pero no filtra lo que una persona escribe.
+ *
+ * La línea que deja el forzado nombra el CÓDIGO y el ESTADO del otro viaje con el que se
+ * comparte el recurso, y también queda persistida. Hoy no filtra nada porque los cinco roles
+ * que leen el detalle pueden pedir ese otro viaje de frente; el día que el detalle autorice
+ * por fila, hay que filtrar también la bitácora, porque este canal sobrevive a la respuesta
+ * y el del 409 no.
+ *
+ * Cancelar y eliminar NO exigen esos datos previos: son las salidas, y
+ * tienen que estar disponibles justamente para los viajes que quedaron a
+ * medias. Lo que sí exigen es del PEDIDO, no del viaje: motivo de 10
+ * caracteres o más e `If-Match` (RN-OP7). Junto con la reapertura son las transiciones más
+ * exigentes en lo que la llamada tiene que traer, y las menos exigentes en
+ * el estado del viaje.
+ *
+ * `dateTime` es opcional (por defecto, ahora) y solo aplica al iniciar o
+ * finalizar. Mandarlo al cancelar, eliminar o reabrir es 400 `COM-001`: esas
+ * tres no fechan el viaje sino la decisión, y aceptar el dato para
+ * descartarlo en silencio dejaría al cliente creyendo que guardó una marca
+ * que nunca existió. RN-OP13 — al finalizar, la fecha de fin no puede ser
+ * anterior a la de inicio (400 `COM-001`).
+ *
+ * RN-OP7 — cancelar y eliminar exigen motivo de 10 caracteres o más, no
+ * los puede hacer `dispatcher` (403: opera el viaje, no decide matarlo ni
+ * descartarlo) y piden `If-Match` con el ETag del detalle, porque son
+ * destructivos y el estado que el usuario vio en pantalla pudo haber
+ * cambiado. Ahí `If-Match` ausente o sin coincidir → 412 `COM-004`.
+ *
+ * Al iniciar y al finalizar el header es OPCIONAL, pero si viene se
+ * EVALÚA: sin coincidir → 412. No se ignora. RFC 9110 §13.1.1 obliga a
+ * evaluar toda precondición recibida, y descartarla le daría al cliente
+ * una protección que cree tener y no tiene. La condicionalidad (obligatorio
+ * en tres de los cinco targets) no se puede declarar en el esquema porque depende de
+ * un campo del cuerpo: la valida el servidor.
+ *
+ * `sales` no participa de las transiciones: registra y edita el servicio,
+ * pero la operación del viaje es del despacho y la gerencia (misma regla
+ * que el sistema anterior).
+ *
+ */
+export const changeServiceStatus = <ThrowOnError extends boolean = false>(options: Options<ChangeServiceStatusData, ThrowOnError>) => (options.client ?? client).post<ChangeServiceStatusResponses, ChangeServiceStatusErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/{id}/status',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Agregar recursos adicionales (solo con el viaje en ruta)
+ *
+ * RN-OP5 — refuerzos de un viaje que YA arrancó: el relevo de un conductor que
+ * agotó su descanso reglamentario, la unidad de apoyo que sale a un varado. Al
+ * menos uno de `driverId`, `tractorId` o `trailerId` (ninguno → 400 `COM-001`) y
+ * motivo OBLIGATORIO de 10 caracteres o más, medidos DESPUÉS de recortar los
+ * espacios de los bordes.
+ *
+ * Los recursos NO reemplazan a los principales: se suman. El viaje se queda en
+ * `IN_PROGRESS` y sus conductor, tracto y carreta originales no se tocan. Un
+ * pedido con los tres recursos deja UNA fila de refuerzo, no tres.
+ *
+ * El estado que no admite la acción se parte en dos códigos, igual que en la
+ * asignación: `PENDING_ASSIGNMENT`, `PENDING_START` y `COMPLETED` responden 409
+ * `OPS-006` (el estado no admite ESTA acción), y los dos terminales inmutables,
+ * `CANCELLED` y `DELETED`, responden 409 `OPS-004`, el mismo código con el que
+ * los rechaza el PUT.
+ *
+ * Los dos conflictos de recurso son DISTINTOS y se evalúan en este orden, que no
+ * es cosmético:
+ *
+ * 1. RN-OP4 — el recurso ya participa de ESTE MISMO viaje, sea como principal o
+ * como refuerzo agregado antes (se revisan AMBAS fuentes) → 409 `OPS-003`,
+ * DURO: `force` no lo saltea y el Problem viaja pelado, sin `forcible` ni
+ * `conflicts`.
+ * 2. RN-OP3 — el recurso está tomado por OTRO viaje en `PENDING_START` o
+ * `IN_PROGRESS`, como principal o como refuerzo (también ambas fuentes) → 409
+ * `OPS-002` con `forcible: true` y el detalle en `conflicts`. Reintentar con
+ * `force: true` lo suma igual y deja constancia en la bitácora y en la
+ * auditoría: el conflicto avisa, no prohíbe.
+ *
+ * Si `OPS-002` se evaluara primero, un `force: true` colaría el duplicado que
+ * RN-OP4 declara no forzable. Mandar `force: true` sin que haya conflicto suma
+ * el refuerzo normal y NO deja registrado que se forzara nada.
+ *
+ * Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+ * disponibilidad NO se valida: sumar un refuerzo ELIGE (a diferencia de reabrir,
+ * que RESTAURA), así que rige el mismo criterio que la asignación y un tracto en
+ * mantenimiento se puede sumar igual.
+ *
+ * Sin `If-Match`, igual que la asignación pero por una razón DISTINTA, y por eso
+ * se escribe: la asignación se auto-protege porque ABANDONA el estado que la
+ * habilita, y esta se queda en "en ruta". Lo que rechaza el reintento acá es
+ * `OPS-003` — el mismo recurso sobre el mismo viaje rebota duro. Un `If-Match`
+ * que llegue igual se ignora. La fila se lee bajo lock y los recursos pedidos se
+ * serializan entre sí, así que dos refuerzos simultáneos no pueden colarse sin
+ * ver el conflicto; si CUALQUIER sentencia de esa transacción se rinde por lock →
+ * 409 `OPS-008`, TRANSITORIO, se resuelve reintentando.
+ *
+ * Los 400 no caen todos en el mismo lugar, igual que en la asignación: los de
+ * FORMATO del cuerpo (al menos un recurso, mínimo y tope del motivo, byte NUL,
+ * ids no positivos, `force` no booleano) se contestan ANTES que cualquier
+ * precondición, así que un id de viaje inexistente con un cuerpo inválido
+ * responde 400 y no 404. Los de NEGOCIO (recurso inexistente o dado de baja) se
+ * contestan DESPUÉS del 404 y del 409 del estado.
+ *
+ * Límite conocido: un viaje que recibió refuerzos ya no se puede REABRIR una vez
+ * cancelado o eliminado (409 `OPS-009`, no forzable). No es una regla de negocio
+ * sino el presupuesto de esperas de lock, que no alcanza para verificar una lista
+ * de recursos de largo variable; se levanta en su propio cambio.
+ *
+ */
+export const addServiceResources = <ThrowOnError extends boolean = false>(options: Options<AddServiceResourcesData, ThrowOnError>) => (options.client ?? client).post<AddServiceResourcesResponses, AddServiceResourcesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/{id}/resources',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Dar de baja un refuerzo cargado por error (solo con el viaje en ruta)
+ *
+ * Quita UNA fila de refuerzo del viaje. Es la contracara de `POST
+ * /services/{id}/resources` y comparte su guarda de estado: solo con el viaje
+ * EN RUTA. `PENDING_ASSIGNMENT`, `PENDING_START` y `COMPLETED` responden 409
+ * `OPS-006`; los dos terminales inmutables, `CANCELLED` y `DELETED`, responden
+ * 409 `OPS-004`, el mismo código con el que los rechaza el PUT.
+ *
+ * `assignmentId` se acota al viaje del path DENTRO de la consulta, no
+ * comparando después. Un refuerzo que no existe y uno que existe pero es de
+ * OTRO viaje responden lo MISMO (404 `OPS-010`), a propósito: distinguirlos
+ * convertiría el 404 en un canal para averiguar qué refuerzos están vivos en
+ * viajes que quien pregunta podría no poder leer.
+ *
+ * La baja es FÍSICA: la fila de refuerzo desaparece. El rastro NO se va con
+ * ella, porque la bitácora y la auditoría cuelgan del viaje y no del refuerzo.
+ *
+ * Sin cuerpo. El alta pide un motivo y la baja no: el "por qué" de un refuerzo
+ * cargado por error es siempre el mismo, y el quién, el cuándo y el qué ya
+ * quedan en el rastro.
+ *
+ * Sin `If-Match`, igual que el alta pero por una razón mejor: acá el reintento
+ * lo rechaza el 404, porque la fila ya no está. Un `If-Match` que llegue se
+ * ignora.
+ *
+ * **Sobre la reapertura.** `OPS-009` impide reabrir un viaje con refuerzos, y la
+ * guarda cuenta filas VIVAS: quitarlos ANTES de cancelar deja el viaje
+ * reabrible, y ése es el camino a ofrecerle al despacho. Lo que la baja NO
+ * puede es rescatar a uno YA cancelado, porque para quitar el refuerzo hay que
+ * estar EN RUTA. Para esos, el límite de D-OPS-18 sigue en pie.
+ *
+ * Devuelve el detalle completo, como sus seis vecinos, y acá el motivo es además
+ * técnico: el borrado mueve la versión del viaje, así que un 204 dejaría al
+ * cliente con un `ETag` que la base ya no tiene y su próximo `If-Match` comería
+ * un 412 espurio.
+ *
+ */
+export const removeServiceResource = <ThrowOnError extends boolean = false>(options: Options<RemoveServiceResourceData, ThrowOnError>) => (options.client ?? client).delete<RemoveServiceResourceResponses, RemoveServiceResourceErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/services/{id}/resources/{assignmentId}',
     ...options
 });

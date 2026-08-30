@@ -19,4 +19,12 @@ public interface ApiError {
     default ApiException toException(String customDetail) {
         return new ApiException(status(), code(), title(), customDetail);
     }
+
+    /**
+     * Error con miembros de extension del Problem (RFC 7807 §3.2): datos que solo tienen sentido
+     * para este codigo y que viajan aplanados junto al resto del cuerpo.
+     */
+    default ApiException toException(String customDetail, java.util.Map<String, Object> extensions) {
+        return new ApiException(status(), code(), title(), customDetail, extensions);
+    }
 }

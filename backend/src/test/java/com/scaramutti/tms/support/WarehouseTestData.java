@@ -16,6 +16,9 @@ import jakarta.persistence.EntityManager;
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 import static io.restassured.RestAssured.given;
 
@@ -29,17 +32,39 @@ import static io.restassured.RestAssured.given;
  * Molde hermético (igual que {@link HermeticTestData}): todo se siembra con prefijo
  * {@code ZTEST_} (o placa/documento propios) y se borra por ese prefijo en el {@code @AfterEach}
  * del test. Las tablas de {@code public} (workers, tractors, trailers, escort_vehicles,
- * document_types, resource_statuses) son COMPARTIDAS con v1: por eso la flota se limpia por su
- * estado propio {@code ZTEST_STATUS} (nunca por prefijo de placa, que podría matchear una real).
+ * document_types, resource_statuses) son COMPARTIDAS con v1: por eso la flota se limpia por los
+ * ids que estos fixtures sembraron, más un barrido de respaldo por el rango de placas reservado
+ * para los tests (ver {@link #deleteTestFleet()}).
  */
 @ApplicationScoped
 public class WarehouseTestData {
 
     public static final String PREFIX = "ZTEST_";
 
+    /**
+     * Rango de placas que los tests reservan: {@code ZF00xx} (flota), {@code ZT0xxx} (retiros),
+     * {@code ZR00xx} (reportes) y {@code ZO00xx} (operaciones). Dos letras y cuatro dígitos, un
+     * formato que ninguna placa real puede tener (las peruanas son tres letras y tres dígitos).
+     *
+     * <p>Cada suite usa su propia segunda letra para que el barrido de respaldo de una no pise
+     * las unidades que otra tiene vivas mientras corre.
+     */
+    private static final String TEST_PLATE_PATTERN = "^Z[FTRO][0-9]{4}$";
+
+    /** Nombres reales de {@code public.resource_statuses} (el catálogo de v1 tiene estas tres filas). */
+    public static final String STATUS_AVAILABLE = "available";
+    public static final String STATUS_MAINTENANCE = "maintenance";
+    public static final String STATUS_NOT_AVAILABLE = "not_available";
+
     // Catálogos base sembrados por el DevDataSeeder (mismos ids en dev y en la CI virgen).
     private static final int CATEGORY_FILTROS = 4;
     private static final int UNIT_UND = 1;
+
+    // Ids de la flota sembrada, para borrarla uno por uno sin rozar la de v1. El bean es
+    // @ApplicationScoped (uno solo para toda la corrida) y cada @AfterEach vacía los sets.
+    private final Set<Integer> seededTractorIds = ConcurrentHashMap.newKeySet();
+    private final Set<Integer> seededTrailerIds = ConcurrentHashMap.newKeySet();
+    private final Set<Integer> seededEscortVehicleIds = ConcurrentHashMap.newKeySet();
 
     @Inject ProductRepository productRepository;
     @Inject SupplierRepository supplierRepository;
@@ -80,22 +105,34 @@ public class WarehouseTestData {
     }
 
     /**
-     * Estado de recurso propio y estable ({@code ZTEST_STATUS}), get-or-create como
-     * {@link #dniDocumentTypeId()}: {@code public.resource_statuses} es una tabla de v1 sin seed
-     * en la BD virgen de CI. La flota lo referencia por FK ({@code status_id}).
+     * Estado de recurso por nombre, get-or-create como {@link #dniDocumentTypeId()}:
+     * {@code public.resource_statuses} es una tabla de v1 sin seed en la BD virgen de CI. La
+     * flota y los conductores lo referencian por FK ({@code status_id}).
+     *
+     * <p>Los nombres son los REALES del catálogo ({@code available}, {@code maintenance},
+     * {@code not_available}), no uno sintético: la API traduce ese nombre a su enum de
+     * disponibilidad y revienta ante cualquier otro, así que un fixture inventado rompería el
+     * listado. Las filas que crea quedan (son catálogo legítimo e idempotente); lo que se
+     * limpia es la flota.
      */
-    public int resourceStatusId() {
+    public int resourceStatusId(String catalogName) {
         var rows = entityManager.createNativeQuery(
-            "SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'").getResultList();
+            "SELECT id FROM public.resource_statuses WHERE name = ?1")
+            .setParameter(1, catalogName).getResultList();
         if (!rows.isEmpty()) {
             return ((Number) rows.get(0)).intValue();
         }
         entityManager.createNativeQuery(
-            "INSERT INTO public.resource_statuses (name, is_active) VALUES ('ZTEST_STATUS', true)")
-            .executeUpdate();
+            "INSERT INTO public.resource_statuses (name, is_active) VALUES (?1, true)")
+            .setParameter(1, catalogName).executeUpdate();
         return ((Number) entityManager.createNativeQuery(
-            "SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'")
-            .getSingleResult()).intValue();
+            "SELECT id FROM public.resource_statuses WHERE name = ?1")
+            .setParameter(1, catalogName).getSingleResult()).intValue();
+    }
+
+    /** Estado por defecto de la flota de test: disponible. */
+    public int resourceStatusId() {
+        return resourceStatusId(STATUS_AVAILABLE);
     }
 
     // ---------- productos -------------------------------------------------------
@@ -172,26 +209,30 @@ public class WarehouseTestData {
     }
 
     // ---------- flota (tractores / semirremolques / escoltas) -------------------
-    // public.tractors/trailers/escort_vehicles son COMPARTIDAS con v1: se referencian por el
-    // estado propio ZTEST_STATUS. brand/model son opcionales (solo /fleet-units los verifica).
+    // public.tractors/trailers/escort_vehicles son COMPARTIDAS con v1: cada id sembrado se
+    // anota para borrarlo uno por uno al final. brand/model son opcionales (solo /fleet-units
+    // los verifica); el estado por defecto es "disponible".
 
     public int seedTractor(String plate) {
         return seedTractor(plate, true);
     }
 
     public int seedTractor(String plate, boolean isActive) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.tractors (plate, status_id, is_active) VALUES (?1, ?2, ?3) RETURNING id")
-            .setParameter(1, plate).setParameter(2, resourceStatusId()).setParameter(3, isActive)
-            .getSingleResult()).intValue());
+        return seedTractor(plate, isActive, null, null, STATUS_AVAILABLE);
     }
 
     public int seedTractor(String plate, boolean isActive, String brand, String model) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.tractors (plate, brand, model, status_id, is_active) "
-                + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
-            .setParameter(1, plate).setParameter(2, brand).setParameter(3, model)
-            .setParameter(4, resourceStatusId()).setParameter(5, isActive).getSingleResult()).intValue());
+        return seedTractor(plate, isActive, brand, model, STATUS_AVAILABLE);
+    }
+
+    public int seedTractor(String plate, boolean isActive, String brand, String model, String statusName) {
+        return trackFleetId(seededTractorIds, QuarkusTransaction.requiringNew().call(() ->
+            ((Number) entityManager.createNativeQuery(
+                "INSERT INTO public.tractors (plate, brand, model, status_id, is_active) "
+                    + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
+                .setParameter(1, plate).setParameter(2, brand).setParameter(3, model)
+                .setParameter(4, resourceStatusId(statusName)).setParameter(5, isActive)
+                .getSingleResult()).intValue()));
     }
 
     public int seedTrailer(String plate) {
@@ -199,10 +240,16 @@ public class WarehouseTestData {
     }
 
     public int seedTrailer(String plate, boolean isActive) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.trailers (plate, type, status_id, is_active) VALUES (?1, 'ZTEST', ?2, ?3) RETURNING id")
-            .setParameter(1, plate).setParameter(2, resourceStatusId()).setParameter(3, isActive)
-            .getSingleResult()).intValue());
+        return seedTrailer(plate, isActive, STATUS_AVAILABLE);
+    }
+
+    public int seedTrailer(String plate, boolean isActive, String statusName) {
+        return trackFleetId(seededTrailerIds, QuarkusTransaction.requiringNew().call(() ->
+            ((Number) entityManager.createNativeQuery(
+                "INSERT INTO public.trailers (plate, type, status_id, is_active) "
+                    + "VALUES (?1, 'ZTEST', ?2, ?3) RETURNING id")
+                .setParameter(1, plate).setParameter(2, resourceStatusId(statusName)).setParameter(3, isActive)
+                .getSingleResult()).intValue()));
     }
 
     public int seedEscortVehicle(String plate) {
@@ -210,18 +257,22 @@ public class WarehouseTestData {
     }
 
     public int seedEscortVehicle(String plate, boolean isActive) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.escort_vehicles (plate, status_id, is_active) VALUES (?1, ?2, ?3) RETURNING id")
-            .setParameter(1, plate).setParameter(2, resourceStatusId()).setParameter(3, isActive)
-            .getSingleResult()).intValue());
+        return seedEscortVehicle(plate, isActive, null, null);
     }
 
     public int seedEscortVehicle(String plate, boolean isActive, String brand, String model) {
-        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
-            "INSERT INTO public.escort_vehicles (plate, brand, model, status_id, is_active) "
-                + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
-            .setParameter(1, plate).setParameter(2, brand).setParameter(3, model)
-            .setParameter(4, resourceStatusId()).setParameter(5, isActive).getSingleResult()).intValue());
+        return trackFleetId(seededEscortVehicleIds, QuarkusTransaction.requiringNew().call(() ->
+            ((Number) entityManager.createNativeQuery(
+                "INSERT INTO public.escort_vehicles (plate, brand, model, status_id, is_active) "
+                    + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
+                .setParameter(1, plate).setParameter(2, brand).setParameter(3, model)
+                .setParameter(4, resourceStatusId()).setParameter(5, isActive)
+                .getSingleResult()).intValue()));
+    }
+
+    private int trackFleetId(Set<Integer> seededIds, int id) {
+        seededIds.add(id);
+        return id;
     }
 
     // ---------- stock vía endpoint ----------------------------------------------
@@ -287,17 +338,39 @@ public class WarehouseTestData {
     }
 
     /**
-     * Borrado quirúrgico de la flota de test por su estado propio {@code ZTEST_STATUS} (NO por
-     * prefijo de placa: {@code public.tractors}/etc son COMPARTIDAS con v1 y un prefijo corto
-     * podría matchear una placa real). El estado se borra al final (su flota, la única FK, ya se fue).
+     * Borrado de la flota de test: primero un barrido por el rango de placas que los tests
+     * reservan y después los ids que estos fixtures sembraron. El borrado por ids es el
+     * quirúrgico (no depende de ningún prefijo), pero solo alcanza a la corrida viva: si una
+     * corrida local se aborta antes del {@code @AfterEach}, los ids se van con la JVM y la
+     * flota queda huérfana en la BD compartida. El barrido la limpia en la corrida siguiente.
+     *
+     * <p>Ahí el prefijo SÍ es seguro, a diferencia del genérico que este soporte evita: el
+     * rango reservado son dos letras y CUATRO dígitos ({@code ZF}/{@code ZT}/{@code ZR}), un
+     * formato que ninguna placa real puede tener (las peruanas son tres letras y tres dígitos).
+     * El catálogo de estados no se toca.
      */
     public void deleteTestFleet() {
-        String byTestStatus = "WHERE status_id = (SELECT id FROM public.resource_statuses WHERE name = 'ZTEST_STATUS')";
-        entityManager.createNativeQuery("DELETE FROM public.tractors " + byTestStatus).executeUpdate();
-        entityManager.createNativeQuery("DELETE FROM public.trailers " + byTestStatus).executeUpdate();
-        entityManager.createNativeQuery("DELETE FROM public.escort_vehicles " + byTestStatus).executeUpdate();
-        entityManager.createNativeQuery("DELETE FROM public.resource_statuses WHERE name = 'ZTEST_STATUS'")
+        deleteFleetRows("public.tractors", seededTractorIds);
+        deleteFleetRows("public.trailers", seededTrailerIds);
+        deleteFleetRows("public.escort_vehicles", seededEscortVehicleIds);
+    }
+
+    private void deleteFleetRows(String table, Set<Integer> seededIds) {
+        entityManager.createNativeQuery("DELETE FROM " + table + " WHERE plate ~ ?1")
+            .setParameter(1, TEST_PLATE_PATTERN).executeUpdate();
+        // Segundo barrido, para las placas que los tests fabrican CON caracteres de control: no
+        // matchean el patron de arriba (el salto no es un digito) y, si una corrida se aborta
+        // antes del @AfterEach, quedan para siempre en la base que se comparte con el sistema
+        // anterior y hacen reventar por unicidad a la corrida siguiente.
+        entityManager.createNativeQuery(
+                "DELETE FROM " + table + " WHERE plate ~ '^Z[FTRO]' AND plate ~ '[[:cntrl:]]'")
             .executeUpdate();
+        if (seededIds.isEmpty()) {
+            return;
+        }
+        entityManager.createNativeQuery("DELETE FROM " + table + " WHERE id IN (?1)")
+            .setParameter(1, List.copyOf(seededIds)).executeUpdate();
+        seededIds.clear();
     }
 
     /** Borra los trabajadores de test ({@code document_number} prefijo {@code ZTEST}). */

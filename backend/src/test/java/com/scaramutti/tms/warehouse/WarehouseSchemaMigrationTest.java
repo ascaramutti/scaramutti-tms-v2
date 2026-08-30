@@ -11,6 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -18,6 +19,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  * Cubre lo que V002__almacen_schema.sql + R__almacen_stock_views.sql
  * agregan: no hay entidades/repositorios todavia (A1 = solo DB), asi que se
  * verifica el schema con SQL directo.
+ *
+ * Las aserciones son sobre lo que la MIGRACION dejo (filas sembradas, vistas que
+ * resuelven, restricciones que rechazan), nunca sobre el estado global de la base: la
+ * de desarrollo es compartida y acumula data real de uso, la de CI nace virgen.
  */
 @QuarkusTest
 class WarehouseSchemaMigrationTest {
@@ -25,9 +30,16 @@ class WarehouseSchemaMigrationTest {
     @Inject
     DataSource dataSource;
 
+    /**
+     * Las 7 categorias que siembra la migracion existen y estan activas. NO se afirma el
+     * TOTAL de la tabla: las categorias se crean al vuelo desde la aplicacion, asi que una
+     * base con uso real tiene mas (la de CI, virgen, tiene exactamente estas).
+     */
     @Test
-    void productCategoriesSeed_has7ActiveRows() throws SQLException {
-        assertEquals(7, count("SELECT count(*) FROM almacen.product_categories WHERE is_active = true"));
+    void seededProductCategories_existAndAreActive() throws SQLException {
+        assertEquals(7, count(
+            "SELECT count(*) FROM almacen.product_categories WHERE is_active = true AND name IN "
+                + "('Repuestos','Lubricantes','Neumáticos','Filtros','EPP','Herramientas','Consumibles')"));
     }
 
     @Test
@@ -41,9 +53,16 @@ class WarehouseSchemaMigrationTest {
             "SELECT count(*) FROM public.roles WHERE name IN ('finance_manager','warehouse_keeper')"));
     }
 
+    /**
+     * La VIEW resuelve y TODAS sus columnas siguen ahi: se proyectan una por una, porque un
+     * {@code count(*)} pelado no toca ninguna y un rename dentro de la vista pasaria de
+     * largo hasta romper el kardex o los reportes. NO se afirma cuantas filas tiene: sobre
+     * una base con movimientos reales no esta vacia.
+     */
     @Test
-    void productStockView_isQueryable() throws SQLException {
-        assertEquals(0, count("SELECT count(*) FROM almacen.product_stock"));
+    void productStockView_resolvesWithAllItsColumns() {
+        assertDoesNotThrow(() -> count(
+            "SELECT count(*) FROM (SELECT product_id, stock, low_stock FROM almacen.product_stock) v"));
     }
 
     /**
@@ -98,9 +117,12 @@ class WarehouseSchemaMigrationTest {
         }
     }
 
+    /** Misma idea que {@link #productStockView_resolvesWithAllItsColumns()}, con las 7 columnas de esta. */
     @Test
-    void stockMovementsView_isQueryable() throws SQLException {
-        assertEquals(0, count("SELECT count(*) FROM almacen.stock_movements"));
+    void stockMovementsView_resolvesWithAllItsColumns() {
+        assertDoesNotThrow(() -> count(
+            "SELECT count(*) FROM (SELECT movement_type, product_id, quantity, moved_at, "
+                + "registered_by, source_id, movement_seq FROM almacen.stock_movements) v"));
     }
 
     @Test

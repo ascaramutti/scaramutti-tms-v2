@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import type { WarehouseWithdrawalResponse } from '../../../api'
 import { formatDate, formatQuantity } from '../../../shared/utils/formatters'
-import { fleetUnitLabel } from '../utils/fleetUnit'
+import { fleetUnitLabel } from '../../../shared/catalogs/fleetUnit'
 
 interface WithdrawalInfoCardsProps {
   withdrawal: WarehouseWithdrawalResponse

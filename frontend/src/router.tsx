@@ -1,6 +1,13 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom'
+import { createBrowserRouter, type RouteObject } from 'react-router-dom'
+import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
-import { QUOTATION_ROLES, WAREHOUSE_ROLES } from './shared/auth/moduleRoles'
+import {
+  OPERATIONS_ROLES,
+  QUOTATION_ROLES,
+  SERVICE_PRICE_WRITE_ROLES,
+  WAREHOUSE_ROLES,
+} from './shared/auth/moduleRoles'
+import { OPERACIONES_LANDING } from './shared/auth/roleLanding'
 import { AppLayout } from './shared/layout/AppLayout'
 import { LoginPage } from './features/auth/components/LoginPage'
 import { ChangePasswordPage } from './features/auth/components/ChangePasswordPage'
@@ -20,12 +27,22 @@ import { WithdrawalDetailPage } from './features/warehouse/pages/WithdrawalDetai
 import { WithdrawalEditPage } from './features/warehouse/pages/WithdrawalEditPage'
 import { WarehouseReportsPage } from './features/warehouse/pages/WarehouseReportsPage'
 import { OpeningBalancesPage } from './features/warehouse/pages/OpeningBalancesPage'
+import { ServicesListPage } from './features/operations/pages/ServicesListPage'
+import { ServiceDetailPage } from './features/operations/pages/ServiceDetailPage'
+import { ServiceEditPage } from './features/operations/pages/ServiceEditPage'
+import { ServiceCreatePage } from './features/operations/pages/ServiceCreatePage'
 
 // Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
 // con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
 // las rutas del módulo ya traían el prefijo /cotizaciones — solo login y cuenta
 // se movieron adentro. La raíz `/` del dominio pertenece a v1.
-export const router = createBrowserRouter([
+/**
+ * La tabla de rutas se exporta aparte del router para poder montarla en un
+ * router de memoria desde los tests: sin eso, cada test que necesita una ruta
+ * declara la suya propia y nadie verifica la de verdad (un rol equivocado o un
+ * typo en el path pasan a producción con la suite en verde).
+ */
+export const routes: RouteObject[] = [
   { path: '/cotizaciones/login', element: <LoginPage /> },
   {
     // Layout route: las rutas autenticadas comparten AppLayout (con sidebar).
@@ -172,8 +189,58 @@ export const router = createBrowserRouter([
           </ProtectedRoute>
         ),
       },
+      // Módulo Operaciones (control de viajes). Cuelga del mismo prefijo que
+      // almacén y por la misma razón: /cotizaciones es el `base` de Vite, no el
+      // módulo comercial.
+      {
+        path: OPERACIONES_LANDING,
+        element: (
+          <ProtectedRoute allowedRoles={OPERATIONS_ROLES} moduleName="Operaciones">
+            <ServicesListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // Roles propios: el alta obliga a mandar el precio, así que el despacho
+        // queda afuera aunque el resto del módulo sea suyo.
+        path: `${OPERACIONES_LANDING}/servicios/nuevo`,
+        element: (
+          <ProtectedRoute allowedRoles={SERVICE_PRICE_WRITE_ROLES} actionName="registrar un servicio">
+            <ServiceCreatePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // Roles propios, igual que el alta y por la misma razón: el cuerpo de la edición
+        // obliga a mandar el precio, que es justo lo que al despacho se le oculta, así
+        // que ese rol recibiría un 403. Va ANTES de `:id` por legibilidad, igual que el
+        // alta: react-router rankea por especificidad y `editar` no es un id válido, pero
+        // el archivo se lee de arriba abajo.
+        path: `${OPERACIONES_LANDING}/servicios/:id/editar`,
+        element: (
+          <ProtectedRoute allowedRoles={SERVICE_PRICE_WRITE_ROLES} actionName="editar un servicio">
+            <ServiceEditPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        // Los cinco roles del módulo: el detalle se LEE, y el despacho lo lee sin
+        // los importes porque el servidor se los omite (RN-OP8). Va DESPUÉS del
+        // alta: react-router rankea por especificidad y la ruta estática gana
+        // igual, pero leído de arriba abajo el archivo no invita a dudarlo. Hay
+        // un test que lo fija.
+        path: `${OPERACIONES_LANDING}/servicios/:id`,
+        element: (
+          <ProtectedRoute allowedRoles={OPERATIONS_ROLES} moduleName="Operaciones">
+            <ServiceDetailPage />
+          </ProtectedRoute>
+        ),
+      },
       { path: '/cotizaciones/cuenta/cambiar-contrasena', element: <ChangePasswordPage /> },
     ],
   },
-  { path: '*', element: <Navigate to="/cotizaciones" replace /> },
-])
+  // Cualquier ruta que no existe: decide según la sesión (ver LandingRedirect).
+  { path: '*', element: <LandingRedirect /> },
+]
+
+export const router = createBrowserRouter(routes)

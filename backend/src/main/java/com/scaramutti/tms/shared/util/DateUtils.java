@@ -43,6 +43,19 @@ public final class DateUtils {
     }
 
     /**
+     * Hermano de {@link #toOffsetDateTime(Object)} para las columnas {@code DATE}: segun la
+     * version de Hibernate y del driver, una fecha de una query nativa llega como
+     * {@code java.sql.Date} o como {@code LocalDate}. Castear a una sola de las dos convierte un
+     * cambio de version en un 500.
+     */
+    public static java.time.LocalDate toLocalDate(Object value) {
+        if (value instanceof java.time.LocalDate localDate) return localDate;
+        if (value instanceof java.sql.Date sqlDate) return sqlDate.toLocalDate();
+        throw new IllegalStateException("Unexpected date type: "
+            + (value == null ? "null" : value.getClass().getName()));
+    }
+
+    /**
      * Inicio del dia (00:00) de una fecha en zona Lima, como {@link OffsetDateTime} para
      * comparar contra columnas {@code timestamptz}. Es el borde INCLUSIVO inferior de un
      * filtro por dia/rango en hora de negocio. Fuente unica del patron: los filtros de
@@ -55,11 +68,33 @@ public final class DateUtils {
 
     /**
      * Inicio del dia SIGUIENTE (00:00) en zona Lima. Es el borde EXCLUSIVO superior de un
-     * rango cuyo {@code dateTo} es inclusivo del dia completo ({@code < limaNextDayStart}
-     * cubre hasta las 23:59:59.999 de {@code date}). Complementa a {@link #limaDayStart}.
+     * rango cuyo {@code dateTo} es inclusivo del dia completo: {@code < limaNextDayStart} cubre
+     * hasta las 23:59:59.999999 de {@code date}, que es la resolucion real de las columnas
+     * contra las que se usa.
+     * Complementa a {@link #limaDayStart}.
      */
     public static OffsetDateTime limaNextDayStart(java.time.LocalDate date) {
         return date.plusDays(1).atStartOfDay(LIMA).toOffsetDateTime();
+    }
+
+    /**
+     * Como se GUARDA una marca de tiempo que llego de afuera: en UTC y truncada a microsegundos.
+     *
+     * <p>Las dos cosas importan y por motivos distintos. UTC porque es el marco de la columna, y
+     * comparar despues una marca guardada contra otra con huso propio daria diferencias que no
+     * existen. Microsegundos porque esa es la precision REAL de {@code timestamptz}: una marca con
+     * nanos se guarda truncada, asi que el valor que relee un GET no es el que se comparo al
+     * escribir, y de ahi salen ETags que no coinciden consigo mismos.
+     *
+     * <p>Vive aca, al lado de {@link #nowUtcMicros()}, porque es su gemela: la misma decision
+     * aplicada al valor que llega en vez de al de ahora. Ya la aplican dos endpoints sobre las
+     * MISMAS dos columnas (el inicio y el fin reales), y una copia por servicio es una divergencia
+     * silenciosa esperando a que alguien retoque una sola.
+     */
+    public static OffsetDateTime toStorableUtc(OffsetDateTime value) {
+        return value == null ? null
+            : value.withOffsetSameInstant(java.time.ZoneOffset.UTC)
+                .truncatedTo(java.time.temporal.ChronoUnit.MICROS);
     }
 
     /**

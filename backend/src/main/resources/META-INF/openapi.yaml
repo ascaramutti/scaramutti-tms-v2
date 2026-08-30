@@ -48,6 +48,8 @@ tags:
     description: Cotizaciones — wizard de creación, listing, edición y PDF
   - name: Warehouse
     description: Almacén — catálogos del módulo, productos+stock, corte inicial, entradas, retiros, kardex, reportes
+  - name: Operations
+    description: Operaciones — servicios de transporte (viajes)
   - name: SharedCatalogs
     description: 'Catálogos compartidos read-only (public): trabajadores y unidades de flota, reutilizados por Almacén y Operaciones'
 
@@ -1724,7 +1726,14 @@ paths:
         (RN-WH9). Sin paginar (flota chica). `id` es el id de la tabla del SUBTIPO:
         la direccion de una unidad es el par `(kind, id)`. `kind` omitido = los
         tres subtipos.
-      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
+
+        Lo consumen los dos modulos: almacen elige la unidad destino del retiro
+        (los tres subtipos) y operaciones elige tracto y carreta al asignar un
+        viaje (`?kind=TRACTOR` / `?kind=TRAILER`), por eso la respuesta incluye
+        `status` (disponibilidad). Las escoltas no participan de la asignacion de
+        viajes: su `status` viaja en null. Ademas de quienes asignan recursos,
+        `sales` puede consultarlos: registra y edita servicios.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper, dispatcher, sales]
       parameters:
         - { name: kind, in: query, schema: { $ref: '#/components/schemas/FleetUnitKind' } }
         - { name: isActive, in: query, schema: { type: boolean } }
@@ -1740,7 +1749,903 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /drivers:
+    get:
+      tags: [SharedCatalogs]
+      operationId: listDrivers
+      summary: Listar conductores (combobox de asignacion del viaje)
+      description: |
+        Catalogo compartido `public.drivers`: quien puede conducir, con su licencia
+        y su disponibilidad. El nombre sale del trabajador asociado, y el `id` que
+        devuelve es el que guarda la asignacion del servicio. Solo lectura desde
+        v2, sin creacion al vuelo: el alta de conductores pertenece a la futura
+        gestion de flota y personal. Sin paginar: plantilla chica. Ademas de
+        quienes asignan recursos, `sales` puede consultarlos: registra y edita
+        servicios.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher, sales]
+      parameters:
+        - { name: isActive, in: query, schema: { type: boolean } }
+      responses:
+        '200':
+          description: Conductores con su disponibilidad
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DriverResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ----- Operations: servicios de transporte (schema operaciones) -------------
+  /services:
+    get:
+      tags: [Operations]
+      operationId: listServices
+      summary: Listar servicios con filtros
+      description: |
+        Búsqueda `q` de 3 caracteres o más sobre código, cliente (nombre/RUC), origen
+        y destino, **multi-palabra**: `q` se tokeniza por espacios y cada palabra debe
+        matchear en algún campo ("IPH piura" encuentra al cliente IPH con destino
+        Piura). Los filtros se combinan entre sí. Orden fijo por fecha de creación
+        descendente: no hay parámetro de ordenamiento.
+
+        Las palabras de menos de 3 caracteres se descartan del término (no acotan la
+        búsqueda y sí multiplican su costo); si ninguna palabra llega a 3, la respuesta
+        es 400. El término admite hasta 200 caracteres y hasta 8 palabras de 3 caracteres o más.
+
+        Los servicios eliminados (`DELETED`) NO aparecen salvo pedirlos explícitamente
+        con `status=DELETED`.
+
+        Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` de cada fila
+        (ausentes, no null): opera los viajes, no ve lo que se cobra por ellos.
+
+        Un `status` que no exista responde 400 `COM-001` con el detalle.
+
+        Un filtro enviado VACÍO (`?clientId=`, como lo serializa un formulario con el
+        campo sin elegir) se trata como OMITIDO, no como error.
+
+        Las fechas se admiten entre 1900-01-01 y 2999-12-31, y el término de búsqueda
+        no admite caracteres de control, salvo los que separan palabras (salto de línea,
+        tabulación): fuera de eso la respuesta es 400.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - { name: status, in: query, schema: { $ref: '#/components/schemas/ServiceStatus' } }
+        - { name: clientId, in: query, description: Filtra por cliente exacto, schema: { type: integer } }
+        - { name: dateFrom, in: query, description: 'Fecha tentativa desde (inclusive). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400', schema: { type: string, format: date } }
+        - { name: dateTo, in: query, description: 'Fecha tentativa hasta (inclusive). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400', schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de servicios
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PageOfServiceSummary' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Operations]
+      operationId: createService
+      summary: Crear servicio
+      description: |
+        El servicio nace en `PENDING_ASSIGNMENT` y el backend le asigna el código:
+        `SRV-` seguido del id del servicio, rellenado con ceros a la izquierda hasta
+        un mínimo de 4 dígitos; a partir del id 10000 el código crece a 5 o más
+        dígitos y **nunca se trunca**.
+
+        La fecha tentativa PUEDE ser pasada (registro retroactivo); la interfaz
+        avisa, el servidor no bloquea. Cliente, tipo de carga o moneda inexistentes
+        o inactivos → 400 `COM-001`. El alta escribe la primera línea de la bitácora
+        y su registro de auditoría.
+
+        Registrar exige poder VER los importes: el cuerpo obliga a mandar el precio, así que a un
+        usuario con el rol de despacho (aunque sume otro que sí registra) se le contesta 403
+        `COM-003` en vez de dejarlo escribir a ciegas un valor que no puede leer. Es el mismo veto
+        que aplica la edición.
+
+        Contra el doble-click: un alta con el mismo cliente, la misma ruta y el mismo
+        usuario dentro de los 30 segundos previos responde 409 `OPS-007`. No es una
+        restricción de unicidad — dos viajes iguales separados en el tiempo se
+        registran sin problema, y el código permite al cliente distinguir este 409
+        benigno de un conflicto real.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceCreateRequest' }
+            example:
+              clientId: 12
+              tripScope: 'PROVINCIA'
+              tentativeDate: '2026-07-10'
+              origin: 'Piura'
+              destination: 'Lima — Callao'
+              cargoTypeId: 3
+              weightKg: 28000
+              lengthM: 12.5
+              price: 5800
+              currencyId: 1
+              observations: 'Coordinar ingreso al puerto con 24 h de anticipación'
+      responses:
+        '201':
+          description: Servicio creado
+          headers:
+            Location: { schema: { type: string }, description: URL del recurso creado }
+            ETag: { schema: { type: string }, description: 'Versión del recurso; reenviarla tal cual en el If-Match, comillas incluidas' }
+            Cache-Control: { schema: { type: string }, description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta' }
+            Vary: { schema: { type: string }, description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /services/stats:
+    get:
+      tags: [Operations]
+      operationId: getServiceStats
+      summary: Indicadores del tablero operativo
+      description: |
+        RN-OP14 — `completedThisWeek` y `weekCycle` usan el ciclo operativo de la empresa:
+        **miércoles a martes, hora de América/Lima**. Los otros tres contadores
+        (`pendingAssignment`, `pendingStart`, `inProgress`) son GLOBALES: cuentan todos los viajes
+        en ese estado, sin ventana de tiempo. La ventana de la consulta es SEMIABIERTA
+        —desde el miércoles 00:00 de Lima inclusive hasta el miércoles siguiente 00:00 de Lima
+        exclusive— para que no se pierda ningún instante del martes: la columna guarda
+        microsegundos, y un tope escrito como `23:59:59.999` deja fuera los últimos 999.
+
+        ⚠️ `weekCycle.end` es el **MARTES, inclusive** (la etiqueta que la pantalla imprime), NO el
+        miércoles exclusivo con el que se consulta. Son dos cosas distintas y se confunden.
+
+        Los contadores de recursos miden lo MISMO que el tablero del sistema anterior, para que el
+        número no cambie de significado con el cambio de sistema: `driversOnRoad` = conductores
+        PRINCIPALES distintos en servicios en ruta **(los refuerzos NO cuentan)** sobre el total de
+        conductores de alta; `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
+        tampoco) sobre el total de tractos de alta. **Las carretas y las escoltas no participan de
+        ningún indicador**, aunque el nombre del campo diga "units".
+
+        En ambos objetos, `active` = el numerador (los que están en ruta AHORA) y `total` = el
+        denominador (el padrón vigente de ese recurso).
+
+        NINGUNO de los dos números mira la disponibilidad del catálogo, solo el alta: un tracto en
+        mantenimiento sigue contando en el padrón, y un conductor en ruta cuenta en `active` aunque
+        figure NO DISPONIBLE, que es justamente como tiene que estar.
+
+        **Desviación consciente respecto del sistema anterior**: el numerador también exige que el
+        recurso esté de alta. Allá no lo hacía, así que un conductor dado de baja mientras su viaje
+        seguía en ruta producía un "6 de 5" en pantalla — una fracción imposible se lee como
+        sistema roto, y lo que la paridad tiene que preservar es el SIGNIFICADO del número.
+
+        `DELETED` y `CANCELLED` no entran en ningún contador. Un `COMPLETED` sin fecha de fin real
+        no cae en ninguna semana y no se compensa con otra fecha: ese dato lo sanea el cutover, y
+        taparlo escondería justo lo que hay que ver.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      responses:
+        '200':
+          description: Contadores del tablero
+          headers:
+            Cache-Control:
+              description: '`no-store`: el cuerpo no depende del rol, pero no debe sobrevivir a la sesión en un proxy ni en un perfil de browser compartido'
+              schema: { type: string }
+            Vary:
+              description: '`Authorization`: hoy el cuerpo es igual para los cinco roles, así que es la segunda red por si alguien saca el `no-store` para poder cachear'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceStatsResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /services/report:
+    get:
+      tags: [Operations]
+      operationId: getServicesReport
+      summary: Reporte de servicios completados de una semana operativa
+      description: |
+        Servicios completados dentro de UNA semana operativa (miércoles→martes,
+        hora de América/Lima, RN-OP14). Se pide de a una semana y NUNCA por rango
+        libre: un reporte que mezcla semanas no sirve para el cálculo de bonos,
+        que es para lo que se usa.
+
+        `weekStart` es el MIÉRCOLES que abre la semana. Si la fecha no cae en
+        miércoles → 400 `COM-001`: se rechaza en vez de ajustarla, para que un
+        error de quien llama se vea en vez de taparse.
+
+        La semana EN CURSO se puede consultar: `closed` dice si ya cerró. Lo que
+        depende de eso es la EXPORTACIÓN, que solo tiene sentido sobre una semana
+        cerrada — un archivo de bonos de una semana abierta se lee como
+        definitivo sin serlo.
+
+        Totales POR MONEDA sin conversión.
+
+        RN-OP8 — es un reporte de facturación: `dispatcher` recibe 403. El veto
+        MANDA sobre la lista de roles de abajo: un usuario que sume `dispatcher`
+        y otro rol la cumple y recibe 403 igual, siempre que `weekStart` sea
+        legible. El parseo del parámetro corre ANTES que el veto, así que ese
+        mismo usuario con una fecha mal formada recibe 400, no 403.
+
+        Este endpoint NO exporta: publica `closed` para que la pantalla apague el
+        botón. El formato de la exportación, y si la genera el cliente o el
+        servidor, está SIN RESOLVER y va en su propio cambio.
+
+        Una fila migrada sin fecha de inicio o sin conductor aborta el reporte en vez
+        de publicarse incompleta: es un documento de facturación y un nulo silencioso
+        ahí se paga. Sale con el mismo Problem que el resto del proyecto
+        (`COM-500`, con el `detail` nombrando el viaje). Lo que NO está declarado es
+        el status: ningún endpoint de esta spec declara el 500, así que el cliente
+        generado no lo va a tipar, pero el cuerpo sí es el Problem de la casa.
+
+        La `duración` por viaje no viaja como campo: la calcula el cliente con
+        `startDateTime` y `endDateTime`, que por eso son ambos obligatorios.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - name: weekStart
+          in: query
+          required: true
+          description: >-
+            Miércoles que abre la semana operativa, en fecha de Lima. Tiene que caer en miércoles
+            (400 `COM-001` si no) y estar dentro de la ventana de negocio 1900-01-01 … 2999-12-31.
+            Con las dos reglas juntas, los extremos REALMENTE aceptables son los miércoles de esos
+            bordes: 1900-01-03 y 2999-12-25.
+          schema: { type: string, format: date, example: '2026-08-19' }
+      responses:
+        '200':
+          description: Filas + totales por moneda
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es TODO importes y no debe sobrevivir a la sesión en ningún proxy ni perfil de browser compartido'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es igual para los cuatro roles que entran, y es la segunda red del día en que alguien saque el `no-store`: con `no-store` puesto, ningún caché conforme lo almacena'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServicesReportResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /services/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+
+    get:
+      tags: [Operations]
+      operationId: getService
+      summary: Detalle del servicio
+      description: |
+        Incluye la bitácora (`events`) en orden cronológico ascendente. Devuelve el
+        header `ETag`, que es la versión del recurso y es lo que hay que mandar en el
+        `If-Match` de la edición y de las transiciones de estado. Reenviarlo TAL CUAL,
+        copiado del header: las comillas son parte del valor, y reconstruirlo a mano
+        desde el cuerpo es la forma habitual de terminar con un 412 inexplicable.
+
+        Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` (ausentes, no
+        null), igual que en el listado: opera los viajes, no ve lo que se cobra por ellos.
+
+        Los REFUERZOS viajan en `additionalResources`: lista vacía mientras el viaje no
+        tenga ninguno, NUNCA null.
+      x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
+      responses:
+        '200':
+          description: Detalle del servicio
+          headers:
+            ETag:
+              description: 'Versión del recurso; reenviarla tal cual en el `If-Match`, comillas incluidas'
+              schema: { type: string }
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    put:
+      tags: [Operations]
+      operationId: updateService
+      summary: Editar servicio (justificación obligatoria)
+      description: |
+        Editables: origen, destino, fecha tentativa, peso, dimensiones, precio, moneda,
+        observaciones y las fechas reales de inicio y fin. El cliente, el ámbito del
+        viaje y el tipo de carga NO viajan en el cuerpo: son inmutables después del alta
+        (si se equivocaron, el viaje se crea de nuevo; si nunca debió existir, se
+        elimina).
+
+        Las fechas reales solo se CORRIGEN acá, no se fijan: cada una es editable
+        únicamente si el servicio YA LA TIENE; mandarla antes es un 400 `COM-001`. La
+        condición es tener la fecha, no estar en un estado: en la práctica el inicio
+        aparece al ponerse en ruta y el fin al completarse. Es MÁS ESTRICTA que la matriz
+        del sistema anterior: un viaje migrado SIN la fecha no se corrige por acá, porque
+        la transición que la fija ya ocurrió; ese saneo va en el script de cutover.
+        Ausente o en null = sin cambio, porque una fecha real no se borra. Al
+        corregirlas rige `fin >= inicio`. Cerrar el viaje sigue siendo la transición de
+        estado, no este endpoint.
+
+        ⚠️ Las fechas las FIJA la transición de estado (`POST /services/{id}/status`):
+        el inicio al pasar a "en ruta" y el fin al completar. Antes de eso un viaje
+        nacido del alta las tiene vacías y estos dos campos le responden 400, porque
+        acá se corrigen y no se fijan. También traen fecha las filas que ya vengan con
+        ella desde el sistema anterior.
+
+        La moneda inexistente es 400 siempre. La ACTIVA solo se exige si se la cambia (a diferencia del alta,
+        que la exige siempre): un viaje cuya moneda se dio de baja después se sigue
+        editando, porque retirar una moneda cierra su uso hacia adelante y no congela
+        lo ya emitido.
+
+        Un cuerpo sin cambios reales responde 200 y NO escribe nada: ni auditoría, ni
+        bitácora, ni la fecha de actualización (con lo cual el `ETag` tampoco se mueve).
+
+        El servicio cancelado o eliminado es inmutable → 409 `OPS-004`. El completado SÍ
+        se edita: es la corrección de datos de un viaje ya cerrado.
+        El ESTADO no se toca por acá: lo mueve `POST /services/{id}/status`, que además es el
+        único que puede REABRIR un viaje cancelado o eliminado. Un viaje que ya salió de esa
+        forma es inmutable para este endpoint hasta que lo reabran.
+
+        Cada campo cambiado deja su fila en la auditoría, y la edición entera deja UNA
+        entrada de bitácora que enumera los cambios y cierra con la justificación.
+
+        En esa entrada el precio y la moneda se NOMBRAN pero no se muestran
+        (`Precio: (no se muestra)`), y un valor ausente —antes o después del cambio— se escribe `(vacío)`: la bitácora viaja dentro del detalle y al detalle
+        entra `dispatcher`, al que la regla del negocio le oculta siempre lo que se
+        cobra. Los valores quedan en la auditoría, que hoy no expone ningún endpoint.
+        La `justification` es texto libre y viaja entera (salvo por los saltos de línea, que
+        la bitácora muestra como `⏎` para que nadie pueda plantar ahí una línea con el
+        formato del servidor; el texto exacto queda en la auditoría). Quien la escribe puede
+        volcar ahí el importe y el despacho lo leería. Lo mismo con el valor ANTERIOR de
+        CUALQUIER texto libre (`observations`, `origin`, `destination`), que la bitácora
+        publica al editarlo: limpiar un dato sensible de uno de esos campos lo deja grabado
+        en la bitácora de forma PERMANENTE, porque ningún endpoint la edita ni la borra.
+        Riesgo ACEPTADO (decisión del dueño, 2026-08-07): el servidor no divulga los
+        importes que él guarda, pero no filtra lo que una persona escribe.
+
+        Editar exige además poder VER los importes: el cuerpo obliga a mandar el precio, así que
+        a un usuario con el rol de despacho (aunque sume otro que sí edita) se le contesta 403
+        `COM-003` en vez de dejarlo escribir a ciegas un valor que no puede leer.
+
+        El 403 del veto de precios se contesta antes que el 404 y después de los 400 de formato:
+        editar un servicio inexistente sin poder ver los importes devuelve 403, no 404.
+
+        Los 400 no caen todos en el mismo lugar: los de FORMATO del cuerpo (campos obligatorios,
+        largos, precisión, ventana de fechas, byte NUL, justificación) se contestan antes que
+        cualquier precondición del recurso, y los de NEGOCIO (moneda inactiva, fecha real que el
+        servicio no tiene, fin anterior al inicio) después del `If-Match`.
+
+        El 409 `OPS-004` se contesta ANTES que el 412: un `If-Match` viejo no tapa la razón
+        real. Es deliberado y sigue el criterio del módulo de almacén, donde el recurso anulado
+        también se contesta antes que la versión; cotizaciones, en cambio, verifica la versión
+        primero.
+
+        Concurrencia: `If-Match` con el `ETag` del detalle, copiado tal cual del header.
+        Ausente o sin coincidir → 412 `COM-004`. La fila se lee bajo lock, así que dos
+        ediciones simultáneas se serializan; si CUALQUIER sentencia de esa transacción se rinde por lock (la espera agotada, un
+        abrazo mortal, un fallo de serialización) → 409 `OPS-008`, transitorio: se resuelve reintentando (el `OPS-004`, en cambio, no se
+        destraba reintentando: el viaje está cancelado o eliminado, y de ahí solo vuelve con `POST /services/{id}/status` y
+        `target: REOPENED`).
+      x-required-roles: [admin, sales, general_manager, operations_manager]
+      parameters:
+        - { name: If-Match, in: header, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ServiceUpdateRequest' }
+      responses:
+        '200':
+          description: Servicio actualizado (o sin cambios)
+          headers:
+            ETag:
+              description: 'Nueva versión del recurso; reenviarla tal cual en el próximo `If-Match`, comillas incluidas'
+              schema: { type: string }
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /services/{id}/assignment:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+
+    post:
+      tags: [Operations]
+      operationId: assignServiceResources
+      summary: Asignar recursos principales (el servicio pasa a pendiente de inicio)
+      description: |
+        Conductor y tracto obligatorios, carreta opcional; solo desde
+        `PENDING_ASSIGNMENT`, y al asignar el servicio pasa a `PENDING_START`.
+
+        El estado que no admite la acción se parte en dos códigos, igual que en la
+        edición: `PENDING_START`, `IN_PROGRESS` y `COMPLETED` responden 409 `OPS-006`
+        (el estado no admite ESTA acción, que no es un cambio de estado), y los dos
+        terminales inmutables, `CANCELLED` y `DELETED`, responden 409 `OPS-004`, el
+        mismo código con el que los rechaza el PUT.
+
+        Si un recurso ya participa de OTRO servicio en `PENDING_START` o `IN_PROGRESS`,
+        sea como recurso principal o como refuerzo (se revisan AMBAS fuentes), responde
+        409 `OPS-002` con `forcible: true` y el detalle en `conflicts`. El texto del error nombra
+        al primero y cuenta cuántos RECURSOS distintos quedan en conflicto; la lista completa
+        viaja en `conflicts`. Reintentar con
+        `force: true` lo asigna igual y deja constancia en la bitácora y en la auditoría:
+        el conflicto avisa, no prohíbe. Mandar `force: true` sin que haya conflicto
+        asigna normal y NO deja registrado que se forzara nada.
+
+        Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+        disponibilidad NO se valida: un tracto en mantenimiento se puede asignar igual,
+        porque esa es una decisión operativa y el catálogo de estados existe para ordenar
+        la lista de la pantalla, no para prohibir.
+
+        Los 400 no caen todos en el mismo lugar, igual que en la edición: los de FORMATO del
+        cuerpo (obligatorios, tope de la nota, byte NUL, ids no positivos) se contestan ANTES que
+        cualquier precondición del recurso, así que un id de viaje inexistente con un cuerpo
+        inválido responde 400 y no 404. Los de NEGOCIO (recurso inexistente o dado de baja) se
+        contestan DESPUÉS del 404 y del 409 del estado.
+
+        Sin `If-Match`: acá la protección es el estado, no la versión (solo se asigna
+        desde un único estado, que la propia operación abandona). La fila se lee bajo
+        lock y los recursos pedidos se serializan entre sí, así que dos asignaciones
+        simultáneas no pueden colarse sin ver el conflicto; si CUALQUIER sentencia de esa
+        transacción se rinde por lock → 409 `OPS-008`, TRANSITORIO, se resuelve
+        reintentando.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AssignResourcesRequest' }
+            example: { driverId: 4, tractorId: 7, trailerId: 3, note: 'Sale del patio a las 05:00', force: false }
+      responses:
+        '200':
+          description: Recursos asignados; el servicio queda pendiente de inicio
+          headers:
+            ETag:
+              description: 'Nueva versión del recurso; reenviarla tal cual en el próximo `If-Match`, comillas incluidas'
+              schema: { type: string }
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: '`OPS-002` (conflicto forzable), `OPS-006` (el estado no admite la acción), `OPS-004` (cancelado o eliminado) u `OPS-008` (conflicto de lock, transitorio)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
+              examples:
+                forcibleConflict:
+                  summary: Conflicto de recursos — la interfaz ofrece "Forzar asignación"
+                  value:
+                    type: 'urn:tms:error:ops-002'
+                    title: 'Resource conflict'
+                    status: 409
+                    detail: 'El conductor Juan Pérez ya está asignado al servicio SRV-0042 (en ruta).'
+                    instance: '/api/v1/services/118/assignment'
+                    code: 'OPS-002'
+                    traceId: '3f2a1b0c-9d8e-7f6a-5b4c-3d2e1f0a9b8c'
+                    forcible: true
+                    conflicts:
+                      - { resource: 'DRIVER', resourceName: 'Juan Pérez', serviceCode: 'SRV-0042', serviceStatus: 'IN_PROGRESS' }
+                statusNotAllowed:
+                  summary: El viaje ya tiene recursos asignados
+                  value:
+                    type: 'urn:tms:error:ops-006'
+                    title: 'Conflict'
+                    status: 409
+                    detail: 'El estado del servicio no admite esta acción'
+                    instance: '/api/v1/services/118/assignment'
+                    code: 'OPS-006'
+                    traceId: '7c6b5a49-3d2e-1f0a-9b8c-7d6e5f4a3b2c'
+
+  /services/{id}/status:
+    post:
+      tags: [Operations]
+      operationId: changeServiceStatus
+      summary: Transicionar estado (iniciar / finalizar / cancelar / eliminar / reabrir)
+      description: |
+        RN-OP1 — transiciones válidas: pendiente de inicio → en ruta, en ruta →
+        completado, cancelado desde los tres estados no terminales, y eliminado
+        SOLO desde los dos pendientes, mas la REAPERTURA, que es el unico arco
+        que sale de un terminal y va al estado que el rastro registre (ver mas
+        abajo). El resto → 409 `OPS-001`. El paso de
+        pendiente de asignación a pendiente de inicio NO se pide acá: es efecto
+        de asignar recursos.
+
+        Eliminar y cancelar son cosas distintas: `DELETED` etiqueta el registro
+        que nunca debió existir (error de digitación) y lo saca de listados e
+        indicadores; `CANCELLED` es un viaje real que se abortó. Un servicio en
+        ruta o completado no se elimina: se cancela o se corrige. Nada se borra
+        de la base de datos.
+
+        ⚠️ Un viaje con recursos de REFUERZO todavía no se reabre hacia un estado
+        que los retiene: sus adicionales también vuelven a quedar tomados y la
+        verificación de disponibilidad hoy solo alcanza a los tres principales.
+        Responde 409 `OPS-009` y **no es forzable**. El endpoint de refuerzos YA
+        existe, así que este límite es ALCANZABLE: sumar un refuerzo, cancelar y
+        querer reabrir deja al viaje sin poder volver. No lo sostiene una regla de
+        negocio sino el presupuesto de esperas de bloqueo, y se levanta en su propio
+        cambio, no con el endpoint de refuerzos. Lo que SÍ evita el callejón es dar de
+        baja los refuerzos con `DELETE /services/{id}/resources/{assignmentId}` ANTES
+        de cancelar, porque la guarda cuenta filas vivas; sobre un viaje ya cancelado
+        no hay salida, ya que para quitarlos hay que estar en ruta. Reabrir hacia "pendiente de
+        asignación" no lo tiene, porque ese estado no retiene nada.
+
+        Cada transición que AVANZA exige los datos que la etapa anterior tenía
+        que haber dejado: iniciar pide conductor y tracto (la carreta es opcional, hay
+        carga que no la lleva) y finalizar pide la fecha de inicio. Falta alguno
+        → 409 `OPS-009`.
+
+        Esas dos son inalcanzables por esta API: a "pendiente de inicio" solo se
+        llega asignando, que exige conductor y tracto, y pasar a "en ruta"
+        SIEMPRE deja registrado el inicio (si `dateTime` no viene, se usa el
+        momento de la llamada). O sea que ahí un `OPS-009` significa que la fila
+        entró sin pasar por la aplicación —data migrada o escritura directa— y
+        el dato hay que sanearlo, no reintentarlo. Las otras dos causas del
+        mismo código nacen al reabrir (sin rastro de dónde venía, o con recursos
+        de refuerzo) y tampoco se reintentan.
+
+        `REOPENED` deshace una cancelación o una eliminación. No lleva estado
+        de destino: el servidor lo saca de la auditoría, así que un viaje
+        cancelado en ruta vuelve a en ruta y no a foja cero. Si no hay rastro
+        de dónde venía (viajes migrados del sistema anterior) responde 409
+        `OPS-009`, porque devolverlo a un estado por defecto lo pondría en uno
+        que quizás nunca tuvo. Un viaje completado NO se reabre: terminar no es
+        un error que haya que deshacer, y sus datos se corrigen editando. Es la
+        transición más acotada: solo `admin` y `general_manager`, y pide motivo
+        e `If-Match` igual que las dos que deshace.
+
+        El 403 del veto se resuelve ANTES de tocar la base, así que un rol vetado recibe el mismo
+        403 exista o no el viaje. Los 400 de forma del cuerpo corren todavía antes, en el mapeo del
+        pedido: un rol vetado que además manda un motivo corto recibe 400 y no 403. No filtra nada
+        —esos 400 solo miran el cuerpo— pero conviene saber el orden al construir la pantalla.
+
+        El motivo se mide DESPUÉS de recortar: diez espacios no son diez caracteres. Y ningún texto
+        libre puede llevar el byte NUL, que PostgreSQL no admite dentro de un texto: es 400, no 500.
+
+        Precedencia entre los rechazos: primero se resuelve el DESTINO (de ahí salen los `OPS-009`
+        de la reapertura), después el estado de la fila (`OPS-004`), después el arco (`OPS-001`) y
+        recién ahí la versión (412). O sea que un `If-Match` viejo sobre un viaje ya cancelado
+        recibe `OPS-004` y no 412: recargar no arregla que desde ese estado no se pueda llegar al
+        pedido. Los datos de la etapa anterior (`OPS-009`) se miran DESPUÉS del 412, porque ahí
+        recargar sí sirve.
+
+        Reabrir hacia un estado que RETIENE recursos (pendiente de inicio o en
+        ruta) vuelve a mirar conflictos: cancelar no limpia el conductor ni el
+        tracto, pero un viaje cancelado deja de retenerlos, así que en el medio
+        otro viaje se los puede haber llevado. Si eso pasó → 409 `OPS-002`
+        forzable, igual que al asignar, y al reabrir con `force` la bitácora
+        deja una línea por cada recurso que se pisó. Sin ese chequeo, dos viajes
+        activos terminarían compartiendo un conductor sin que nadie lo haya
+        decidido.
+
+        ⚠️ La `note` es texto libre y viaja entera a la bitácora (salvo por los saltos de línea,
+        que se muestran como `⏎` para que nadie pueda plantar ahí una línea con el formato del
+        servidor). Al cancelar, eliminar y reabrir es OBLIGATORIA, la escriben roles que SÍ ven
+        los importes, y la bitácora la lee todo el que pueda leer el detalle del viaje, incluido
+        el despacho, que no ve precios. Quien la escribe puede volcar ahí un importe y el despacho
+        lo leería, de forma PERMANENTE (ningún endpoint la edita ni la borra). Riesgo ACEPTADO
+        (decisión del dueño, 2026-08-07, la misma que rige para la `justification` del PUT): el
+        servidor no divulga los importes que él guarda, pero no filtra lo que una persona escribe.
+
+        La línea que deja el forzado nombra el CÓDIGO y el ESTADO del otro viaje con el que se
+        comparte el recurso, y también queda persistida. Hoy no filtra nada porque los cinco roles
+        que leen el detalle pueden pedir ese otro viaje de frente; el día que el detalle autorice
+        por fila, hay que filtrar también la bitácora, porque este canal sobrevive a la respuesta
+        y el del 409 no.
+
+        Cancelar y eliminar NO exigen esos datos previos: son las salidas, y
+        tienen que estar disponibles justamente para los viajes que quedaron a
+        medias. Lo que sí exigen es del PEDIDO, no del viaje: motivo de 10
+        caracteres o más e `If-Match` (RN-OP7). Junto con la reapertura son las transiciones más
+        exigentes en lo que la llamada tiene que traer, y las menos exigentes en
+        el estado del viaje.
+
+        `dateTime` es opcional (por defecto, ahora) y solo aplica al iniciar o
+        finalizar. Mandarlo al cancelar, eliminar o reabrir es 400 `COM-001`: esas
+        tres no fechan el viaje sino la decisión, y aceptar el dato para
+        descartarlo en silencio dejaría al cliente creyendo que guardó una marca
+        que nunca existió. RN-OP13 — al finalizar, la fecha de fin no puede ser
+        anterior a la de inicio (400 `COM-001`).
+
+        RN-OP7 — cancelar y eliminar exigen motivo de 10 caracteres o más, no
+        los puede hacer `dispatcher` (403: opera el viaje, no decide matarlo ni
+        descartarlo) y piden `If-Match` con el ETag del detalle, porque son
+        destructivos y el estado que el usuario vio en pantalla pudo haber
+        cambiado. Ahí `If-Match` ausente o sin coincidir → 412 `COM-004`.
+
+        Al iniciar y al finalizar el header es OPCIONAL, pero si viene se
+        EVALÚA: sin coincidir → 412. No se ignora. RFC 9110 §13.1.1 obliga a
+        evaluar toda precondición recibida, y descartarla le daría al cliente
+        una protección que cree tener y no tiene. La condicionalidad (obligatorio
+        en tres de los cinco targets) no se puede declarar en el esquema porque depende de
+        un campo del cuerpo: la valida el servidor.
+
+        `sales` no participa de las transiciones: registra y edita el servicio,
+        pero la operación del viaje es del despacho y la gerencia (misma regla
+        que el sistema anterior).
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - name: If-Match
+          in: header
+          required: false
+          description: 'Obligatorio cuando `target` es `CANCELLED`, `DELETED` o `REOPENED` (ausente o sin coincidir → 412 `COM-004`). Al iniciar y al finalizar es opcional, pero si se envía se evalúa igual: sin coincidir → 412.'
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ChangeStatusRequest' }
+            examples:
+              start:   { summary: Iniciar,   value: { target: 'IN_PROGRESS', dateTime: '2026-07-10T05:12:00Z' } }
+              finish:  { summary: Finalizar, value: { target: 'COMPLETED', note: 'Descarga conforme, sin observaciones' } }
+              cancel:  { summary: Cancelar,  value: { target: 'CANCELLED', note: 'El cliente reprogramó el embarque para agosto' } }
+              delete:  { summary: Eliminar,  value: { target: 'DELETED', note: 'Registro duplicado por error de digitación' } }
+              reopen:  { summary: 'Reabrir (deshace cancelar o eliminar; pide motivo e If-Match)', value: { target: 'REOPENED', note: 'El cliente retomó el embarque que había reprogramado' } }
+      responses:
+        '200':
+          description: Estado actualizado
+          headers:
+            ETag: { schema: { type: string }, description: 'Nueva versión del recurso; reenviarla tal cual (comillas incluidas) en el próximo If-Match' }
+            Cache-Control: { schema: { type: string }, description: '`no-store`: el cuerpo depende del rol que pregunta (al despacho le faltan los importes)' }
+            Vary: { schema: { type: string }, description: '`Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna caché puede reusar uno para otro usuario' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: 'Transición inválida (`OPS-001`), servicio ya cancelado o eliminado (`OPS-004`), recurso ya tomado por otro viaje al reabrir (`OPS-002`, forzable), viaje al que le faltan los datos de la etapa anterior (`OPS-009`: sin conductor y tracto al iniciar o al reabrir hacia un estado que los pide, sin fecha de inicio al cerrar, con un rastro que no dice de dónde venía al reabrir —o que apunta a un estado desconocido, o a uno del que no se vuelve—, o con recursos de refuerzo que todavía no se pueden verificar al reabrir), o conflicto transitorio de bloqueo (`OPS-008`: otra operación tiene el viaje tomado; se reintenta)'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
+              example:
+                type: 'urn:tms:error:ops-001'
+                title: 'Invalid status transition'
+                status: 409
+                detail: 'No se puede pasar de "completado" a "en ruta"'
+                instance: '/api/v1/services/118/status'
+                code: 'OPS-001'
+                traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+        '412': { $ref: '#/components/responses/PreconditionFailed' }
+
+  /services/{id}/resources:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+
+    post:
+      tags: [Operations]
+      operationId: addServiceResources
+      summary: Agregar recursos adicionales (solo con el viaje en ruta)
+      description: |
+        RN-OP5 — refuerzos de un viaje que YA arrancó: el relevo de un conductor que
+        agotó su descanso reglamentario, la unidad de apoyo que sale a un varado. Al
+        menos uno de `driverId`, `tractorId` o `trailerId` (ninguno → 400 `COM-001`) y
+        motivo OBLIGATORIO de 10 caracteres o más, medidos DESPUÉS de recortar los
+        espacios de los bordes.
+
+        Los recursos NO reemplazan a los principales: se suman. El viaje se queda en
+        `IN_PROGRESS` y sus conductor, tracto y carreta originales no se tocan. Un
+        pedido con los tres recursos deja UNA fila de refuerzo, no tres.
+
+        El estado que no admite la acción se parte en dos códigos, igual que en la
+        asignación: `PENDING_ASSIGNMENT`, `PENDING_START` y `COMPLETED` responden 409
+        `OPS-006` (el estado no admite ESTA acción), y los dos terminales inmutables,
+        `CANCELLED` y `DELETED`, responden 409 `OPS-004`, el mismo código con el que
+        los rechaza el PUT.
+
+        Los dos conflictos de recurso son DISTINTOS y se evalúan en este orden, que no
+        es cosmético:
+
+        1. RN-OP4 — el recurso ya participa de ESTE MISMO viaje, sea como principal o
+           como refuerzo agregado antes (se revisan AMBAS fuentes) → 409 `OPS-003`,
+           DURO: `force` no lo saltea y el Problem viaja pelado, sin `forcible` ni
+           `conflicts`.
+        2. RN-OP3 — el recurso está tomado por OTRO viaje en `PENDING_START` o
+           `IN_PROGRESS`, como principal o como refuerzo (también ambas fuentes) → 409
+           `OPS-002` con `forcible: true` y el detalle en `conflicts`. Reintentar con
+           `force: true` lo suma igual y deja constancia en la bitácora y en la
+           auditoría: el conflicto avisa, no prohíbe.
+
+        Si `OPS-002` se evaluara primero, un `force: true` colaría el duplicado que
+        RN-OP4 declara no forzable. Mandar `force: true` sin que haya conflicto suma
+        el refuerzo normal y NO deja registrado que se forzara nada.
+
+        Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+        disponibilidad NO se valida: sumar un refuerzo ELIGE (a diferencia de reabrir,
+        que RESTAURA), así que rige el mismo criterio que la asignación y un tracto en
+        mantenimiento se puede sumar igual.
+
+        Sin `If-Match`, igual que la asignación pero por una razón DISTINTA, y por eso
+        se escribe: la asignación se auto-protege porque ABANDONA el estado que la
+        habilita, y esta se queda en "en ruta". Lo que rechaza el reintento acá es
+        `OPS-003` — el mismo recurso sobre el mismo viaje rebota duro. Un `If-Match`
+        que llegue igual se ignora. La fila se lee bajo lock y los recursos pedidos se
+        serializan entre sí, así que dos refuerzos simultáneos no pueden colarse sin
+        ver el conflicto; si CUALQUIER sentencia de esa transacción se rinde por lock →
+        409 `OPS-008`, TRANSITORIO, se resuelve reintentando.
+
+        Los 400 no caen todos en el mismo lugar, igual que en la asignación: los de
+        FORMATO del cuerpo (al menos un recurso, mínimo y tope del motivo, byte NUL,
+        ids no positivos, `force` no booleano) se contestan ANTES que cualquier
+        precondición, así que un id de viaje inexistente con un cuerpo inválido
+        responde 400 y no 404. Los de NEGOCIO (recurso inexistente o dado de baja) se
+        contestan DESPUÉS del 404 y del 409 del estado.
+
+        Límite conocido: un viaje que recibió refuerzos ya no se puede REABRIR una vez
+        cancelado o eliminado (409 `OPS-009`, no forzable). No es una regla de negocio
+        sino el presupuesto de esperas de lock, que no alcanza para verificar una lista
+        de recursos de largo variable; se levanta en su propio cambio.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AddResourcesRequest' }
+            examples:
+              driverRelay:
+                summary: Relevo de conductor
+                value: { driverId: 9, reason: 'Relevo por descanso reglamentario del conductor principal' }
+              backupUnit:
+                summary: Unidad de apoyo, forzando el conflicto
+                value: { tractorId: 7, trailerId: 3, reason: 'Apoyo por varadura en el km 214 de la Panamericana', force: true }
+      responses:
+        '200':
+          description: Refuerzos sumados; el viaje sigue en ruta
+          headers:
+            ETag:
+              description: 'Nueva versión del recurso; reenviarla tal cual (comillas incluidas) en el próximo `If-Match`'
+              schema: { type: string }
+            Cache-Control:
+              description: '`no-store`: el cuerpo depende del rol que pregunta (al despacho le faltan los importes)'
+              schema: { type: string }
+            Vary:
+              description: '`Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna caché puede reusar uno para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: 'En orden de PRECEDENCIA: `OPS-004` (cancelado o eliminado), `OPS-006` (el estado no admite la acción), `OPS-003` (el recurso ya participa de este mismo viaje; duro, no forzable) y `OPS-002` (tomado por otro viaje activo; forzable). Además `OPS-008` (conflicto de lock, transitorio) desde cualquier punto.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/ServiceResourceConflictProblem' }
+              examples:
+                duplicateInSameService:
+                  summary: El recurso ya está en este viaje — la interfaz NO ofrece forzar
+                  value:
+                    type: 'urn:tms:error:ops-003'
+                    title: 'Duplicate resource'
+                    status: 409
+                    detail: 'El conductor Juan Pérez ya participa de este servicio.'
+                    instance: '/api/v1/services/118/resources'
+                    code: 'OPS-003'
+                    traceId: '8e7d6c5b-4a39-2817-0f6e-5d4c3b2a1908'
+                forcibleConflict:
+                  summary: Tomado por otro viaje — la interfaz ofrece "Forzar"
+                  value:
+                    type: 'urn:tms:error:ops-002'
+                    title: 'Resource conflict'
+                    status: 409
+                    detail: 'El conductor Juan Pérez ya está asignado al servicio SRV-0042 (en ruta).'
+                    instance: '/api/v1/services/118/resources'
+                    code: 'OPS-002'
+                    traceId: '3f2a1b0c-9d8e-7f6a-5b4c-3d2e1f0a9b8c'
+                    forcible: true
+                    conflicts:
+                      - { resource: 'DRIVER', resourceName: 'Juan Pérez', serviceCode: 'SRV-0042', serviceStatus: 'IN_PROGRESS' }
+
+  /services/{id}/resources/{assignmentId}:
+    delete:
+      tags: [Operations]
+      operationId: removeServiceResource
+      summary: Dar de baja un refuerzo cargado por error (solo con el viaje en ruta)
+      description: |
+        Quita UNA fila de refuerzo del viaje. Es la contracara de `POST
+        /services/{id}/resources` y comparte su guarda de estado: solo con el viaje
+        EN RUTA. `PENDING_ASSIGNMENT`, `PENDING_START` y `COMPLETED` responden 409
+        `OPS-006`; los dos terminales inmutables, `CANCELLED` y `DELETED`, responden
+        409 `OPS-004`, el mismo código con el que los rechaza el PUT.
+
+        `assignmentId` se acota al viaje del path DENTRO de la consulta, no
+        comparando después. Un refuerzo que no existe y uno que existe pero es de
+        OTRO viaje responden lo MISMO (404 `OPS-010`), a propósito: distinguirlos
+        convertiría el 404 en un canal para averiguar qué refuerzos están vivos en
+        viajes que quien pregunta podría no poder leer.
+
+        La baja es FÍSICA: la fila de refuerzo desaparece. El rastro NO se va con
+        ella, porque la bitácora y la auditoría cuelgan del viaje y no del refuerzo.
+
+        Sin cuerpo. El alta pide un motivo y la baja no: el "por qué" de un refuerzo
+        cargado por error es siempre el mismo, y el quién, el cuándo y el qué ya
+        quedan en el rastro.
+
+        Sin `If-Match`, igual que el alta pero por una razón mejor: acá el reintento
+        lo rechaza el 404, porque la fila ya no está. Un `If-Match` que llegue se
+        ignora.
+
+        **Sobre la reapertura.** `OPS-009` impide reabrir un viaje con refuerzos, y la
+        guarda cuenta filas VIVAS: quitarlos ANTES de cancelar deja el viaje
+        reabrible, y ése es el camino a ofrecerle al despacho. Lo que la baja NO
+        puede es rescatar a uno YA cancelado, porque para quitar el refuerzo hay que
+        estar EN RUTA. Para esos, el límite de D-OPS-18 sigue en pie.
+
+        Devuelve el detalle completo, como sus seis vecinos, y acá el motivo es además
+        técnico: el borrado mueve la versión del viaje, así que un 204 dejaría al
+        cliente con un `ETag` que la base ya no tiene y su próximo `If-Match` comería
+        un 412 espurio.
+      x-required-roles: [admin, general_manager, operations_manager, dispatcher]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+        - { name: assignmentId, in: path, required: true, description: 'Id de la fila de refuerzo: el que publica `additionalResources[].id` del detalle', schema: { type: integer, format: int64 } }
+      responses:
+        '200':
+          description: Refuerzo dado de baja; el viaje sigue en ruta
+          headers:
+            ETag: { schema: { type: string }, description: Nueva versión del recurso; reenviarla tal cual en el próximo If-Match }
+            Cache-Control: { schema: { type: string }, description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta' }
+            Vary: { schema: { type: string }, description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ServiceDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404':
+          description: '`OPS-005` si el viaje no existe; `OPS-010` si el refuerzo no existe o no es de este viaje. El 404 del refuerzo se evalúa DESPUÉS de la guarda de estado: sobre un viaje cancelado o fuera de ruta manda el 409.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '409':
+          description: 'En orden de PRECEDENCIA: `OPS-004` (cancelado o eliminado) y `OPS-006` (el estado no admite la acción). Además `OPS-008` (conflicto de lock, transitorio) desde cualquier punto.'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
 # =============================================================================
+
 components:
 # =============================================================================
 
@@ -1860,6 +2765,36 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            duplicateServiceDetected:
+              summary: Servicio duplicado detectado (protección anti doble-click backend-side)
+              value:
+                type: 'urn:tms:error:ops-007'
+                title: 'Conflict'
+                status: 409
+                detail: 'Se detectó un servicio idéntico creado hace menos de 30 segundos'
+                instance: '/api/v1/services'
+                code: 'OPS-007'
+                traceId: '8f9a0b1c-2d3e-4f5a-6b7c-8d9e0f1a2b3c'
+            serviceNotEditable:
+              summary: Servicio cancelado o eliminado (inmutable)
+              value:
+                type: 'urn:tms:error:ops-004'
+                title: 'Conflict'
+                status: 409
+                detail: 'El servicio está cancelado o eliminado: ya no admite cambios'
+                instance: '/api/v1/services/42'
+                code: 'OPS-004'
+                traceId: '9a0b1c2d-3e4f-5a6b-7c8d-9e0f1a2b3c4d'
+            serviceLocked:
+              summary: Fila tomada por otra operación (conflicto transitorio)
+              value:
+                type: 'urn:tms:error:ops-008'
+                title: 'Conflict'
+                status: 409
+                detail: 'No se pudo completar la operación por un bloqueo temporal en la base de datos, reintente en unos segundos'
+                instance: '/api/v1/services/42'
+                code: 'OPS-008'
+                traceId: 'a1b2c3d4-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
             duplicateRuc:
               summary: RUC duplicado al crear cliente
               value:
@@ -1937,6 +2872,16 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            serviceNotFound:
+              summary: Servicio de transporte inexistente
+              value:
+                type: 'urn:tms:error:ops-005'
+                title: 'Resource not found'
+                status: 404
+                detail: 'El servicio indicado no existe'
+                instance: '/api/v1/services/999'
+                code: 'OPS-005'
+                traceId: '9f2c1e4a-3b7d-4c2e-9a1f-6d5b8c3e7a12'
             quotationNotFound:
               summary: Cotización inexistente
               value:
@@ -2169,14 +3114,26 @@ components:
 
     CargoTypeRequest:
       type: object
+      description: |
+        Los cuatro numéricos son mayores que cero. El peso es obligatorio; las tres
+        medidas son opcionales, y si vienen, tampoco pueden ser cero: una medida en
+        cero no existe, y lo que ese cero decía era "no la sé", que se expresa
+        omitiendo el campo.
+
+        Hasta 2026-08-25 el cero se admitía en los cuatro. Se revirtió para que este
+        catálogo diga lo mismo que las medidas de un servicio, que ya lo rechazaban.
+        Los ítems de una cotización todavía lo admiten: esa parte queda pendiente.
+
+        `CargoTypeResponse` conserva `minimum: 0` a propósito: las filas creadas antes
+        de esta regla siguen existiendo y la salida tiene que poder describirlas.
       required: [name, standardWeight]
       properties:
         name:           { type: string, minLength: 1, maxLength: 100 }
         description:    { type: [string, 'null'] }
-        standardWeight: { type: number, format: double, minimum: 0 }
-        standardLength: { type: [number, 'null'], format: double, minimum: 0 }
-        standardWidth:  { type: [number, 'null'], format: double, minimum: 0 }
-        standardHeight: { type: [number, 'null'], format: double, minimum: 0 }
+        standardWeight: { type: number, format: double, exclusiveMinimum: 0 }
+        standardLength: { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        standardWidth:  { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        standardHeight: { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
 
     # -------- Clients ------------------------------------------------------
     ClientRef:
@@ -3072,7 +4029,43 @@ components:
           properties:
             brand:    { type: [string, 'null'], maxLength: 50 }
             model:    { type: [string, 'null'], maxLength: 50 }
+            status:
+              # Mismo dominio que FleetResourceStatus, inline y admitiendo null: el parser de
+              # la spec runtime no soporta el `type: 'null'` suelto que usa el contrato.
+              type: [string, 'null']
+              enum: [AVAILABLE, MAINTENANCE, NOT_AVAILABLE, null]
+              description: 'null en las escoltas: no participan de la asignacion de viajes.'
             isActive: { type: boolean }
+
+    FleetResourceStatus:
+      type: string
+      enum: [AVAILABLE, MAINTENANCE, NOT_AVAILABLE]
+      description: |
+        Disponibilidad del recurso (unidad de flota o conductor), en mayusculas
+        como el resto de los enums de la API. Donde el recurso puede no tenerla
+        (las escoltas), la propiedad se declara admitiendo null.
+
+    DriverRef:
+      type: object
+      description: |
+        Referencia minima a un conductor (public.drivers). El id es el que guarda la
+        asignacion del servicio; el nombre sale del trabajador asociado.
+      required: [id, fullName]
+      properties:
+        id:       { type: integer }
+        fullName: { type: string, example: 'Juan Pérez Huamán' }
+
+    DriverResponse:
+      allOf:
+        - $ref: '#/components/schemas/DriverRef'
+        - type: object
+          required: [licenseNumber, status, isActive]
+          properties:
+            licenseNumber:   { type: string }
+            licenseCategory: { type: [string, 'null'] }
+            phone:           { type: [string, 'null'], pattern: '^\d{9}$' }
+            status:          { $ref: '#/components/schemas/FleetResourceStatus' }
+            isActive:        { type: boolean }
 
     WarehouseWithdrawalRequest:
       type: object
@@ -3182,3 +4175,434 @@ components:
         totalPEN:   { type: number }
         totalUSD:   { type: number }
         totalCount: { type: number }
+
+    # -------- Operations: servicios de transporte ------------------------------
+    ServiceStatus:
+      type: string
+      enum: [PENDING_ASSIGNMENT, PENDING_START, IN_PROGRESS, COMPLETED, CANCELLED, DELETED]
+      description: |
+        Ciclo de vida del servicio:
+        `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`;
+        `CANCELLED` desde cualquiera de los tres no terminales; `DELETED` solo desde
+        los dos pendientes. El alta siempre nace en `PENDING_ASSIGNMENT`; las transiciones
+        las pide `POST /services/{id}/status`, que además REABRE un viaje cancelado o eliminado
+        y lo devuelve al estado que tenía.
+
+    TripScope:
+      type: string
+      enum: [LOCAL, PROVINCIA]
+      description: |
+        Ámbito del viaje. Dominio cerrado sin catálogo administrable: viaja como enum
+        y la base de datos lo fija con una restricción, igual que el estado. No hay
+        endpoint de ámbitos — el selector de la interfaz sale de este enum.
+
+    ServiceEventType:
+      type: string
+      enum: [CREATED, ASSIGNMENT, STATUS_CHANGE, FIELD_EDIT, NOTE]
+      description: |
+        Tipo de la entrada de bitácora, para que la interfaz la muestre con su
+        etiqueta sin interpretar el texto.
+
+        `ASSIGNMENT` cubre TANTO la asignación de los recursos principales COMO los
+        refuerzos sumados con el viaje en ruta: los distingue el TEXTO de la entrada,
+        cuya primera línea nombra la acción.
+
+    ServiceEventResponse:
+      type: object
+      description: Entrada de la bitácora del servicio (una fila por acción).
+      required: [id, eventType, note, createdBy, createdAt]
+      properties:
+        id:        { type: integer, format: int64 }
+        eventType: { $ref: '#/components/schemas/ServiceEventType' }
+        note:      { type: string }
+        createdBy: { $ref: '#/components/schemas/UserRef' }
+        createdAt: { type: string, format: date-time }
+
+    ServiceCreateRequest:
+      type: object
+      description: |
+        Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
+
+        Los textos libres no pueden contener el byte NUL (`U+0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` los saltos y las tabulaciones sí son válidos.
+      required: [clientId, tripScope, tentativeDate, origin, destination, cargoTypeId, weightKg, price, currencyId]
+      properties:
+        clientId:      { type: integer }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400 (el formato ISO admite años que la columna no).' }
+        origin:        { type: string, minLength: 1, maxLength: 255 }
+        destination:   { type: string, minLength: 1, maxLength: 255 }
+        cargoTypeId:   { type: integer }
+        weightKg:      { type: number, format: double, exclusiveMinimum: 0 }
+        lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        price:         { type: number, format: double, exclusiveMinimum: 0, description: 'Mayor que cero: un viaje siempre tiene precio' }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+
+    ServiceUpdateRequest:
+      type: object
+      description: |
+        Edición del servicio. El cliente, el ámbito del viaje y el tipo de carga NO
+        viajan: son inmutables después del alta. `justification` es obligatoria: 10
+        caracteres o más MEDIDOS SOBRE EL TEXTO RECORTADO (un texto corto rellenado con
+        espacios se rechaza). Un cuerpo sin cambios reales responde 200 sin escribir nada.
+
+        Precisión: hasta 2 decimales; el entero admite 8 cifras en peso y dimensiones y 10 en precio (los topes de las columnas). Fuera de eso es 400.
+
+        Los campos opcionales NO se comportan todos igual frente a `null`: `lengthM`,
+        `widthM`, `heightM` y `observations` se asignan tal cual, así que mandarlos en
+        null (o ausentes) los VACÍA — un cuerpo parcial borra lo que no incluye. Las
+        fechas reales, en cambio, solo CORRIGEN un valor que el servicio ya tiene: ahí
+        ausente o null significa sin cambio, porque una fecha real no se borra.
+
+        Los textos libres no pueden contener el byte NUL (`U+0000`): la columna no lo admite y se rechaza con 400. En `origin` y `destination` tampoco se admite ningún carácter de control, saltos de línea incluidos: son textos de UNA línea y el servidor los registra en su log, donde un salto inventaría una línea entera. En `observations` y `justification` los saltos y las tabulaciones sí son válidos.
+      required: [tentativeDate, origin, destination, weightKg, price, currencyId, justification]
+      properties:
+        tentativeDate: { type: string, format: date, description: 'Puede ser pasada (registro retroactivo). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400 (el formato ISO admite años que la columna no).' }
+        origin:        { type: string, minLength: 1, maxLength: 255 }
+        destination:   { type: string, minLength: 1, maxLength: 255 }
+        weightKg:      { type: number, format: double, exclusiveMinimum: 0 }
+        lengthM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        widthM:        { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        heightM:       { type: [number, 'null'], format: double, exclusiveMinimum: 0 }
+        price:         { type: number, format: double, exclusiveMinimum: 0, description: 'Mayor que cero: un viaje siempre tiene precio' }
+        currencyId:    { type: integer }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+        startDateTime:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Corrección del inicio real. Solo se admite si el servicio YA lo tiene: la
+            condición es tener la fecha, no estar en un estado (en la práctica aparece al
+            ponerse en ruta). Un viaje migrado SIN la fecha no se corrige por acá: ese saneo
+            va en el script de cutover. Ausente o null = sin cambio. Entre 1900 y 2999: fuera
+            de esa ventana es 400. ⚠️ La fecha la fija la transición a "en ruta"; en un viaje
+            que todavía no arrancó, este campo responde 400.
+        endDateTime:
+          type: [string, 'null']
+          format: date-time
+          description: |
+            Corrección del fin real. Solo se admite si el servicio YA lo tiene (misma
+            condición que el inicio: la fecha, no el estado) y tiene que quedar posterior
+            o igual al inicio. Las mismas consecuencias que el inicio para un viaje migrado
+            sin la fecha. Ausente o null = sin cambio. Entre 1900 y 2999: fuera de esa ventana
+            es 400. ⚠️ La fecha la fija la transición a "completado"; en un viaje que todavía no
+            cerró, este campo responde 400.
+        justification: { type: string, minLength: 10, maxLength: 500, pattern: '^\s*\S[\s\S]{8,}\S\s*$', description: 'El `minLength` cuenta el texto CRUDO; el patrón expresa el mínimo real, que es sobre el texto YA RECORTADO: sin él, un cliente generado aceptaría un texto corto rellenado con espacios que el servidor rechaza' }
+
+    AddResourcesRequest:
+      type: object
+      description: |
+        Refuerzos de un viaje ya en ruta. Los tres recursos son opcionales por separado
+        pero al menos uno tiene que venir: los tres ausentes (o los tres en null) es 400
+        `COM-001`. Es una condición ENTRE campos, así que no se puede declarar en el
+        esquema; la valida el servidor.
+
+        El motivo es OBLIGATORIO, a diferencia de la nota de la asignación, y su mínimo
+        se mide DESPUÉS de recortar los espacios de los bordes: diez espacios no son un
+        motivo. El `pattern` dice exactamente eso (un no-espacio, ocho caracteres
+        cualesquiera, un no-espacio, con espacios libres alrededor), para que un cliente
+        generado no acepte lo que el servidor rechaza.
+
+        El motivo entra en la bitácora junto con los recursos sumados y se anexa a la
+        descripción de las filas de auditoría. Sus saltos de línea se APLASTAN al
+        escribirlo en la bitácora (se ven como `⏎`), porque cada entrada tiene una línea
+        por dato y un salto permitiría plantar una línea falsa con el formato del
+        servidor. No puede contener el byte NUL (`U+0000`), que la columna no admite
+        y se rechaza con 400.
+
+        `force` ausente equivale a `false`.
+      required: [reason]
+      properties:
+        driverId:  { type: [integer, 'null'], minimum: 1 }
+        tractorId: { type: [integer, 'null'], minimum: 1 }
+        trailerId: { type: [integer, 'null'], minimum: 1 }
+        reason:
+          type: string
+          minLength: 10
+          maxLength: 500
+          pattern: '^\s*\S[\s\S]{8,}\S\s*$'
+          description: 'Por qué se suma el refuerzo. Obligatorio; 10 caracteres o más ya recortado.'
+        force:
+          type: [boolean, 'null']
+          default: false
+          description: 'true = suma el recurso pese al conflicto OPS-002 y lo deja registrado en la bitácora y en la auditoría. Ausente, null y false son lo mismo. NO abre el duplicado del mismo viaje (OPS-003), que es duro.'
+
+    AssignResourcesRequest:
+      type: object
+      description: |
+        Conductor y tracto obligatorios, carreta opcional.
+
+        La nota es libre y opcional (no tiene mínimo, a diferencia de la justificación de
+        la edición): entra en la bitácora junto con los recursos asignados y se anexa a la
+        descripción de las filas de auditoría. Una nota en blanco se trata como ausente. Sus
+        saltos de línea se APLASTAN al escribirla en la bitácora (se ven como `⏎`), porque cada
+        entrada tiene una línea por dato y un salto permitiría plantar una línea falsa con el
+        formato del servidor. No puede contener el byte NUL (`U+0000`), que la columna no admite
+        y se rechaza con 400.
+
+        `force` ausente equivale a `false`.
+      required: [driverId, tractorId]
+      properties:
+        driverId:  { type: integer, minimum: 1 }
+        tractorId: { type: integer, minimum: 1 }
+        trailerId: { type: [integer, 'null'], minimum: 1 }
+        note:      { type: [string, 'null'], maxLength: 500 }
+        force:     { type: [boolean, 'null'], default: false, description: 'true = asigna pese al conflicto OPS-002; queda registrado en la bitácora y en la auditoría. Ausente, null y false son lo mismo' }
+
+    ChangeStatusRequest:
+      type: object
+      required: [target]
+      properties:
+        target:
+          type: string
+          enum: [IN_PROGRESS, COMPLETED, CANCELLED, DELETED, REOPENED]
+          description: 'Estado al que se quiere IR, no el actual. Los dos pendientes no se piden: a "pendiente de inicio" se llega asignando recursos. `REOPENED` no es un estado sino una ACCIÓN: deshace una cancelación o una eliminación y devuelve el viaje al estado que tenía antes, que el servidor saca del rastro de auditoría.'
+        dateTime:
+          type: [string, 'null']
+          format: date-time
+          description: 'Inicio o fin real; ausente o null = ahora. Solo aplica al iniciar o finalizar: enviarlo al cancelar, eliminar o reabrir es 400 COM-001. Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400. Al finalizar debe ser posterior o igual al inicio, y al iniciar no puede quedar después de un fin ya registrado (RN-OP13).'
+        note:
+          type: [string, 'null']
+          maxLength: 500
+          description: 'Opcional al iniciar o finalizar; OBLIGATORIA (10 caracteres o más) al cancelar, eliminar o reabrir (RN-OP7).'
+        force:
+          type: [boolean, 'null']
+          default: false
+          description: 'Solo al REABRIR: reabre pese al conflicto OPS-002 y lo deja registrado en la bitácora. Ausente, null y false son lo mismo (no forzar), para que un formulario que serializa el objeto entero siga andando. `true` en cualquiera de las otras cuatro transiciones es 400: ninguna moviliza recursos, y es la única bandera que autoriza pisar la reja de conflictos.'
+
+    ServiceResourceConflictProblem:
+      allOf:
+        - $ref: '#/components/schemas/Problem'
+        - type: object
+          description: |
+            Extensión del error para `OPS-002`: le dice a la interfaz que el conflicto se
+            puede forzar y qué recurso está ocupado. Los dos campos viajan SOLO en ese
+            código; los otros 409 de este endpoint usan el Problem pelado.
+          properties:
+            forcible: { type: boolean, description: 'true solo en OPS-002' }
+            conflicts:
+              type: array
+              items:
+                type: object
+                required: [resource, resourceName, serviceCode, serviceStatus]
+                properties:
+                  resource:     { type: string, enum: [DRIVER, TRACTOR, TRAILER] }
+                  resourceName: { type: string, description: 'Nombre del conductor o placa de la unidad' }
+                  serviceCode:  { type: string, example: 'SRV-0042' }
+                  serviceStatus:
+                    type: string
+                    enum: [PENDING_START, IN_PROGRESS]
+                    description: |
+                      Estado del servicio que retiene el recurso. Solo estos dos: antes de
+                      asignar no hay recursos, y los terminales (completado, cancelado,
+                      eliminado) ya los liberaron.
+
+    ServiceAdditionalResourceResponse:
+      type: object
+      description: |
+        Recurso sumado a un viaje que ya estaba en ruta (relevo de conductor, unidad de
+        apoyo), con el motivo por el que se sumó y quién lo hizo.
+
+        Una fila puede traer los tres recursos, uno solo o cualquier combinación: es el
+        pedido que la creó, no un recurso suelto. Los que no participaron viajan en null.
+      required: [id, reason, assignedBy, assignedAt]
+      properties:
+        id:         { type: integer, format: int64 }
+        driver:     { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
+        tractor:    { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
+        trailer:    { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
+        reason:     { type: string, maxLength: 500, description: 'Por qué se sumó. Obligatorio al crearlo, así que nunca viaja vacío.' }
+        assignedBy: { $ref: '#/components/schemas/UserRef' }
+        assignedAt: { type: string, format: date-time }
+
+    ServiceDetailResponse:
+      type: object
+      description: |
+        Detalle del servicio con su bitácora. Los recursos asignados (conductor, tracto,
+        carreta) viajan desde que existe el endpoint que los asigna: son null mientras el
+        viaje esté pendiente de asignación, y la carreta puede seguir en null después,
+        porque es opcional.
+
+        Las fechas reales de inicio y fin SÍ viajan: las fija la transición de estado,
+        pero la edición las corrige, y sin poder leerlas esa corrección sería imposible
+        de pedir y de confirmar.
+
+        Los REFUERZOS viajan en `additionalResources` desde que existe el endpoint que
+        los suma: lista vacía mientras no haya ninguno, NUNCA null.
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, cargoType, weightKg, status, driver, tractor, trailer, additionalResources, events, createdBy, createdAt, updatedAt]
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string, example: 'SRV-0042' }
+        client:        { $ref: '#/components/schemas/ClientRef' }
+        origin:        { type: string, maxLength: 255 }
+        destination:   { type: string, maxLength: 255 }
+        tentativeDate: { type: string, format: date }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        cargoType:     { $ref: '#/components/schemas/CargoTypeRef' }
+        weightKg:      { type: number, format: double }
+        lengthM:       { type: [number, 'null'], format: double }
+        widthM:        { type: [number, 'null'], format: double }
+        heightM:       { type: [number, 'null'], format: double }
+        observations:  { type: [string, 'null'], maxLength: 500 }
+        price:         { type: number, format: double, description: 'Ausente para el rol de despacho' }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol de despacho' }
+        status:        { $ref: '#/components/schemas/ServiceStatus' }
+        driver:        { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
+        tractor:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
+        trailer:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
+        startDateTime: { type: [string, 'null'], format: date-time, description: 'Inicio real. Lo fija la transición a "en ruta" y la edición lo corrige; null mientras el viaje no haya arrancado' }
+        endDateTime:   { type: [string, 'null'], format: date-time, description: 'Fin real. Lo fija la transición a "completado" y la edición lo corrige; null mientras el viaje no haya cerrado' }
+        additionalResources:
+          type: array
+          description: 'Refuerzos sumados con el viaje en ruta, en orden cronológico ascendente. Lista vacía si no hay, nunca null.'
+          items: { $ref: '#/components/schemas/ServiceAdditionalResourceResponse' }
+        events:
+          type: array
+          description: Bitácora en orden cronológico ascendente
+          items: { $ref: '#/components/schemas/ServiceEventResponse' }
+        createdBy:     { $ref: '#/components/schemas/UserRef' }
+        createdAt:     { type: string, format: date-time }
+        updatedAt:     { type: string, format: date-time, description: 'Ultima actualizacion. Para el If-Match reenviar el header ETag tal cual, NO este valor' }
+
+    ServicesReportRowResponse:
+      type: object
+      required: [serviceId, code, clientName, tripScope, origin, destination, startDateTime, endDateTime, price, currencyCode, principalDriver, additionalDrivers]
+      properties:
+        serviceId:       { type: integer, format: int64 }
+        code:            { type: string }
+        clientName:      { type: string }
+        tripScope:       { $ref: '#/components/schemas/TripScope' }
+        origin:          { type: string }
+        destination:     { type: string }
+        startDateTime:   { type: string, format: date-time }
+        endDateTime:     { type: string, format: date-time }
+        price:           { type: number, format: double }
+        # Se declara por FORMA y no como enum cerrado: el codigo devuelve lo que tenga
+        # `public.currencies.code`, sin CHECK que lo limite, asi que un enum dejaria al cliente
+        # TypeScript generado recibiendo un valor fuera de la union el dia que se siembre una
+        # tercera moneda. El listado y el detalle ya se relajaron igual en el PR #141.
+        currencyCode:    { type: string, pattern: '^[A-Z]{3}$' }
+        principalDriver: { type: string }
+        additionalDrivers:
+          type: array
+          description: Conductores sumados en ruta, con el motivo de cada relevo.
+          items:
+            type: object
+            required: [name, reason]
+            properties:
+              name:   { type: string }
+              reason: { type: string }
+
+    ServicesReportTotalsResponse:
+      type: object
+      description: Una fila por moneda, sin conversión (mismo criterio que el reporte de almacén).
+      required: [currencyCode, totalServices, totalRevenue]
+      properties:
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$' }
+        totalServices: { type: integer }
+        totalRevenue:  { type: number, format: double }
+
+    ServicesReportResponse:
+      type: object
+      required: [weekCycle, closed, rows, totals]
+      properties:
+        weekCycle:
+          type: object
+          description: >-
+            La semana que se está reportando. `end` es el MARTES inclusive, no el miércoles con el
+            que se consulta la base: son dos fechas distintas separadas por un día.
+          required: [start, end]
+          properties:
+            start: { type: string, format: date, description: 'Miércoles en que abrió (Lima)' }
+            end:   { type: string, format: date, description: 'Martes en que cierra, INCLUSIVE (Lima)' }
+        closed:
+          type: boolean
+          description: >-
+            Si la semana ya cerró. La semana EN CURSO se puede consultar y devuelve `false`; lo que
+            depende de esto es la exportación, no la lectura. Va UN solo campo y no dos: publicar
+            además su negación deja dos formas de la misma verdad que pueden contradecirse.
+        rows:
+          type: array
+          description: >-
+            Ordenadas por fecha de fin ascendente (el desempate por id las deja en un orden estable
+            entre dos impresiones de la misma semana). Lista vacía si no hubo servicios completados en
+            la semana, nunca null.
+          items: { $ref: '#/components/schemas/ServicesReportRowResponse' }
+        totals:
+          type: array
+          description: >-
+            Una fila por cada moneda PRESENTE en la semana, en el orden en que aparecen en las filas.
+            Lista vacía si no hubo servicios, nunca null: no se publica una fila en cero por cada
+            moneda del catálogo.
+          items: { $ref: '#/components/schemas/ServicesReportTotalsResponse' }
+
+    ServiceStatsResponse:
+      type: object
+      description: |
+        La tira de indicadores que va arriba del listado. El cuerpo es IDÉNTICO para los cinco
+        roles: no lleva un solo importe, así que la regla de precios no recorta nada acá.
+      required: [pendingAssignment, pendingStart, inProgress, completedThisWeek, driversOnRoad, unitsOnRoad, weekCycle]
+      properties:
+        pendingAssignment: { type: integer, minimum: 0, description: 'Viajes esperando que se les asignen recursos. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek' }
+        pendingStart:      { type: integer, minimum: 0, description: 'Viajes con recursos asignados que todavía no arrancaron. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek' }
+        inProgress:        { type: integer, minimum: 0, description: 'Viajes en ruta. GLOBAL: sin ventana de tiempo, el ciclo semanal solo aplica a completedThisWeek' }
+        completedThisWeek: { type: integer, minimum: 0, description: 'Completados con fecha de fin real dentro del ciclo operativo miércoles→martes de América/Lima (RN-OP14)' }
+        driversOnRoad:
+          type: object
+          description: 'Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan.'
+          required: [active, total]
+          properties:
+            active: { type: integer, minimum: 0 }
+            total:  { type: integer, minimum: 0 }
+        unitsOnRoad:
+          type: object
+          description: 'TRACTOS principales distintos en viajes en ruta, sobre el padrón de tractos de alta. Carretas y escoltas NO participan, pese al nombre del campo.'
+          required: [active, total]
+          properties:
+            active: { type: integer, minimum: 0 }
+            total:  { type: integer, minimum: 0 }
+        weekCycle:
+          type: object
+          description: 'El ciclo vigente. `end` es el MARTES inclusive, no el miércoles con el que se consulta.'
+          required: [start, end]
+          properties:
+            start: { type: string, format: date, description: 'Miércoles en que abrió el ciclo (Lima)' }
+            end:   { type: string, format: date, description: 'Martes en que cierra, INCLUSIVE (Lima)' }
+
+    ServiceSummaryResponse:
+      type: object
+      description: |
+        Fila del listado. `price` y `currencyCode` están AUSENTES (no en null) para el
+        rol `dispatcher`. Origen y destino viajan separados porque la tabla los muestra
+        en dos líneas.
+
+        `driver` y `tractor` son null mientras el viaje esté pendiente de asignación: la
+        fila los trae desde que existe el endpoint que los asigna. La carreta no está acá
+        (es opcional y la tabla no la muestra); vive en el detalle.
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, driver, tractor, createdAt]
+      properties:
+        id:            { type: integer, format: int64 }
+        code:          { type: string, example: 'SRV-0042' }
+        client:        { $ref: '#/components/schemas/ClientRef' }
+        origin:        { type: string, maxLength: 255 }
+        destination:   { type: string, maxLength: 255 }
+        tentativeDate: { type: string, format: date }
+        tripScope:     { $ref: '#/components/schemas/TripScope' }
+        status:        { $ref: '#/components/schemas/ServiceStatus' }
+        driver:        { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
+        tractor:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
+        price:         { type: number, format: double, description: 'Ausente para el rol dispatcher' }
+        currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol dispatcher' }
+        createdAt:     { type: string, format: date-time }
+
+    PageOfServiceSummary:
+      allOf:
+        - $ref: '#/components/schemas/PageMeta'
+        - type: object
+          required: [content]
+          properties:
+            content:
+              type: array
+              items: { $ref: '#/components/schemas/ServiceSummaryResponse' }

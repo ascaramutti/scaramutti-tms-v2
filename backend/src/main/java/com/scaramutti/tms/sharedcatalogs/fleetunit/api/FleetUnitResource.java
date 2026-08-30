@@ -20,6 +20,10 @@ import java.util.List;
  * creacion al vuelo (RN-WH9: los trabajadores y las unidades de flota nunca se crean desde
  * almacen, solo se buscan). Sin paginar (flota chica). {@code kind} malformado (no matchea
  * el enum) devuelve 404 (RESTEasy, query param tipado que no parsea).
+ *
+ * <p>Lo consumen los dos modulos: almacen elige la unidad destino del retiro y operaciones
+ * elige tracto y carreta al asignar un viaje, por eso lo alcanzan tambien {@code dispatcher}
+ * (asigna recursos) y {@code sales} (registra y edita servicios).
  */
 @Path("/fleet-units")
 @Produces(MediaType.APPLICATION_JSON)
@@ -29,7 +33,8 @@ public class FleetUnitResource {
     @Inject FleetUnitResourceMapper fleetUnitResourceMapper;
 
     @GET
-    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper",
+        "dispatcher", "sales"})
     public List<FleetUnitResponse> listFleetUnits(
         @QueryParam("kind")     FleetUnitKind kind,
         @QueryParam("isActive") Boolean isActive

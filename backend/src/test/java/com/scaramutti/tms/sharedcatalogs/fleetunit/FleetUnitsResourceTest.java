@@ -8,6 +8,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
@@ -17,15 +19,16 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Integration tests de GET /fleet-units. Hermetico: la flota de test se siembra con un
- * estado de recurso propio ({@code ZTEST_STATUS}) y se limpia por ese status en
- * {@code @AfterEach} (NUNCA por prefijo de placa: {@code public.tractors}/etc son
- * COMPARTIDAS con v1 y un prefijo corto podria matchear una placa real). Placas en el rango
- * PROPIO {@code ZF00xx} (los retiros usan {@code ZT00xx} y los reportes {@code ZR00xx}: rangos
- * disjuntos para no colisionar en la BD compartida). Aserciones por PRESENCIA.
+ * Integration tests de GET /fleet-units. Hermetico: la flota de test se limpia en
+ * {@code @AfterEach} por los ids que sembro el fixture, con un barrido de respaldo por el
+ * rango de placas reservado ({@code public.tractors}/etc son COMPARTIDAS con v1). Placas en
+ * el rango PROPIO {@code ZF00xx} (los retiros usan {@code ZT0xxx} y los reportes
+ * {@code ZR00xx}: rangos disjuntos para no colisionar en la BD compartida). Aserciones por
+ * PRESENCIA.
  */
 @QuarkusTest
 class FleetUnitsResourceTest {
@@ -57,6 +60,55 @@ class FleetUnitsResourceTest {
             .body("find { it.kind == 'TRAILER' && it.id == " + trailer + " }.model", nullValue())
             .body("find { it.kind == 'ESCORT' && it.id == " + escort + " }.brand", equalTo("Toyota"))
             .body("find { it.kind == 'ESCORT' && it.id == " + escort + " }.model", equalTo("Hilux"));
+    }
+
+    // ---------- disponibilidad ---------------------------------------------------
+
+    /**
+     * El estado sale del catalogo {@code public.resource_statuses} POR NOMBRE (sus ids
+     * difieren entre ambientes) y llega a la API en mayusculas.
+     */
+    @Test
+    void listFleetUnits_tractorAndTrailerCarryTheirAvailability() {
+        int available = fixtures.seedTractor("ZF0021", true, "Volvo", "FH", WarehouseTestData.STATUS_AVAILABLE);
+        int maintenance = fixtures.seedTractor("ZF0022", true, "Scania", "R450",
+            WarehouseTestData.STATUS_MAINTENANCE);
+        int notAvailable = fixtures.seedTrailer("ZF0023", true, WarehouseTestData.STATUS_NOT_AVAILABLE);
+        String token = adminToken();
+
+        given().header("Authorization", "Bearer " + token).when().get("/fleet-units")
+        .then().statusCode(200)
+            .body("find { it.kind == 'TRACTOR' && it.id == " + available + " }.status", equalTo("AVAILABLE"))
+            .body("find { it.kind == 'TRACTOR' && it.id == " + maintenance + " }.status", equalTo("MAINTENANCE"))
+            .body("find { it.kind == 'TRAILER' && it.id == " + notAvailable + " }.status",
+                equalTo("NOT_AVAILABLE"));
+    }
+
+    /** Las escoltas no se asignan a viajes: su disponibilidad no significa nada y viaja en null. */
+    @Test
+    void listFleetUnits_escortCarriesNullAvailability() {
+        int escort = fixtures.seedEscortVehicle("ZF0024", true, "Toyota", "Hilux");
+        String token = adminToken();
+
+        given().header("Authorization", "Bearer " + token).queryParam("kind", "ESCORT")
+        .when().get("/fleet-units")
+        .then().statusCode(200)
+            .body("find { it.id == " + escort + " }.status", nullValue());
+    }
+
+    /** El shape es el del contrato: ni un campo de mas ni uno de menos. */
+    @Test
+    void listFleetUnits_responseShapeMatchesTheContract() {
+        int tractor = fixtures.seedTractor("ZF0025", true, "Volvo", "FH");
+        String token = adminToken();
+
+        Map<String, Object> unit = given().header("Authorization", "Bearer " + token)
+            .queryParam("kind", "TRACTOR")
+        .when().get("/fleet-units")
+        .then().statusCode(200)
+            .extract().jsonPath().getMap("find { it.id == " + tractor + " }");
+
+        assertEquals(Set.of("kind", "id", "plate", "brand", "model", "status", "isActive"), unit.keySet());
     }
 
     // ---------- kind filter ------------------------------------------------------
@@ -185,17 +237,18 @@ class FleetUnitsResourceTest {
         given().when().get("/fleet-units").then().statusCode(401);
     }
 
+    /** Registra y edita servicios: elige tracto y carreta como quien despacha. */
     @Test
-    void listFleetUnits_withSalesRole_returns403_COM003() {
+    void listFleetUnits_withSalesRole_returns200() {
         String token = login("lcampos", "Sales1234");
         given().header("Authorization", "Bearer " + token).when().get("/fleet-units")
-        .then().statusCode(403).body("code", equalTo("COM-003"));
+        .then().statusCode(200);
     }
 
     @Test
-    void listFleetUnits_withDispatcherRole_returns403_COM003() {
+    void listFleetUnits_withDispatcherRole_returns200() {
         given().header("Authorization", "Bearer " + fabricateAccessToken("disp_test", "dispatcher"))
-        .when().get("/fleet-units").then().statusCode(403).body("code", equalTo("COM-003"));
+        .when().get("/fleet-units").then().statusCode(200);
     }
 
     @Test

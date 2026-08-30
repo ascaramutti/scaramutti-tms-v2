@@ -5,6 +5,7 @@ import com.scaramutti.tms.shared.repository.CargoTypeRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.restassured.path.json.JsonPath;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
@@ -12,9 +13,12 @@ import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.containsInRelativeOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -27,6 +31,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.fail;
 
 @QuarkusTest
 class CargoTypesResourceTest {
@@ -34,8 +39,11 @@ class CargoTypesResourceTest {
     @Inject CargoTypeRepository cargoTypeRepository;
 
     // Prefijo ZTEST_ en name para identificar fixtures de tests; Z al final del
-    // orden alfabetico no perturba los 69 seeds prod reales.
+    // orden alfabetico no perturba los seeds prod reales.
     private static final String TEST_NAME_PREFIX = "ZTEST_";
+
+    /** Guarda anti-bucle del recorrido de paginas: el catalogo real esta lejos de este tope. */
+    private static final int MAX_PAGES_WALKED = 50;
 
     @AfterEach
     void cleanupListingFixtures() {
@@ -152,7 +160,10 @@ class CargoTypesResourceTest {
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/cargo-types?q=EXCAVADORA")
+            // q con el prefijo de los fixtures: el catalogo real tiene sus propias
+            // EXCAVADORA* y crece por uso, asi que un q generico deja el resultado a merced
+            // de cuantas haya (el orden con q es por relevancia y la pagina es de 20).
+            .get("/cargo-types?q=" + TEST_NAME_PREFIX + "EXCAVADORA")
         .then()
             .statusCode(200)
             .body("content.name", hasItem(TEST_NAME_PREFIX + "EXCAVADORA_320"))
@@ -161,17 +172,21 @@ class CargoTypesResourceTest {
 
     @Test
     void list_withShortQAsSubstring_matchesLongName_viaIlike() {
-        // Regresion guard: q corto contra name largo debe matchear via ILIKE substring.
-        seedCargoType(TEST_NAME_PREFIX + "EXCAVADORA_LONG_NAME_OPT", true);
+        // Regresion guard del comodin IZQUIERDO del ILIKE: el termino tiene que matchear en
+        // el INTERIOR del name, no solo como prefijo. De ahi que el fixture lleve el prefijo
+        // de test DOS veces: al principio para que el @AfterEach lo limpie, y otra vez en el
+        // medio, que es donde pega la busqueda sin competir con el catalogo real.
+        String longName = TEST_NAME_PREFIX + "LONG_" + TEST_NAME_PREFIX + "EXCAVADORA_OPT";
+        seedCargoType(longName, true);
         String token = login("admin", "Admin1234");
 
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/cargo-types?q=EXCA")
+            .get("/cargo-types?q=" + TEST_NAME_PREFIX + "EXCAVADORA")
         .then()
             .statusCode(200)
-            .body("content.name", hasItem(TEST_NAME_PREFIX + "EXCAVADORA_LONG_NAME_OPT"));
+            .body("content.name", hasItem(longName));
     }
 
     @Test
@@ -420,21 +435,41 @@ class CargoTypesResourceTest {
 
     @Test
     void list_resultsOrderedByNameAscending() {
-        // Sin q: order primario es name ASC.
+        // Sin q el orden primario es name ASC; con q pasa a ser por relevancia, asi que
+        // este caso NO puede filtrar para acotar el listado.
         seedCargoType(TEST_NAME_PREFIX + "ZZZ", true);
         seedCargoType(TEST_NAME_PREFIX + "AAA", true);
         seedCargoType(TEST_NAME_PREFIX + "MMM", true);
         String token = login("admin", "Admin1234");
 
-        given()
-            .header("Authorization", "Bearer " + token)
-        .when()
-            .get("/cargo-types?size=100")
-        .then()
-            .statusCode(200)
-            .body("content.name", containsInRelativeOrder(
-                TEST_NAME_PREFIX + "AAA", TEST_NAME_PREFIX + "MMM", TEST_NAME_PREFIX + "ZZZ"
-            ));
+        assertThat(allCargoTypeNamesInListOrder(token), containsInRelativeOrder(
+            TEST_NAME_PREFIX + "AAA", TEST_NAME_PREFIX + "MMM", TEST_NAME_PREFIX + "ZZZ"
+        ));
+    }
+
+    /**
+     * Nombres del listado completo, en el orden en que los sirve el backend: recorre las
+     * paginas hasta la ultima en vez de mirar solo la primera. El catalogo real CRECE (la
+     * aplicacion crea tipos de carga al vuelo) y los fixtures llevan prefijo Z, que ordena
+     * al final: mirando una sola pagina, el tope de 100 del contrato los dejaba fuera en
+     * cuanto el catalogo paso de 100 filas.
+     */
+    private List<String> allCargoTypeNamesInListOrder(String token) {
+        List<String> names = new ArrayList<>();
+        for (int page = 0; page < MAX_PAGES_WALKED; page++) {
+            JsonPath body = given()
+                .header("Authorization", "Bearer " + token)
+            .when()
+                .get("/cargo-types?page=" + page + "&size=100")
+            .then()
+                .statusCode(200)
+                .extract().jsonPath();
+            names.addAll(body.getList("content.name", String.class));
+            if (body.getBoolean("last")) {
+                return names;
+            }
+        }
+        return fail("El listado no llego a su ultima pagina en " + MAX_PAGES_WALKED + " vueltas");
     }
 
     // ---------- Validacion 400 (Bean Validation en query params) -------------
@@ -550,7 +585,7 @@ class CargoTypesResourceTest {
     // Calco de POST /clients (PR #15) con 3 simplificaciones:
     //  - 1 solo codigo de duplicado (CGT-001 sobre name)
     //  - Sin patterns regex
-    //  - Numericos con @DecimalMin("0") + @Digits(8,2)
+    //  - Numericos con @DecimalMin("0", inclusive=false) + @Digits(8,2)
 
     private void cleanupCargoTypeByName(String nameUpper) {
         QuarkusTransaction.requiringNew().run(() ->
@@ -939,24 +974,102 @@ class CargoTypesResourceTest {
     // ---------- Boundary numericos (decisiones distintivas del PR) ---------
 
     @Test
-    void create_withZeroStandardWeight_returns201() {
-        // Lock-in de @DecimalMin(value="0", inclusive=true): un cargo type con
-        // standardWeight=0 es valido. Si en el futuro se cambia a inclusive=false
-        // este test debe fallar (decision explicita del PR).
-        String name = "ZTEST_ZEROWEIGHT";
+    void create_withZeroStandardWeight_returns400_COM001() {
+        // Lock-in de @DecimalMin(value="0", inclusive=false).
+        //
+        // Este test afirmaba lo CONTRARIO: hasta 2026-08-25 el peso 0 era valido a
+        // proposito. El ejemplo que lo justificaba ("DOCUMENTO" sin peso) esta en la
+        // bitacora del proyecto, que no se versiona: buscarlo en el repo no lo
+        // encuentra. La decision se revirtio porque una carga que pesa cero no existe,
+        // y el camino era alcanzable porque el formulario arrancaba el campo en 0.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZEROWEIGHT", null, "0", null, null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWeight"));
+    }
+
+    @Test
+    void create_withZeroDimension_returns400_COM001() {
+        // Una medida en cero se rechaza igual que el peso. Es la misma regla que ya
+        // aplican las medidas de un servicio (ServiceCreateRequest): un 0 no es una
+        // medida, es "no la se", y para eso el campo se omite.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM", null, "1000", "0", null, null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardLength"));
+    }
+
+    @Test
+    void create_withZeroDimensionWrittenWithDecimals_returns400_COM001() {
+        // "0.00" es el mismo cero: la regla mira el valor, no como se escribio.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM2", null, "1000", null, "0.00", null))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardWidth"));
+    }
+
+    @Test
+    void create_withZeroHeight_returns400_COM001() {
+        // El alto era el unico de los cuatro numericos sin caso propio: se podia
+        // revertir la regla en ese campo con la suite entera en verde.
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("ZTEST_ZERODIM3", null, "1000", null, null, "0"))
+        .when()
+            .post("/cargo-types")
+        .then()
+            .statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("standardHeight"));
+    }
+
+    @Test
+    void create_withSmallestPositiveValues_returns201() {
+        // El borde que distingue "mayor que cero" de "rechaza todo lo chico".
+        String name = "ZTEST_SMALLEST";
         try {
             String token = login("admin", "Admin1234");
 
             given()
                 .header("Authorization", "Bearer " + token)
                 .contentType(ContentType.JSON)
-                .body(body(name, null, "0", null, null, null))
+                .body(body(name, null, "0.01", "0.01", "0.01", "0.01"))
             .when()
                 .post("/cargo-types")
             .then()
                 .statusCode(201)
-                // BigDecimal "0" se serializa sin decimal → JSON parser lo lee como Integer 0.
-                .body("standardWeight", equalTo(0));
+                // Los cuatro: si el minimo de cualquiera subiera, este caso lo caza.
+                .body("standardWeight", equalTo(0.01f))
+                .body("standardLength", equalTo(0.01f))
+                .body("standardWidth", equalTo(0.01f))
+                .body("standardHeight", equalTo(0.01f));
         } finally {
             cleanupCargoTypeByName(name);
         }

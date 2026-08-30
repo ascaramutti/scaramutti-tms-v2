@@ -28,7 +28,7 @@ import {
   withdrawalFormSchema,
   type WithdrawalEditFormInput,
 } from '../schemas/withdrawal.schema'
-import { FleetUnitField } from './FleetUnitField'
+import { FleetUnitField } from '../../../shared/catalogs/FleetUnitField'
 import { WarehouseProductField } from './WarehouseProductField'
 import { WorkerField } from './WorkerField'
 
@@ -320,6 +320,8 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
             label="Unidad de flota (opcional)"
             selected={selectedFleetUnit}
             onSelectedChange={setSelectedFleetUnit}
+            placeholder="Tracto, carreta o escolta (opcional)…"
+            loadErrorText="No se pudieron cargar las unidades de flota. El retiro se puede registrar sin unidad."
           />
         </div>
       </section>
