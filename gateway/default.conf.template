@@ -1,0 +1,63 @@
+# ==========================================
+# Gateway de PRODUCCIÓN (Azure Container Apps)
+#
+# Plantilla: nginx la procesa al arrancar sustituyendo la variable del sufijo,
+# que Terraform inyecta con el sufijo interno del environment. Sin esa
+# variable los destinos quedan rotos y nginx no levanta.
+#
+# (El nombre de la variable no se escribe en los comentarios a propósito:
+# envsubst tambien los sustituye, y la frase quedaria circular.)
+#
+# Las aplicaciones internas hablan HTTPS con su propio nombre, de ahí
+# `proxy_ssl_server_name on` y el Host explícito en cada bloque.
+#
+# ⚠️ Este archivo NO es intercambiable con `nginx.conf`, que es la variante
+# para el compose de integración local: aquel usa HTTP y nombres de
+# contenedor fijos. Un cambio de ruteo hay que hacerlo en LOS DOS.
+# ==========================================
+server {
+    listen 80;
+    absolute_redirect off;
+
+    location = /gateway/health { access_log off; default_type text/plain; return 200 'ok'; }
+
+    # v2 API (Quarkus)
+    location /api/v1/ {
+        proxy_pass https://backend.${INTERNAL_SUFFIX};
+        proxy_ssl_server_name on;
+        proxy_set_header Host backend.${INTERNAL_SUFFIX};
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    # v2 SPA
+    location /cotizaciones/ {
+        proxy_pass https://frontend.${INTERNAL_SUFFIX};
+        proxy_ssl_server_name on;
+        proxy_set_header Host frontend.${INTERNAL_SUFFIX};
+    }
+    location = /cotizaciones { return 302 /cotizaciones/; }
+    location = /login { return 302 /cotizaciones/login; }
+    location = /api/v1 { return 308 /api/v1/; }
+
+    # Todo lo demás va a la SPA.
+    #
+    # Acá vivían los dos bloques de v1: `location /` al frontend viejo y
+    # `location /api/` a su backend. Se retiran juntos, y el porqué importa:
+    # nginx resuelve los destinos de `proxy_pass` AL ARRANCAR, y si uno no
+    # resuelve NO levanta. Este es el único componente público del sistema.
+    #
+    # Matiz: escalar una aplicación a cero NO rompe la resolución. Eso SÍ está
+    # medido: las de v1 ya estaban en cero y el gateway arrancaba bien, porque
+    # el nombre interno de Container Apps resuelve exista o no una réplica.
+    # Lo que sí la rompería es BORRAR la aplicación — no verificado, no se
+    # encontró fuente que lo confirme.
+    #
+    # El orden vale bajo las dos hipótesis, y por eso se prescribe igual:
+    # desplegar primero el gateway que ya no la nombra, verificar, y recién
+    # entonces retirarla.
+    #
+    # El 302 además evita que los enlaces guardados de v1 den error: llevan a
+    # la aplicación nueva en vez de a la nada.
+    location / {
+        return 302 /cotizaciones/;
+    }
+}

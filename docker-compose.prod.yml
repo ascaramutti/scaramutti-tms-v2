@@ -70,10 +70,12 @@ services:
           memory: 256M
 
   # ==========================================
-  # Gateway de unificación v1 + v2 (un solo origin)
+  # Gateway (un solo origin) — topología anterior a Azure, documentada como
+  # referencia del rollback.
   # Apache Perú (hostname scaramutti-tms) apunta a :8085.
-  # Rutea: /api/v1/* y /cotizaciones/* → v2 · resto → v1.
-  # Los hostnames viejos (:80 v1 / :8080 v2) siguen vivos durante la transición.
+  # Rutea: /api/v1/* y /cotizaciones/* → v2 · todo lo demás → 302 a la SPA.
+  # Desde el cutover ya NO sirve v1, así que como rollback devuelve v2, no el
+  # sistema viejo.
   # ==========================================
   gateway:
     image: nginx:alpine
@@ -85,9 +87,9 @@ services:
       - "8085:80"
     networks:
       - scaramutti-tms_default
-    # Solo se puede declarar dependencia de v2 (v1 corre en otro compose).
-    # OJO: nginx resuelve los nombres de TODOS los upstreams al arrancar →
-    # v1 también debe estar corriendo cuando el gateway (re)inicia.
+    # OJO: nginx resuelve los nombres de TODOS los upstreams al arrancar, así
+    # que los destinos declarados tienen que existir. Desde el cutover el
+    # gateway ya no nombra ninguno de v1: arranca sin él.
     depends_on:
       frontend:
         condition: service_healthy
