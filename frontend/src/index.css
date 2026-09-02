@@ -1,7 +1,248 @@
 @import "tailwindcss";
 
-@theme {
+/* Nada de la carpeta del tema aporta clases al CSS de producción.
+   Tailwind escanea buscando nombres de clase y no distingue código de comentario
+   ni de literal: nombrar una utilidad en un test, o en la frase que la explica,
+   la crea de verdad en el bundle. Medido dos veces al escribir este archivo: un
+   comentario que nombraba dos utilidades del tema las agregó, y la palabra del
+   modificador de abajo agregó una regla de posición.
+   La exclusión toma la carpeta entera y no solo sus pruebas, y la razón es
+   concreta: dos de los cuatro módulos de apoyo nombran la palabra `static` en un
+   comentario, que es una utilidad de Tailwind. Medido: acotar el glob a las
+   pruebas devuelve `.static{position:static}` al bundle (35567 contra 35543
+   bytes). Verificado que es seguro: ningún archivo fuera de la carpeta los
+   importa. Consecuencia que conviene saber: acá no puede vivir código de
+   pantalla, porque sus clases no se publicarían y el build no diría nada; hay
+   una guarda en la prueba que lo impide.
+
+   Extenderla a todos los tests es probablemente lo correcto y saca ~1.5 kB del
+   bundle, pero eso cambia qué clases se publican y merece su propio PR, con el
+   diff a la vista. */
+@source not "./shared/theme/**";
+
+/* ============================================================================
+   Tokens semánticos del tema.
+
+   Los colores se nombran por FUNCIÓN ("la superficie de una tarjeta") y no por
+   tono ("blanco"), porque el nombre tiene que seguir siendo cierto cuando el
+   valor cambie: el modo oscuro redefine estas mismas variables y no toca una
+   sola clase del marcado.
+
+   Los valores de acá son los que la aplicación YA usa. Se midieron contando las
+   clases crudas del árbol, no se eligieron:
+     SRC=$(find src \( -name "*.tsx" -o -name "*.ts" \) ! -name "*.test.*")
+     PROP='bg|text|border|ring|divide|placeholder|from|to|via|outline|decoration|accent|fill|stroke|caret|shadow'
+     PAL='slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black'
+     cat $SRC | grep -oE "($PROP)-($PAL)(-[0-9]{2,3})?" | sort | uniq -c | sort -rn
+   Al escribir esto, ese comando da 1246 clases crudas en 116 archivos de
+   producción (acotado a las seis familias que este mapa cubre, 1227). Por eso
+   hay CUATRO niveles de texto y DOS de borde: no es ruido, son roles distintos
+   y usados de forma consistente. Aplanarlos sería un cambio visual.
+
+   Los hexadecimales son la conversión a sRGB de los oklch() de Tailwind 4
+   (node_modules/tailwindcss/theme.css). El comentario de cada línea dice de qué
+   color de la paleta sale, para que el reemplazo sea comprobable.
+
+   Dos cosas sobre la declaracion, las dos medidas contra el Tailwind 4.3.0 de
+   este proyecto y no leídas de la documentación:
+
+   1. Va `@theme static` y no `@theme` a secas. Sin `static`, Tailwind descarta
+      del CSS final toda variable que ninguna utilidad use, y como este archivo
+      llega antes que los componentes que lo van a usar, las 27 quedarían
+      afuera: el CSS compilado sale idéntico al de antes, byte por byte. Con
+      `static` se emiten siempre.
+   2. NO usar `@theme inline`. Esa variante hornea el valor dentro de cada
+      utilidad. Con ella el modo oscuro no funcionaría y el fallo sería
+      silencioso, porque el CSS compila igual. Con `@theme` las utilidades
+      emiten var(--color-...), que es lo que permite redefinir el valor en un
+      solo lugar y dar vuelta la aplicacion entera.
+
+   MAPA para los PRs de extracción y para el barrido de colores sueltos. A la
+   izquierda lo que hoy está escrito en los componentes, a la derecha el token.
+   Entre paréntesis, las veces que aparece.
+
+   ⚠️ EL MAPA ES DE MUCHOS A UNO, Y ESO CAMBIA TONOS. Cada token es un solo valor,
+   así que donde una fila junta dos tonos, uno de los dos se pierde. Aplicar el
+   mapa entero cambia el valor de 81 usos, listados abajo. El dueño lo aceptó el
+   2026-09-02, con dos excepciones que se convirtieron en tokens propios porque
+   bajaban el contraste: el borde de error de un control y el realce sutil de
+   fila. "Los valores son los que la aplicación ya usa" vale token por token, NO
+   uso por uso.
+
+     bg-slate-50 de AppLayout y LoginPage (2)     -> bg-canvas
+     bg-white (104)                               -> bg-surface
+     bg-slate-50 restante (63: 30 hover del botón
+       secundario, 21 cajas inertes y de solo
+       lectura, 5 hover de otras cosas (una sola
+       es fila de tabla), 4 encabezados y pie de
+       tabla, 2 deshabilitado, 1 focus)           -> bg-surface-subtle
+     bg-slate-100 (12)                            -> bg-surface-muted
+     text-slate-900 (109), text-slate-800 (2)     -> text-fg
+     text-slate-700 (111), text-slate-600 (22)    -> text-fg-body
+     text-slate-500 (126)                         -> text-fg-muted
+     text-slate-400 (46, de los cuales 9 son
+       placeholder, 2 deshabilitado, unos 18
+       íconos, y el RESTO texto corriente, que a
+       2.63 es un incumplimiento liso)            -> text-fg-subtle
+     border-slate-200 (73), -100 (5), divide-~    -> border-border
+     border-slate-300 (67)                        -> border-border-strong
+     bg-blue-600 (23), text-blue-600 (24)         -> ~-accent
+     ring-blue-500 (75), focus:border-blue-500 (19) -> ~-focus
+     hover:bg-blue-700 (15), bg-blue-700 sólido
+       (1, QuotationDetailActions), text-blue-700 (16) -> ~-accent-hover
+     bg-blue-50 (8), bg-blue-100 (7)              -> ~-accent-soft
+     text-white (32) sobre un relleno de color    -> text-on-solid
+     text-red-600 (32), bg-red-600 (3),
+       ring-red-500 (14, entre focus y focus-visible),
+       focus:border-red-500 (6)                   -> ~-danger
+     bg-red-50 (20)                               -> bg-danger-soft
+     text-red-700 (19), text-red-800 (6)          -> text-danger-fg
+     border-red-200 (11)                          -> border-danger-border
+     border-red-300 (23), borde de error de un
+       control                                    -> border-danger-border-strong
+     text-amber-700 (16)                          -> text-warning
+     bg-amber-50 (15), bg-amber-100 (3)           -> bg-warning-soft
+     text-amber-800 (14), text-amber-900 (12)     -> text-warning-fg
+     border-amber-200 (13), -300 (2)              -> border-warning-border
+     Los divide-slate-100 (2) van con border-slate-100: son el separador de
+     filas de DataTable y de ReportRowsList.
+     bg-emerald-100 y text-emerald-700 de Badge,
+       y el text-emerald-700 del kardex           -> ~-success-soft, ~-success-fg
+
+   LOS 81 USOS QUE CAMBIAN DE TONO al aplicar el mapa, con su antes y después:
+     text-slate-600 -> slate-700     22    text-red-800   -> red-700       6
+     ring-red-500 -> red-600         14    border-slate-100 -> slate-200   5
+     text-amber-900 -> amber-800     12    bg-amber-100 -> amber-50        3
+     bg-blue-100 -> blue-50           7    text-slate-800 -> slate-900     2
+     focus:border-red-500 -> red-600  6    border-amber-300 -> amber-200   2
+                                           divide-slate-100 -> slate-200   2
+   Dos de esos merecen mirarse al hacerlos. De los 12 text-amber-900, ocho son el
+   enlace subrayado DENTRO del banner ámbar cuyo texto es text-amber-800, así que
+   tras el barrido el enlace se distingue solo por el subrayado (8.73 -> 6.84 sobre
+   el fondo real, que es amber-50). Los otros cuatro son de ResourceConflictAlert y
+   NO son enlaces: son el cuerpo de la alerta, la tabla de conflictos, el párrafo
+   de consecuencia y un botón sobre blanco; ahí el colapso baja el texto principal
+   de la alerta sin que nada lo distinga de lo que era. Y los 20 del foco rojo
+   dejan el anillo y el borde del mismo color, que es lo que se buscaba, pero un
+   paso más oscuro que hoy.
+
+   Y hay DOS que no cambian un tono sino que borran un elemento, así que son los
+   que más cuidado piden. Los dos salen de juntar bg-blue-50 y bg-blue-100 en un
+   token: (1) el botón de IntegralComponents.tsx:16 es bg-blue-50 con
+   hover:bg-blue-100, y tras el barrido el hover queda en no-op, sin ningún
+   acuse; (2) la fila de un servicio integral es bg-blue-50
+   (QuotationItemsSection.tsx:23) y adentro va un Badge info que es bg-blue-100
+   sin borde, así que la pastilla pasa de separarse a 1.12 a no separarse (1.00) y
+   desaparece dentro de la fila. Las dos piden decidir al hacer el barrido: o el
+   azul suave fuerte se queda con token propio, como se hizo con el borde de
+   error, o esos dos lugares cambian de recurso visual.
+
+   Y hay un TERCERO, en la familia ámbar: el botón de forzar de
+   ResourceConflictAlert.tsx:138 vive dentro del banner bg-amber-50 y su hover es
+   bg-amber-100. Tras el barrido el relleno de hover pasa a ser exactamente el
+   color del banner que lo contiene (1.07 -> 1.00) y su borde cae de 1.40 a 1.20
+   contra ese fondo. Mismo caso que el Badge de arriba, pero sobre un control que
+   se aprieta.
+
+   `success` a secas no sale de ningún relleno sólido: hoy no existe alerta de
+   éxito. Vale lo mismo que `success-fg` a propósito, y el par que lo mide es el
+   texto del kardex.
+
+   El mapa NO cubre todos los colores del árbol, y la partición cierra así:
+     1178 usos mapeados (41 clases)
+     +  49 sueltos de estas mismas familias (25 clases)
+     = 1227 de las seis familias con las seis propiedades
+     +  19 de familias y propiedades que el mapa ni mira (rose, sky, teal,
+          orange y violet, más un shadow-slate-200)
+     = 1246, el censo del encabezado
+   Entre los 19, la variante de peligro de Badge, que es rose y no red. Los levanta
+   el PR de barrido, decidiendo caso por caso. Para listarlos, escribí las clases
+   de este mapa una por línea en `mapeadas.txt` (son las 37 escritas a la
+   IZQUIERDA de las flechas más las 4 formas cortas `border-slate-100`,
+   `border-amber-300`, `divide-slate-100` y `divide-slate-200`, 41 en total) y
+   corré:
+     SEIS='(bg|text|border|ring|divide|placeholder)-(slate|blue|red|amber|emerald|white)(-[0-9]{2,3})?'
+     cat $SRC | grep -oE "$SEIS" | sort > todos.txt
+     grep -vxF -f mapeadas.txt todos.txt | sort | uniq -c | sort -rn   # los 49, por clase
+
+   M2: hay un uso que el mapa ABSORBE sin cubrirlo, y por eso no aparece en ese
+   censo: el séptimo border-red-500, el del círculo de paso en error
+   (Stepper.tsx:58). La fila solo declara la forma con focus:, así que el sólido
+   queda sin destino y mapearlo a danger sería cambio visual. Se nombra acá por la
+   misma razón que el text-slate-300.
+
+   Un uso que se queda sin token y es correcto así: text-slate-300, una sola vez,
+   en el ícono de EmptyState.tsx:22, que es aria-hidden y por lo tanto decorativo.
+
+   Trece pares del tema claro quedan por debajo de su umbral de WCAG AA (4.5:1
+   los de texto, 3:1 los de elemento de interfaz). Nueve son anteriores a este
+   archivo y cuatro los hace visibles un token nuevo (el borde de control en
+   error y el realce sutil de fila, dos pares cada uno). Uno de los trece, el
+   texto de un control deshabilitado,
+   no es un incumplimiento: WCAG exime los controles inactivos, y se mide igual
+   para que el par quede declarado. Están
+   declarados como excepciones conocidas en
+   src/shared/theme/theme-contrast.test.ts, cada una con su cociente medido y su
+   lugar, y se arreglan en un PR propio, porque arreglarlos cambia el aspecto del
+   modo claro. El número sale de contar ese objeto, no de acá.
+   ============================================================================ */
+
+@theme static {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Fondo de la página y superficies. `surface-subtle` vale lo mismo que
+     `canvas` a propósito: es el realce de una fila con el mouse encima o el
+     fondo de una caja de solo lectura, y hoy los dos son el mismo gris. Existe
+     aparte porque colapsarlo a `surface-muted` oscurecía 63 usos y dejaba el
+     texto secundario del hover de fila en 4.35, bajo AA, en 35 lugares.
+     Ruling del dueño 2026-09-02. */
+  --color-canvas: #f8fafc;        /* slate-50  */
+  --color-surface: #ffffff;       /* white     */
+  --color-surface-subtle: #f8fafc;/* slate-50  */
+  --color-surface-muted: #f1f5f9; /* slate-100 */
+
+  /* Texto, de más a menos énfasis. */
+  --color-fg: #0f172b;            /* slate-900 */
+  --color-fg-body: #314158;       /* slate-700 */
+  --color-fg-muted: #62748e;      /* slate-500 */
+  --color-fg-subtle: #90a1b9;     /* slate-400 */
+
+  /* Bordes: el de las tarjetas y tablas, y el de los controles. */
+  --color-border: #e2e8f0;        /* slate-200 */
+  --color-border-strong: #cad5e2; /* slate-300 */
+
+  /* Acento. `on-solid` es el texto y los íconos que van ENCIMA de cualquier
+     relleno sólido de color (botón primario y destructivo): existe como token
+     propio porque es el que se da vuelta en el modo oscuro. */
+  --color-accent: #155dfc;        /* blue-600  */
+  --color-accent-hover: #1447e6;  /* blue-700  */
+  --color-accent-soft: #eff6ff;   /* blue-50   */
+  --color-on-solid: #ffffff;      /* white     */
+
+  /* Anillo de foco. Separado del acento porque el foco tiene que poder subir de
+     contraste sin que cambie el color de los botones. */
+  --color-focus: #2b7fff;         /* blue-500  */
+
+  /* Estados. Cada uno con la misma forma: el color sólido, el fondo suave de la
+     alerta, el texto sobre ese fondo y su borde. `success` no lleva borde: hoy
+     no existe ninguna alerta de éxito que lo necesite. */
+  --color-danger: #e7000b;        /* red-600     */
+  --color-danger-soft: #fef2f2;   /* red-50      */
+  --color-danger-fg: #c10007;     /* red-700     */
+  --color-danger-border: #ffc9c9; /* red-200     */
+  /* El borde de un control en estado de error. Token propio y no el marco de la
+     alerta porque es un elemento de interfaz (WCAG 1.4.11) y colapsarlo al
+     red-200 le bajaba el contraste de 1.92 a 1.45. Ruling del dueño 2026-09-02. */
+  --color-danger-border-strong: #ffa2a2; /* red-300 */
+
+  --color-warning: #bb4d00;        /* amber-700  */
+  --color-warning-soft: #fffbeb;   /* amber-50   */
+  --color-warning-fg: #973c00;     /* amber-800  */
+  --color-warning-border: #fee685; /* amber-200  */
+
+  --color-success: #007a55;       /* emerald-700 */
+  --color-success-soft: #d0fae5;  /* emerald-100 */
+  --color-success-fg: #007a55;    /* emerald-700 */
 }
 
 @layer base {
