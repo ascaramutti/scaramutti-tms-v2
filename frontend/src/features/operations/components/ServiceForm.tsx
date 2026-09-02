@@ -10,7 +10,6 @@ import { SelectField, type SelectOption } from '../../../shared/ui/SelectField'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { Textarea } from '../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { cn } from '../../../shared/utils/cn'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
@@ -31,6 +30,7 @@ import {
 import { canCreateCatalogEntry } from '../status/operationsPermissions'
 import { isPastInLima, todayInLima } from '../utils/limaDate'
 import { ServiceClientField } from './ServiceClientField'
+import { Button } from '../../../shared/ui/Button'
 
 /** Campos que aceptan un error de campo del backend. */
 const FORM_FIELDS = [
@@ -203,13 +203,9 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
             ? getApiErrorMessage(currenciesQuery.error, 'No se pudieron cargar las monedas.')
             : 'No hay monedas configuradas. Sin moneda no se puede registrar un servicio.'}
         </p>
-        <button
-          type="button"
-          onClick={() => void currenciesQuery.refetch()}
-          className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <Button variant="secondary" onClick={() => void currenciesQuery.refetch()} className="mt-4">
           Reintentar
-        </button>
+        </Button>
       </div>
     )
   }
@@ -418,10 +414,10 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
       </Section>
 
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className={SECONDARY_BUTTON} disabled={isSubmitting}>
+        <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
-        </button>
-        <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON}>
+        </Button>
+        <Button variant="primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? (
             <>
               <Spinner size={16} label="Registrando" />
@@ -430,7 +426,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
           ) : (
             'Registrar servicio'
           )}
-        </button>
+        </Button>
       </div>
     </form>
   )

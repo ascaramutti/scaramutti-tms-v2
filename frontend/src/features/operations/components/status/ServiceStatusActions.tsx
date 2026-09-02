@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { CheckCircle2, Pencil, Play, RotateCcw, Trash2, XCircle } from 'lucide-react'
 import type { UserRole } from '../../../../api'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import type { ServiceWithEtag } from '../../hooks/useService'
 import {
   SERVICE_STATUS_TRANSITION_PRESENTATION,
@@ -15,6 +14,8 @@ import { canEditService } from '../../status/operationsPermissions'
 import { isServiceEditable } from '../../status/serviceStatusTransitions'
 import { ServiceExitModal } from './ServiceExitModal'
 import { ServiceProgressModal } from './ServiceProgressModal'
+import { Button } from '../../../../shared/ui/Button'
+import { buttonClasses, type ButtonVariant } from '../../../../shared/ui/buttonClasses'
 
 interface ServiceStatusActionsProps {
   service: ServiceWithEtag
@@ -38,12 +39,12 @@ const TRANSITION_ICONS: Record<ServiceStatusTransition, typeof Play> = {
  * Reabrir no sigue esa regla porque no destruye nada: repara. Es primario en los dos
  * lugares, y en la pantalla de un viaje que ya salió del circuito no compite con nada.
  */
-const TRANSITION_BUTTON_STYLES: Record<ServiceStatusTransition, string> = {
-  IN_PROGRESS: PRIMARY_BUTTON,
-  COMPLETED: PRIMARY_BUTTON,
-  CANCELLED: SECONDARY_BUTTON,
-  DELETED: SECONDARY_BUTTON,
-  REOPENED: PRIMARY_BUTTON,
+const TRANSITION_BUTTON_VARIANTS: Record<ServiceStatusTransition, ButtonVariant> = {
+  IN_PROGRESS: 'primary',
+  COMPLETED: 'primary',
+  CANCELLED: 'secondary',
+  DELETED: 'secondary',
+  REOPENED: 'primary',
 }
 
 /**
@@ -81,7 +82,7 @@ export function ServiceStatusActions({ service, role }: ServiceStatusActionsProp
           {showsEdit && (
             <Link
               to={`${OPERACIONES_LANDING}/servicios/${service.id}/editar`}
-              className={SECONDARY_BUTTON}
+              className={buttonClasses({ variant: 'secondary' })}
             >
               <Pencil size={16} className="mr-2" aria-hidden />
               Editar
@@ -90,15 +91,14 @@ export function ServiceStatusActions({ service, role }: ServiceStatusActionsProp
           {transitions.map((transition) => {
             const Icon = TRANSITION_ICONS[transition]
             return (
-              <button
+              <Button
                 key={transition}
-                type="button"
+                variant={TRANSITION_BUTTON_VARIANTS[transition]}
                 onClick={() => setOpenTransition(transition)}
-                className={TRANSITION_BUTTON_STYLES[transition]}
               >
                 <Icon size={16} className="mr-2" aria-hidden />
                 {SERVICE_STATUS_TRANSITION_PRESENTATION[transition].buttonLabel}
-              </button>
+              </Button>
             )
           })}
         </div>

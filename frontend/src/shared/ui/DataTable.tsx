@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '../utils/cn'
 import { Spinner } from './Spinner'
 import { EmptyState } from './EmptyState'
+import { Button } from './Button'
 
 export interface Column<T> {
   /** Clave única de la columna (no necesariamente un campo de `T`). */
@@ -99,13 +100,9 @@ export function DataTable<T>({
           {errorMessage ?? 'No se pudieron cargar los datos.'}
         </p>
         {onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
+          <Button variant="secondary" onClick={onRetry} className="mt-4">
             Reintentar
-          </button>
+          </Button>
         )}
       </div>
     )
@@ -211,6 +208,11 @@ export function DataTable<T>({
             <span className="text-sm text-slate-600">
               Mostrando {from}–{to} de {total}
             </span>
+            {/* Las dos flechas NO usan `Button`, y no es un olvido: son una cuarta forma.
+                No tienen relleno ni anillo de foco, y su señal de deshabilitado es
+                `disabled:opacity-40`; ninguna de las tres variantes las reproduce, y
+                pasarlas a `secondary` les agregaría borde y fondo. Entran el día que exista
+                una variante sin relleno, que es cuando `size="icon"` tendrá su primer uso. */}
             <div className="flex gap-1">
               <button
                 type="button"

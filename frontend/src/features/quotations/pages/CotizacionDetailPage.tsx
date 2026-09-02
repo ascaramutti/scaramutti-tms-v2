@@ -2,7 +2,6 @@ import { FileQuestion } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { Spinner } from '../../../shared/ui/Spinner'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { useQuotation } from '../hooks/useQuotation'
 import { QuotationAuditFooter } from '../components/QuotationAuditFooter'
@@ -16,6 +15,7 @@ import { QuotationStandbyTable } from '../components/QuotationStandbyTable'
 import { QuotationSummaryCard } from '../components/QuotationSummaryCard'
 import { QuotationTotalGeneral } from '../components/QuotationTotalGeneral'
 import { montoEnLetras } from '../utils/montoEnLetras'
+import { Button } from '../../../shared/ui/Button'
 
 export function CotizacionDetailPage() {
   const navigate = useNavigate()
@@ -38,9 +38,9 @@ export function CotizacionDetailPage() {
           title="Cotización no encontrada"
           description="La cotización que buscas no existe o fue eliminada."
           action={
-            <button type="button" onClick={goToList} className={PRIMARY_BUTTON}>
+            <Button variant="primary" onClick={goToList}>
               Volver al listado
-            </button>
+            </Button>
           }
         />
       </div>
@@ -66,12 +66,12 @@ export function CotizacionDetailPage() {
             {getApiErrorMessage(error, 'No se pudo cargar la cotización.')}
           </p>
           <div className="mt-4 flex gap-2">
-            <button type="button" onClick={() => refetch()} className={SECONDARY_BUTTON}>
+            <Button variant="secondary" onClick={() => refetch()}>
               Reintentar
-            </button>
-            <button type="button" onClick={goToList} className={SECONDARY_BUTTON}>
+            </Button>
+            <Button variant="secondary" onClick={goToList}>
               Volver
-            </button>
+            </Button>
           </div>
         </div>
       </div>

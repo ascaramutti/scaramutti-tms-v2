@@ -317,6 +317,11 @@ describe('EntryCreatePage', () => {
     // El nombre llega precargado con lo que se venía buscando.
     expect(screen.getByLabelText(/razón social/i)).toHaveValue('Sellos SAC')
     await user.type(screen.getByLabelText(/^ruc/i), '20512345678')
+    // El botón trae la clase que lo apaga mientras envía: pasó de vivir dentro de la
+    // constante a ser una prop suelta del componente compartido.
+    expect(screen.getByRole('button', { name: /crear proveedor/i }).className).toContain(
+      'disabled:bg-blue-300',
+    )
     await user.click(screen.getByRole('button', { name: /crear proveedor/i }))
     await waitFor(() => expect(sink.body).toEqual({
       name: 'Sellos SAC',

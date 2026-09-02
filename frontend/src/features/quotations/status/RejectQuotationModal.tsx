@@ -6,13 +6,13 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Modal } from '../../../shared/ui/Modal'
 import { Textarea } from '../../../shared/ui/Textarea'
-import { DANGER_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
 import { isPreconditionFailedError } from '../../../shared/utils/getApiErrorMessage'
 import { stripControlChars } from '../../../shared/utils/sanitizeText'
 import { useChangeQuotationStatus } from '../hooks/useChangeQuotationStatus'
 import { rejectSchema, type RejectFormValues } from './reject.schema'
 import type { Problem } from '../../../api'
+import { Button } from '../../../shared/ui/Button'
 
 const REASON_FALLBACK_ERROR = 'No se pudo registrar el rechazo.'
 
@@ -162,18 +162,18 @@ export function RejectQuotationModal({
         />
 
         <div className="flex justify-end gap-2">
-          <button
-            type="button"
+          <Button
+            variant="secondary"
             onClick={onClose}
             disabled={changeStatus.isPending}
-            className={`${SECONDARY_BUTTON} ${DISABLED}`}
+            className={DISABLED}
           >
             Cancelar
-          </button>
-          <button type="submit" disabled={changeStatus.isPending} className={`${DANGER_BUTTON} ${DISABLED}`}>
+          </Button>
+          <Button type="submit" variant="danger" disabled={changeStatus.isPending} className={DISABLED}>
             {changeStatus.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />}
             Registrar rechazo
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

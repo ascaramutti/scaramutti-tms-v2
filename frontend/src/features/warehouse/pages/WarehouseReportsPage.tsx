@@ -3,8 +3,6 @@ import { Download, FileBarChart2 } from 'lucide-react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { Spinner } from '../../../shared/ui/Spinner'
-import { PRIMARY_BUTTON } from '../../../shared/ui/buttonStyles'
-import { cn } from '../../../shared/utils/cn'
 import { csvBlob } from '../../../shared/utils/csv'
 import { downloadBlob } from '../../../shared/utils/downloadBlob'
 import { formatDateOnly } from '../../../shared/utils/formatters'
@@ -20,6 +18,7 @@ import {
 } from '../schemas/report-filters.schema'
 import { buildReportCsv, reportCsvFilename } from '../utils/reportCsv'
 import { reportCutMeta } from '../utils/reportCuts'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Reportes del almacén: los 4 cortes agregados de `GET /warehouse/reports`.
@@ -54,15 +53,15 @@ export function WarehouseReportsPage() {
         description="Consumo y compras agregados por período — la base del costo de mantenimiento por unidad."
         divider
         action={
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={handleExport}
             disabled={!canExport}
-            className={cn(PRIMARY_BUTTON, !canExport && 'cursor-not-allowed opacity-50')}
+            className={!canExport ? 'cursor-not-allowed opacity-50' : undefined}
           >
             <Download className="mr-2 h-4 w-4" aria-hidden="true" />
             Exportar CSV
-          </button>
+          </Button>
         }
       />
 

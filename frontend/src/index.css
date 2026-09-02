@@ -58,8 +58,24 @@
       solo lugar y dar vuelta la aplicacion entera.
 
    MAPA para los PRs de extracción y para el barrido de colores sueltos. A la
-   izquierda lo que hoy está escrito en los componentes, a la derecha el token.
-   Entre paréntesis, las veces que aparece.
+   izquierda lo que está escrito en los componentes, a la derecha el token.
+
+   ⚠️ LOS NÚMEROS ENTRE PARÉNTESIS SON UNA FOTO, NO UN CONTADOR VIVO. Se midieron
+   sobre `develop` al escribir este mapa (PR 1, 2026-09-02) y cada PR de extracción
+   consume una parte, así que quedan altos: el PR del botón, por ejemplo, bajó
+   text-slate-700 de 111 a 104, ring-blue-500 de 75 a 64 y bg-blue-600 de 23 a 19.
+   NO se actualizan fila por fila, porque mantener veinte números a mano en cada PR es
+   una fuente de error mayor que volver a medir. Antes de usar una cifra, re-medila:
+
+     git grep -o -- "<la clase>" HEAD -- frontend/src | grep -v index.css | wc -l
+
+   Ese comando cuenta también las menciones dentro de comentarios y de aserciones, que
+   los PRs de mudanza escriben para explicar lo que dejan afuera. Hoy hay una sola
+   (`bg-white` dentro de la nota de `EntryDetailPage`), así que ese conteo da 98 y los
+   usos reales son 97; si la diferencia importa, hay que mirar las líneas, no el total.
+
+   Lo que el mapa sí fija y no cambia es la CORRESPONDENCIA clase -> token, que es
+   para lo que existe.
 
    ⚠️ EL MAPA ES DE MUCHOS A UNO, Y ESO CAMBIA TONOS. Cada token es un solo valor,
    así que donde una fila junta dos tonos, uno de los dos se pierde. Aplicar el
@@ -92,6 +108,8 @@
        (1, QuotationDetailActions), text-blue-700 (16) -> ~-accent-hover
      bg-blue-50 (8), bg-blue-100 (7)              -> ~-accent-soft
      text-white (32) sobre un relleno de color    -> text-on-solid
+     hover:bg-red-700 (3, el hover del
+       relleno destructivo)                       -> ~-danger-hover
      text-red-600 (32), bg-red-600 (3),
        ring-red-500 (14, entre focus y focus-visible),
        focus:border-red-500 (6)                   -> ~-danger
@@ -109,7 +127,20 @@
      bg-emerald-100 y text-emerald-700 de Badge,
        y el text-emerald-700 del kardex           -> ~-success-soft, ~-success-fg
 
-   LOS 81 USOS QUE CAMBIAN DE TONO al aplicar el mapa, con su antes y después:
+   SIN TOKEN Y A PROPÓSITO: `disabled:bg-blue-300`, en CINCO lugares de producto:
+     `grep -rn "disabled:bg-blue-300" src --include=*.tsx | grep -v "\.test\."`. (Se filtran
+     las pruebas a propósito: cada aserción que cuida esa clase suma una línea, así que el
+     comando sin filtro devuelve un número que envejece con cada test nuevo.) Es el
+     relleno del primario deshabilitado y no hay token que lo cubra: el mapa no tiene un
+     `accent-disabled`, y agregarlo sin medir los otros deshabilitados sería inventar un
+     rol. Los otros deshabilitados usan TRES recetas de opacidad (`disabled:opacity-40`,
+     `-50` y `-60`) en 13 declaraciones, que son 16 sitios de aplicación porque tres
+     constantes `DISABLED` se aplican en seis lugares. Queda crudo hasta que el PR de los
+     colores sueltos mida las tres.
+
+   LOS 81 USOS QUE CAMBIAN DE TONO al aplicar el mapa, con su antes y después.
+   Misma advertencia que arriba: es la foto del PR 1. El PR del botón ya consumió
+   uno de los 14 `ring-red-500`, así que quedan 13 y el total baja a 80.
      text-slate-600 -> slate-700     22    text-red-800   -> red-700       6
      ring-red-500 -> red-600         14    border-slate-100 -> slate-200   5
      text-amber-900 -> amber-800     12    bg-amber-100 -> amber-50        3
@@ -227,6 +258,12 @@
      alerta, el texto sobre ese fondo y su borde. `success` no lleva borde: hoy
      no existe ninguna alerta de éxito que lo necesite. */
   --color-danger: #e7000b;        /* red-600     */
+  /* El hover del relleno destructivo, espejo de `accent-hover`. Vale lo mismo
+     que `danger-fg`, y existe aparte a propósito: son dos roles distintos, y
+     prestarle a un botón el token del texto de una alerta lo rompe de costado el
+     día que ese texto se ajuste por contraste. Ruling 2026-09-02, cierra la
+     asimetría que la revisión del PR 1 dejó anotada. */
+  --color-danger-hover: #c10007;  /* red-700     */
   --color-danger-soft: #fef2f2;   /* red-50      */
   --color-danger-fg: #c10007;     /* red-700     */
   --color-danger-border: #ffc9c9; /* red-200     */

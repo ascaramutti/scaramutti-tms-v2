@@ -8,7 +8,6 @@ import { SelectField, type SelectOption } from '../../../shared/ui/SelectField'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { Textarea } from '../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { getApiErrorMessage, isPreconditionFailedError } from '../../../shared/utils/getApiErrorMessage'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
 import { stripControlChars } from '../../../shared/utils/sanitizeText'
@@ -32,6 +31,7 @@ import {
   SERVICE_OBSERVATIONS_MAX_LENGTH,
 } from '../schemas/service-fields.schema'
 import type { ServiceWithEtag } from '../hooks/useService'
+import { Button } from '../../../shared/ui/Button'
 
 /** Campos que aceptan un error de campo del backend, cuando están en pantalla. */
 const FORM_FIELDS = [
@@ -239,9 +239,9 @@ function CatalogAlert({ message, onRetry }: { message: string; onRetry: () => vo
   return (
     <div role="alert" className="flex flex-col items-center px-6 py-16 text-center">
       <p className="text-sm font-medium text-slate-700">{message}</p>
-      <button type="button" onClick={onRetry} className={`mt-4 ${SECONDARY_BUTTON}`}>
+      <Button variant="secondary" onClick={onRetry} className="mt-4">
         Reintentar
-      </button>
+      </Button>
     </div>
   )
 }
@@ -392,9 +392,9 @@ function EditFields({
              * que la otra persona acaba de cambiar, y lo pisaría en silencio. Eso
              * convertiría el bloqueo optimista en un "gana el último que aprieta".
              */
-            <button type="button" onClick={onReload} className={`mt-2 ${SECONDARY_BUTTON}`}>
+            <Button variant="secondary" onClick={onReload} className="mt-2">
               Descartar y recargar
-            </button>
+            </Button>
           )}
         </div>
       )}
@@ -564,15 +564,10 @@ function EditFields({
       </Section>
 
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className={SECONDARY_BUTTON}
-          disabled={isSubmitting}
-        >
+        <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
-        </button>
-        <button type="submit" disabled={isSubmitting || missingEtag} className={PRIMARY_BUTTON}>
+        </Button>
+        <Button type="submit" variant="primary" disabled={isSubmitting || missingEtag}>
           {isSubmitting ? (
             <>
               <Spinner size={16} label="Guardando" />
@@ -581,7 +576,7 @@ function EditFields({
           ) : (
             'Guardar cambios'
           )}
-        </button>
+        </Button>
       </div>
     </form>
   )

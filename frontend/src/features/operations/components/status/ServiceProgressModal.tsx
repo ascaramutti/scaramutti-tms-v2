@@ -5,7 +5,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Modal } from '../../../../shared/ui/Modal'
 import { Spinner } from '../../../../shared/ui/Spinner'
 import { Textarea } from '../../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { cn } from '../../../../shared/utils/cn'
 import { stripControlChars } from '../../../../shared/utils/sanitizeText'
 import { useChangeServiceStatus } from '../../hooks/useChangeServiceStatus'
@@ -24,6 +23,7 @@ import {
 } from '../../schemas/service-status.schema'
 import { nowInLimaForInput } from '../../utils/limaDate'
 import { ServiceStatusErrorAlert } from './ServiceStatusErrorAlert'
+import { Button } from '../../../../shared/ui/Button'
 
 interface ServiceProgressModalProps {
   isOpen: boolean
@@ -177,10 +177,10 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={onClose}>
             Volver
-          </button>
-          <button type="submit" disabled={isPending} className={PRIMARY_BUTTON}>
+          </Button>
+          <Button variant="primary" type="submit" disabled={isPending}>
             {isPending ? (
               <>
                 <Spinner size={16} className="mr-2 text-white" /> {presentation.pendingLabel}
@@ -188,7 +188,7 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
             ) : (
               presentation.submitLabel
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

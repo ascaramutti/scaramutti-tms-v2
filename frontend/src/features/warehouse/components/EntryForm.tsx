@@ -31,6 +31,7 @@ import {
 } from '../schemas/purchase-invoice.schema'
 import { EntryItemsTable } from './EntryItemsTable'
 import { SupplierField } from './SupplierField'
+import { Button } from '../../../shared/ui/Button'
 
 interface EntryCreateModeProps {
   mode: 'create'
@@ -212,13 +213,9 @@ export function EntryForm(props: EntryFormProps) {
         <p className="text-sm font-medium text-slate-700">
           {getApiErrorMessage(currencies.error, 'No se pudieron cargar las monedas.')}
         </p>
-        <button
-          type="button"
-          onClick={() => currencies.refetch()}
-          className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <Button variant="secondary" onClick={() => currencies.refetch()} className="mt-4">
           Reintentar
-        </button>
+        </Button>
       </div>
     )
   }
@@ -349,6 +346,11 @@ export function EntryForm(props: EntryFormProps) {
           />
         </div>
 
+        {/* Los dos botones del pie NO usan `Button`, y no es un olvido: son otra forma.
+            Llevan `px-4 py-2.5` en vez de `px-4 py-2`, `focus-visible:` en vez de `focus:`
+            y no son `inline-flex`. Unificarlos cambiaría el aspecto, que es justo lo que la
+            mudanza del botón compartido no hace; entran cuando se decida la forma buena,
+            mismo criterio que el botón de contorno rojo de `WizardForm`. */}
         <div className="flex justify-end gap-3">
           <button
             type="button"

@@ -363,6 +363,17 @@ describe('WarehouseReportsPage', () => {
 
     await user.type(screen.getByLabelText('Hasta'), '2020-01-01')
     expect(screen.getByRole('button', { name: /Exportar CSV/ })).toBeDisabled()
+    // Y se ve apagado. La clase que lo apaga dejó de vivir dentro de la constante y ahora
+    // es una prop aparte que una edición futura puede soltar sola, sin que nada falle.
+    expect(screen.getByRole('button', { name: /Exportar CSV/ }).className).toContain(
+      'cursor-not-allowed',
+    )
+    // Y trae el relleno de la acción principal, que es la única del encabezado. La clase
+    // sobrevive al deshabilitado, así que se mide acá mismo; pintarla de secundaria dejaba
+    // el archivo entero en verde.
+    expect(screen.getByRole('button', { name: /Exportar CSV/ }).className).toContain(
+      'bg-accent',
+    )
   })
 
   it('el botón "Mes actual" repone el rango del mes en curso', async () => {

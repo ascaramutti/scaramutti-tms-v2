@@ -7,6 +7,7 @@ import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
 import { useCreateClient } from '../hooks/useCreateClient'
 import { createClientSchema, type CreateClientInput } from '../schemas/client.schema'
 import type { ClientResponse } from '../../../api'
+import { Button } from '../../../shared/ui/Button'
 
 interface ClientCreateModalProps {
   /** Texto tipeado en el combobox, para precargar la razón social. */
@@ -16,11 +17,6 @@ interface ClientCreateModalProps {
 }
 
 const CLIENT_FIELDS = ['name', 'ruc', 'phone', 'contactName'] as const
-
-const PRIMARY =
-  'inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300'
-const SECONDARY =
-  'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500'
 
 /**
  * Modal de creación de cliente al vuelo. `POST /clients`; un 409 (RUC duplicado,
@@ -90,10 +86,15 @@ export function ClientCreateModal({ initialName = '', onClose, onCreated }: Clie
           register={register('phone')}
         />
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className={SECONDARY}>
+          <Button variant="secondary" onClick={onClose}>
             Cancelar
-          </button>
-          <button type="submit" disabled={isSubmitting} className={PRIMARY}>
+          </Button>
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={isSubmitting}
+            className="gap-2 disabled:cursor-not-allowed disabled:bg-blue-300"
+          >
             {isSubmitting ? (
               <>
                 <Spinner size={16} label="Creando" />
@@ -102,7 +103,7 @@ export function ClientCreateModal({ initialName = '', onClose, onCreated }: Clie
             ) : (
               'Crear cliente'
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

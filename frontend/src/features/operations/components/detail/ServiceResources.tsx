@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Plus, Truck } from 'lucide-react'
 import type { ServiceDetailResponse } from '../../../../api'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { formatDateTime } from '../../../../shared/utils/formatters'
 import { describeAdditionalResource } from '../../status/resourcePresentation'
 import { AddResourcesModal } from '../resources/AddResourcesModal'
 import { AssignResourcesModal } from '../resources/AssignResourcesModal'
 import { RemoveResourceDialog } from '../resources/RemoveResourceDialog'
 import { DetailCard, Field } from './DetailCard'
+import { Button } from '../../../../shared/ui/Button'
 
 interface ServiceResourcesProps {
   service: ServiceDetailResponse
@@ -55,14 +55,14 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         headingId="service-resources-heading"
         action={
           canAssign ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => setIsAssignOpen(true)}
-              className={`${PRIMARY_BUTTON} shrink-0`}
+              className="shrink-0"
             >
               <Truck className="mr-2 h-4 w-4" aria-hidden="true" />
               Asignar recursos
-            </button>
+            </Button>
           ) : undefined
         }
       >
@@ -102,14 +102,14 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         headingId="service-additional-heading"
         action={
           canReinforce ? (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setIsAddOpen(true)}
-              className={`${SECONDARY_BUTTON} shrink-0`}
+              className="shrink-0"
             >
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Agregar refuerzo
-            </button>
+            </Button>
           ) : undefined
         }
       >

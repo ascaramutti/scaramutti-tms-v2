@@ -3,11 +3,11 @@ import { toast } from 'sonner'
 import type { ServiceAdditionalResourceResponse } from '../../../../api'
 import { Modal } from '../../../../shared/ui/Modal'
 import { Spinner } from '../../../../shared/ui/Spinner'
-import { DANGER_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { formatDateTime } from '../../../../shared/utils/formatters'
 import { getApiErrorMessage } from '../../../../shared/utils/getApiErrorMessage'
 import { useRemoveServiceResource } from '../../hooks/useRemoveServiceResource'
 import { describeAdditionalResource } from '../../status/resourcePresentation'
+import { Button } from '../../../../shared/ui/Button'
 
 interface RemoveResourceDialogProps {
   isOpen: boolean
@@ -85,14 +85,13 @@ function RemoveResourceConfirm({
         )}
 
         <div className="flex justify-end gap-3">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={onClose}>
             Cancelar
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            variant="danger"
             onClick={confirm}
             disabled={removeResource.isPending}
-            className={DANGER_BUTTON}
           >
             {removeResource.isPending ? (
               <>
@@ -101,7 +100,7 @@ function RemoveResourceConfirm({
             ) : (
               'Quitar refuerzo'
             )}
-          </button>
+          </Button>
         </div>
       </div>
     </Modal>
