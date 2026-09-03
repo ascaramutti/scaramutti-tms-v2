@@ -2,6 +2,7 @@ import { Search } from 'lucide-react'
 import { cn } from '../../../shared/utils/cn'
 import { ENTRY_SEARCH_MIN_LENGTH } from '../hooks/useWarehousePurchaseInvoicesList'
 import { ENTRY_SEARCH_MAX_LENGTH, type EntryFilters } from '../schemas/entry-filters.schema'
+import { Card } from '../../../shared/ui/Card'
 
 interface EntriesFilterBarProps {
   value: EntryFilters
@@ -31,7 +32,7 @@ export function EntriesFilterBar({ value, onChange }: EntriesFilterBarProps) {
   const invalidRange = !!value.dateFrom && !!value.dateTo && value.dateFrom > value.dateTo
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-12">
         <div className="lg:col-span-6">
           <label htmlFor="entries-q" className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -124,6 +125,6 @@ export function EntriesFilterBar({ value, onChange }: EntriesFilterBarProps) {
           La fecha "desde" no puede ser posterior a la fecha "hasta".
         </p>
       )}
-    </div>
+    </Card>
   )
 }

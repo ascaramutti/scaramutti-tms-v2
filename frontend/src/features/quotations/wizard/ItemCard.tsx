@@ -9,6 +9,7 @@ import { IntegralComponents } from './IntegralComponents'
 import { itemTotal } from './itemCalc'
 import { itemSchema, type ItemServiceKind, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
 
 interface ItemCardProps {
   index: number
@@ -123,7 +124,7 @@ export function ItemCard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <Card padding="none">
       {/* Header colapsable: resumen + estado + total. */}
       <div className="flex items-center gap-2 p-4">
         <button
@@ -347,6 +348,6 @@ export function ItemCard({
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

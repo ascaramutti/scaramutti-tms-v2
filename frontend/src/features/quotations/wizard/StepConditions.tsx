@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react'
 import { QuotationNotesFields } from './QuotationNotesFields'
 import type { WizardFormInput } from './quotation-wizard.schema'
 import type { ConditionResponse, QuotationConditionResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
 
 interface StepConditionsProps {
   /** Catálogo de condiciones ACTIVAS (las elegibles, ordenadas por displayOrder). */
@@ -60,10 +61,7 @@ export function StepConditions({ conditions, linkedConditions = [] }: StepCondit
           <fieldset className="space-y-2">
             <legend className="sr-only">Condiciones generales aplicables</legend>
             {conditions.map((condition) => (
-              <label
-                key={condition.id}
-                className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 hover:bg-slate-50"
-              >
+              <Card as="label" padding="md" elevated={false} className="cursor-pointer flex gap-3 hover:bg-slate-50 items-start" key={condition.id}>
                 <input
                   type="checkbox"
                   checked={selected.includes(condition.id)}
@@ -71,7 +69,7 @@ export function StepConditions({ conditions, linkedConditions = [] }: StepCondit
                   className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
                 />
                 <span className="text-sm text-slate-700">{condition.text}</span>
-              </label>
+              </Card>
             ))}
           </fieldset>
         )}

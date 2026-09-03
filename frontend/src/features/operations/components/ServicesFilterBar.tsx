@@ -14,6 +14,7 @@ import {
   SERVICE_SEARCH_MIN_LENGTH,
   type ServiceFilters,
 } from '../schemas/service-filters.schema'
+import { Card } from '../../../shared/ui/Card'
 
 interface ServicesFilterBarProps {
   value: ServiceFilters
@@ -51,7 +52,7 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
   const invalidRange = !isValidDateRange(value.dateFrom, value.dateTo)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div className="lg:col-span-2">
           <label htmlFor="services-q" className="mb-1.5 block text-sm font-medium text-slate-700">
@@ -157,6 +158,6 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
           fechas no se está aplicando.
         </p>
       )}
-    </div>
+    </Card>
   )
 }

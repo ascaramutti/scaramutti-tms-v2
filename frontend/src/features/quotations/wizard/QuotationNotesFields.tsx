@@ -2,6 +2,8 @@ import { useFormContext } from 'react-hook-form'
 import { Textarea } from '../../../shared/ui/Textarea'
 import { stripControlChars } from '../../../shared/utils/sanitizeText'
 import type { WizardFormInput } from './quotation-wizard.schema'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 const NOTE_MAX_LENGTH = 500
 
@@ -28,7 +30,7 @@ export function QuotationNotesFields() {
   return (
     <fieldset className="border-0 p-0">
       <legend className="p-0 text-base font-semibold text-slate-900">Observaciones</legend>
-      <div className="mt-3 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
+      <Card className="gap-4 grid grid-cols-1 md:grid-cols-2 mt-3">
         <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4">
           <Textarea
             id="quotation-client-note"
@@ -45,7 +47,7 @@ export function QuotationNotesFields() {
           />
         </div>
 
-        <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
+        <Alert variant="info" role={undefined} className="rounded-lg p-4">
           <Textarea
             id="quotation-internal-note"
             label="Observaciones internas"
@@ -65,8 +67,8 @@ export function QuotationNotesFields() {
             register={register('internalNote')}
             sanitize={stripControlChars}
           />
-        </div>
-      </div>
+        </Alert>
+      </Card>
     </fieldset>
   )
 }

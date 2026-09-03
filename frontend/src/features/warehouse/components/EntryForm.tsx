@@ -32,6 +32,8 @@ import {
 import { EntryItemsTable } from './EntryItemsTable'
 import { SupplierField } from './SupplierField'
 import { Button } from '../../../shared/ui/Button'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 interface EntryCreateModeProps {
   mode: 'create'
@@ -226,10 +228,7 @@ export function EntryForm(props: EntryFormProps) {
     <FormProvider {...form}>
       <form onSubmit={onSubmit} noValidate className="space-y-6">
         {props.mode === 'edit' && versionConflict && (
-          <div
-            role="alert"
-            className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-          >
+          <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
             <span>
               {getApiErrorMessage(
                 updateInvoice.error,
@@ -244,17 +243,17 @@ export function EntryForm(props: EntryFormProps) {
             >
               Descartar y recargar
             </button>
-          </div>
+          </Alert>
         )}
 
         {missingEtag && (
-          <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
             No se puede guardar: falta la versión de la entrada. Recarga la página e intenta de nuevo.
-          </p>
+          </Alert>
         )}
 
         {props.mode === 'edit' && (
-          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+          <Card>
             <Textarea
               id="entry-edit-reason"
               label="Motivo de edición"
@@ -263,10 +262,10 @@ export function EntryForm(props: EntryFormProps) {
               error={errors.reason?.message}
               register={register('reason')}
             />
-          </div>
+          </Card>
         )}
 
-        <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <Card as="section" className="space-y-4">
           <h2 className="text-sm font-semibold text-slate-900">Factura</h2>
 
           {props.mode === 'edit' ? (
@@ -325,18 +324,18 @@ export function EntryForm(props: EntryFormProps) {
               error={errors.currencyId?.message}
             />
           </div>
-        </section>
+        </Card>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <Card>
           <EntryItemsTable
             currencyCode={selectedCurrency?.code}
             initialSelectedProducts={
               props.mode === 'edit' ? props.invoice.items.map((item) => item.product) : undefined
             }
           />
-        </div>
+        </Card>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <Card>
           <Textarea
             id="entry-observations"
             label="Observaciones"
@@ -344,7 +343,7 @@ export function EntryForm(props: EntryFormProps) {
             error={errors.observations?.message}
             register={register('observations')}
           />
-        </div>
+        </Card>
 
         {/* Los dos botones del pie NO usan `Button`, y no es un olvido: son otra forma.
             Llevan `px-4 py-2.5` en vez de `px-4 py-2`, `focus-visible:` en vez de `focus:`

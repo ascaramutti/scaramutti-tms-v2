@@ -10,6 +10,7 @@ import {
 } from '../schemas/report-filters.schema'
 import { REPORT_CUTS } from '../utils/reportCuts'
 import { Button } from '../../../shared/ui/Button'
+import { Card } from '../../../shared/ui/Card'
 
 interface ReportFilterBarProps {
   value: ReportFilters
@@ -66,7 +67,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md" className="space-y-4">
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Corte del reporte">
         {REPORT_CUTS.map((option, index) => {
           const selected = value.cut === option.value
@@ -148,6 +149,6 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
           {rangeMessage}
         </p>
       )}
-    </div>
+    </Card>
   )
 }

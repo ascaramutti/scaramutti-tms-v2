@@ -11,6 +11,8 @@ import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getAp
 import { WithdrawalCancelModal } from '../components/WithdrawalCancelModal'
 import { WithdrawalInfoCards } from '../components/WithdrawalInfoCards'
 import { useWarehouseWithdrawal } from '../hooks/useWarehouseWithdrawal'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 const WITHDRAWALS_PATH = '/cotizaciones/almacen/retiros'
 
@@ -113,11 +115,7 @@ export function WithdrawalDetailPage() {
       />
 
       {!isActive && (
-        <section
-          role="alert"
-          aria-labelledby="withdrawal-cancelled-heading"
-          className="rounded-xl border border-red-200 bg-red-50 p-4"
-        >
+        <Alert as="section" role="alert" className="rounded-xl p-4" aria-labelledby="withdrawal-cancelled-heading">
           <div className="flex items-center gap-2">
             <Badge variant="danger">Anulado</Badge>
             {data.cancelledBy && data.cancelledAt && (
@@ -131,16 +129,13 @@ export function WithdrawalDetailPage() {
               <span className="font-medium">Motivo:</span> {data.cancelReason}
             </p>
           )}
-        </section>
+        </Alert>
       )}
 
       <WithdrawalInfoCards withdrawal={data} />
 
       {data.observations && (
-        <section
-          aria-labelledby="withdrawal-observations-heading"
-          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-        >
+        <Card as="section" padding="md" aria-labelledby="withdrawal-observations-heading">
           <h2
             id="withdrawal-observations-heading"
             className="text-sm font-semibold text-slate-900"
@@ -148,7 +143,7 @@ export function WithdrawalDetailPage() {
             Observaciones
           </h2>
           <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{data.observations}</p>
-        </section>
+        </Card>
       )}
 
       <WithdrawalCancelModal

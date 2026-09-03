@@ -25,6 +25,7 @@ import {
 } from './quotation-wizard.schema'
 import type { WizardCatalogs } from './useWizardCatalogs'
 import type { ClientResponse, QuotationConditionResponse } from '../../../api'
+import { Alert } from '../../../shared/ui/Alert'
 
 // Índices de paso (evitan números mágicos al renderizar/validar — el orden importa).
 const STEP_STANDBY = 2
@@ -255,17 +256,14 @@ export function WizardForm({
             )}
           </div>
           {bannerMessage && (
-            <div
-              role="alert"
-              className="space-y-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
+            <Alert role="alert" className="space-y-3 rounded-lg px-4 py-3 text-sm text-red-700">
               <p>{bannerMessage}</p>
               {showRecover && (
                 <button type="button" onClick={onRecover} className={RECOVER_DRAFT_BUTTON}>
                   Recargar cotización
                 </button>
               )}
-            </div>
+            </Alert>
           )}
           <WizardNav
             isFirst={currentStep === 0}

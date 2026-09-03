@@ -31,6 +31,8 @@ import {
 import { FleetUnitField } from '../../../shared/catalogs/FleetUnitField'
 import { WarehouseProductField } from './WarehouseProductField'
 import { WorkerField } from './WorkerField'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 interface WithdrawalCreateModeProps {
   mode: 'create'
@@ -196,10 +198,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
       {props.mode === 'edit' && versionConflict && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
           <span>
             {getApiErrorMessage(
               updateWithdrawal.error,
@@ -214,17 +213,17 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
           >
             Descartar y recargar
           </button>
-        </div>
+        </Alert>
       )}
 
       {missingEtag && (
-        <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+        <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
           No se puede guardar: falta la versión del retiro. Recarga la página e intenta de nuevo.
-        </p>
+        </Alert>
       )}
 
       {props.mode === 'edit' && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <Card>
           <Textarea
             id="withdrawal-edit-reason"
             label="Motivo de edición"
@@ -233,10 +232,10 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
             error={errors.reason?.message}
             register={register('reason')}
           />
-        </div>
+        </Card>
       )}
 
-      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <Card as="section" className="space-y-4">
         <h2 className="text-sm font-semibold text-slate-900">Salida</h2>
 
         {/* Producto ocupa la mayor parte del ancho (necesita sitio para buscar); la
@@ -299,9 +298,9 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
             sistema lo rechaza.
           </p>
         )}
-      </section>
+      </Card>
 
-      <section className="space-y-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <Card as="section" className="space-y-4">
         <h2 className="text-sm font-semibold text-slate-900">Destino</h2>
 
         {/* Receptor y unidad al mismo nivel: son los dos datos del destino del retiro. */}
@@ -324,9 +323,9 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
             loadErrorText="No se pudieron cargar las unidades de flota. El retiro se puede registrar sin unidad."
           />
         </div>
-      </section>
+      </Card>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+      <Card>
         <Textarea
           id="withdrawal-observations"
           label="Observaciones (opcional)"
@@ -334,7 +333,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
           error={errors.observations?.message}
           register={register('observations')}
         />
-      </div>
+      </Card>
 
       <div className="flex justify-end gap-3">
         <button

@@ -4,6 +4,7 @@ import { cn } from '../../../shared/utils/cn'
 import { standbyTargets, type StandbyTarget } from './standbyTargets'
 import { STANDBY_DEFAULTS, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
 
 interface StepStandByProps {
   /** Todos los tipos de servicio (para etiquetar los ítems elegibles). */
@@ -111,7 +112,7 @@ function StandbyRow({ target, onRemove }: StandbyRowProps) {
   const priceError = getFieldState(priceField, formState).error?.message
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <Card padding="md" elevated={false}>
       <div className="flex items-start justify-between gap-3">
         <p className="text-sm font-semibold text-slate-900">{target.label}</p>
         <button
@@ -156,6 +157,6 @@ function StandbyRow({ target, onRemove }: StandbyRowProps) {
           <span className="text-sm text-slate-700">El precio incluye IGV</span>
         </label>
       </div>
-    </div>
+    </Card>
   )
 }

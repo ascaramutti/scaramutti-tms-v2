@@ -1,3 +1,5 @@
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 /** ¿La nota tiene contenido visible? (null/undefined/solo-whitespace → vacía). */
 function hasContent(value: string | null | undefined): boolean {
   return !!value?.trim()
@@ -28,7 +30,7 @@ export function QuotationNotesSection({ clientNote, internalNote }: QuotationNot
   return (
     <section>
       <h2 className="text-base font-semibold text-slate-900">Observaciones</h2>
-      <div className="mt-3 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
+      <Card className="gap-4 grid grid-cols-1 md:grid-cols-2 mt-3">
         <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4">
           <h3 className="text-sm font-medium text-slate-700">Observaciones para el cliente</h3>
           {hasContent(clientNote) ? (
@@ -38,7 +40,7 @@ export function QuotationNotesSection({ clientNote, internalNote }: QuotationNot
           )}
         </div>
 
-        <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
+        <Alert variant="info" role={undefined} className="rounded-lg p-4">
           <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium text-blue-900">
             Observaciones internas
             <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
@@ -51,8 +53,8 @@ export function QuotationNotesSection({ clientNote, internalNote }: QuotationNot
           ) : (
             <p className="mt-1 text-sm text-blue-400">—</p>
           )}
-        </div>
-      </div>
+        </Alert>
+      </Card>
     </section>
   )
 }

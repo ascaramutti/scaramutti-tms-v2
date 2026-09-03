@@ -8,6 +8,7 @@ import {
 } from '../schemas/quotation-filters.schema'
 import { QUOTATION_STATUS_LABELS, QUOTATION_TYPE_LABELS } from '../utils/quotationLabels'
 import { SEARCH_MIN_LENGTH } from '../hooks/useQuotationsList'
+import { Card } from '../../../shared/ui/Card'
 
 interface CotizacionesFilterBarProps {
   value: QuotationFilters
@@ -32,7 +33,7 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
   const dateRangeInvalid = !isValidDateRange(value.dateFrom, value.dateTo)
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         {/* Búsqueda libre */}
         <div className="lg:col-span-2">
@@ -146,6 +147,6 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
           )}
         </div>
       </div>
-    </div>
+    </Card>
   )
 }

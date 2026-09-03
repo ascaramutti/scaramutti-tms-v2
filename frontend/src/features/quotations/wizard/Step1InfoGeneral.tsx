@@ -6,6 +6,7 @@ import { ClientField } from './ClientField'
 import { QuotationTypeCards } from './QuotationTypeCards'
 import type { ImmutableField, WizardFormInput } from './quotation-wizard.schema'
 import type { ClientResponse, CurrencyResponse, PaymentTermResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
 
 function todayISO(): string {
   const now = new Date()
@@ -24,7 +25,6 @@ interface Step1InfoGeneralProps {
   immutableFields?: ReadonlyArray<ImmutableField>
 }
 
-const SECTION = 'rounded-xl border border-slate-200 bg-white p-5 shadow-sm'
 const SECTION_TITLE = 'text-sm font-semibold uppercase tracking-wide text-slate-500'
 // En el grid de 4 columnas (lg) "Fecha tentativa (opcional)" envuelve a 2 líneas: reservar 2
 // líneas de alto con el texto abajo mantiene los inputs alineados, sin aire extra en mobile.
@@ -67,7 +67,7 @@ export function Step1InfoGeneral({
         </div>
       </section>
 
-      <section className={`${SECTION} space-y-4`}>
+      <Card as="section" className="space-y-4">
         <h2 className={SECTION_TITLE}>Cliente</h2>
         <ClientField
           selectedClient={selectedClient}
@@ -89,10 +89,10 @@ export function Step1InfoGeneral({
             register={register('contactPhone')}
           />
         </div>
-      </section>
+      </Card>
 
       {isTransporte && (
-        <section className={`${SECTION} space-y-4`}>
+        <Card as="section" className="space-y-4">
           <h2 className={SECTION_TITLE}>Ruta</h2>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <TextField
@@ -108,10 +108,10 @@ export function Step1InfoGeneral({
               register={register('destination')}
             />
           </div>
-        </section>
+        </Card>
       )}
 
-      <section className={`${SECTION} space-y-4`}>
+      <Card as="section" className="space-y-4">
         <h2 className={SECTION_TITLE}>Condiciones comerciales</h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SelectField
@@ -158,7 +158,7 @@ export function Step1InfoGeneral({
             })}
           />
         </div>
-      </section>
+      </Card>
     </div>
   )
 }

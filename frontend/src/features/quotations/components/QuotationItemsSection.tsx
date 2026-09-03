@@ -4,6 +4,7 @@ import { cn } from '../../../shared/utils/cn'
 import { formatCurrency } from '../../../shared/utils/formatters'
 import { isIntegralItem, itemIgvAmount, itemSubtext, itemTotalWithIgv } from '../utils/quotationItemFormat'
 import type { QuotationItemResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
 
 interface QuotationItemsSectionProps {
   items: QuotationItemResponse[]
@@ -91,7 +92,7 @@ export function QuotationItemsSection({ items, currencyCode, subtotal, igv }: Qu
   return (
     <section>
       <h2 className="text-base font-semibold text-slate-900">Detalle de ítems</h2>
-      <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <Card padding="none" className="mt-3 overflow-x-auto">
         <table className="min-w-full">
           <caption className="sr-only">Detalle de ítems de la cotización</caption>
           <thead className="bg-slate-50">
@@ -147,7 +148,7 @@ export function QuotationItemsSection({ items, currencyCode, subtotal, igv }: Qu
             </tr>
           </tfoot>
         </table>
-      </div>
+      </Card>
     </section>
   )
 }

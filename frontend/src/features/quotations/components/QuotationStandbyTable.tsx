@@ -1,6 +1,7 @@
 import { Badge } from '../../../shared/ui/Badge'
 import { formatCurrency } from '../../../shared/utils/formatters'
 import type { QuotationItemResponse, QuotationStandbyCostResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
 
 interface QuotationStandbyTableProps {
   items: QuotationItemResponse[]
@@ -37,7 +38,7 @@ export function QuotationStandbyTable({ items, currencyCode }: QuotationStandbyT
   return (
     <section>
       <h2 className="text-base font-semibold text-slate-900">Stand-By</h2>
-      <div className="mt-3 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
+      <Card padding="none" className="mt-3 overflow-x-auto">
         <table className="min-w-full">
           <caption className="sr-only">Costos de stand-by por ítem</caption>
           <thead className="bg-slate-50">
@@ -71,7 +72,7 @@ export function QuotationStandbyTable({ items, currencyCode }: QuotationStandbyT
             ))}
           </tbody>
         </table>
-      </div>
+      </Card>
     </section>
   )
 }

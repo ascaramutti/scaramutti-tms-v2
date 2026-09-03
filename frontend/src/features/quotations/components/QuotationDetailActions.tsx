@@ -12,6 +12,7 @@ import { QUOTATION_STATUS_LABELS } from '../utils/quotationLabels'
 import type { QuotationStatus } from '../../../api'
 import { Button } from '../../../shared/ui/Button'
 import { buttonClasses } from '../../../shared/ui/buttonClasses'
+import { Alert } from '../../../shared/ui/Alert'
 
 type PdfMode = 'preview' | 'download'
 
@@ -102,16 +103,13 @@ export function QuotationDetailActions({
   return (
     <div className="flex flex-col items-end gap-2">
       {staleConflict && (
-        <div
-          role="alert"
-          className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-amber-800">
           <span>La cotización fue modificada por otra persona. Recargá para ver la versión actual.</span>
           <Button variant="secondary" onClick={handleReload}>
             <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
             Recargar
           </Button>
-        </div>
+        </Alert>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">

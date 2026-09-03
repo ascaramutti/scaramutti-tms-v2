@@ -1,4 +1,6 @@
 import type { QuotationResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 /**
  * Sección de lectura del motivo de rechazo en el Detalle. Espeja la observación interna de
@@ -26,11 +28,11 @@ export function QuotationRejectionReasonSection({ quotation }: { quotation: Quot
           interno
         </span>
       </h2>
-      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
+      <Card className="mt-3">
+        <Alert variant="info" role={undefined} className="rounded-lg p-4">
           <p className="whitespace-pre-wrap break-words text-sm text-blue-900">{rejectionReason}</p>
-        </div>
-      </div>
+        </Alert>
+      </Card>
     </section>
   )
 }

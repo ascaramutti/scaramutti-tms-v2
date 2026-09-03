@@ -19,6 +19,7 @@ import {
 import { buildReportCsv, reportCsvFilename } from '../utils/reportCsv'
 import { reportCutMeta } from '../utils/reportCuts'
 import { Button } from '../../../shared/ui/Button'
+import { Alert } from '../../../shared/ui/Alert'
 
 /**
  * Reportes del almacén: los 4 cortes agregados de `GET /warehouse/reports`.
@@ -68,10 +69,7 @@ export function WarehouseReportsPage() {
       <ReportFilterBar value={filters} onChange={setFilters} />
 
       {isError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-        >
+        <Alert role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-red-800">
           <span>{getApiErrorMessage(error, 'No se pudo generar el reporte.')}</span>
           <button
             type="button"
@@ -80,7 +78,7 @@ export function WarehouseReportsPage() {
           >
             Reintentar
           </button>
-        </div>
+        </Alert>
       )}
 
       {/* El cambio de corte o de rango no mueve el foco: hay que anunciarlo. Se

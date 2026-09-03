@@ -14,6 +14,7 @@ import {
   warehouseCancelSchema,
   type WarehouseCancelInput,
 } from '../schemas/warehouse-cancel.schema'
+import { Alert } from '../../../shared/ui/Alert'
 
 interface EntryCancelModalProps {
   isOpen: boolean
@@ -77,19 +78,13 @@ function EntryCancelForm({ onClose, invoice, onReloadRequested }: EntryCancelMod
   return (
     <Modal isOpen onClose={onClose} title="Anular entrada">
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        <p
-          role="alert"
-          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        >
+        <Alert as="p" variant="warning" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-amber-800">
           Anular esta factura descuenta del stock los ítems que sumó. Esta acción no se puede
           deshacer.
-        </p>
+        </Alert>
 
         {versionConflict && (
-          <div
-            role="alert"
-            className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-          >
+          <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
             <span>
               {getApiErrorMessage(
                 cancelInvoice.error,
@@ -104,19 +99,19 @@ function EntryCancelForm({ onClose, invoice, onReloadRequested }: EntryCancelMod
             >
               Descartar y recargar
             </button>
-          </div>
+          </Alert>
         )}
 
         {missingEtag && (
-          <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
             No se puede anular: falta la versión de la entrada. Recarga la página e intenta de nuevo.
-          </p>
+          </Alert>
         )}
 
         {backendError && (
-          <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
             {backendError}
-          </p>
+          </Alert>
         )}
 
         <Textarea

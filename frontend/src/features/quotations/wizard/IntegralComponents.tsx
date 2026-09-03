@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react'
 import { ChildItemCard } from './ChildItemCard'
 import { CHILD_DEFAULTS, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
 
 interface IntegralComponentsProps {
   /** Índice del ítem Integral (padre) en `items`. */
@@ -43,7 +44,7 @@ export function IntegralComponents({ parentIndex, serviceTypes, currencyCode }: 
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4">
+    <Card padding="md" elevated={false}>
       <div className="flex items-start justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
@@ -84,6 +85,6 @@ export function IntegralComponents({ parentIndex, serviceTypes, currencyCode }: 
           ))}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

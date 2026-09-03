@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import { SERVICE_STATUS_PRESENTATION } from '../../status/serviceStatusPresentation'
 import { SERVICE_RESOURCE_LABELS } from '../../status/resourcePresentation'
 import type { ServiceOperationError } from '../../utils/serviceResourceConflict'
+import { Alert } from '../../../../shared/ui/Alert'
 
 interface ResourceConflictAlertProps {
   error: ServiceOperationError
@@ -72,7 +73,7 @@ export function ResourceConflictAlert({
   isPending,
 }: ResourceConflictAlertProps) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+    <Alert variant="warning" role={undefined} className="flex items-start gap-3 rounded-lg px-4 py-3">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
       <div className="flex-1">
         {/* El `alert` va en el PÁRRAFO y no en el recuadro entero: una región viva se
@@ -142,6 +143,6 @@ export function ResourceConflictAlert({
           </>
         )}
       </div>
-    </div>
+    </Alert>
   )
 }
