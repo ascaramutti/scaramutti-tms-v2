@@ -22,8 +22,8 @@ export function QuotationAuditFooter({
   updatedAt,
 }: QuotationAuditFooterProps) {
   return (
-    <footer className="text-xs text-slate-500">
-      <p className="font-semibold uppercase tracking-wide text-slate-400">Auditoría</p>
+    <footer className="text-xs text-fg-muted">
+      <p className="font-semibold uppercase tracking-wide text-fg-subtle">Auditoría</p>
       <p className="mt-1">
         Elaborada por {userLabel(createdBy)} · {formatDate(createdAt)}
       </p>

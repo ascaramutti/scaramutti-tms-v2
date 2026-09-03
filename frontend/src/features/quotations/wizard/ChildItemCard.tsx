@@ -66,7 +66,7 @@ function NumberCell({ label, ariaLabel, register, error, min = 0, step = 0.01 }:
         className={cn(CONTROL, error ? 'border-danger-border-strong' : 'border-border-strong')}
       />
       {error && (
-        <p role="alert" className="mt-1 text-xs text-red-600">
+        <p role="alert" className="mt-1 text-xs text-danger">
           {error}
         </p>
       )}
@@ -129,15 +129,15 @@ export function ChildItemCard({
   return (
     <div
       data-testid="integral-child"
-      className="rounded-lg border-l-2 border-dashed border-orange-300 bg-slate-50/60 pl-4"
+      className="rounded-lg border-l-2 border-dashed border-warning-border-strong bg-surface-subtle/60 pl-4"
     >
       <div className="flex items-center justify-between gap-2 px-2 py-2">
-        <span className="text-sm font-semibold text-slate-700">Componente {position}</span>
+        <span className="text-sm font-semibold text-fg-body">Componente {position}</span>
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Eliminar componente ${position}`}
-          className="shrink-0 text-slate-400 hover:text-red-600"
+          className="shrink-0 text-fg-subtle hover:text-danger"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -164,7 +164,7 @@ export function ChildItemCard({
             ))}
           </select>
           {childErrors?.serviceTypeId?.message && (
-            <p role="alert" className="mt-1 text-xs text-red-600">
+            <p role="alert" className="mt-1 text-xs text-danger">
               {childErrors.serviceTypeId.message}
             </p>
           )}
@@ -256,7 +256,7 @@ export function ChildItemCard({
                   className={cn(CONTROL, childErrors?.internalReferencePrice ? 'border-danger-border-strong' : 'border-border-strong')}
                 />
                 {childErrors?.internalReferencePrice?.message && (
-                  <p role="alert" className="mt-1 text-xs text-red-600">
+                  <p role="alert" className="mt-1 text-xs text-danger">
                     {childErrors.internalReferencePrice.message}
                   </p>
                 )}

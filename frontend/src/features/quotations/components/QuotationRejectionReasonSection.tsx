@@ -22,7 +22,7 @@ export function QuotationRejectionReasonSection({ quotation }: { quotation: Quot
 
   return (
     <section>
-      <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
+      <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-fg">
         Motivo del rechazo
         <Badge variant="info" bordered>
           <span aria-hidden="true">🔒</span>
@@ -31,7 +31,7 @@ export function QuotationRejectionReasonSection({ quotation }: { quotation: Quot
       </h2>
       <Card className="mt-3">
         <Alert variant="info" role={undefined} className="rounded-lg p-4">
-          <p className="whitespace-pre-wrap break-words text-sm text-blue-900">{rejectionReason}</p>
+          <p className="whitespace-pre-wrap break-words text-sm text-accent-hover">{rejectionReason}</p>
         </Alert>
       </Card>
     </section>

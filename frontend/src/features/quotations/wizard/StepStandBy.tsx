@@ -48,14 +48,14 @@ export function StepStandBy({ serviceTypes }: StepStandByProps) {
   return (
     <div className="space-y-4">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Stand-By por ítem</h2>
-        <p className="text-xs text-slate-500">Paso opcional · máximo un stand-by por ítem</p>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Stand-By por ítem</h2>
+        <p className="text-xs text-fg-muted">Paso opcional · máximo un stand-by por ítem</p>
       </div>
 
       {targets.length === 0 ? (
         <div
           role="alert"
-          className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500"
+          className="rounded-lg border border-dashed border-border-strong bg-surface-subtle px-6 py-10 text-center text-sm text-fg-muted"
         >
           No hay ítems que admitan stand-by. Agrega ítems en el paso anterior.
         </div>
@@ -83,7 +83,7 @@ export function StepStandBy({ serviceTypes }: StepStandByProps) {
           )}
 
           {withStandby.length === 0 ? (
-            <p className="text-sm text-slate-500">Ningún ítem tiene stand-by todavía (es opcional).</p>
+            <p className="text-sm text-fg-muted">Ningún ítem tiene stand-by todavía (es opcional).</p>
           ) : (
             <div className="space-y-3">
               {withStandby.map((target) => (
@@ -114,12 +114,12 @@ function StandbyRow({ target, onRemove }: StandbyRowProps) {
   return (
     <Card padding="md" elevated={false}>
       <div className="flex items-start justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-900">{target.label}</p>
+        <p className="text-sm font-semibold text-fg">{target.label}</p>
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Quitar stand-by de ${target.label}`}
-          className="shrink-0 text-slate-400 hover:text-red-600"
+          className="shrink-0 text-fg-subtle hover:text-danger"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -142,7 +142,7 @@ function StandbyRow({ target, onRemove }: StandbyRowProps) {
             className={cn(CONTROL, priceError ? 'border-danger-border-strong' : 'border-border-strong')}
           />
           {priceError && (
-            <p role="alert" className="mt-1.5 text-sm text-red-600">
+            <p role="alert" className="mt-1.5 text-sm text-danger">
               {priceError}
             </p>
           )}
@@ -154,7 +154,7 @@ function StandbyRow({ target, onRemove }: StandbyRowProps) {
             {...register(igvField)}
             className={FIELD_CHECKBOX}
           />
-          <span className="text-sm text-slate-700">El precio incluye IGV</span>
+          <span className="text-sm text-fg-body">El precio incluye IGV</span>
         </label>
       </div>
     </Card>

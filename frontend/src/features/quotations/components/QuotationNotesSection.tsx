@@ -30,19 +30,19 @@ export function QuotationNotesSection({ clientNote, internalNote }: QuotationNot
 
   return (
     <section>
-      <h2 className="text-base font-semibold text-slate-900">Observaciones</h2>
+      <h2 className="text-base font-semibold text-fg">Observaciones</h2>
       <Card className="gap-4 grid grid-cols-1 md:grid-cols-2 mt-3">
-        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4">
-          <h3 className="text-sm font-medium text-slate-700">Observaciones para el cliente</h3>
+        <div className="rounded-lg border border-accent-border bg-accent-soft/60 p-4">
+          <h3 className="text-sm font-medium text-fg-body">Observaciones para el cliente</h3>
           {hasContent(clientNote) ? (
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-slate-900">{clientNote}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-fg">{clientNote}</p>
           ) : (
-            <p className="mt-1 text-sm text-slate-400">—</p>
+            <p className="mt-1 text-sm text-fg-subtle">—</p>
           )}
         </div>
 
         <Alert variant="info" role={undefined} className="rounded-lg p-4">
-          <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium text-blue-900">
+          <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium text-accent-hover">
             Observaciones internas
             <Badge variant="info" bordered>
               <span aria-hidden="true">🔒</span>
@@ -50,9 +50,9 @@ export function QuotationNotesSection({ clientNote, internalNote }: QuotationNot
             </Badge>
           </h3>
           {hasContent(internalNote) ? (
-            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-blue-900">{internalNote}</p>
+            <p className="mt-1 whitespace-pre-wrap break-words text-sm text-accent-hover">{internalNote}</p>
           ) : (
-            <p className="mt-1 text-sm text-blue-400">—</p>
+            <p className="mt-1 text-sm text-fg-subtle">—</p>
           )}
         </Alert>
       </Card>

@@ -81,7 +81,7 @@ export function ClientField({ selectedClient, onClientChange, readOnly = false }
             aria-label="Cliente de la cotización"
             className={cn('w-full', fieldReadonlyClasses())}
           />
-          <p className="mt-1.5 text-xs text-slate-500">El cliente no se puede cambiar al editar.</p>
+          <p className="mt-1.5 text-xs text-fg-muted">El cliente no se puede cambiar al editar.</p>
         </div>
         <div>
           <label htmlFor="cliente-ruc-display" className={SHARED_FIELD_LABEL}>

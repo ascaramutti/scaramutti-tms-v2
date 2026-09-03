@@ -34,7 +34,7 @@ describe('SidebarNavItem', () => {
     const link = screen.getByRole('link', { name: /inicio/i })
     // react-router le pone aria-current="page" al activo
     expect(link).toHaveAttribute('aria-current', 'page')
-    expect(link.className).toContain('bg-blue-50')
+    expect(link.className).toContain('bg-accent-soft')
   })
 
   it('NO marca activo cuando la ruta no coincide', () => {
@@ -70,6 +70,6 @@ describe('SidebarNavItem', () => {
     )
     const link = screen.getByRole('link', { name: /cotizaciones/i })
     expect(link).not.toHaveAttribute('aria-current')
-    expect(link.className).not.toContain('bg-blue-50')
+    expect(link.className).not.toContain('bg-accent-soft')
   })
 })

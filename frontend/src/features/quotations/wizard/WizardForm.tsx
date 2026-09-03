@@ -57,7 +57,7 @@ const WIZARD_STEPS: StepperStep[] = [
  * nombre de constante no es buscar por valor.
  */
 const RECOVER_DRAFT_BUTTON =
-  'inline-flex items-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500'
+  'inline-flex items-center rounded-lg border border-danger-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-danger-fg hover:bg-danger-soft focus:outline-none focus:ring-2 focus:ring-danger'
 
 export interface WizardFormProps {
   catalogs: WizardCatalogs
@@ -256,7 +256,7 @@ export function WizardForm({
             )}
           </div>
           {bannerMessage && (
-            <Alert role="alert" className="space-y-3 rounded-lg px-4 py-3 text-sm text-red-700">
+            <Alert role="alert" className="space-y-3 rounded-lg px-4 py-3 text-sm text-danger-fg">
               <p>{bannerMessage}</p>
               {showRecover && (
                 <button type="button" onClick={onRecover} className={RECOVER_DRAFT_BUTTON}>

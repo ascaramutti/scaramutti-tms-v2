@@ -30,9 +30,9 @@ export function QuotationNotesFields() {
 
   return (
     <fieldset className="border-0 p-0">
-      <legend className="p-0 text-base font-semibold text-slate-900">Observaciones</legend>
+      <legend className="p-0 text-base font-semibold text-fg">Observaciones</legend>
       <Card className="gap-4 grid grid-cols-1 md:grid-cols-2 mt-3">
-        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4">
+        <div className="rounded-lg border border-accent-border bg-accent-soft/60 p-4">
           <Textarea
             id="quotation-client-note"
             label="Observaciones para el cliente"

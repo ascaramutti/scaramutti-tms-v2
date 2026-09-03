@@ -22,7 +22,7 @@ export function CotizacionWizardPage() {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div className="flex justify-center py-16">
-          <Spinner size={28} label="Cargando formulario" className="text-blue-600" />
+          <Spinner size={28} label="Cargando formulario" className="text-accent" />
         </div>
       </div>
     )
@@ -32,7 +32,7 @@ export function CotizacionWizardPage() {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div role="alert" className="flex flex-col items-center justify-center px-6 py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(catalogs.error, 'No se pudo cargar el formulario de cotización.')}
           </p>
           <Button variant="secondary" onClick={catalogs.refetch} className="mt-4">
