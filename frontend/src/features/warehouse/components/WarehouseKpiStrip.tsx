@@ -1,8 +1,7 @@
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Package, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Package } from 'lucide-react'
 import type { WarehouseStatsResponse } from '../../../api'
-import { Spinner } from '../../../shared/ui/Spinner'
 import { cn } from '../../../shared/utils/cn'
-import { Card } from '../../../shared/ui/Card'
+import { KpiTile } from '../../../shared/ui/KpiTile'
 import { Alert } from '../../../shared/ui/Alert'
 
 interface WarehouseKpiStripProps {
@@ -14,38 +13,6 @@ interface WarehouseKpiStripProps {
   /** El corte "solo stock bajo" está aplicado en la tabla. */
   lowOnly: boolean
   onToggleLowOnly: () => void
-}
-
-interface TileProps {
-  icon: LucideIcon
-  label: string
-  value: number | undefined
-  isLoading: boolean
-  highlight?: boolean
-}
-
-function TileBody({ icon: Icon, label, value, isLoading, highlight }: TileProps) {
-  return (
-    <>
-      <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-        <Icon className="h-4 w-4" aria-hidden="true" />
-        {label}
-      </span>
-      {isLoading ? (
-        <Spinner size={18} label="Cargando indicadores" className="mt-2 text-blue-600" />
-      ) : (
-        <span
-          className={cn(
-            'mt-2 block text-2xl font-semibold tabular-nums',
-            highlight ? 'text-amber-700' : 'text-slate-900',
-          )}
-        >
-          {/* `0` es un dato, no un vacío: solo el undefined (stats en error) cae al guion. */}
-          {value ?? '—'}
-        </span>
-      )}
-    </>
-  )
 }
 
 /**
@@ -85,18 +52,15 @@ export function WarehouseKpiStrip({
       )}
 
       <div role="group" aria-label="Resumen del almacén" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card padding="md" className="text-left">
-          <TileBody
-            icon={Package}
-            label="Productos activos"
-            value={data?.activeProducts}
-            isLoading={isLoading}
-          />
-        </Card>
+        <KpiTile
+          icon={Package}
+          label="Productos activos"
+          value={data?.activeProducts}
+          isLoading={isLoading}
+        />
 
-        <Card
+        <KpiTile
           as="button"
-          padding="md"
           type="button"
           onClick={onToggleLowOnly}
           aria-pressed={lowOnly}
@@ -105,37 +69,29 @@ export function WarehouseKpiStrip({
           // accionable sería además el único que un lector de pantalla no puede leer.
           aria-label={`Con stock bajo: ${data?.lowStockCount ?? 'sin dato'}. Filtrar: solo stock bajo`}
           className={cn(
-            'text-left',
             'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
             lowOnly ? 'border-amber-400 bg-amber-50' : 'hover:bg-slate-50',
           )}
-        >
-          <TileBody
-            icon={AlertTriangle}
-            label="Con stock bajo"
-            value={data?.lowStockCount}
-            isLoading={isLoading}
-            highlight={!!data && data.lowStockCount > 0}
-          />
-        </Card>
+          icon={AlertTriangle}
+          label="Con stock bajo"
+          value={data?.lowStockCount}
+          isLoading={isLoading}
+          highlight={!!data && data.lowStockCount > 0}
+        />
 
-        <Card padding="md" className="text-left">
-          <TileBody
-            icon={ArrowDownToLine}
-            label="Entradas del mes"
-            value={data?.entriesThisMonth}
-            isLoading={isLoading}
-          />
-        </Card>
+        <KpiTile
+          icon={ArrowDownToLine}
+          label="Entradas del mes"
+          value={data?.entriesThisMonth}
+          isLoading={isLoading}
+        />
 
-        <Card padding="md" className="text-left">
-          <TileBody
-            icon={ArrowUpFromLine}
-            label="Retiros del mes"
-            value={data?.withdrawalsThisMonth}
-            isLoading={isLoading}
-          />
-        </Card>
+        <KpiTile
+          icon={ArrowUpFromLine}
+          label="Retiros del mes"
+          value={data?.withdrawalsThisMonth}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   )

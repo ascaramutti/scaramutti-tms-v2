@@ -5,12 +5,10 @@ import {
   Route,
   Truck,
   User,
-  type LucideIcon,
 } from 'lucide-react'
 import type { ServiceStatsResponse } from '../../../api'
-import { Spinner } from '../../../shared/ui/Spinner'
 import { formatDateOnly } from '../../../shared/utils/formatters'
-import { Card } from '../../../shared/ui/Card'
+import { KpiTile } from '../../../shared/ui/KpiTile'
 import { Alert } from '../../../shared/ui/Alert'
 
 interface ServicesKpiStripProps {
@@ -21,66 +19,22 @@ interface ServicesKpiStripProps {
   onRetry: () => void
 }
 
-interface TileProps {
-  icon: LucideIcon
-  label: string
-  value: number | undefined
-  isLoading: boolean
-}
-
-interface RatioTileProps {
-  icon: LucideIcon
-  label: string
-  ratio: { active: number; total: number } | undefined
-  isLoading: boolean
-}
-
-const LABEL_CLASSES =
-  'flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500'
-
-function TileBody({ icon: Icon, label, value, isLoading }: TileProps) {
-  return (
-    <>
-      <span className={LABEL_CLASSES}>
-        <Icon className="h-4 w-4" aria-hidden="true" />
-        {label}
-      </span>
-      {isLoading ? (
-        <Spinner size={18} label="Cargando indicadores" className="mt-2 text-blue-600" />
-      ) : (
-        <span className="mt-2 block text-2xl font-semibold tabular-nums text-slate-900">
-          {/* `0` es un dato, no un vacío: solo el undefined (stats en error) cae al guion. */}
-          {value ?? '—'}
-        </span>
-      )}
-    </>
-  )
-}
-
 /**
  * Recurso en servicio sobre su padrón. Se muestran los dos números y la palabra
  * que los separa, para que "3 de 5" no se pueda leer como un total de 35.
+ *
+ * Devuelve `undefined` y no un guion cuando no hay dato: el guion lo pone el tile, que es
+ * quien decide cómo se dibuja un indicador sin valor.
  */
-function RatioTileBody({ icon: Icon, label, ratio, isLoading }: RatioTileProps) {
+function ratioValue(ratio: { active: number; total: number } | undefined) {
+  if (!ratio) return undefined
   return (
     <>
-      <span className={LABEL_CLASSES}>
-        <Icon className="h-4 w-4" aria-hidden="true" />
-        {label}
-      </span>
-      {isLoading ? (
-        <Spinner size={18} label="Cargando indicadores" className="mt-2 text-blue-600" />
-      ) : ratio ? (
-        <span className="mt-2 block text-2xl font-semibold tabular-nums text-slate-900">
-          {ratio.active}
-          {/* El denominador es el padrón vigente de ESE recurso (todos los
-              conductores de alta, o todos los tractos), no los principales: ser
-              principal es un rol por asignación, no un atributo del recurso. */}
-          <span className="text-base font-normal text-slate-500"> de {ratio.total} de alta</span>
-        </span>
-      ) : (
-        <span className="mt-2 block text-2xl font-semibold tabular-nums text-slate-900">—</span>
-      )}
+      {ratio.active}
+      {/* El denominador es el padrón vigente de ESE recurso (todos los
+          conductores de alta, o todos los tractos), no los principales: ser
+          principal es un rol por asignación, no un atributo del recurso. */}
+      <span className="text-base font-normal text-slate-500"> de {ratio.total} de alta</span>
     </>
   )
 }
@@ -132,70 +86,58 @@ export function ServicesKpiStrip({
         // vez de aprovechar el espacio.
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
-        <Card padding="md" className="text-left">
-          <TileBody
-            icon={ClipboardList}
-            label="Pend. asignación"
-            value={data?.pendingAssignment}
-            isLoading={isLoading}
-          />
-        </Card>
+        <KpiTile
+          icon={ClipboardList}
+          label="Pend. asignación"
+          value={data?.pendingAssignment}
+          isLoading={isLoading}
+        />
 
-        <Card padding="md" className="text-left">
-          <TileBody
-            icon={Hourglass}
-            label="Pend. inicio"
-            value={data?.pendingStart}
-            isLoading={isLoading}
-          />
-        </Card>
+        <KpiTile
+          icon={Hourglass}
+          label="Pend. inicio"
+          value={data?.pendingStart}
+          isLoading={isLoading}
+        />
 
-        <Card padding="md" className="text-left">
-          {/* `Route` y no `Truck`: el tile de tractos usa el camión, y estos dos
-              son justamente los que no hay que confundir (uno cuenta viajes, el
-              otro unidades). */}
-          <TileBody
-            icon={Route}
-            label="En ruta"
-            value={data?.inProgress}
-            isLoading={isLoading}
-          />
-        </Card>
+        {/* `Route` y no `Truck`: el tile de tractos usa el camión, y estos dos
+            son justamente los que no hay que confundir (uno cuenta viajes, el
+            otro unidades). */}
+        <KpiTile
+          icon={Route}
+          label="En ruta"
+          value={data?.inProgress}
+          isLoading={isLoading}
+        />
 
-        <Card padding="md" className="text-left">
-          <TileBody
-            icon={CheckCircle2}
-            // El único contador con ventana de tiempo: el rótulo la nombra para que
-            // no se lea como un total, que es lo que son los otros tres.
-            label="Completados (semana)"
-            value={data?.completedThisWeek}
-            isLoading={isLoading}
-          />
-        </Card>
+        <KpiTile
+          icon={CheckCircle2}
+          // El único contador con ventana de tiempo: el rótulo la nombra para que
+          // no se lea como un total, que es lo que son los otros tres.
+          label="Completados (semana)"
+          value={data?.completedThisWeek}
+          isLoading={isLoading}
+        />
 
-        <Card padding="md" className="text-left">
-          {/* Cuenta SOLO conductores principales: quien maneja como refuerzo está
-              en ruta y no entra acá. Sin decirlo, "3 de 5" con cuatro personas
-              manejando se lee como un sistema roto. */}
-          <RatioTileBody
-            icon={User}
-            label="Conductores en ruta (principales)"
-            ratio={data?.driversOnRoad}
-            isLoading={isLoading}
-          />
-        </Card>
+        {/* Cuenta SOLO conductores principales: quien maneja como refuerzo está
+            en ruta y no entra acá. Sin decirlo, "3 de 5" con cuatro personas
+            manejando se lee como un sistema roto. */}
+        <KpiTile
+          icon={User}
+          label="Conductores en ruta (principales)"
+          value={ratioValue(data?.driversOnRoad)}
+          isLoading={isLoading}
+        />
 
-        <Card padding="md" className="text-left">
-          {/* Cuenta SOLO tractos, pese a que el campo del contrato se llame
-              "units": las carretas y las escoltas no participan de ningún
-              indicador. Por eso el rótulo nombra el tracto y no la unidad. */}
-          <RatioTileBody
-            icon={Truck}
-            label="Tractos en ruta (principales)"
-            ratio={data?.unitsOnRoad}
-            isLoading={isLoading}
-          />
-        </Card>
+        {/* Cuenta SOLO tractos, pese a que el campo del contrato se llame
+            "units": las carretas y las escoltas no participan de ningún
+            indicador. Por eso el rótulo nombra el tracto y no la unidad. */}
+        <KpiTile
+          icon={Truck}
+          label="Tractos en ruta (principales)"
+          value={ratioValue(data?.unitsOnRoad)}
+          isLoading={isLoading}
+        />
       </div>
 
       <p className="text-xs text-slate-500">

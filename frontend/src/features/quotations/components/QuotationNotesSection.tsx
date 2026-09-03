@@ -1,3 +1,4 @@
+import { Badge } from '../../../shared/ui/Badge'
 import { Card } from '../../../shared/ui/Card'
 import { Alert } from '../../../shared/ui/Alert'
 /** ¿La nota tiene contenido visible? (null/undefined/solo-whitespace → vacía). */
@@ -43,10 +44,10 @@ export function QuotationNotesSection({ clientNote, internalNote }: QuotationNot
         <Alert variant="info" role={undefined} className="rounded-lg p-4">
           <h3 className="flex flex-wrap items-center gap-2 text-sm font-medium text-blue-900">
             Observaciones internas
-            <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+            <Badge variant="info" bordered>
               <span aria-hidden="true">🔒</span>
               interno
-            </span>
+            </Badge>
           </h3>
           {hasContent(internalNote) ? (
             <p className="mt-1 whitespace-pre-wrap break-words text-sm text-blue-900">{internalNote}</p>

@@ -12,6 +12,7 @@ import { stripControlChars } from '../../../shared/utils/sanitizeText'
 import { useChangeQuotationStatus } from '../hooks/useChangeQuotationStatus'
 import { rejectSchema, type RejectFormValues } from './reject.schema'
 import type { Problem } from '../../../api'
+import { Badge } from '../../../shared/ui/Badge'
 import { Button } from '../../../shared/ui/Button'
 
 const REASON_FALLBACK_ERROR = 'No se pudo registrar el rechazo.'
@@ -145,10 +146,10 @@ export function RejectQuotationModal({
           id="reject-reason"
           label="Motivo del rechazo"
           labelSlot={
-            <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+            <Badge variant="info" bordered>
               <span aria-hidden="true">🔒</span>
               interno
-            </span>
+            </Badge>
           }
           rows={4}
           maxLength={REASON_MAX_LENGTH}

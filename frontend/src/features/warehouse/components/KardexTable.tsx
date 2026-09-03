@@ -31,10 +31,12 @@ const MOVEMENT_LABELS: Record<WarehouseKardexMovementType, string> = {
 }
 
 const MOVEMENT_VARIANTS: Record<WarehouseKardexMovementType, BadgeVariant> = {
-  APERTURA: 'slate',
+  APERTURA: 'default',
   ENTRADA: 'success',
-  // Rosa como la cantidad de la misma fila: el distintivo y el número tienen que
-  // contar lo mismo (sale stock), no dos colores para el mismo hecho.
+  // Del mismo color que la cantidad de la misma fila: el distintivo y el número tienen
+  // que contar lo mismo (sale stock), no dos colores para el mismo hecho. Los dos pasaron
+  // juntos del rosa al rojo de peligro cuando se unificó la familia, y por eso se cambian
+  // juntos: si uno se mueve sin el otro, la fila cuenta dos cosas.
   SALIDA: 'danger',
 }
 
@@ -142,7 +144,7 @@ export function KardexTable({
         <span
           className={cn(
             'font-medium tabular-nums',
-            isOutgoing(movement.movementType) ? 'text-rose-700' : 'text-emerald-700',
+            isOutgoing(movement.movementType) ? 'text-danger-fg' : 'text-success-fg',
           )}
         >
           {isOutgoing(movement.movementType) ? '−' : '+'}

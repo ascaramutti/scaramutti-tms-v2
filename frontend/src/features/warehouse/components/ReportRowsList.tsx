@@ -81,7 +81,7 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
               {/* Decorativa: repite montos que ya están en texto dos líneas
                   arriba, así que se oculta en vez de anunciarse por segunda vez. */}
               <div
-                className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+                className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted"
                 aria-hidden="true"
               >
                 <div

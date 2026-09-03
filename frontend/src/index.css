@@ -170,23 +170,22 @@
    dejan el anillo y el borde del mismo color, que es lo que se buscaba, pero un
    paso más oscuro que hoy.
 
-   Y hay DOS que no cambian un tono sino que borran un elemento, así que son los
-   que más cuidado piden. Los dos salen de juntar bg-blue-50 y bg-blue-100 en un
-   token: (1) el botón de IntegralComponents.tsx:16 es bg-blue-50 con
-   hover:bg-blue-100, y tras el barrido el hover queda en no-op, sin ningún
-   acuse; (2) la fila de un servicio integral es bg-blue-50
-   (QuotationItemsSection.tsx:23) y adentro va un Badge info que es bg-blue-100
-   sin borde, así que la pastilla pasa de separarse a 1.12 a no separarse (1.00) y
-   desaparece dentro de la fila. Las dos piden decidir al hacer el barrido: o el
-   azul suave fuerte se queda con token propio, como se hizo con el borde de
-   error, o esos dos lugares cambian de recurso visual.
-
-   Y hay un TERCERO, en la familia ámbar: el botón de forzar de
-   ResourceConflictAlert.tsx:138 vive dentro del banner bg-amber-50 y su hover es
-   bg-amber-100. Tras el barrido el relleno de hover pasa a ser exactamente el
-   color del banner que lo contiene (1.07 -> 1.00) y su borde cae de 1.40 a 1.20
-   contra ese fondo. Mismo caso que el Badge de arriba, pero sobre un control que
-   se aprieta.
+   Hubo TRES que no cambiaban un tono sino que borraban un elemento, y las tres se
+   RESOLVIERON con los dos tonos suaves fuertes que declara este archivo (ruling
+   del dueño 2026-09-03, mismo criterio que el borde de error). Salían de juntar
+   dos tonos suaves en un token: (1) la fila de un servicio integral es bg-blue-50
+   (QuotationItemsSection.tsx) y adentro va una pastilla informativa que era
+   bg-blue-100 sin borde, así que la pastilla pasaba de separarse a 1.12 a no
+   separarse (1.00) y desaparecía dentro de la fila; hoy la pastilla usa
+   `accent-soft-strong` y conserva el 1.12. (2) El botón de forzar de
+   ResourceConflictAlert vive dentro del banner ámbar y su relleno de hover era
+   bg-amber-100, que tras el barrido habría sido exactamente el color del banner
+   (1.07 -> 1.00); hoy usa `warning-soft-strong` y conserva el 1.07. Su borde
+   sigue siendo amber-300 crudo y ese caso QUEDA ABIERTO para el barrido: el mapa
+   lo manda a amber-200 y ahí sí cae de 1.40 a 1.20 contra el banner. (3) El botón
+   de IntegralComponents.tsx es bg-blue-50 con hover:bg-blue-100 y también queda
+   abierto: es un hover de botón, no una pastilla, y el token que lo arregla ya
+   existe, pero cambiarlo es del barrido que toque ese archivo.
 
    `success` a secas no sale de ningún relleno sólido: hoy no existe alerta de
    éxito. Vale lo mismo que `success-fg` a propósito, y el par que lo mide es el
@@ -261,6 +260,12 @@
   --color-accent: #155dfc;        /* blue-600  */
   --color-accent-hover: #1447e6;  /* blue-700  */
   --color-accent-soft: #eff6ff;   /* blue-50   */
+  /* El azul suave FUERTE, un paso por encima del anterior. Existe por la misma razón que
+     `danger-border-strong`: el mapa mandaba los dos azules suaves al mismo token y la
+     pastilla informativa, que se dibuja DENTRO de la fila azul de un servicio integral,
+     pasaba de separarse 1.12 a 1.00, o sea a desaparecer. Ruling del dueño 2026-09-03,
+     mismo criterio que `danger-border-strong` y `accent-border`. */
+  --color-accent-soft-strong: #dbeafe; /* blue-100 */
   /* El borde de la caja informativa, espejo de `danger-border` y `warning-border`. Lo
      pidió el PR de `Card` y `Alert`: sin él, la variante informativa quedaba con un
      `border-blue-300` crudo, que es justo lo que el mapa existe para evitar. Ruling del
@@ -293,8 +298,24 @@
 
   --color-warning: #bb4d00;        /* amber-700  */
   --color-warning-soft: #fffbeb;   /* amber-50   */
+  /* El ámbar suave fuerte, espejo del azul de arriba: es el relleno del chip que quita el
+     filtro de stock bajo, y colapsarlo al fondo del banner lo dejaba sin relleno propio.
+     Ruling del dueño 2026-09-03. */
+  --color-warning-soft-strong: #fef3c6; /* amber-100 */
   --color-warning-fg: #973c00;     /* amber-800  */
   --color-warning-border: #fee685; /* amber-200  */
+
+  /* Las dos variantes de pastilla que sobreviven al recorte de las decorativas, con nombre
+     por función y no por color. `progress` es el viaje en movimiento y `transition` es el
+     cambio de estado (la cotización aceptada y la entrada de bitácora que registra un
+     cambio). Existen como tokens y no como color crudo porque el modo oscuro necesita su
+     par, igual que los estados. Ruling del dueño 2026-09-03, que corrige la decisión 4:
+     de cuatro decorativas quedan dos con nombre, `slate` era un renombre de la neutra y
+     el rosa se funde en el rojo de peligro. */
+  --color-progress-soft: #ede9fe; /* violet-100 */
+  --color-progress-fg: #7008e7;   /* violet-700 */
+  --color-transition-soft: #cbfbf1; /* teal-100 */
+  --color-transition-fg: #00786f; /* teal-700 */
 
   --color-success: #007a55;       /* emerald-700 */
   --color-success-soft: #d0fae5;  /* emerald-100 */

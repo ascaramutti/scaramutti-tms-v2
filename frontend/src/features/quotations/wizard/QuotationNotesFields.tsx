@@ -2,6 +2,7 @@ import { useFormContext } from 'react-hook-form'
 import { Textarea } from '../../../shared/ui/Textarea'
 import { stripControlChars } from '../../../shared/utils/sanitizeText'
 import type { WizardFormInput } from './quotation-wizard.schema'
+import { Badge } from '../../../shared/ui/Badge'
 import { Card } from '../../../shared/ui/Card'
 import { Alert } from '../../../shared/ui/Alert'
 
@@ -52,10 +53,10 @@ export function QuotationNotesFields() {
             id="quotation-internal-note"
             label="Observaciones internas"
             labelSlot={
-              <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+              <Badge variant="info" bordered>
                 <span aria-hidden="true">🔒</span>
                 interno — no se muestra al cliente
-              </span>
+              </Badge>
             }
             rows={3}
             maxLength={NOTE_MAX_LENGTH}

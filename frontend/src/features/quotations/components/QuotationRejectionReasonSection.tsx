@@ -1,4 +1,5 @@
 import type { QuotationResponse } from '../../../api'
+import { Badge } from '../../../shared/ui/Badge'
 import { Card } from '../../../shared/ui/Card'
 import { Alert } from '../../../shared/ui/Alert'
 
@@ -23,10 +24,10 @@ export function QuotationRejectionReasonSection({ quotation }: { quotation: Quot
     <section>
       <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
         Motivo del rechazo
-        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+        <Badge variant="info" bordered>
           <span aria-hidden="true">🔒</span>
           interno
-        </span>
+        </Badge>
       </h2>
       <Card className="mt-3">
         <Alert variant="info" role={undefined} className="rounded-lg p-4">

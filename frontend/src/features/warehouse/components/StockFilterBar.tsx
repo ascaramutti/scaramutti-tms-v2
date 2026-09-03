@@ -112,11 +112,16 @@ export function StockFilterBar({
           <span className="text-xs font-medium uppercase tracking-wide text-fg-muted">
             Filtros aplicados
           </span>
+          {/* El anillo de foco de este chip está en token y el del tile de indicadores de
+              al lado no, y es a propósito: el chip entero se convirtió en este PR, así que
+              dejarle una clase suelta adentro lo partiría al medio. El tile todavía tiene
+              colores sin token (el ámbar de su borde no tiene ninguno), así que convertirle
+              solo el anillo sería la mitad de una mudanza. Los dos valen el mismo color. */}
           <button
             type="button"
             onClick={() => set('lowOnly', false)}
             aria-label="Quitar filtro: solo stock bajo"
-            className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft-strong px-2.5 py-0.5 text-xs font-medium text-warning hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Solo stock bajo
             <X className="h-3.5 w-3.5" aria-hidden="true" />
