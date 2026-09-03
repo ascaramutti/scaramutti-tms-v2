@@ -1,4 +1,5 @@
 import { getApiErrorMessage, isPreconditionFailedError } from '../../../../shared/utils/getApiErrorMessage'
+import { Alert } from '../../../../shared/ui/Alert'
 
 interface ServiceStatusErrorAlertProps {
   error: unknown
@@ -28,7 +29,7 @@ export function ServiceStatusErrorAlert({
   onRefresh,
 }: ServiceStatusErrorAlertProps) {
   return (
-    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
+    <Alert role="alert" className="rounded-lg px-3.5 py-3">
       <p className="text-sm text-red-700">
         {getApiErrorMessage(error, fallback)}
       </p>
@@ -41,6 +42,6 @@ export function ServiceStatusErrorAlert({
           Descartar y recargar
         </button>
       )}
-    </div>
+    </Alert>
   )
 }

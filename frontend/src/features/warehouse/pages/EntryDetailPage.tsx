@@ -12,6 +12,8 @@ import { EntryCancelModal } from '../components/EntryCancelModal'
 import { EntryDetailItemsTable } from '../components/EntryDetailItemsTable'
 import { EntryInfoCards } from '../components/EntryInfoCards'
 import { useWarehousePurchaseInvoice } from '../hooks/useWarehousePurchaseInvoice'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 const ENTRIES_PATH = '/cotizaciones/almacen/entradas'
 
@@ -132,11 +134,7 @@ export function EntryDetailPage() {
       />
 
       {!isActive && (
-        <section
-          role="alert"
-          aria-labelledby="entry-cancelled-heading"
-          className="rounded-xl border border-red-200 bg-red-50 p-4"
-        >
+        <Alert as="section" role="alert" className="rounded-xl p-4" aria-labelledby="entry-cancelled-heading">
           <div className="flex items-center gap-2">
             <Badge variant="danger">Anulada</Badge>
             {data.cancelledBy && data.cancelledAt && (
@@ -150,21 +148,18 @@ export function EntryDetailPage() {
               <span className="font-medium">Motivo:</span> {data.cancelReason}
             </p>
           )}
-        </section>
+        </Alert>
       )}
 
       <EntryInfoCards invoice={data} />
 
       {data.observations && (
-        <section
-          aria-labelledby="entry-observations-heading"
-          className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-        >
+        <Card as="section" padding="md" aria-labelledby="entry-observations-heading">
           <h2 id="entry-observations-heading" className="text-sm font-semibold text-slate-900">
             Observaciones
           </h2>
           <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{data.observations}</p>
-        </section>
+        </Card>
       )}
 
       <EntryDetailItemsTable

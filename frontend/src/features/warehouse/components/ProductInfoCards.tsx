@@ -2,12 +2,12 @@ import type { WarehouseProductResponse } from '../../../api'
 import { Badge } from '../../../shared/ui/Badge'
 import { formatDate, formatQuantity } from '../../../shared/utils/formatters'
 import { StockLevel } from './StockLevel'
+import { Card } from '../../../shared/ui/Card'
 
 interface ProductInfoCardsProps {
   product: WarehouseProductResponse
 }
 
-const cardClasses = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -28,7 +28,7 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <section className={cardClasses} aria-labelledby="product-stock-heading">
+      <Card as="section" padding="md" aria-labelledby="product-stock-heading">
         <h2 id="product-stock-heading" className="text-sm font-semibold text-slate-900">
           Existencias
         </h2>
@@ -42,9 +42,9 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
         <p className="mt-2 text-sm text-slate-500">
           Mínimo {formatQuantity(product.minStock)} {product.unitOfMeasure.code}
         </p>
-      </section>
+      </Card>
 
-      <section className={cardClasses} aria-labelledby="product-info-heading">
+      <Card as="section" padding="md" aria-labelledby="product-info-heading">
         <h2 id="product-info-heading" className="text-sm font-semibold text-slate-900">
           Ficha
         </h2>
@@ -61,9 +61,9 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
             value={`${product.createdBy.fullName} · ${formatDate(product.createdAt)}`}
           />
         </dl>
-      </section>
+      </Card>
 
-      <section className={cardClasses} aria-labelledby="product-attributes-heading">
+      <Card as="section" padding="md" aria-labelledby="product-attributes-heading">
         <h2 id="product-attributes-heading" className="text-sm font-semibold text-slate-900">
           Características
         </h2>
@@ -76,7 +76,7 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
             ))}
           </dl>
         )}
-      </section>
+      </Card>
     </div>
   )
 }

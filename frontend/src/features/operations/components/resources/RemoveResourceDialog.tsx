@@ -8,6 +8,7 @@ import { getApiErrorMessage } from '../../../../shared/utils/getApiErrorMessage'
 import { useRemoveServiceResource } from '../../hooks/useRemoveServiceResource'
 import { describeAdditionalResource } from '../../status/resourcePresentation'
 import { Button } from '../../../../shared/ui/Button'
+import { Alert } from '../../../../shared/ui/Alert'
 
 interface RemoveResourceDialogProps {
   isOpen: boolean
@@ -76,12 +77,9 @@ function RemoveResourceConfirm({
         </p>
 
         {error && (
-          <p
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700"
-          >
+          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
             {error}
-          </p>
+          </Alert>
         )}
 
         <div className="flex justify-end gap-3">

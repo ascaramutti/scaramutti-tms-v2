@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Building2, FileText, MapPin, type LucideIcon } from 'lucide-react'
 import { formatDateOnly } from '../../../shared/utils/formatters'
+import { Card } from '../../../shared/ui/Card'
 
 interface QuotationSummaryCardProps {
   /** Nombre del cliente; ausente → "Sin cliente seleccionado" (resumen antes de elegir). */
@@ -19,13 +20,13 @@ interface QuotationSummaryCardProps {
 
 function InfoCard({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <Card as="section">
       <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         {title}
       </h2>
       <div className="mt-3">{children}</div>
-    </section>
+    </Card>
   )
 }
 

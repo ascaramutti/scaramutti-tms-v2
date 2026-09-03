@@ -2,6 +2,8 @@ import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Package, type LucideIc
 import type { WarehouseStatsResponse } from '../../../api'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { cn } from '../../../shared/utils/cn'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 interface WarehouseKpiStripProps {
   data?: WarehouseStatsResponse
@@ -21,8 +23,6 @@ interface TileProps {
   isLoading: boolean
   highlight?: boolean
 }
-
-const TILE_CLASSES = 'rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm'
 
 function TileBody({ icon: Icon, label, value, isLoading, highlight }: TileProps) {
   return (
@@ -69,10 +69,7 @@ export function WarehouseKpiStrip({
     <div className="space-y-3">
       {/* Los KPIs son informativos: si fallan, se degrada el strip y la tabla sigue trabajando. */}
       {isError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
           <span>{errorMessage ?? 'No se pudieron cargar los indicadores del almacén.'}</span>
           <button
             type="button"
@@ -84,20 +81,22 @@ export function WarehouseKpiStrip({
           >
             Reintentar
           </button>
-        </div>
+        </Alert>
       )}
 
       <div role="group" aria-label="Resumen del almacén" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           <TileBody
             icon={Package}
             label="Productos activos"
             value={data?.activeProducts}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
 
-        <button
+        <Card
+          as="button"
+          padding="md"
           type="button"
           onClick={onToggleLowOnly}
           aria-pressed={lowOnly}
@@ -106,7 +105,7 @@ export function WarehouseKpiStrip({
           // accionable sería además el único que un lector de pantalla no puede leer.
           aria-label={`Con stock bajo: ${data?.lowStockCount ?? 'sin dato'}. Filtrar: solo stock bajo`}
           className={cn(
-            TILE_CLASSES,
+            'text-left',
             'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
             lowOnly ? 'border-amber-400 bg-amber-50' : 'hover:bg-slate-50',
           )}
@@ -118,25 +117,25 @@ export function WarehouseKpiStrip({
             isLoading={isLoading}
             highlight={!!data && data.lowStockCount > 0}
           />
-        </button>
+        </Card>
 
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           <TileBody
             icon={ArrowDownToLine}
             label="Entradas del mes"
             value={data?.entriesThisMonth}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
 
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           <TileBody
             icon={ArrowUpFromLine}
             label="Retiros del mes"
             value={data?.withdrawalsThisMonth}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
       </div>
     </div>
   )

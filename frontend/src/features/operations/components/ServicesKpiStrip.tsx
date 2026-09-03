@@ -10,6 +10,8 @@ import {
 import type { ServiceStatsResponse } from '../../../api'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { formatDateOnly } from '../../../shared/utils/formatters'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 interface ServicesKpiStripProps {
   data?: ServiceStatsResponse
@@ -33,7 +35,6 @@ interface RatioTileProps {
   isLoading: boolean
 }
 
-const TILE_CLASSES = 'rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm'
 const LABEL_CLASSES =
   'flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500'
 
@@ -108,10 +109,7 @@ export function ServicesKpiStrip({
     <div className="space-y-3">
       {/* Los indicadores son contexto: si fallan, se degrada el strip y la tabla sigue trabajando. */}
       {isError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
           <span>{errorMessage ?? 'No se pudieron cargar los indicadores operativos.'}</span>
           <button
             type="button"
@@ -123,7 +121,7 @@ export function ServicesKpiStrip({
           >
             Reintentar
           </button>
-        </div>
+        </Alert>
       )}
 
       <div
@@ -134,25 +132,25 @@ export function ServicesKpiStrip({
         // vez de aprovechar el espacio.
         className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           <TileBody
             icon={ClipboardList}
             label="Pend. asignación"
             value={data?.pendingAssignment}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
 
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           <TileBody
             icon={Hourglass}
             label="Pend. inicio"
             value={data?.pendingStart}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
 
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           {/* `Route` y no `Truck`: el tile de tractos usa el camión, y estos dos
               son justamente los que no hay que confundir (uno cuenta viajes, el
               otro unidades). */}
@@ -162,9 +160,9 @@ export function ServicesKpiStrip({
             value={data?.inProgress}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
 
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           <TileBody
             icon={CheckCircle2}
             // El único contador con ventana de tiempo: el rótulo la nombra para que
@@ -173,9 +171,9 @@ export function ServicesKpiStrip({
             value={data?.completedThisWeek}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
 
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           {/* Cuenta SOLO conductores principales: quien maneja como refuerzo está
               en ruta y no entra acá. Sin decirlo, "3 de 5" con cuatro personas
               manejando se lee como un sistema roto. */}
@@ -185,9 +183,9 @@ export function ServicesKpiStrip({
             ratio={data?.driversOnRoad}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
 
-        <div className={TILE_CLASSES}>
+        <Card padding="md" className="text-left">
           {/* Cuenta SOLO tractos, pese a que el campo del contrato se llame
               "units": las carretas y las escoltas no participan de ningún
               indicador. Por eso el rótulo nombra el tracto y no la unidad. */}
@@ -197,7 +195,7 @@ export function ServicesKpiStrip({
             ratio={data?.unitsOnRoad}
             isLoading={isLoading}
           />
-        </div>
+        </Card>
       </div>
 
       <p className="text-xs text-slate-500">

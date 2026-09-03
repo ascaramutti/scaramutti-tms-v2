@@ -1,6 +1,7 @@
 import type { WarehouseReportResponse, WarehouseReportRowResponse } from '../../../api'
 import { formatCurrency, formatDateOnly, formatQuantity } from '../../../shared/utils/formatters'
 import { reportCutMeta } from '../utils/reportCuts'
+import { Card } from '../../../shared/ui/Card'
 
 interface ReportRowsListProps {
   report: WarehouseReportResponse
@@ -53,7 +54,7 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
   const maxWeight = report.rows.reduce((max, row) => Math.max(max, rowWeight(row)), 1)
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <Card as="section" padding="none">
       <h2 className="border-b border-slate-200 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
         {meta.label}
       </h2>
@@ -100,6 +101,6 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
           )
         })}
       </ul>
-    </section>
+    </Card>
   )
 }

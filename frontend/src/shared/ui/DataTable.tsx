@@ -4,6 +4,8 @@ import { cn } from '../utils/cn'
 import { Spinner } from './Spinner'
 import { EmptyState } from './EmptyState'
 import { Button } from './Button'
+import { Card } from './Card'
+import { Alert } from './Alert'
 
 export interface Column<T> {
   /** Clave única de la columna (no necesariamente un campo de `T`). */
@@ -123,10 +125,7 @@ export function DataTable<T>({
     <div className="space-y-3">
       {/* Error con data previa (ej. refetch al paginar falló): aviso no destructivo. */}
       {isError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
           <span>{errorMessage ?? 'No se pudieron actualizar los datos.'}</span>
           {onRetry && (
             <button
@@ -137,10 +136,10 @@ export function DataTable<T>({
               Reintentar
             </button>
           )}
-        </div>
+        </Alert>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <Card padding="none">
         <div className="overflow-x-auto" aria-busy={isFetching}>
           <table className={cn('min-w-full divide-y divide-slate-200', isFetching && 'opacity-60')}>
             {caption && <caption className="sr-only">{caption}</caption>}
@@ -235,7 +234,7 @@ export function DataTable<T>({
             </div>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

@@ -9,6 +9,7 @@ import type { WithdrawalFilters } from '../schemas/withdrawal-filters.schema'
 import { FleetUnitField } from '../../../shared/catalogs/FleetUnitField'
 import { WarehouseProductField } from './WarehouseProductField'
 import { WorkerField } from './WorkerField'
+import { Card } from '../../../shared/ui/Card'
 
 /**
  * Aviso cuando el catálogo de flota no carga.
@@ -70,7 +71,7 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md" className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <WarehouseProductField
           id="withdrawals-filter-product"
@@ -163,6 +164,6 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
           La fecha "desde" no puede ser posterior a la fecha "hasta".
         </p>
       )}
-    </div>
+    </Card>
   )
 }

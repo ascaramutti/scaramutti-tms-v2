@@ -25,6 +25,7 @@ import type { WarehouseProductWithEtag } from '../hooks/useWarehouseProduct'
 import { productCreateSchema, type ProductCreateInput } from '../schemas/product.schema'
 import { ProductAttributesField } from './ProductAttributesField'
 import { ProductCategoryField } from './ProductCategoryField'
+import { Alert } from '../../../shared/ui/Alert'
 
 interface ProductEditModeProps {
   mode: 'edit'
@@ -192,10 +193,7 @@ function ProductForm(props: ProductFormModalProps) {
     >
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
         {versionConflict && props.mode === 'edit' && (
-          <div
-            role="alert"
-            className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-          >
+          <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
             <span>
               {getApiErrorMessage(
                 updateProduct.error,
@@ -210,19 +208,19 @@ function ProductForm(props: ProductFormModalProps) {
             >
               Descartar y recargar
             </button>
-          </div>
+          </Alert>
         )}
 
         {missingEtag && (
-          <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
             No se puede guardar: falta la versión del producto. Recarga la página e intenta de nuevo.
-          </p>
+          </Alert>
         )}
 
         {blockedByUnits && (
-          <p role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
             No se pudieron cargar las unidades de medida, y el producto no se puede crear sin una.
-          </p>
+          </Alert>
         )}
 
         <TextField

@@ -24,6 +24,7 @@ import {
 } from '../../utils/serviceResourceConflict'
 import { ResourceConflictAlert } from './ResourceConflictAlert'
 import { Button } from '../../../../shared/ui/Button'
+import { Alert } from '../../../../shared/ui/Alert'
 
 interface AddResourcesModalProps {
   isOpen: boolean
@@ -183,12 +184,9 @@ function AddResourcesForm({ onClose, serviceId, serviceCode }: AddResourcesModal
         )}
 
         {genericError && (
-          <p
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700"
-          >
+          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
             {genericError}
-          </p>
+          </Alert>
         )}
 
         <div className="flex justify-end gap-3 pt-2">

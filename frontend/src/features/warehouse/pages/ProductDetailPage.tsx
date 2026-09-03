@@ -12,6 +12,7 @@ import { ProductFormModal } from '../components/ProductFormModal'
 import { ProductInactiveBadge, ProductInfoCards } from '../components/ProductInfoCards'
 import { useWarehouseProduct } from '../hooks/useWarehouseProduct'
 import { useWarehouseProductKardex } from '../hooks/useWarehouseProductKardex'
+import { Card } from '../../../shared/ui/Card'
 
 const KARDEX_PAGE_SIZE = 10
 const STOCK_LIST_PATH = '/cotizaciones/almacen'
@@ -123,12 +124,12 @@ export function ProductDetailPage() {
       <ProductInfoCards product={data} />
 
       {data.observations && (
-        <section aria-labelledby="product-observations-heading" className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <Card as="section" padding="md" aria-labelledby="product-observations-heading">
           <h2 id="product-observations-heading" className="text-sm font-semibold text-slate-900">
             Observaciones
           </h2>
           <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{data.observations}</p>
-        </section>
+        </Card>
       )}
 
       <section aria-labelledby="product-kardex-heading" className="space-y-3">

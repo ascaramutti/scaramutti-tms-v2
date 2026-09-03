@@ -83,6 +83,9 @@ const PAIRS: Pair[] = [
   { fg: 'surface-subtle', bg: 'surface', min: AA_NON_TEXT, what: 'foco de teclado de la fila clickeable' },
   { fg: 'danger-border', bg: 'surface', min: AA_NON_TEXT, what: 'marco de la alerta de peligro' },
   { fg: 'danger-border', bg: 'canvas', min: AA_NON_TEXT, what: 'borde del botón de anular, que va sobre el fondo de página' },
+  { fg: 'accent-border', bg: 'accent-soft', min: AA_NON_TEXT, what: 'marco de la caja informativa, contra su propio fondo' },
+  { fg: 'accent-border', bg: 'surface', min: AA_NON_TEXT, what: 'marco de la caja informativa, que va dentro de una tarjeta' },
+  { fg: 'success-border', bg: 'success-soft', min: AA_NON_TEXT, what: 'marco del aviso de éxito, contra su propio fondo' },
   { fg: 'warning-border', bg: 'warning-soft', min: AA_NON_TEXT, what: 'borde del botón de forzar, dentro del banner ámbar' },
   { fg: 'danger-border-strong', bg: 'danger-soft', min: AA_NON_TEXT, what: 'borde del botón de descartar, dentro de la alerta roja' },
   { fg: 'border-strong', bg: 'canvas', min: AA_NON_TEXT, what: 'borde del botón secundario, que va sobre el fondo de página' },
@@ -190,6 +193,27 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
       'Texto de un control deshabilitado sobre su propio fondo (TextField.tsx:95). WCAG exime los ' +
       'controles inactivos, así que no es un incumplimiento; se mide igual para que el par no ' +
       'quede sin declarar y alguien lo descubra creyendo que es un hallazgo.',
+  },
+  'accent-border/accent-soft': {
+    ratio: 1.67,
+    note:
+      'El marco de las tres cajas informativas contra su propio fondo. Es el mismo caso que ' +
+      '`danger-border` y `warning-border`: un filete decorativo que acompaña al color de fondo, ' +
+      'no la única señal del estado, que la da el fondo entero. No lo empeora el mapa: hoy ya ' +
+      'es blue-300 y el token conserva ese valor.',
+  },
+  'accent-border/surface': {
+    ratio: 1.81,
+    note:
+      'La misma caja, contra la tarjeta que la contiene. Mismo criterio que la anterior.',
+  },
+  'success-border/success-soft': {
+    ratio: 1.13,
+    note:
+      'El marco del aviso de éxito, que HOY NO EXISTE: la variante entra sin ningún uso, así que ' +
+      'este par no describe nada en pantalla todavía. Se declara igual para que el token no quede ' +
+      'sin medir, y para que quien estrene el primer aviso de éxito vea el número antes de ' +
+      'ponerlo: 1.13 es el más bajo de la familia y conviene mirarlo en pantalla.',
   },
   'warning-border/warning-soft': {
     ratio: 1.2,
@@ -470,11 +494,13 @@ describe('tokens del tema', () => {
       'danger-hover': '#c10007', // red-700
       'danger-soft': '#fef2f2', // red-50
       'danger-fg': '#c10007', // red-700
+      'accent-border': '#8ec5ff', // blue-300
       'danger-border': '#ffc9c9', // red-200
       'danger-border-strong': '#ffa2a2', // red-300
       'warning': '#bb4d00', // amber-700
       'warning-soft': '#fffbeb', // amber-50
       'warning-fg': '#973c00', // amber-800
+      'success-border': '#a4f4cf', // emerald-200
       'warning-border': '#fee685', // amber-200
       'success': '#007a55', // emerald-700
       'success-soft': '#d0fae5', // emerald-100
@@ -542,6 +568,8 @@ describe('tokens del tema', () => {
    */
   it('el conjunto de pares medidos es exactamente este', () => {
     expect(PAIRS.map(key).sort()).toEqual([
+      'accent-border/accent-soft',
+      'accent-border/surface',
       'accent-hover/accent-soft',
       'accent-hover/canvas',
       'accent-hover/surface',
@@ -589,6 +617,7 @@ describe('tokens del tema', () => {
       'on-solid/danger',
       'on-solid/danger-hover',
       'on-solid/success',
+      'success-border/success-soft',
       'success-fg/success-soft',
       'success-fg/surface',
       'success/surface',
@@ -610,6 +639,8 @@ describe('tokens del tema', () => {
    */
   it('el conjunto de excepciones es exactamente este', () => {
     expect(Object.keys(KNOWN_FAILURES).sort()).toEqual([
+      'accent-border/accent-soft',
+      'accent-border/surface',
       'border-strong/canvas',
       'border-strong/surface',
       'danger-border-strong/danger-soft',
@@ -621,6 +652,7 @@ describe('tokens del tema', () => {
       'fg-subtle/canvas',
       'fg-subtle/surface',
       'fg-subtle/surface-subtle',
+      'success-border/success-soft',
       'surface-subtle/surface',
       'warning-border/warning-soft',
     ])
@@ -657,18 +689,21 @@ describe('los umbrales son los de la norma', () => {
     const noTextuales = PAIRS.filter((pair) => pair.min === AA_NON_TEXT).map(key).sort()
     expect(noTextuales).toEqual(
       [
-        'accent/canvas',
-        'border-strong/canvas',
-        'border-strong/surface',
-        'danger-border-strong/danger-soft',
-        'danger-border-strong/surface',
-        'danger-border/canvas',
-        'danger-border/surface',
-        'focus/canvas',
-        'focus/surface',
-        'surface-subtle/surface',
-        'warning-border/warning-soft',
-      ].sort(),
+      'accent-border/accent-soft',
+      'accent-border/surface',
+      'accent/canvas',
+      'border-strong/canvas',
+      'border-strong/surface',
+      'danger-border-strong/danger-soft',
+      'danger-border-strong/surface',
+      'danger-border/canvas',
+      'danger-border/surface',
+      'focus/canvas',
+      'focus/surface',
+      'success-border/success-soft',
+      'surface-subtle/surface',
+      'warning-border/warning-soft',
+    ].sort(),
     )
   })
 })

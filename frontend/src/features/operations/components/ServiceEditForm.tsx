@@ -32,6 +32,8 @@ import {
 } from '../schemas/service-fields.schema'
 import type { ServiceWithEtag } from '../hooks/useService'
 import { Button } from '../../../shared/ui/Button'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 /** Campos que aceptan un error de campo del backend, cuando están en pantalla. */
 const FORM_FIELDS = [
@@ -52,10 +54,10 @@ const FORM_FIELDS = [
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <Card as="section">
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
       <div className="space-y-4">{children}</div>
-    </section>
+    </Card>
   )
 }
 
@@ -370,19 +372,13 @@ function EditFields({
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {missingEtag && (
-        <p
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
+        <Alert as="p" role="alert" className="rounded-xl px-4 py-3 text-sm text-red-700">
           No se puede guardar: falta la versión del viaje. Recarga la página e intenta de nuevo.
-        </p>
+        </Alert>
       )}
 
       {errors.root?.message && (
-        <div
-          role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-amber-800">
           <p>{errors.root.message}</p>
           {stale && (
             /*
@@ -396,7 +392,7 @@ function EditFields({
               Descartar y recargar
             </Button>
           )}
-        </div>
+        </Alert>
       )}
 
       <Section title="Viaje">

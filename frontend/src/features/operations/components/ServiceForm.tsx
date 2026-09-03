@@ -31,6 +31,8 @@ import { canCreateCatalogEntry } from '../status/operationsPermissions'
 import { isPastInLima, todayInLima } from '../utils/limaDate'
 import { ServiceClientField } from './ServiceClientField'
 import { Button } from '../../../shared/ui/Button'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 /** Campos que aceptan un error de campo del backend. */
 const FORM_FIELDS = [
@@ -58,10 +60,10 @@ const DUPLICATE_SERVICE_CODE = 'OPS-007'
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+    <Card as="section">
       <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
       <div className="space-y-4">{children}</div>
-    </section>
+    </Card>
   )
 }
 
@@ -213,12 +215,9 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {errors.root?.message && (
-        <p
-          role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-        >
+        <Alert as="p" variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-amber-800">
           {errors.root.message}
-        </p>
+        </Alert>
       )}
 
       <Section title="Viaje">

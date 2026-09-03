@@ -3,6 +3,7 @@ import type { WarehouseProductCategoryResponse } from '../../../api'
 import { cn } from '../../../shared/utils/cn'
 import { SEARCH_MIN_LENGTH } from '../hooks/useWarehouseProductsList'
 import { SEARCH_MAX_LENGTH, type StockFilters } from '../schemas/stock-filters.schema'
+import { Card } from '../../../shared/ui/Card'
 
 interface StockFilterBarProps {
   value: StockFilters
@@ -40,7 +41,7 @@ export function StockFilterBar({
   const showSearchHint = qLength > 0 && qLength < SEARCH_MIN_LENGTH
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {/* Búsqueda libre */}
         <div className="sm:col-span-2">
@@ -122,6 +123,6 @@ export function StockFilterBar({
           </button>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

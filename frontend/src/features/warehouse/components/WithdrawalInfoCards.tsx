@@ -2,12 +2,12 @@ import { Link } from 'react-router-dom'
 import type { WarehouseWithdrawalResponse } from '../../../api'
 import { formatDate, formatQuantity } from '../../../shared/utils/formatters'
 import { fleetUnitLabel } from '../../../shared/catalogs/fleetUnit'
+import { Card } from '../../../shared/ui/Card'
 
 interface WithdrawalInfoCardsProps {
   withdrawal: WarehouseWithdrawalResponse
 }
 
-const cardClasses = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
@@ -26,7 +26,7 @@ function Field({ label, value }: { label: string; value: string }) {
 export function WithdrawalInfoCards({ withdrawal }: WithdrawalInfoCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <section className={cardClasses} aria-labelledby="withdrawal-info-heading">
+      <Card as="section" padding="md" aria-labelledby="withdrawal-info-heading">
         <h2 id="withdrawal-info-heading" className="text-sm font-semibold text-slate-900">
           Retiro
         </h2>
@@ -68,10 +68,10 @@ export function WithdrawalInfoCards({ withdrawal }: WithdrawalInfoCardsProps) {
             value={`${withdrawal.registeredBy.fullName} · ${formatDate(withdrawal.withdrawnAt)}`}
           />
         </dl>
-      </section>
+      </Card>
 
       {withdrawal.lastEdit && (
-        <section className={cardClasses} aria-labelledby="withdrawal-lastedit-heading">
+        <Card as="section" padding="md" aria-labelledby="withdrawal-lastedit-heading">
           <h2 id="withdrawal-lastedit-heading" className="text-sm font-semibold text-slate-900">
             Última edición
           </h2>
@@ -82,7 +82,7 @@ export function WithdrawalInfoCards({ withdrawal }: WithdrawalInfoCardsProps) {
             />
             <Field label="Motivo" value={withdrawal.lastEdit.reason} />
           </dl>
-        </section>
+        </Card>
       )}
     </div>
   )

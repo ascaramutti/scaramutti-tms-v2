@@ -11,6 +11,7 @@ import { OpeningBalanceForm } from '../components/OpeningBalanceForm'
 import { OpeningBalancesTable } from '../components/OpeningBalancesTable'
 import { WarehouseProductField } from '../components/WarehouseProductField'
 import { useWarehouseOpeningBalancesList } from '../hooks/useWarehouseOpeningBalancesList'
+import { Card } from '../../../shared/ui/Card'
 
 const PAGE_SIZE = 10
 
@@ -53,10 +54,7 @@ export function OpeningBalancesPage() {
       />
 
       {canRegister ? (
-        <section
-          aria-labelledby="opening-balance-form-heading"
-          className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm"
-        >
+        <Card as="section" aria-labelledby="opening-balance-form-heading">
           <h2
             id="opening-balance-form-heading"
             className="mb-4 text-sm font-semibold text-slate-900"
@@ -74,7 +72,7 @@ export function OpeningBalancesPage() {
               setPage(0)
             }}
           />
-        </section>
+        </Card>
       ) : (
         // Un espacio vacío se leería como una pantalla rota: se dice por qué no
         // está el formulario. La autoridad real es el 403 del backend.

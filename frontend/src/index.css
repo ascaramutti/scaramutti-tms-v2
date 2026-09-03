@@ -107,6 +107,7 @@
      hover:bg-blue-700 (15), bg-blue-700 sólido
        (1, QuotationDetailActions), text-blue-700 (16) -> ~-accent-hover
      bg-blue-50 (8), bg-blue-100 (7)              -> ~-accent-soft
+     border-blue-300 de la caja informativa (3)    -> border-accent-border
      text-white (32) sobre un relleno de color    -> text-on-solid
      hover:bg-red-700 (3, el hover del
        relleno destructivo)                       -> ~-danger-hover
@@ -248,6 +249,12 @@
   --color-accent: #155dfc;        /* blue-600  */
   --color-accent-hover: #1447e6;  /* blue-700  */
   --color-accent-soft: #eff6ff;   /* blue-50   */
+  /* El borde de la caja informativa, espejo de `danger-border` y `warning-border`. Lo
+     pidió el PR de `Card` y `Alert`: sin él, la variante informativa quedaba con un
+     `border-blue-300` crudo, que es justo lo que el mapa existe para evitar. Ruling del
+     dueño 2026-09-03, mismo criterio que `danger-hover` en el PR del botón: token propio
+     antes que tono crudo o prestado. */
+  --color-accent-border: #8ec5ff; /* blue-300  */
   --color-on-solid: #ffffff;      /* white     */
 
   /* Anillo de foco. Separado del acento porque el foco tiene que poder subir de
@@ -280,6 +287,7 @@
   --color-success: #007a55;       /* emerald-700 */
   --color-success-soft: #d0fae5;  /* emerald-100 */
   --color-success-fg: #007a55;    /* emerald-700 */
+  --color-success-border: #a4f4cf;/* emerald-200 */
 }
 
 @layer base {
