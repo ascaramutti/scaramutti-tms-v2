@@ -4,6 +4,8 @@ import { Combobox, type ComboboxOption } from '../../../shared/ui/Combobox'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { ClientCreateModal } from '../../clients/components/ClientCreateModal'
 import { CLIENT_SEARCH_MIN_LENGTH, useClientsSearch } from '../../clients/hooks/useClientsSearch'
+import { fieldReadonlyClasses } from '../../../shared/ui/fieldClasses'
+import { cn } from '../../../shared/utils/cn'
 
 /** Espera entre la última tecla y la búsqueda, igual que el resto de los buscadores. */
 const SEARCH_DEBOUNCE_MS = 300
@@ -104,7 +106,7 @@ export function ServiceClientField({
           value={value?.ruc ?? ''}
           readOnly
           aria-label="RUC del cliente seleccionado"
-          className="w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none"
+          className={cn('w-full', fieldReadonlyClasses())}
         />
       </div>
       {modalOpen && (

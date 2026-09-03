@@ -513,7 +513,7 @@ describe('ServiceProgressModal, accesibilidad', () => {
     // Y se VE apagado, con las mismas clases que el textarea de al lado: medir solo el
     // atributo dejaba pasar un campo que no acepta escritura pero conserva aspecto de
     // editable, que es el síntoma que esta línea existe para evitar.
-    expect(dateField).toHaveClass('bg-slate-50')
+    expect(dateField).toHaveClass('bg-surface-subtle')
   })
 
   it('arranca con el foco en el campo de fecha', async () => {

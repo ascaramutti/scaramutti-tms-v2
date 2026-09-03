@@ -10,6 +10,7 @@ import {
   type PurchaseInvoiceFormInput,
 } from '../schemas/purchase-invoice.schema'
 import { EntryProductField } from './EntryProductField'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface EntryItemsTableProps {
   /** Código de moneda elegido en la cabecera, para formatear los importes. */
@@ -21,8 +22,7 @@ interface EntryItemsTableProps {
   initialSelectedProducts?: Array<WarehouseProductSummary | null>
 }
 
-const inputClasses =
-  'w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }), 'placeholder:text-fg-subtle py-2.5')
 
 function lineTotal(quantity: number | undefined, unitPrice: number | undefined): number | null {
   if (typeof quantity !== 'number' || !Number.isFinite(quantity)) return null
@@ -139,7 +139,7 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
                       // Ancho fijo (no `flex-1`): así la unidad queda pegada al número
                       // y no estirada hasta el borde de la columna, separada de Precio.
                       'w-20 tabular-nums',
-                      itemErrors?.quantity ? 'border-red-300' : 'border-slate-300',
+                      itemErrors?.quantity ? 'border-danger-border-strong' : 'border-border-strong',
                     )}
                   />
                   {/* La unidad va al costado del número: "1000 GAL" se lee de un vistazo. */}
@@ -167,7 +167,7 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
                   className={cn(
                     inputClasses,
                     'tabular-nums',
-                    itemErrors?.unitPrice ? 'border-red-300' : 'border-slate-300',
+                    itemErrors?.unitPrice ? 'border-danger-border-strong' : 'border-border-strong',
                   )}
                 />
                 {itemErrors?.unitPrice && (

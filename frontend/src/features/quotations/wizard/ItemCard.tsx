@@ -10,6 +10,7 @@ import { itemTotal } from './itemCalc'
 import { itemSchema, type ItemServiceKind, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
 import { Card } from '../../../shared/ui/Card'
+import { fieldClasses, fieldReadonlyClasses, FIELD_LABEL as SHARED_FIELD_LABEL } from '../../../shared/ui/fieldClasses'
 
 interface ItemCardProps {
   index: number
@@ -24,11 +25,9 @@ interface ItemCardProps {
   onRemove: () => void
 }
 
-const FIELD_LABEL = 'mb-1.5 block text-sm font-medium text-slate-700'
-const CONTROL =
-  'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
-const READONLY =
-  'w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none'
+const FIELD_LABEL = SHARED_FIELD_LABEL
+const CONTROL = cn('w-full', fieldClasses())
+const READONLY = cn('w-full', fieldReadonlyClasses())
 
 /** Empty → `null` (campos numéricos opcionales). */
 function nullableNum(value: string): number | null {
@@ -188,7 +187,7 @@ export function ItemCard({
               onChange={(event) => handleServiceTypeChange(event.target.value)}
               onBlur={() => trigger(`items.${index}.serviceTypeId`)}
               aria-invalid={!!itemErrors?.serviceTypeId}
-              className={cn(CONTROL, itemErrors?.serviceTypeId ? 'border-red-300' : 'border-slate-300')}
+              className={cn(CONTROL, itemErrors?.serviceTypeId ? 'border-danger-border-strong' : 'border-border-strong')}
             >
               <option value="">Selecciona</option>
               {serviceTypes.map((type) => {
@@ -323,7 +322,7 @@ export function ItemCard({
                       if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault()
                     }}
                     aria-label={`Total del ítem ${position}`}
-                    className={cn(CONTROL, 'border-slate-300')}
+                    className={CONTROL}
                   />
                 </div>
               </div>
@@ -336,7 +335,7 @@ export function ItemCard({
                   id={`item-${index}-observations`}
                   rows={2}
                   {...register(`items.${index}.observations`)}
-                  className={cn(CONTROL, 'resize-none', itemErrors?.observations ? 'border-red-300' : 'border-slate-300')}
+                  className={cn(CONTROL, 'resize-none', itemErrors?.observations ? 'border-danger-border-strong' : 'border-border-strong')}
                 />
                 {itemErrors?.observations?.message && (
                   <p role="alert" className="mt-1.5 text-sm text-red-600">

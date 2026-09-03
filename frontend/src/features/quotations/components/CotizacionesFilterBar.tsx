@@ -9,14 +9,14 @@ import {
 import { QUOTATION_STATUS_LABELS, QUOTATION_TYPE_LABELS } from '../utils/quotationLabels'
 import { SEARCH_MIN_LENGTH } from '../hooks/useQuotationsList'
 import { Card } from '../../../shared/ui/Card'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface CotizacionesFilterBarProps {
   value: QuotationFilters
   onChange: (next: QuotationFilters) => void
 }
 
-const inputClasses =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }))
 
 /**
  * Barra de filtros del listado de cotizaciones: búsqueda libre + estado + tipo
@@ -37,12 +37,12 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         {/* Búsqueda libre */}
         <div className="lg:col-span-2">
-          <label htmlFor="q" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="q" className="mb-1.5 block text-sm font-medium text-fg-body">
             Buscar
           </label>
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
               aria-hidden="true"
             />
             <input
@@ -52,11 +52,11 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
               onChange={(event) => set('q', event.target.value)}
               placeholder="Código, cliente, RUC, origen, destino…"
               aria-describedby={showSearchHint ? 'q-hint' : undefined}
-              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-slate-400')}
+              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-fg-subtle')}
             />
           </div>
           {showSearchHint && (
-            <p id="q-hint" className="mt-1 text-xs text-slate-500">
+            <p id="q-hint" className="mt-1 text-xs text-fg-muted">
               Ingresa al menos {SEARCH_MIN_LENGTH} caracteres para buscar.
             </p>
           )}
@@ -64,7 +64,7 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
 
         {/* Estado */}
         <div>
-          <label htmlFor="status" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="status" className="mb-1.5 block text-sm font-medium text-fg-body">
             Estado
           </label>
           <select
@@ -86,7 +86,7 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
 
         {/* Tipo */}
         <div>
-          <label htmlFor="quotationType" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="quotationType" className="mb-1.5 block text-sm font-medium text-fg-body">
             Tipo
           </label>
           <select
@@ -111,7 +111,7 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
 
         {/* Fecha desde */}
         <div>
-          <label htmlFor="dateFrom" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="dateFrom" className="mb-1.5 block text-sm font-medium text-fg-body">
             Desde
           </label>
           <input
@@ -125,7 +125,7 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
 
         {/* Fecha hasta */}
         <div>
-          <label htmlFor="dateTo" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="dateTo" className="mb-1.5 block text-sm font-medium text-fg-body">
             Hasta
           </label>
           <input
@@ -137,11 +137,11 @@ export function CotizacionesFilterBar({ value, onChange }: CotizacionesFilterBar
             aria-describedby={dateRangeInvalid ? 'dateTo-error' : undefined}
             className={cn(
               inputClasses,
-              dateRangeInvalid && 'border-red-300 focus:border-red-500 focus:ring-red-500',
+              dateRangeInvalid && 'border-danger-border-strong focus:border-danger focus:ring-danger',
             )}
           />
           {dateRangeInvalid && (
-            <p id="dateTo-error" role="alert" className="mt-1 text-xs text-red-600">
+            <p id="dateTo-error" role="alert" className="mt-1 text-xs text-danger">
               No puede ser anterior a "Desde".
             </p>
           )}

@@ -6,6 +6,8 @@ import { CLIENT_SEARCH_MIN_LENGTH, useClientsSearch } from '../../clients/hooks/
 import { ClientCreateModal } from '../../clients/components/ClientCreateModal'
 import type { ClientResponse } from '../../../api'
 import type { WizardFormInput } from './quotation-wizard.schema'
+import { fieldReadonlyClasses, FIELD_LABEL as SHARED_FIELD_LABEL } from '../../../shared/ui/fieldClasses'
+import { cn } from '../../../shared/utils/cn'
 
 function toOption(client: ClientResponse): ComboboxOption {
   return { id: client.id, label: client.name, sublabel: `RUC ${client.ruc}` }
@@ -68,7 +70,7 @@ export function ClientField({ selectedClient, onClientChange, readOnly = false }
     return (
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="sm:col-span-2">
-          <label htmlFor="cliente-readonly" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="cliente-readonly" className={SHARED_FIELD_LABEL}>
             Cliente
           </label>
           <input
@@ -77,12 +79,12 @@ export function ClientField({ selectedClient, onClientChange, readOnly = false }
             value={selectedClient?.name ?? ''}
             readOnly
             aria-label="Cliente de la cotización"
-            className="w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none"
+            className={cn('w-full', fieldReadonlyClasses())}
           />
           <p className="mt-1.5 text-xs text-slate-500">El cliente no se puede cambiar al editar.</p>
         </div>
         <div>
-          <label htmlFor="cliente-ruc-display" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="cliente-ruc-display" className={SHARED_FIELD_LABEL}>
             RUC
           </label>
           <input
@@ -91,7 +93,7 @@ export function ClientField({ selectedClient, onClientChange, readOnly = false }
             value={selectedClient?.ruc ?? ''}
             readOnly
             aria-label="RUC del cliente seleccionado"
-            className="w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none"
+            className={cn('w-full', fieldReadonlyClasses())}
           />
         </div>
       </div>
@@ -123,7 +125,7 @@ export function ClientField({ selectedClient, onClientChange, readOnly = false }
           />
         </div>
         <div>
-          <label htmlFor="cliente-ruc-display" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="cliente-ruc-display" className={SHARED_FIELD_LABEL}>
             RUC
           </label>
           {/* Vacío hasta elegir cliente; luego muestra su RUC. Siempre de solo lectura. */}
@@ -135,7 +137,7 @@ export function ClientField({ selectedClient, onClientChange, readOnly = false }
             // Accessible name propio: evita colisionar con el campo "RUC" del modal de
             // crear cliente (el <label> visible sigue siendo "RUC").
             aria-label="RUC del cliente seleccionado"
-            className="w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none"
+            className={cn('w-full', fieldReadonlyClasses())}
           />
         </div>
       </div>
