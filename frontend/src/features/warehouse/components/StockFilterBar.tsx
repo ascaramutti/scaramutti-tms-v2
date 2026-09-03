@@ -4,6 +4,7 @@ import { cn } from '../../../shared/utils/cn'
 import { SEARCH_MIN_LENGTH } from '../hooks/useWarehouseProductsList'
 import { SEARCH_MAX_LENGTH, type StockFilters } from '../schemas/stock-filters.schema'
 import { Card } from '../../../shared/ui/Card'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface StockFilterBarProps {
   value: StockFilters
@@ -14,8 +15,7 @@ interface StockFilterBarProps {
   categoriesError: boolean
 }
 
-const inputClasses =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }))
 
 /**
  * Barra de filtros de Existencias: búsqueda libre + categoría. El debounce de
@@ -47,13 +47,13 @@ export function StockFilterBar({
         <div className="sm:col-span-2">
           <label
             htmlFor="warehouse-q"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Buscar
           </label>
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
               aria-hidden="true"
             />
             <input
@@ -64,11 +64,11 @@ export function StockFilterBar({
               onChange={(event) => set('q', event.target.value)}
               placeholder="Código, producto, marca, número de parte…"
               aria-describedby={showSearchHint ? 'warehouse-q-hint' : undefined}
-              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-slate-400')}
+              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-fg-subtle')}
             />
           </div>
           {showSearchHint && (
-            <p id="warehouse-q-hint" className="mt-1 text-xs text-slate-500">
+            <p id="warehouse-q-hint" className="mt-1 text-xs text-fg-muted">
               Ingresa al menos {SEARCH_MIN_LENGTH} caracteres para buscar.
             </p>
           )}
@@ -78,7 +78,7 @@ export function StockFilterBar({
         <div>
           <label
             htmlFor="warehouse-category"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Categoría
           </label>
@@ -100,7 +100,7 @@ export function StockFilterBar({
             ))}
           </select>
           {categoriesError && (
-            <p id="warehouse-category-error" role="alert" className="mt-1 text-xs text-amber-700">
+            <p id="warehouse-category-error" role="alert" className="mt-1 text-xs text-warning">
               No se pudieron cargar las categorías.
             </p>
           )}
@@ -109,7 +109,7 @@ export function StockFilterBar({
 
       {value.lowOnly && (
         <div className="mt-4 flex items-center gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-fg-muted">
             Filtros aplicados
           </span>
           <button

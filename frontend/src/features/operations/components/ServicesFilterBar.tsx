@@ -15,17 +15,17 @@ import {
   type ServiceFilters,
 } from '../schemas/service-filters.schema'
 import { Card } from '../../../shared/ui/Card'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface ServicesFilterBarProps {
   value: ServiceFilters
   onChange: (next: ServiceFilters) => void
 }
 
-const inputClasses =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }))
 
 /** El rango inválido se marca en los dos inputs, no solo con el texto al pie. */
-const invalidInputClasses = 'border-red-300 focus:border-red-500 focus:ring-red-500'
+const invalidInputClasses = 'border-danger-border-strong focus:border-danger focus:ring-danger'
 
 /**
  * Filtros del listado de servicios: búsqueda libre, estado y rango de fecha
@@ -55,12 +55,12 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
     <Card padding="md">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6">
         <div className="lg:col-span-2">
-          <label htmlFor="services-q" className="mb-1.5 block text-sm font-medium text-slate-700">
+          <label htmlFor="services-q" className="mb-1.5 block text-sm font-medium text-fg-body">
             Buscar
           </label>
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
               aria-hidden="true"
             />
             <input
@@ -71,11 +71,11 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
               onChange={(event) => set('q', event.target.value)}
               placeholder="Código, cliente, RUC, origen, destino…"
               aria-describedby={showSearchHint ? 'services-q-hint' : undefined}
-              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-slate-400')}
+              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-fg-subtle')}
             />
           </div>
           {showSearchHint && (
-            <p id="services-q-hint" className="mt-1 text-xs text-slate-500">
+            <p id="services-q-hint" className="mt-1 text-xs text-fg-muted">
               Ingresa al menos una palabra de {SERVICE_SEARCH_MIN_LENGTH} caracteres para buscar.
             </p>
           )}
@@ -86,7 +86,7 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
         <div className="lg:col-span-2">
           <label
             htmlFor="services-status"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Estado
           </label>
@@ -114,7 +114,7 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
           <div>
             <label
               htmlFor="services-date-from"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
+              className="mb-1.5 block text-sm font-medium text-fg-body"
             >
               Desde
             </label>
@@ -133,7 +133,7 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
           <div>
             <label
               htmlFor="services-date-to"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
+              className="mb-1.5 block text-sm font-medium text-fg-body"
             >
               Hasta
             </label>
@@ -153,7 +153,7 @@ export function ServicesFilterBar({ value, onChange }: ServicesFilterBarProps) {
       </div>
 
       {invalidRange && (
-        <p id="services-date-error" role="alert" className="mt-3 text-xs text-red-600">
+        <p id="services-date-error" role="alert" className="mt-3 text-xs text-danger">
           La fecha "desde" no puede ser posterior a la fecha "hasta": el filtro de
           fechas no se está aplicando.
         </p>

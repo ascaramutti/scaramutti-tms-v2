@@ -7,6 +7,7 @@ import {
 } from 'react-hook-form'
 import { cn } from '../../../shared/utils/cn'
 import type { ProductCreateInput } from '../schemas/product.schema'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface ProductAttributesFieldProps {
   control: Control<ProductCreateInput>
@@ -15,8 +16,7 @@ interface ProductAttributesFieldProps {
   disabled?: boolean
 }
 
-const inputClasses =
-  'w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-50 disabled:text-slate-400'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }), 'disabled:bg-surface-subtle disabled:text-fg-subtle placeholder:text-fg-subtle')
 
 /**
  * Editor de las características del producto (rosca, viscosidad, medida…). El
@@ -58,7 +58,7 @@ export function ProductAttributesField({
                 aria-invalid={!!keyError}
                 placeholder="Rosca"
                 disabled={disabled}
-                className={cn(inputClasses, keyError ? 'border-red-300' : 'border-slate-300')}
+                className={cn(inputClasses, keyError ? 'border-danger-border-strong' : 'border-border-strong')}
               />
               {keyError && (
                 <p role="alert" className="mt-1 text-xs text-red-600">
@@ -73,7 +73,7 @@ export function ProductAttributesField({
                 aria-invalid={!!valueError}
                 placeholder="3/4-16"
                 disabled={disabled}
-                className={cn(inputClasses, valueError ? 'border-red-300' : 'border-slate-300')}
+                className={cn(inputClasses, valueError ? 'border-danger-border-strong' : 'border-border-strong')}
               />
               {valueError && (
                 <p role="alert" className="mt-1 text-xs text-red-600">

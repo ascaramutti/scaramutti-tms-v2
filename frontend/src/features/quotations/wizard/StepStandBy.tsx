@@ -5,15 +5,15 @@ import { standbyTargets, type StandbyTarget } from './standbyTargets'
 import { STANDBY_DEFAULTS, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
 import { Card } from '../../../shared/ui/Card'
+import { FIELD_CHECKBOX, fieldClasses, FIELD_LABEL as SHARED_FIELD_LABEL } from '../../../shared/ui/fieldClasses'
 
 interface StepStandByProps {
   /** Todos los tipos de servicio (para etiquetar los ítems elegibles). */
   serviceTypes: QuotationServiceTypeResponse[]
 }
 
-const FIELD_LABEL = 'mb-1.5 block text-sm font-medium text-slate-700'
-const CONTROL =
-  'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+const FIELD_LABEL = SHARED_FIELD_LABEL
+const CONTROL = cn('w-full', fieldClasses())
 
 /** Empty → `undefined` (precio requerido: zod muestra el mensaje). */
 function requiredNum(value: string): number | undefined {
@@ -70,7 +70,7 @@ export function StepStandBy({ serviceTypes }: StepStandByProps) {
                 id="standby-add"
                 value=""
                 onChange={(event) => handleAdd(event.target.value)}
-                className={cn(CONTROL, 'border-slate-300')}
+                className={CONTROL}
               >
                 <option value="">Selecciona un ítem…</option>
                 {without.map((target, index) => (
@@ -139,7 +139,7 @@ function StandbyRow({ target, onRemove }: StandbyRowProps) {
               if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault()
             }}
             {...register(priceField, { setValueAs: requiredNum })}
-            className={cn(CONTROL, priceError ? 'border-red-300' : 'border-slate-300')}
+            className={cn(CONTROL, priceError ? 'border-danger-border-strong' : 'border-border-strong')}
           />
           {priceError && (
             <p role="alert" className="mt-1.5 text-sm text-red-600">
@@ -152,7 +152,7 @@ function StandbyRow({ target, onRemove }: StandbyRowProps) {
             type="checkbox"
             aria-label={`El precio incluye IGV — ${target.label}`}
             {...register(igvField)}
-            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            className={FIELD_CHECKBOX}
           />
           <span className="text-sm text-slate-700">El precio incluye IGV</span>
         </label>

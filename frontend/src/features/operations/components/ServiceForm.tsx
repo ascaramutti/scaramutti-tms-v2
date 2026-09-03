@@ -6,6 +6,7 @@ import { TriangleAlert } from 'lucide-react'
 import type { CargoTypeResponse, ClientResponse, Problem, ServiceDetailResponse } from '../../../api'
 import { useAuth } from '../../../shared/auth/AuthContext'
 import { DateField } from '../../../shared/ui/DateField'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 import { SelectField, type SelectOption } from '../../../shared/ui/SelectField'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
@@ -253,10 +254,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
                   onBlur={field.onBlur}
                   aria-invalid={Boolean(errors.tripScope)}
                   aria-describedby={errors.tripScope ? 'service-trip-scope-error' : undefined}
-                  className={cn(
-                    'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
-                    errors.tripScope ? 'border-red-300' : 'border-slate-300',
-                  )}
+                  className={cn('w-full', fieldClasses({ invalid: Boolean(errors.tripScope) }))}
                 >
                   <option value="">Elige el ámbito</option>
                   {TRIP_SCOPE_OPTIONS.map((option) => (

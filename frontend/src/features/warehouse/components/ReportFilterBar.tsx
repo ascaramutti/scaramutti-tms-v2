@@ -11,14 +11,16 @@ import {
 import { REPORT_CUTS } from '../utils/reportCuts'
 import { Button } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface ReportFilterBarProps {
   value: ReportFilters
   onChange: (next: ReportFilters) => void
 }
 
-const inputClasses =
-  'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+// Sin `w-full`: en esta barra el control va en una fila de ancho fijo y estirarlo
+// cambiaría el ancho de los dos campos de fecha.
+const inputClasses = fieldClasses({ density: 'compact' })
 
 /**
  * Corte y rango del reporte. Los cortes son un `tablist`: son cuatro vistas del
@@ -102,7 +104,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
         <div>
           <label
             htmlFor="report-date-from"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Desde
           </label>
@@ -119,7 +121,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
         <div>
           <label
             htmlFor="report-date-to"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Hasta
           </label>
@@ -145,7 +147,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
       </div>
 
       {rangeMessage && (
-        <p id="report-date-error" role="alert" className="text-xs text-red-600">
+        <p id="report-date-error" role="alert" className="text-xs text-danger">
           {rangeMessage}
         </p>
       )}

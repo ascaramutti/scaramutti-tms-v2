@@ -4,6 +4,8 @@ import { QuotationNotesFields } from './QuotationNotesFields'
 import type { WizardFormInput } from './quotation-wizard.schema'
 import type { ConditionResponse, QuotationConditionResponse } from '../../../api'
 import { Card } from '../../../shared/ui/Card'
+import { FIELD_CHECKBOX } from '../../../shared/ui/fieldClasses'
+import { cn } from '../../../shared/utils/cn'
 
 interface StepConditionsProps {
   /** Catálogo de condiciones ACTIVAS (las elegibles, ordenadas por displayOrder). */
@@ -66,7 +68,7 @@ export function StepConditions({ conditions, linkedConditions = [] }: StepCondit
                   type="checkbox"
                   checked={selected.includes(condition.id)}
                   onChange={(event) => toggle(condition.id, event.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className={cn('mt-0.5 shrink-0', FIELD_CHECKBOX)}
                 />
                 <span className="text-sm text-slate-700">{condition.text}</span>
               </Card>
@@ -94,7 +96,10 @@ export function StepConditions({ conditions, linkedConditions = [] }: StepCondit
                   checked={false}
                   disabled
                   aria-label={`${condition.text} (ya no vigente)`}
-                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300"
+                  // La casilla de una condición que ya no rige: deshabilitada y sin marcar, así que
+                  // no lleva el color de marca ni el anillo de foco de las demás. Solo el borde
+                  // pasa al token.
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-border-strong"
                 />
                 <span className="text-sm text-slate-500 line-through">{condition.text}</span>
               </label>

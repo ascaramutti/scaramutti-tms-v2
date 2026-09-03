@@ -10,6 +10,8 @@ import { FleetUnitField } from '../../../shared/catalogs/FleetUnitField'
 import { WarehouseProductField } from './WarehouseProductField'
 import { WorkerField } from './WorkerField'
 import { Card } from '../../../shared/ui/Card'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
+import { cn } from '../../../shared/utils/cn'
 
 /**
  * Aviso cuando el catálogo de flota no carga.
@@ -27,8 +29,7 @@ interface WithdrawalsFilterBarProps {
   onChange: (next: WithdrawalFilters) => void
 }
 
-const inputClasses =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }))
 
 /**
  * Filtros del listado de retiros: producto, trabajador y unidad de flota (los tres
@@ -99,7 +100,7 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
         <div>
           <label
             htmlFor="withdrawals-status"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Estado
           </label>
@@ -125,7 +126,7 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
         <div>
           <label
             htmlFor="withdrawals-date-from"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Desde
           </label>
@@ -143,7 +144,7 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
         <div>
           <label
             htmlFor="withdrawals-date-to"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Hasta
           </label>
@@ -160,7 +161,7 @@ export function WithdrawalsFilterBar({ value, onChange }: WithdrawalsFilterBarPr
       </div>
 
       {invalidRange && (
-        <p id="withdrawals-date-error" role="alert" className="text-xs text-red-600">
+        <p id="withdrawals-date-error" role="alert" className="text-xs text-danger">
           La fecha "desde" no puede ser posterior a la fecha "hasta".
         </p>
       )}
