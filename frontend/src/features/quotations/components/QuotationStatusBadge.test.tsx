@@ -6,11 +6,11 @@ import type { QuotationStatus } from '../../../api'
 
 // label esperado + una clase representativa de la variante de cada estado.
 const CASES: { status: QuotationStatus; label: string; className: string }[] = [
-  { status: 'DRAFT', label: 'Borrador', className: 'bg-slate-100' },
-  { status: 'SENT', label: 'Enviada', className: 'bg-blue-100' },
-  { status: 'ACCEPTED', label: 'Aceptada', className: 'bg-teal-100' },
-  { status: 'REJECTED', label: 'Rechazada', className: 'bg-rose-100' },
-  { status: 'EXPIRED', label: 'Vencida', className: 'bg-amber-100' },
+  { status: 'DRAFT', label: 'Borrador', className: 'bg-surface-muted' },
+  { status: 'SENT', label: 'Enviada', className: 'bg-accent-soft-strong' },
+  { status: 'ACCEPTED', label: 'Aceptada', className: 'bg-transition-soft' },
+  { status: 'REJECTED', label: 'Rechazada', className: 'bg-danger-soft' },
+  { status: 'EXPIRED', label: 'Vencida', className: 'bg-warning-soft-strong' },
 ]
 
 describe('QuotationStatusBadge', () => {

@@ -101,6 +101,8 @@ const PAIRS: Pair[] = [
   { fg: 'accent-hover', bg: 'canvas', min: AA_TEXT, what: 'etiqueta del paso visitado del asistente' },
   { fg: 'accent-hover', bg: 'surface-muted', min: AA_TEXT, what: 'opción del desplegable resaltada por teclado' },
   { fg: 'accent-hover', bg: 'accent-soft', min: AA_TEXT, what: 'total del asistente, ítem activo de la barra lateral y pastillas internas' },
+  { fg: 'accent-hover', bg: 'accent-soft-strong', min: AA_TEXT, what: 'texto de la pastilla informativa y del círculo con el número de ítem' },
+  { fg: 'accent-soft-strong', bg: 'accent-soft', min: AA_NON_TEXT, what: 'la pastilla informativa contra la fila integral que la contiene, que es el motivo por el que este token existe' },
   // Dos usos, no uno: el texto del error y el anillo de foco del botón destructivo. El
   // umbral queda en el del texto, que es el más estricto de los dos (4.5 contra 3).
   { fg: 'danger', bg: 'surface', min: AA_TEXT, what: 'mensaje de error bajo un campo, y anillo de foco del destructivo sobre tarjeta' },
@@ -110,10 +112,13 @@ const PAIRS: Pair[] = [
   { fg: 'danger-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde de un control en error' },
   { fg: 'warning', bg: 'surface', min: AA_TEXT, what: 'aviso de campo sobre tarjeta' },
   { fg: 'warning', bg: 'warning-soft', min: AA_TEXT, what: 'pastilla de aviso de Badge, y el valor del tile de stock bajo con el filtro activo' },
+  { fg: 'warning', bg: 'warning-soft-strong', min: AA_TEXT, what: 'texto del chip que quita el filtro de stock bajo' },
   { fg: 'warning-fg', bg: 'warning-soft', min: AA_TEXT, what: 'texto de la alerta de aviso' },
   { fg: 'success', bg: 'surface', min: AA_TEXT, what: 'PREVENTIVO: no hay texto ni relleno con el tono sólido todavía' },
   { fg: 'success-fg', bg: 'surface', min: AA_TEXT, what: 'texto de entrada en el kardex' },
   { fg: 'success-fg', bg: 'success-soft', min: AA_TEXT, what: 'texto de la pastilla de éxito' },
+  { fg: 'progress-fg', bg: 'progress-soft', min: AA_TEXT, what: 'texto de la pastilla del viaje en ruta' },
+  { fg: 'transition-fg', bg: 'transition-soft', min: AA_TEXT, what: 'texto de la pastilla de la cotización aceptada y del cambio de estado en la bitácora' },
   { fg: 'focus', bg: 'surface', min: AA_NON_TEXT, what: 'anillo de foco sobre tarjeta' },
   { fg: 'focus', bg: 'canvas', min: AA_NON_TEXT, what: 'anillo de foco sobre el fondo' },
   { fg: 'border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde del input sobre tarjeta' },
@@ -227,6 +232,15 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
     note:
       'El mismo borde de control en error, contra el fondo suave: el botón de descartar de ' +
       'ServiceStatusErrorAlert.tsx:39 vive dentro de la alerta roja, no sobre tarjeta.',
+  },
+  'accent-soft-strong/accent-soft': {
+    ratio: 1.12,
+    note:
+      'La pastilla informativa dentro de la fila de un servicio integral ' +
+      '(QuotationItemsSection.tsx). Es el número que este token existe para conservar: el mapa ' +
+      'mandaba los dos azules suaves al mismo valor y la pastilla pasaba a 1.00, o sea a ' +
+      'desaparecer dentro de la fila. A 1.12 tampoco se separa por contraste, y no hace falta: ' +
+      'lo que comunica es el texto "Integral", no el relleno.',
   },
   'fg-muted/accent-soft': {
     ratio: 4.38,
@@ -488,6 +502,7 @@ describe('tokens del tema', () => {
       'accent': '#155dfc', // blue-600
       'accent-hover': '#1447e6', // blue-700
       'accent-soft': '#eff6ff', // blue-50
+      'accent-soft-strong': '#dbeafe', // blue-100
       'on-solid': '#ffffff', // white
       'focus': '#2b7fff', // blue-500
       'danger': '#e7000b', // red-600
@@ -499,9 +514,14 @@ describe('tokens del tema', () => {
       'danger-border-strong': '#ffa2a2', // red-300
       'warning': '#bb4d00', // amber-700
       'warning-soft': '#fffbeb', // amber-50
+      'warning-soft-strong': '#fef3c6', // amber-100
       'warning-fg': '#973c00', // amber-800
       'success-border': '#a4f4cf', // emerald-200
       'warning-border': '#fee685', // amber-200
+      'progress-soft': '#ede9fe', // violet-100
+      'progress-fg': '#7008e7', // violet-700
+      'transition-soft': '#cbfbf1', // teal-100
+      'transition-fg': '#00786f', // teal-700
       'success': '#007a55', // emerald-700
       'success-soft': '#d0fae5', // emerald-100
       'success-fg': '#007a55', // emerald-700
@@ -571,10 +591,12 @@ describe('tokens del tema', () => {
       'accent-border/accent-soft',
       'accent-border/surface',
       'accent-hover/accent-soft',
+      'accent-hover/accent-soft-strong',
       'accent-hover/canvas',
       'accent-hover/surface',
       'accent-hover/surface-muted',
       'accent-hover/surface-subtle',
+      'accent-soft-strong/accent-soft',
       'accent/accent-soft',
       'accent/canvas',
       'accent/surface',
@@ -617,16 +639,19 @@ describe('tokens del tema', () => {
       'on-solid/danger',
       'on-solid/danger-hover',
       'on-solid/success',
+      'progress-fg/progress-soft',
       'success-border/success-soft',
       'success-fg/success-soft',
       'success-fg/surface',
       'success/surface',
       'surface-subtle/surface',
+      'transition-fg/transition-soft',
       'warning-border/warning-soft',
       'warning-fg/surface',
       'warning-fg/warning-soft',
       'warning/surface',
       'warning/warning-soft',
+      'warning/warning-soft-strong',
     ])
   })
 
@@ -641,6 +666,7 @@ describe('tokens del tema', () => {
     expect(Object.keys(KNOWN_FAILURES).sort()).toEqual([
       'accent-border/accent-soft',
       'accent-border/surface',
+      'accent-soft-strong/accent-soft',
       'border-strong/canvas',
       'border-strong/surface',
       'danger-border-strong/danger-soft',
@@ -691,6 +717,7 @@ describe('los umbrales son los de la norma', () => {
       [
       'accent-border/accent-soft',
       'accent-border/surface',
+      'accent-soft-strong/accent-soft',
       'accent/canvas',
       'border-strong/canvas',
       'border-strong/surface',

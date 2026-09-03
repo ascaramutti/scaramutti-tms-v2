@@ -84,5 +84,5 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
 /** Distintivo del producto dado de baja. La baja todavía no se hace desde la UI,
  * pero un producto inactivo puede llegar por URL o desde el kardex. */
 export function ProductInactiveBadge() {
-  return <Badge variant="slate">Inactivo</Badge>
+  return <Badge>Inactivo</Badge>
 }

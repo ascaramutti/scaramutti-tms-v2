@@ -32,9 +32,9 @@ interface ServiceStatusPresentation {
  * verde terminado, y rojo y ámbar para las dos salidas malas.
  */
 export const SERVICE_STATUS_PRESENTATION: Record<ServiceStatus, ServiceStatusPresentation> = {
-  PENDING_ASSIGNMENT: { label: 'Pendiente de asignación', badgeVariant: 'slate' },
+  PENDING_ASSIGNMENT: { label: 'Pendiente de asignación', badgeVariant: 'default' },
   PENDING_START: { label: 'Pendiente de inicio', badgeVariant: 'info' },
-  IN_PROGRESS: { label: 'En ruta', badgeVariant: 'violet' },
+  IN_PROGRESS: { label: 'En ruta', badgeVariant: 'progress' },
   COMPLETED: { label: 'Completado', badgeVariant: 'success' },
   CANCELLED: { label: 'Cancelado', badgeVariant: 'danger' },
   DELETED: { label: 'Eliminado', badgeVariant: 'warning' },

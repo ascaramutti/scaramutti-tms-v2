@@ -132,7 +132,7 @@ export function ItemCard({
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft-strong text-sm font-semibold text-accent-hover">
             {position}
           </span>
           <span className="min-w-0 flex-1">
