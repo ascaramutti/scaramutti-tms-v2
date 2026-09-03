@@ -307,6 +307,10 @@ describe('ServicesListPage', () => {
     server.use(servicesError(500, { detail: 'El servidor falló al listar.' }))
     renderServicios()
     expect(await screen.findByText('El servidor falló al listar.')).toBeInTheDocument()
+    // El botón de reintento conserva su separación del mensaje: el `mt-4` dejó de estar
+    // embebido en la cadena de clases y ahora es una prop suelta del componente compartido,
+    // que se puede soltar sola. Sin esta línea, quedaba pegado al texto y nada fallaba.
+    expect(screen.getByRole('button', { name: /reintentar/i }).className).toContain('mt-4')
     server.use(servicesPage([fakeServiceSummary()]))
     await userEvent.click(screen.getByRole('button', { name: /reintentar/i }))
     expect(await screen.findByText('SRV-0042')).toBeInTheDocument()

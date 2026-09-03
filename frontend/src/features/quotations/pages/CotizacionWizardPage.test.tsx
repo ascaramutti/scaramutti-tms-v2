@@ -416,6 +416,11 @@ describe('CotizacionWizardPage', () => {
     await user.click(screen.getByRole('button', { name: /agregar ítem/i }))
     expect(screen.getByText(/máximo 1 ítems · 1\/1/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /agregar ítem/i })).toBeDisabled()
+    // Y se ve apagado. La clase que lo apaga dejó de vivir dentro de la constante y ahora es
+    // una prop suelta del componente compartido.
+    expect(screen.getByRole('button', { name: /agregar ítem/i }).className).toContain(
+      'disabled:bg-blue-300',
+    )
   })
 
   it('crea un tipo de carga al vuelo y lo selecciona', async () => {

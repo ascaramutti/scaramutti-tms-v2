@@ -7,7 +7,6 @@ import { FleetUnitField } from '../../../../shared/catalogs/FleetUnitField'
 import { Modal } from '../../../../shared/ui/Modal'
 import { Spinner } from '../../../../shared/ui/Spinner'
 import { Textarea } from '../../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { stripControlChars } from '../../../../shared/utils/sanitizeText'
 import { DriverField } from '../DriverField'
 import { useAssignServiceResources } from '../../hooks/useAssignServiceResources'
@@ -23,6 +22,7 @@ import {
   type ServiceOperationError,
 } from '../../utils/serviceResourceConflict'
 import { ResourceConflictAlert } from './ResourceConflictAlert'
+import { Button } from '../../../../shared/ui/Button'
 
 interface AssignResourcesModalProps {
   isOpen: boolean
@@ -212,10 +212,10 @@ function AssignResourcesForm({ onClose, serviceId, serviceCode }: AssignResource
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={onClose}>
             Cancelar
-          </button>
-          <button type="submit" disabled={isPending} className={PRIMARY_BUTTON}>
+          </Button>
+          <Button variant="primary" type="submit" disabled={isPending}>
             {isPending ? (
               <>
                 <Spinner size={16} className="mr-2 text-white" /> Asignando…
@@ -223,7 +223,7 @@ function AssignResourcesForm({ onClose, serviceId, serviceCode }: AssignResource
             ) : (
               'Asignar recursos'
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

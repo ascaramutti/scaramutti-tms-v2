@@ -3,8 +3,6 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { Modal } from '../../../shared/ui/Modal'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
-import { cn } from '../../../shared/utils/cn'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
 import {
   toSupplierRequest,
@@ -12,6 +10,7 @@ import {
 } from '../hooks/useCreateWarehouseSupplier'
 import { supplierFormSchema, type SupplierFormInput } from '../schemas/supplier.schema'
 import type { WarehouseSupplierResponse } from '../../../api'
+import { Button } from '../../../shared/ui/Button'
 
 interface SupplierCreateModalProps {
   /** Texto tipeado en el combobox, para precargar la razón social. */
@@ -92,13 +91,14 @@ export function SupplierCreateModal({
           register={register('phone')}
         />
         <div className="flex justify-end gap-2 pt-2">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={onClose}>
             Cancelar
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
+            variant="primary"
             disabled={isSubmitting}
-            className={cn(PRIMARY_BUTTON, 'gap-2 disabled:cursor-not-allowed disabled:bg-blue-300')}
+            className="gap-2 disabled:cursor-not-allowed disabled:bg-blue-300"
           >
             {isSubmitting ? (
               <>
@@ -108,7 +108,7 @@ export function SupplierCreateModal({
             ) : (
               'Crear proveedor'
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

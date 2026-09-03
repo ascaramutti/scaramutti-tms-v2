@@ -41,6 +41,18 @@ export function EntryDetailPage() {
           title="No se encontró la entrada"
           description="Puede que se haya anulado o que el enlace esté mal."
           action={
+            /* Esta cadena NO usa `buttonClasses`, y no es un olvido. Es la gemela del
+                secundario compartido: idéntica clase por clase salvo que el anillo de foco
+                sale con `focus-visible:` en vez de `focus:`, o sea aparece al llegar con el
+                tabulador pero no al hacer clic con el mouse. Son doce en siete archivos
+                (`grep -rn "border-slate-300 bg-white px-4 py-2 " src --include=*.tsx |
+                grep focus-visible`), y unificarlas cambia CUÁNDO se ve el anillo, que es un
+                cambio de aspecto y no una mudanza.
+
+                Aviso para el próximo barrido por valor: por conjunto de clases estas doce se
+                parecen mucho a la secundaria, y esa es justo la trampa que el PR del botón
+                documentó del otro lado en `WizardForm`. La decisión y su fila están en
+                `docs/2-diseno/frontend-tema/DECISIONES.md`. */
             <Link
               to={ENTRIES_PATH}
               className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { describe, expect, it } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { cleanup, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import type { ServiceStatus } from '../../../../api'
@@ -8,6 +8,7 @@ import { ServiceResources } from './ServiceResources'
 import { server } from '../../../../test/mocks/server'
 import { driversList, fakeBaitedServiceDetail } from '../../../../test/mocks/handlers/operations'
 import { fakeFleetUnit, fleetUnitsByKind } from '../../../../test/mocks/handlers/shared-catalogs'
+import { buttonClasses } from '../../../../shared/ui/buttonClasses'
 
 /**
  * Cada caso monta SU fixture: compartir un objeto entre casos y mutarlo es la forma
@@ -48,6 +49,20 @@ describe('ServiceResources · el botón de asignar', () => {
     renderResources('PENDING_ASSIGNMENT')
     expectCardsRendered()
     expect(assignButton()).toBeInTheDocument()
+  })
+
+  it('asignar es la acción principal de la ficha, y agregar refuerzo la secundaria', () => {
+    // La jerarquía entre los dos, que es la decisión: asignar recursos es lo que falta para
+    // que el viaje pueda arrancar; agregar refuerzo es opcional. Intercambiarlos deja esta
+    // pantalla y el detalle del viaje en verde: medido. Van en dos estados distintos porque
+    // los dos botones no se ofrecen a la vez: asignar mientras falta asignar, reforzar una
+    // vez que el viaje salió.
+    renderResources('PENDING_ASSIGNMENT')
+    expect(assignButton()?.className).toBe(buttonClasses({ variant: 'primary' }) + ' shrink-0')
+    cleanup()
+
+    renderResources('IN_PROGRESS')
+    expect(addButton()?.className).toBe(buttonClasses({ variant: 'secondary' }) + ' shrink-0')
   })
 
   it('no se ofrece con el viaje pendiente de inicio', () => {

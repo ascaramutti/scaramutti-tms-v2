@@ -359,7 +359,7 @@ describe('CotizacionEditPage', () => {
 
   // ----- 412 conflicto -----
 
-  it('muestra el mensaje de conflicto (412) y ofrece recargar', async () => {
+  it('muestra el mensaje de conflicto (412) y ofrece recargar, en contorno rojo', async () => {
     const user = userEvent.setup()
     server.use(
       quotationDetail(editableQuotation()),
@@ -374,7 +374,13 @@ describe('CotizacionEditPage', () => {
     await user.click(screen.getByRole('button', { name: /guardar cambios/i }))
 
     expect(await screen.findByText(/modificado por otro usuario/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /recargar cotización/i })).toBeInTheDocument()
+    const recargar = screen.getByRole('button', { name: /recargar cotización/i })
+    expect(recargar).toBeInTheDocument()
+    // Y sigue siendo de contorno rojo. Este es EL botón que la mudanza al componente
+    // compartido casi pinta de gris, porque su constante se llamaba igual que la
+    // compartida y decía otra cosa. Sin esta aserción, volverlo gris deja los veintitrés
+    // casos de este archivo en verde: medido.
+    expect(recargar.className).toMatch(/border-red-300/)
     // No navega: sigue en el wizard.
     expect(screen.queryByText(/DETALLE COTIZACION/i)).not.toBeInTheDocument()
   })

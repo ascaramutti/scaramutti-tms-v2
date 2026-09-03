@@ -21,6 +21,7 @@ import {
 import type { ServiceWithEtag } from '../../hooks/useService'
 import type { ServiceProgressTransition } from '../../status/serviceStatusTransitions'
 import { operationsKeys } from '../../queryKeys'
+import { buttonClasses } from '../../../../shared/ui/buttonClasses'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -107,6 +108,19 @@ describe('ServiceProgressModal, la forma', () => {
     renderModal('COMPLETED')
 
     expect(screen.getByRole('dialog', { name: 'Finalizar viaje' })).toBeInTheDocument()
+  })
+
+  it.each([
+    ['IN_PROGRESS', 'Iniciar viaje'],
+    ['COMPLETED', 'Finalizar viaje'],
+  ] as const)('el botón que confirma (%s) es la acción principal, no la destructiva', (transition, etiqueta) => {
+    // Su gemelo, el modal de salida, tiene esta red desde este PR; este no la tenía, y
+    // pintar de rojo el confirmar de AVANZAR un viaje dejaba los 41 casos del archivo en
+    // verde. El rojo está reservado a lo que saca el viaje del circuito.
+    renderModal(transition)
+    expect(screen.getByRole('button', { name: etiqueta }).className).toBe(
+      buttonClasses({ variant: 'primary' }),
+    )
   })
 
   it('rotula el campo de fecha según la transición', () => {

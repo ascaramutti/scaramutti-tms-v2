@@ -1,6 +1,5 @@
 import { useRef } from 'react'
 import { CalendarRange } from 'lucide-react'
-import { SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { cn } from '../../../shared/utils/cn'
 import { todayIsoDate } from '../../../shared/utils/formatters'
 import {
@@ -10,6 +9,7 @@ import {
   type ReportFilters,
 } from '../schemas/report-filters.schema'
 import { REPORT_CUTS } from '../utils/reportCuts'
+import { Button } from '../../../shared/ui/Button'
 
 interface ReportFilterBarProps {
   value: ReportFilters
@@ -132,16 +132,15 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
             className={inputClasses}
           />
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={() =>
             onChange({ ...value, dateFrom: currentMonthStart(), dateTo: todayIsoDate() })
           }
-          className={SECONDARY_BUTTON}
         >
           <CalendarRange className="mr-2 h-4 w-4" aria-hidden="true" />
           Mes actual
-        </button>
+        </Button>
       </div>
 
       {rangeMessage && (

@@ -6,6 +6,7 @@ import { ItemCard } from './ItemCard'
 import { itemsSubtotal } from './itemCalc'
 import { ITEM_DEFAULTS, type WizardFormInput } from './quotation-wizard.schema'
 import type { CurrencyResponse, QuotationServiceTypeResponse } from '../../../api'
+import { Button } from '../../../shared/ui/Button'
 
 interface Step2ItemsProps {
   /** Todos los tipos de servicio (se filtran acá según el tipo de cotización). */
@@ -14,9 +15,6 @@ interface Step2ItemsProps {
   igvPercentage: number
   maxRootItems: number
 }
-
-const ADD_BUTTON =
-  'inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300'
 
 export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootItems }: Step2ItemsProps) {
   const {
@@ -96,10 +94,15 @@ export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootIte
             {`Máximo ${maxRootItems} ítems · ${fields.length}/${maxRootItems}`}
           </p>
         </div>
-        <button type="button" onClick={handleAdd} disabled={atMax} className={ADD_BUTTON}>
+        <Button
+          variant="primary"
+          onClick={handleAdd}
+          disabled={atMax}
+          className="gap-2 disabled:cursor-not-allowed disabled:bg-blue-300"
+        >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Agregar ítem
-        </button>
+        </Button>
       </div>
 
       {isIntegralMode && (

@@ -89,6 +89,7 @@ const PAIRS: Pair[] = [
   { fg: 'on-solid', bg: 'accent', min: AA_TEXT, what: 'texto del botón primario' },
   { fg: 'on-solid', bg: 'accent-hover', min: AA_TEXT, what: 'texto del botón primario al pasar el mouse' },
   { fg: 'on-solid', bg: 'danger', min: AA_TEXT, what: 'texto del botón destructivo' },
+  { fg: 'on-solid', bg: 'danger-hover', min: AA_TEXT, what: 'texto del botón destructivo con el mouse encima' },
   { fg: 'on-solid', bg: 'success', min: AA_TEXT, what: 'PREVENTIVO: el único relleno sólido verde es Stepper.tsx:64 y es emerald-500, no este token' },
   { fg: 'accent', bg: 'surface', min: AA_TEXT, what: 'enlace y texto de acento sobre tarjeta' },
   { fg: 'accent', bg: 'canvas', min: AA_NON_TEXT, what: 'anillo del spinner de carga sobre el fondo de página' },
@@ -97,8 +98,10 @@ const PAIRS: Pair[] = [
   { fg: 'accent-hover', bg: 'canvas', min: AA_TEXT, what: 'etiqueta del paso visitado del asistente' },
   { fg: 'accent-hover', bg: 'surface-muted', min: AA_TEXT, what: 'opción del desplegable resaltada por teclado' },
   { fg: 'accent-hover', bg: 'accent-soft', min: AA_TEXT, what: 'total del asistente, ítem activo de la barra lateral y pastillas internas' },
-  { fg: 'danger', bg: 'surface', min: AA_TEXT, what: 'mensaje de error bajo un campo' },
-  { fg: 'danger', bg: 'canvas', min: AA_TEXT, what: 'mensaje de error sobre el fondo de página' },
+  // Dos usos, no uno: el texto del error y el anillo de foco del botón destructivo. El
+  // umbral queda en el del texto, que es el más estricto de los dos (4.5 contra 3).
+  { fg: 'danger', bg: 'surface', min: AA_TEXT, what: 'mensaje de error bajo un campo, y anillo de foco del destructivo sobre tarjeta' },
+  { fg: 'danger', bg: 'canvas', min: AA_TEXT, what: 'mensaje de error sobre el fondo de página, y anillo de foco del destructivo sobre el lienzo' },
   { fg: 'danger-fg', bg: 'surface', min: AA_TEXT, what: 'texto de peligro en su tono fuerte, sobre tarjeta' },
   { fg: 'danger-fg', bg: 'danger-soft', min: AA_TEXT, what: 'texto de la alerta de peligro' },
   { fg: 'danger-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde de un control en error' },
@@ -404,8 +407,8 @@ describe('declaración del tema', () => {
     // build no diría nada.
     const carpeta = join(process.cwd(), 'src', 'shared', 'theme')
     // Se afirma el contenido EXACTO de la carpeta, y no que no haya `.tsx`: el
-    // patrón de la casa para guardar nombres de clase es un `.ts` de constantes
-    // (`shared/ui/buttonStyles.ts`, `shared/utils/cn.ts`), que es justo lo que
+    // patrón de la casa para guardar nombres de clase es un `.ts` sin JSX
+    // (`shared/ui/buttonClasses.ts`, `shared/utils/cn.ts`), que es justo lo que
     // los PRs de extracción van a querer poner acá. Medido: un `themeStyles.ts`
     // con literales de clase dejaba dos de tres sin publicar, con el build en
     // exit 0 y la suite en verde.
@@ -464,6 +467,7 @@ describe('tokens del tema', () => {
       'on-solid': '#ffffff', // white
       'focus': '#2b7fff', // blue-500
       'danger': '#e7000b', // red-600
+      'danger-hover': '#c10007', // red-700
       'danger-soft': '#fef2f2', // red-50
       'danger-fg': '#c10007', // red-700
       'danger-border': '#ffc9c9', // red-200
@@ -583,6 +587,7 @@ describe('tokens del tema', () => {
       'on-solid/accent',
       'on-solid/accent-hover',
       'on-solid/danger',
+      'on-solid/danger-hover',
       'on-solid/success',
       'success-fg/success-soft',
       'success-fg/surface',

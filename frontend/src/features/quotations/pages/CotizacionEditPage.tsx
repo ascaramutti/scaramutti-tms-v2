@@ -4,7 +4,6 @@ import { Navigate, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { Spinner } from '../../../shared/ui/Spinner'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { useQuotation } from '../hooks/useQuotation'
 import { useUpdateQuotation } from '../hooks/useUpdateQuotation'
@@ -16,6 +15,7 @@ import { useWizardCatalogs } from '../wizard/useWizardCatalogs'
 import { WizardForm } from '../wizard/WizardForm'
 import type { WizardFormInput } from '../wizard/quotation-wizard.schema'
 import type { ClientResponse } from '../../../api'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Página de EDICIÓN de cotización (`/cotizaciones/:id/editar`). Carga la cotización (GET) y los
@@ -65,9 +65,9 @@ export function CotizacionEditPage() {
           title="Cotización no encontrada"
           description="La cotización que buscas no existe o fue eliminada."
           action={
-            <button type="button" onClick={goToList} className={PRIMARY_BUTTON}>
+            <Button variant="primary" onClick={goToList}>
               Volver al listado
-            </button>
+            </Button>
           }
         />
       </div>
@@ -100,12 +100,12 @@ export function CotizacionEditPage() {
             {getApiErrorMessage(quotation.error, 'No se pudo cargar la cotización.')}
           </p>
           <div className="mt-4 flex gap-2">
-            <button type="button" onClick={() => quotation.refetch()} className={SECONDARY_BUTTON}>
+            <Button variant="secondary" onClick={() => quotation.refetch()}>
               Reintentar
-            </button>
-            <button type="button" onClick={goToList} className={SECONDARY_BUTTON}>
+            </Button>
+            <Button variant="secondary" onClick={goToList}>
               Volver
-            </button>
+            </Button>
           </div>
         </div>
       </div>
@@ -120,9 +120,9 @@ export function CotizacionEditPage() {
           <p className="text-sm font-medium text-slate-700">
             {getApiErrorMessage(catalogs.error, 'No se pudo cargar el formulario de cotización.')}
           </p>
-          <button type="button" onClick={catalogs.refetch} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={catalogs.refetch}>
             Reintentar
-          </button>
+          </Button>
         </div>
       </div>
     )

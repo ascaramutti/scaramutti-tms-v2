@@ -36,6 +36,16 @@ describe('CargoTypeCreateModal', () => {
     expect((screen.getByLabelText('Nombre') as HTMLInputElement).value).toBe('contenedor')
   })
 
+  it('el botón de crear trae la clase que lo apaga cuando queda deshabilitado', () => {
+    // La clase vivía dentro de la constante y se aplicaba entera; ahora es una prop suelta
+    // del componente compartido, que una edición futura puede soltar sola. Sin esto, el
+    // botón quedaría deshabilitado para el DOM y encendido para el ojo.
+    renderModal()
+    expect(screen.getByRole('button', { name: /crear tipo de carga/i }).className).toContain(
+      'disabled:bg-blue-300',
+    )
+  })
+
   it('manda al servidor todo lo que se cargó, no solo el nombre', async () => {
     const user = userEvent.setup()
     const sink: { body?: CargoTypeRequest } = {}

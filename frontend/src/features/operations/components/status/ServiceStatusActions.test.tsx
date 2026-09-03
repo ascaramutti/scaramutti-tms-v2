@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter } from 'react-router-dom'
 import type { ServiceStatus, UserRole } from '../../../../api'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { REOPEN_AVAILABLE_NOTE } from '../../status/serviceStatusTransitions'
 import { ServiceStatusActions } from './ServiceStatusActions'
 import { server } from '../../../../test/mocks/server'
@@ -15,6 +14,7 @@ import {
   fakeServiceDetail,
 } from '../../../../test/mocks/handlers/operations'
 import type { ServiceWithEtag } from '../../hooks/useService'
+import { buttonClasses } from '../../../../shared/ui/buttonClasses'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -68,7 +68,7 @@ describe('ServiceStatusActions, qué ofrece', () => {
     expect(screen.queryByRole('button', { name: /Iniciar viaje/ })).not.toBeInTheDocument()
   })
 
-  it('en un viaje completado no queda ninguna transición, pero sí se corrige', () => {
+  it('en un viaje completado no queda ninguna transición, pero sí se corrige con el enlace secundario', () => {
     // El único estado del circuito que no admite ninguna transición. Editar SÍ, y es
     // deliberado: corregir los datos de un viaje ya cerrado es para lo que existe el
     // endpoint. Por eso acá se afirma la ausencia de BOTONES y la presencia del enlace,
@@ -81,6 +81,13 @@ describe('ServiceStatusActions, qué ofrece', () => {
     expect(screen.getByRole('link', { name: 'Editar' })).toHaveAttribute(
       'href',
       '/cotizaciones/operaciones/servicios/77/editar',
+    )
+    // Y con la variante que le toca. El `it.each` de arriba cubre el mapa de
+    // transiciones, pero este enlace vive al lado y no sale del mapa: pintarlo de primario
+    // pone un segundo azul sólido junto a "Finalizar viaje", que es justo lo que el mapa
+    // existe para impedir. Medido: sin esta línea, la mutación dejaba los 39 casos en verde.
+    expect(screen.getByRole('link', { name: 'Editar' }).className).toBe(
+      buttonClasses({ variant: 'secondary' }),
     )
   })
 
@@ -144,29 +151,30 @@ describe('ServiceStatusActions, qué ofrece', () => {
     expect(labels).toEqual(['Finalizar viaje', 'Cancelar viaje'])
   })
 
-  it('ofrece la cancelación en gris y no como acción destructiva de la barra', () => {
-    // Decisión de diseño con su párrafo en el código y, sin esto, sin ninguna red: el
-    // rojo se reserva para el botón que confirma dentro del diálogo.
-    renderActions('IN_PROGRESS', 'admin')
-
-    // Contra las constantes y no contra clases sueltas: prohibir solo el rojo dejaba
-    // pasar que cancelar se pintara del mismo azul primario que finalizar, que es el
-    // error real, porque borra la jerarquía entre avanzar el viaje y matarlo.
-    expect(screen.getByRole('button', { name: /Cancelar viaje/ }).className).toBe(SECONDARY_BUTTON)
-    expect(screen.getByRole('button', { name: /Finalizar viaje/ }).className).toBe(PRIMARY_BUTTON)
-  })
-
-  it('ofrece las dos salidas en gris y la reapertura en primario', () => {
-    // Eliminar acompaña a cancelar: las dos sacan el viaje del circuito y ninguna es la
-    // acción principal de esa pantalla. Reabrir sí lo es, porque en un viaje que ya salió
-    // del circuito no compite con nada.
-    const { unmount } = renderActions('PENDING_START', 'admin')
-    expect(screen.getByRole('button', { name: /Eliminar viaje/ }).className).toBe(SECONDARY_BUTTON)
-    unmount()
-
-    renderActions('CANCELLED', 'admin')
-    expect(screen.getByRole('button', { name: /Reabrir viaje/ }).className).toBe(PRIMARY_BUTTON)
-  })
+  // El mapa ENTERO, una fila por entrada. Con dos casos sueltos quedaba una entrada sin
+  // mirar (`IN_PROGRESS`, el "Iniciar viaje"), y pintarla de gris dejaba las dos pantallas
+  // en verde: medido. Recorrer el mapa obliga a que la próxima transición traiga su fila.
+  //
+  // La variante va escrita a mano acá, no leída del mapa: si se leyera, cambiar el mapa
+  // cambiaría las dos puntas a la vez y el caso no podría fallar.
+  it.each([
+    ['PENDING_START', /Iniciar viaje/, 'primary'],
+    ['IN_PROGRESS', /Finalizar viaje/, 'primary'],
+    ['IN_PROGRESS', /Cancelar viaje/, 'secondary'],
+    ['PENDING_START', /Eliminar viaje/, 'secondary'],
+    ['CANCELLED', /Reabrir viaje/, 'primary'],
+  ] as const)(
+    'desde %s, el botón %s se pinta como %s',
+    (status, etiqueta, variante) => {
+      // Prohibir solo el rojo dejaba pasar que cancelar se pintara del mismo azul que
+      // finalizar, que es el error real: borra la jerarquía entre avanzar el viaje y
+      // sacarlo del circuito. Por eso se compara el conjunto entero.
+      renderActions(status, 'admin')
+      expect(screen.getByRole('button', { name: etiqueta }).className).toBe(
+        buttonClasses({ variant: variante }),
+      )
+    },
+  )
 
   it('agrupa los botones con un nombre', () => {
     renderActions('PENDING_START', 'admin')

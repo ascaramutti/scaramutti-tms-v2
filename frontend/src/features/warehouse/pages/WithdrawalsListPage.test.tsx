@@ -33,6 +33,8 @@ import {
   fleetUnitsList,
   workersSearchCapture,
 } from '../../../test/mocks/handlers/shared-catalogs'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
+import { cn } from '../../../shared/utils/cn'
 
 function renderRetiros() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -461,10 +463,16 @@ describe('WithdrawalsListPage', () => {
   })
 
   // ----- Navegación -----
-  it('el botón de registrar lleva al formulario de nuevo retiro', async () => {
+  it('el enlace de registrar es la acción principal y lleva al formulario de nuevo retiro', async () => {
     const user = userEvent.setup()
     renderRetiros()
     await screen.findByText('Aceite 15W40')
+    // Es un enlace con pinta de botón: tiene que NAVEGAR (por eso el click de abajo) y
+    // tiene que verse como la acción principal del listado. Sin esta línea, pintarlo de
+    // secundario dejaba todos los casos del archivo en verde: medido.
+    expect(screen.getByRole('link', { name: /registrar retiro/i }).className).toBe(
+      cn(buttonClasses({ variant: 'primary' }), 'gap-1.5'),
+    )
     await user.click(screen.getByRole('link', { name: /registrar retiro/i }))
     expect(await screen.findByText('NUEVO RETIRO STUB')).toBeInTheDocument()
   })

@@ -3,6 +3,7 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { QuotationStatusActions } from './QuotationStatusActions'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
@@ -63,6 +64,43 @@ describe('QuotationStatusActions', () => {
     renderActions({ status: 'SENT' })
     expect(screen.getByRole('button', { name: /aceptada/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /^rechazada$/i })).toBeInTheDocument()
+  })
+
+  it('"Rechazada" se pinta como destructiva y "Aceptada" no', () => {
+    // El rol del botón es una decisión de producto, no un detalle de estilo: rechazar es
+    // la acción que saca la cotización del circuito. Sin esta aserción, cambiarle la
+    // variante a gris o a azul deja los otros diez casos de este archivo en verde.
+    renderActions({ status: 'SENT' })
+    // Por inclusión y no por igualdad: estos botones agregan sus clases de `disabled:`
+    // sobre las de la variante.
+    const clases = (n: RegExp) =>
+      new Set(screen.getByRole('button', { name: n }).className.split(/\s+/))
+    const rechazar = clases(/^rechazada$/i)
+    for (const c of buttonClasses({ variant: 'danger' }).split(/\s+/)) {
+      expect(rechazar.has(c)).toBe(true)
+    }
+    expect(rechazar.has('bg-accent')).toBe(false)
+    // Y "Aceptada" conserva SU color, no solo "no es el destructivo": el verde azulado es
+    // la única forma de relleno que quedó fuera del componente compartido, y moverla a la
+    // primaria dejaba los otros diez casos de este archivo en verde. El literal va escrito acá
+    // a mano a propósito, para no derivarlo de la misma fuente que mide.
+    expect(clases(/aceptada/i).has('bg-teal-600')).toBe(true)
+    expect(clases(/aceptada/i).has('bg-danger')).toBe(false)
+    // Y las dos traen la clase que las apaga mientras hay una transición en vuelo.
+    expect(rechazar.has('disabled:opacity-60')).toBe(true)
+    expect(clases(/aceptada/i).has('disabled:opacity-60')).toBe(true)
+  })
+
+  it('"Enviada" se pinta como la acción principal, no como destructiva', () => {
+    // La otra entrada del mismo mapa. El caso de arriba solo renderiza SENT, donde esta
+    // entrada no se usa, así que pintar de rojo la acción de AVANZAR una cotización dejaba
+    // las dos pantallas en verde: medido. El rojo está reservado a lo que saca del circuito.
+    renderActions({ status: 'DRAFT' })
+    const c = new Set(screen.getByRole('button', { name: /^enviada$/i }).className.split(/\s+/))
+    for (const k of buttonClasses({ variant: 'primary' }).split(/\s+/)) {
+      expect(c.has(k)).toBe(true)
+    }
+    expect(c.has('bg-danger')).toBe(false)
   })
 
   it('estados terminales no renderizan nada', () => {

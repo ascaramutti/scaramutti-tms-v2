@@ -20,6 +20,7 @@ import {
   removeResourceSlow,
   type RemoveResourceCaptureSink,
 } from '../../../../test/mocks/handlers/operations'
+import { buttonClasses } from '../../../../shared/ui/buttonClasses'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -159,6 +160,27 @@ describe('la baja de un refuerzo · la confirmación', () => {
     // La baja es física y no tiene deshacer: sin confirmación, un clic errado en una
     // lista de filas parecidas borra sin red.
     expect(sink.calls ?? []).toHaveLength(0)
+  })
+
+  it('el botón que confirma la baja se pinta como destructivo', async () => {
+    // Misma razón que en las acciones de cotización: la baja es física y sin deshacer, y
+    // el rojo es lo que la distingue del "Cancelar" de al lado. Sin esta aserción,
+    // volverlo gris deja los otros cincuenta y un casos de esta carpeta en verde.
+    const user = userEvent.setup()
+    renderInProgress()
+
+    await openRemove(user, 'Ana Ríos Chávez')
+
+    const dialog = screen.getByRole('dialog', { name: 'Quitar refuerzo' })
+    expect(within(dialog).getByRole('button', { name: 'Quitar refuerzo' }).className).toBe(
+      buttonClasses({ variant: 'danger' }),
+    )
+    // Y el Cancelar de al lado es el secundario: el contraste entre los dos es lo que
+    // distingue la salida sin consecuencias de la que borra. Volverlo primario lo dejaba
+    // tan fuerte como el destructivo, con todo el archivo en verde.
+    expect(within(dialog).getByRole('button', { name: 'Cancelar' }).className).toBe(
+      buttonClasses({ variant: 'secondary' }),
+    )
   })
 
   it('confirma sobre el refuerzo que se clickeó, no sobre el primero', async () => {

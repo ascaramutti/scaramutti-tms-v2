@@ -1,7 +1,6 @@
 import type { MouseEvent } from 'react'
 import { Ban, Check, Loader2, Send } from 'lucide-react'
 import { useAuth } from '../../../shared/auth/AuthContext'
-import { DANGER_BUTTON, PRIMARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { useChangeQuotationStatus } from '../hooks/useChangeQuotationStatus'
 import type { QuotationStatus } from '../../../api'
 import {
@@ -10,6 +9,7 @@ import {
   type QuotationStatusAction,
   type StatusActionVariant,
 } from './quotationStatusPresentation'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 
 interface QuotationStatusActionsProps {
   quotationId: number
@@ -22,11 +22,17 @@ interface QuotationStatusActionsProps {
   onStatusError?: (error: unknown) => void
 }
 
+// `success` es la única forma de relleno que no es ni la de acción principal ni la
+// destructiva: se usa solo acá. `grep -rln "bg-teal-600" src --include=*.tsx | grep -v test`
+// devuelve un archivo, este; se filtran las pruebas y se usa `-l` porque tanto este
+// comentario como la aserción que lo cuida contienen la cadena. Queda
+// escrita a mano, sin variante propia en `Button`, hasta que un segundo uso justifique
+// el rol. Las otras dos sí salen del componente compartido.
 const VARIANT_BUTTON: Record<StatusActionVariant, string> = {
-  primary: PRIMARY_BUTTON,
+  primary: buttonClasses({ variant: 'primary' }),
   success:
     'inline-flex items-center rounded-lg bg-teal-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2',
-  danger: DANGER_BUTTON,
+  danger: buttonClasses({ variant: 'danger' }),
 }
 
 const VARIANT_ICON: Record<StatusActionVariant, typeof Send> = {

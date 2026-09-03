@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { axe } from 'vitest-axe'
-import { DANGER_BUTTON, PRIMARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { ServiceExitModal } from './ServiceExitModal'
 import {
   SERVICE_EXIT_REASON_MIN_LENGTH,
@@ -34,6 +33,7 @@ import {
   type ServiceExitTransition,
 } from '../../status/serviceStatusTransitions'
 import { operationsKeys } from '../../queryKeys'
+import { buttonClasses } from '../../../../shared/ui/buttonClasses'
 
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
@@ -201,7 +201,9 @@ describe('ServiceExitModal, la forma', () => {
     // daría vuelta el color entre una pantalla y la siguiente sin que nada lo explique.
     renderModal(serviceInCache({ status: 'CANCELLED' }), 'REOPENED')
 
-    expect(screen.getByRole('button', { name: 'Reabrir viaje' }).className).toBe(PRIMARY_BUTTON)
+    expect(screen.getByRole('button', { name: 'Reabrir viaje' }).className).toBe(
+      buttonClasses({ variant: 'primary' }),
+    )
   })
 
   it('rotula el motivo nombrando la acción', () => {
@@ -213,14 +215,23 @@ describe('ServiceExitModal, la forma', () => {
     expect(screen.getByLabelText(/Motivo de la reapertura/)).toBeInTheDocument()
   })
 
-  it('marca como destructivo el botón que confirma', () => {
+  it.each([
+    ['CANCELLED', 'Cancelar viaje'],
+    ['DELETED', 'Eliminar viaje'],
+  ] as const)('marca como destructivo el botón que confirma (%s)', (transition, etiqueta) => {
     // Es el único indicio visual de que ese botón no es uno más, y la decisión tenía
-    // su párrafo en el código y ninguna red.
-    renderModal()
+    // su párrafo en el código y ninguna red. Van las DOS salidas: con una sola, el
+    // ternario se puede reescribir para que ELIMINAR quede azul y nada falla (medido).
+    // El estado va con la transición: eliminar solo se ofrece desde pendiente de inicio, y
+    // montar el par que el producto no produce haría que el caso describa una pantalla que
+    // no existe, aunque la variante no dependa del estado.
+    renderModal(serviceInCache(transition === 'DELETED' ? { status: 'PENDING_START' } : {}), transition)
 
     // Contra la constante y no contra una clase suelta: el caso mide el ROL del botón
     // (destructivo), y sobrevive a que el tono cambie.
-    expect(screen.getByRole('button', { name: 'Cancelar viaje' }).className).toBe(DANGER_BUTTON)
+    expect(screen.getByRole('button', { name: etiqueta }).className).toBe(
+      buttonClasses({ variant: 'danger' }),
+    )
   })
 
   it('no se monta cuando está cerrado', () => {
