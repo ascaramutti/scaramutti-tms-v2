@@ -74,6 +74,16 @@ describe('TextField', () => {
     expect(clases).toContain('focus:border-danger')
   })
 
+  it('deshabilitado, se ve apagado y no solo por el tono', () => {
+    // El texto apagado y el tipeado se distinguen por el color, y esa distancia depende de dos
+    // tokens que pueden moverse por otro motivo; el fondo tampoco ayuda, que separa 1.05 del
+    // normal. La opacidad es la señal que sobrevive a cualquier ajuste de la escala de grises.
+    render(<TestForm disabled />)
+    const clases = screen.getByLabelText(/campo de prueba/i).className.split(/\s+/)
+    expect(clases).toContain('disabled:opacity-60')
+    expect(clases).toContain('disabled:text-fg-subtle')
+  })
+
   it('sin error: no aplica aria-invalid ni aria-describedby', () => {
     render(<TestForm />)
     const input = screen.getByLabelText(/campo de prueba/i)

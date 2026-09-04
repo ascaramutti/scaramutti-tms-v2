@@ -210,7 +210,14 @@ describe('EntryDetailPage', () => {
   it('muestra el botón Anular si la factura está activa', async () => {
     server.use(warehouseInvoiceDetail())
     renderDetalle()
-    expect(await screen.findByRole('button', { name: /anular/i })).toBeEnabled()
+    const boton = await screen.findByRole('button', { name: /anular/i })
+    expect(boton).toBeEnabled()
+    // Y con el borde de CONTROL, no con el marco de la alerta. Los dos son rojos y a simple
+    // vista se parecen, pero el marco decora una caja cuyo mensaje ya se lee, mientras que
+    // este borde es el único límite del botón: es lo que dice dónde se puede hacer clic. Se
+    // separaron cuando el marco pasó a declararse decorativo, porque un token no se puede
+    // arreglar para un uso y quedarse quieto para el otro.
+    expect(boton.className).toMatch(/border-danger-border-strong/)
   })
 
   it('no muestra el botón Anular si la factura ya está anulada', async () => {

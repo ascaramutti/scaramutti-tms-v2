@@ -13,8 +13,12 @@ interface IntegralComponentsProps {
   currencyCode: string
 }
 
+// El borde va con el acento pleno y no con el suave del marco de una caja: este botón tiene
+// relleno propio, pero su relleno NO lo separa de la tarjeta que lo contiene (1.09), así que su
+// ÚNICO límite es el borde. Con el suave daba 1.67 contra su propio relleno; con este, 4.82. Es
+// el mismo criterio con el que la tarjeta seleccionada de la elección de tipo lleva `border-accent`.
 const ADD_COMPONENT =
-  'inline-flex items-center gap-1.5 rounded-lg border border-accent-border bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent-hover hover:bg-accent-soft-strong focus:outline-none focus:ring-2 focus:ring-focus'
+  'inline-flex items-center gap-1.5 rounded-lg border border-accent bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent-hover hover:bg-accent-soft-strong focus:outline-none focus:ring-2 focus:ring-focus'
 
 /**
  * Sección "Componentes del Servicio Integral": lista anidada (`useFieldArray` sobre

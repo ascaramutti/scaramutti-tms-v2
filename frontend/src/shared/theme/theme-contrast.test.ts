@@ -83,15 +83,9 @@ const PAIRS: Pair[] = [
   { fg: 'accent-hover', bg: 'surface-subtle', min: AA_TEXT, what: 'opción de crear, con el mouse encima' },
   { fg: 'fg-subtle', bg: 'surface', min: AA_TEXT, what: 'placeholder del input' },
   { fg: 'fg-subtle', bg: 'canvas', min: AA_TEXT, what: 'texto apagado sobre el fondo de página' },
-  { fg: 'fg-subtle', bg: 'surface-subtle', min: AA_TEXT, what: 'texto de un control deshabilitado' },
+  { fg: 'fg-subtle', bg: 'surface-subtle', min: AA_TEXT, what: 'el texto de sugerencia sobre una caja inerte. NO el de un control deshabilitado, que desde que lleva opacidad no se dibuja a este valor: como el velo, lo que se ve es una mezcla, y la norma exime a los controles inactivos' },
   { fg: 'fg-subtle', bg: 'accent-soft', min: AA_TEXT, what: 'el guion de "sin observaciones" dentro de la caja de notas de la cotización' },
   { fg: 'surface-subtle', bg: 'surface', min: AA_NON_TEXT, what: 'foco de teclado de la fila clickeable' },
-  { fg: 'danger-border', bg: 'surface', min: AA_NON_TEXT, what: 'marco de la alerta de peligro' },
-  { fg: 'danger-border', bg: 'canvas', min: AA_NON_TEXT, what: 'borde del botón de anular, que va sobre el fondo de página' },
-  { fg: 'accent-border', bg: 'accent-soft', min: AA_NON_TEXT, what: 'marco de la caja informativa, contra su propio fondo' },
-  { fg: 'accent-border', bg: 'surface', min: AA_NON_TEXT, what: 'marco de la caja informativa, que va dentro de una tarjeta' },
-  { fg: 'success-border', bg: 'success-soft', min: AA_NON_TEXT, what: 'marco del aviso de éxito, contra su propio fondo' },
-  { fg: 'warning-border', bg: 'warning-soft', min: AA_NON_TEXT, what: 'borde del botón de forzar, dentro del banner ámbar' },
   { fg: 'danger-border-strong', bg: 'danger-soft', min: AA_NON_TEXT, what: 'borde del botón de descartar, dentro de la alerta roja' },
   { fg: 'border-strong', bg: 'canvas', min: AA_NON_TEXT, what: 'borde del botón secundario, que va sobre el fondo de página' },
   { fg: 'on-solid', bg: 'accent', min: AA_TEXT, what: 'texto del botón primario' },
@@ -110,7 +104,6 @@ const PAIRS: Pair[] = [
   { fg: 'accent-hover', bg: 'surface-muted', min: AA_TEXT, what: 'opción del desplegable resaltada por teclado' },
   { fg: 'accent-hover', bg: 'accent-soft', min: AA_TEXT, what: 'total del asistente, ítem activo de la barra lateral y pastillas internas' },
   { fg: 'accent-hover', bg: 'accent-soft-strong', min: AA_TEXT, what: 'texto de la pastilla informativa y del círculo con el número de ítem' },
-  { fg: 'accent-soft-strong', bg: 'accent-soft', min: AA_NON_TEXT, what: 'la pastilla informativa contra la fila integral que la contiene, que es el motivo por el que este token existe' },
   // Dos usos, no uno: el texto del error y el anillo de foco del botón destructivo. El
   // umbral queda en el del texto, que es el más estricto de los dos (4.5 contra 3).
   { fg: 'danger', bg: 'surface', min: AA_TEXT, what: 'mensaje de error bajo un campo, y anillo de foco del destructivo sobre tarjeta' },
@@ -119,7 +112,9 @@ const PAIRS: Pair[] = [
   { fg: 'danger-fg', bg: 'danger-soft', min: AA_TEXT, what: 'texto de la alerta de peligro' },
   { fg: 'danger-fg', bg: 'danger-soft-strong', min: AA_TEXT, what: 'texto del botón de descartar cuando responde al mouse, dentro de la alerta' },
   { fg: 'danger-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde de un control en error' },
-  { fg: 'warning-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde punteado de la tarjeta de componente integral, y borde del botón de forzar' },
+  { fg: 'warning-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'el borde punteado de la tarjeta de componente integral, y el relleno del botón de forzar contra su propio borde' },
+  { fg: 'warning-border-strong', bg: 'warning-soft', min: AA_NON_TEXT, what: 'el borde del botón de forzar contra el banner ámbar que lo contiene: su otro lado, y el que faltaba. Contra su PROPIO relleno con el mouse encima da 2.87, que no se mide acá porque el límite que 1.4.11 pide ver es el de afuera, contra lo que lo rodea' },
+  { fg: 'danger-border-strong', bg: 'canvas', min: AA_NON_TEXT, what: 'el borde del botón de anular, que va sobre el fondo de página' },
   { fg: 'warning', bg: 'surface', min: AA_TEXT, what: 'aviso de campo sobre tarjeta' },
   { fg: 'warning', bg: 'warning-soft', min: AA_TEXT, what: 'pastilla de aviso de Badge, y el valor del tile de stock bajo con el filtro activo' },
   { fg: 'warning', bg: 'warning-soft-strong', min: AA_TEXT, what: 'texto del chip que quita el filtro de stock bajo' },
@@ -156,10 +151,10 @@ const PAIRS: Pair[] = [
  * acompaña a un dato que ya se lee no dicen nada que no esté dicho de otra forma. Afirmarlos
  * contra un número inventado sería una prueba que no prueba nada.
  *
- * Una advertencia sobre esta lista, que la revisión de este PR levantó: creció de una entrada
- * a cuatro y su justificación se quedó describiendo la versión de una. La guarda de cobertura
- * no puede verlo, porque los dos lados se mueven juntos; lo único que lo ataja es leerla al
- * agregar.
+ * Una advertencia sobre esta lista: creció de una entrada a cuatro, y de cuatro a ocho cuando
+ * el PR del contraste claro declaró decorativos los marcos de las alertas. Su justificación ya
+ * se quedó vieja una vez, describiendo la versión de una. La guarda de cobertura no puede
+ * verlo, porque los dos lados se mueven juntos; lo único que lo ataja es leerla al agregar.
  *
  * `danger-border` y `warning-border` estuvieron acá y salieron, por la razón
  * inversa: en los dos casos hay un botón con relleno propio cuyo borde es el único
@@ -178,6 +173,23 @@ const SIN_PAR: Record<string, string> = {
     'el color de la sombra de una tarjeta elevada. Una sombra no comunica un estado ni lleva ' +
     'texto encima: es profundidad. Su único uso además está sobre una tarjeta que ya se ' +
     'recorta con un filete propio, así que la sombra tampoco es lo que la separa del fondo.',
+  'danger-border':
+    'el marco de la alerta roja, y nada más desde que los botones de anular pasaron al borde de ' +
+    'control. Un marco cuyo mensaje ya se lee por el texto y por el fondo de la caja no comunica ' +
+    'por sí solo: enmarca. Decisión del dueño 2026-09-05.',
+  'warning-border':
+    'el marco de la alerta ámbar y el de la caja de aviso del asistente, por la misma razón. Este ' +
+    'token estuvo medido creyendo que era el borde del botón de forzar, y no lo era: ese botón usa ' +
+    'el borde de control. Era una nota equivocada, no un par.',
+  'accent-border':
+    'tres roles, los tres decorativos: el marco de la caja informativa y el de la caja de notas, ' +
+    'el filete de la pastilla, y un separador horizontal en el resumen del asistente. Ninguno ' +
+    'comunica solo, y ninguno es el límite de un control: el botón de agregar componente, que sí ' +
+    'lo era, pasó al acento pleno en el PR del contraste claro, y ese cambio es lo que hace ' +
+    'verdadera esta nota. Antes no lo era, y la revisión lo levantó.',
+  'success-border':
+    'el marco del aviso de éxito. Mismo caso, y además hoy no hay una sola alerta de éxito en el ' +
+    'árbol: el token entró para que la familia esté completa.',
   trace:
     'el trazo decorativo que no es texto ni borde: el ícono de una pantalla sin datos, que es ' +
     '`aria-hidden`, y la línea que une dos pasos del asistente, que acompaña a un número que ' +
@@ -200,23 +212,6 @@ const SIN_PAR: Record<string, string> = {
  * borrar la línea. Una excepción que no se puede olvidar.
  */
 const EXCEPCIONES_CLARO: Record<string, { ratio: number; note: string }> = {
-  'fg-subtle/surface': {
-    ratio: 2.63,
-    note:
-      'slate-400 sobre blanco. De sus 46 usos, 9 son placeholder (en 9 archivos), 2 son texto ' +
-      'deshabilitado y unos 18 son íconos; el RESTO es texto corriente y ahí el 2.63 es un ' +
-      'incumplimiento liso: entre otros, los dos encabezados de la barra lateral que además son ' +
-      'el nombre accesible de sus listas de navegación (SidebarSection.tsx:12, ' +
-      'SidebarFooter.tsx:17), y el contenido de celda de OpeningBalancesTable.tsx:79 y ' +
-      'WithdrawalsTable.tsx:86. No es el peor par del sistema: el borde del control está más ' +
-      'lejos de su umbral que este.',
-  },
-  'fg-subtle/canvas': {
-    ratio: 2.51,
-    note:
-      'El mismo gris sobre el fondo de página. El caso más claro es la razón social del pie del ' +
-      'login (LoginPage.tsx), que es texto corriente sobre el gris del lienzo.',
-  },
   'surface-subtle/surface': {
     ratio: 1.05,
     note:
@@ -226,117 +221,6 @@ const EXCEPCIONES_CLARO: Record<string, { ratio: number; note: string }> = {
       'teclado no podía usarse. Eso se arregló dándole contorno propio con el token de foco, que ' +
       'sí se mide, así que hoy este par vuelve a ser lo que siempre debió ser, un realce ' +
       'decorativo que acompaña.',
-  },
-  'danger-border/surface': {
-    ratio: 1.45,
-    note:
-      'El marco de las nueve alertas de peligro. Los otros dos usos de este token son el borde ' +
-      'del botón de anular, que no va sobre tarjeta sino sobre el fondo de página y se mide ' +
-      'aparte.',
-  },
-  'fg-subtle/accent-soft': {
-    ratio: 2.42,
-    note:
-      'El guion que ocupa el lugar de una observación vacía, dentro de la caja azul de notas. ' +
-      'El sitio le pone opacidad a la caja, así que sobre la tarjeta el par real da 2.50, un ' +
-      'pelo mejor que el del token pleno y igual de lejos del mínimo. Lo levantó la revisión ' +
-      'de este PR barriendo los pares que la lista no tenía: los dos tokens ya aparecían por ' +
-      'separado en otros pares, así que la guarda de cobertura no podía verlo. El tema oscuro ' +
-      'lo arregla sin que nadie lo buscara, y por eso no tiene entrada gemela.',
-  },
-  'fg-subtle/surface-subtle': {
-    ratio: 2.51,
-    note:
-      'Texto de un control deshabilitado sobre su propio fondo (TextField.tsx:95). WCAG exime los ' +
-      'controles inactivos, así que no es un incumplimiento; se mide igual para que el par no ' +
-      'quede sin declarar y alguien lo descubra creyendo que es un hallazgo.',
-  },
-  'accent-border/accent-soft': {
-    ratio: 1.67,
-    note:
-      'El marco de las tres cajas informativas contra su propio fondo. Es el mismo caso que ' +
-      '`danger-border` y `warning-border`: un filete decorativo que acompaña al color de fondo, ' +
-      'no la única señal del estado, que la da el fondo entero. No lo empeora el mapa: hoy ya ' +
-      'es blue-300 y el token conserva ese valor.',
-  },
-  'accent-border/surface': {
-    ratio: 1.81,
-    note:
-      'La misma caja, contra la tarjeta que la contiene. Mismo criterio que la anterior.',
-  },
-  'success-border/success-soft': {
-    ratio: 1.13,
-    note:
-      'El marco del aviso de éxito, que HOY NO EXISTE: la variante entra sin ningún uso, así que ' +
-      'este par no describe nada en pantalla todavía. Se declara igual para que el token no quede ' +
-      'sin medir, y para que quien estrene el primer aviso de éxito vea el número antes de ' +
-      'ponerlo: 1.13 es el más bajo de la familia y conviene mirarlo en pantalla.',
-  },
-  'warning-border/warning-soft': {
-    ratio: 1.2,
-    note:
-      'El borde del botón de forzar (ResourceConflictAlert.tsx:138), que tiene relleno blanco ' +
-      'dentro del banner ámbar: el borde es su único límite. Y el mapa lo empeora, porque hoy es ' +
-      'amber-300 (1.40 contra el banner) y colapsa a amber-200.',
-  },
-  'danger-border-strong/danger-soft': {
-    ratio: 1.75,
-    note:
-      'El mismo borde de control en error, contra el fondo suave: el botón de descartar de ' +
-      'ServiceStatusErrorAlert.tsx:39 vive dentro de la alerta roja, no sobre tarjeta.',
-  },
-  'accent-soft-strong/accent-soft': {
-    ratio: 1.12,
-    note:
-      'La pastilla informativa dentro de la fila de un servicio integral ' +
-      '(QuotationItemsSection.tsx). Es el número que este token existe para conservar: el mapa ' +
-      'mandaba los dos azules suaves al mismo valor y la pastilla pasaba a 1.00, o sea a ' +
-      'desaparecer dentro de la fila. A 1.12 tampoco se separa por contraste, y no hace falta: ' +
-      'lo que comunica es el texto "Integral", no el relleno.',
-  },
-  'fg-muted/accent-soft': {
-    ratio: 4.38,
-    note:
-      'Las celdas secundarias de la fila de un servicio integral, que se pinta azul suave ' +
-      '(QuotationItemsSection.tsx y su texto secundario). Queda a 0.12 del mínimo.',
-  },
-  'warning-border-strong/surface': {
-    ratio: 1.45,
-    note:
-      'amber-300 sobre blanco: el borde punteado de la tarjeta de componente integral ' +
-      '(ChildItemCard.tsx) y el del botón de forzar de ResourceConflictAlert, que tienen ' +
-      'relleno propio dentro de una caja del mismo tono, así que el borde es su único ' +
-      'límite. Mismo régimen que el borde del control en error y el mismo incumplimiento ' +
-      'anterior a este archivo. Existe como token propio, y no colapsado al marco de la ' +
-      'alerta, justamente para no bajarlo de 1.45 a 1.21 en el barrido.',
-  },
-  'danger-border-strong/surface': {
-    ratio: 1.92,
-    note:
-      'red-300 sobre blanco: el borde de un control en estado de error (TextField.tsx:97 y otros ' +
-      '22). Mismo régimen que border-strong, y el mismo incumplimiento anterior a este archivo. ' +
-      'Existe como token propio, y no colapsado al marco de la alerta, justamente para no bajarlo ' +
-      'de 1.92 a 1.45 en el barrido.',
-  },
-  'border-strong/canvas': {
-    ratio: 1.42,
-    note:
-      'El mismo borde, contra el fondo de página, que es donde de verdad se dibuja el botón ' +
-      'secundario: PageHeader.tsx:19 no tiene fondo propio. La cara de tarjeta vale para los ' +
-      'inputs; esta, para los botones.',
-  },
-  'danger-border/canvas': {
-    ratio: 1.39,
-    note:
-      'El borde del botón de anular contra el fondo de página. Su relleno blanco es del propio ' +
-      'botón, no de una tarjeta: el lado que lo hace visible contra la página es este.',
-  },
-  'border-strong/surface': {
-    ratio: 1.49,
-    note:
-      'slate-300 sobre blanco, contra el mínimo de 3:1 de 1.4.11 (no el de texto). Es el borde ' +
-      'de todos los inputs, que sí viven en tarjeta blanca. El botón secundario usa el mismo ' +
-      'token pero se dibuja sobre el fondo de página, y se mide aparte.',
   },
   'on-solid/accent-disabled': {
     ratio: 2.64,
@@ -354,31 +238,32 @@ const EXCEPCIONES_CLARO: Record<string, { ratio: number; note: string }> = {
       'anterior a este PR: el relleno de hover ya era ese tono escrito a mano. En oscuro el ' +
       'mismo par da 4.56 y pasa.',
   },
-  'fg-muted/surface-muted': {
-    ratio: 4.35,
+  'fg-subtle/accent-soft': {
+    ratio: 4.38,
     note:
-      'slate-500 sobre slate-100. El lugar real es Combobox.tsx:273, el sublabel de la opción ' +
-      'resaltada POR TECLADO, que es peor de lo que parece. Ojo: el hover de fila de DataTable y ' +
-      'el fondo deshabilitado de TextField son slate-50, no slate-100, y ahí el par da 4.55 y pasa.',
+      'El texto de sugerencia dentro de la caja de notas de la cotización, que es el único de ' +
+      'sus cuatro fondos donde no llega. Y no hay a dónde moverlo: el paso siguiente de la escala ' +
+      'es el del texto secundario, y usarlo daría vuelta la jerarquía, que es el error que la ' +
+      'revisión de este PR levantó. Además el sitio le pone opacidad a esa caja, así que el par ' +
+      'que se ve de verdad es un poco mejor que este, que mide el token pleno.',
   },
 }
 
 /**
- * Las excepciones del TEMA OSCURO. Son NUEVE, y las nueve ya fallaban en claro: **el tema
- * oscuro no estrena ni un incumplimiento**. Al revés, arregla DOCE de las VEINTIUNA del claro,
- * entre ellas el texto de sugerencia de los campos, que es el peor par de TEXTO sobre
- * superficie del claro (2.63) y en oscuro llega a 5.25. (No es el peor par del sistema a
- * secas: ese es el realce de fila, con 1.05, y así lo dice la nota de ese par doscientas
- * líneas más arriba.)
+ * Las excepciones del TEMA OSCURO. Son DOS, y las dos ya fallaban en claro: **el tema oscuro no
+ * estrena ni un incumplimiento**. Al revés, arregla DOS de las CUATRO que le quedan al claro.
  *
- * Las nueve que quedan son las mismas de siempre: filetes decorativos que acompañan a un
- * fondo y no comunican solos, más el realce de fila, la pastilla dentro de su fila y el
- * botón apagado. SIETE de las nueve MEJORAN respecto del claro; bajan DOS, las dos del
- * marco de la caja informativa, y las dos siguen en el mismo régimen.
+ * Eran nueve hasta que el PR del contraste claro sacó de la lista los filetes decorativos y la
+ * pastilla: no porque cumplieran, sino porque no son cosas que la norma pida medir. Quedan las
+ * dos que sí se miden y no llegan: el realce de la fila de una tabla, que es el peor par del
+ * sistema con 1.06 y es decorativo desde que el foco tiene contorno propio, y el texto del botón
+ * primario apagado, que la norma exime por ser un control inactivo.
  *
  * Los conteos de este bloque los fijan las listas congeladas de más abajo: si alguno se
  * escribe de memoria y queda viejo, esas listas siguen en verde y este texto miente. Pasó
- * con la primera versión, con cuatro números.
+ * con la primera versión, con cuatro números, y volvió a pasar con esta: el PR que dejó la
+ * lista en dos no tocó una sola línea de este comentario, y los cinco números que decía
+ * quedaron mal a la vez. Lo levantó la revisión de cierre.
  */
 const EXCEPCIONES_OSCURO: Record<string, { ratio: number; note: string }> = {
   'surface-subtle/surface': {
@@ -388,47 +273,12 @@ const EXCEPCIONES_OSCURO: Record<string, { ratio: number; note: string }> = {
       '1.05: el tema oscuro no lo arregla ni lo empeora, y no hace falta que lo arregle, porque ' +
       'lo que señala el foco es el contorno y ese sí se mide.',
   },
-  'danger-border/surface': {
-    ratio: 1.68,
-    note: 'El marco de las alertas de peligro sobre tarjeta. En claro da 1.45: mejora y no alcanza.',
-  },
-  'danger-border/canvas': {
-    ratio: 1.91,
-    note: 'El mismo marco contra el fondo de página. En claro da 1.39: mejora y no alcanza.',
-  },
-  'accent-border/accent-soft': {
-    ratio: 1.57,
-    note:
-      'El filete de la caja informativa contra su propio fondo. Es de los dos únicos pares que ' +
-      'BAJAN en oscuro (1.67 en claro), y se acepta por lo mismo que en claro: el filete ' +
-      'acompaña al color de fondo, que es el que comunica.',
-  },
-  'accent-border/surface': {
-    ratio: 1.73,
-    note: 'La misma caja contra la tarjeta que la contiene. El otro par que baja (1.81 en claro).',
-  },
-  'success-border/success-soft': {
-    ratio: 1.84,
-    note:
-      'El marco del aviso de éxito, que sigue sin existir en pantalla. En claro da 1.13, que ' +
-      'es el más bajo de la familia: en oscuro mejora bastante y sigue sin llegar.',
-  },
-  'warning-border/warning-soft': {
-    ratio: 1.82,
-    note: 'El borde del botón de forzar dentro del banner ámbar. En claro da 1.20.',
-  },
   'on-solid/accent-disabled': {
     ratio: 3.89,
     note:
       'El mismo botón apagado en oscuro. Mejora respecto del claro (2.64) y sigue sin llegar; ' +
       'WCAG exime los controles inactivos. Se eligió un tono que se distingue del primario ' +
       'activo (1.74 entre los dos) para que "apagado" se siga leyendo como apagado.',
-  },
-  'accent-soft-strong/accent-soft': {
-    ratio: 1.13,
-    note:
-      'La pastilla informativa contra la fila que la contiene. Es el número que ese token ' +
-      'existe para conservar, y en oscuro se conserva igual: 1.12 en claro, 1.13 acá.',
   },
 }
 
@@ -733,10 +583,10 @@ describe('tokens del tema', () => {
       'surface-muted': '#f1f5f9', // slate-100
       'fg': '#0f172b', // slate-900
       'fg-body': '#314158', // slate-700
-      'fg-muted': '#62748e', // slate-500
-      'fg-subtle': '#90a1b9', // slate-400
+      'fg-muted': '#45556c', // slate-600
+      'fg-subtle': '#62748e', // slate-500
       'border': '#e2e8f0', // slate-200
-      'border-strong': '#cad5e2', // slate-300
+      'border-strong': '#62748e', // slate-500
       'accent': '#155dfc', // blue-600
       'accent-hover': '#1447e6', // blue-700
       'accent-soft': '#eff6ff', // blue-50
@@ -751,7 +601,7 @@ describe('tokens del tema', () => {
       'danger-fg': '#c10007', // red-700
       'accent-border': '#8ec5ff', // blue-300
       'danger-border': '#ffc9c9', // red-200
-      'danger-border-strong': '#ffa2a2', // red-300
+      'danger-border-strong': '#fb2c36', // red-500
       'warning': '#bb4d00', // amber-700
       'warning-soft': '#fffbeb', // amber-50
       'warning-soft-strong': '#fef3c6', // amber-100
@@ -762,7 +612,7 @@ describe('tokens del tema', () => {
       'warning-soft-hover': '#fee685', // amber-200
       'trace': '#cad5e2', // slate-300
       'warning-border': '#fee685', // amber-200
-      'warning-border-strong': '#ffd230', // amber-300
+      'warning-border-strong': '#e17100', // amber-600
       'progress-soft': '#ede9fe', // violet-100
       'progress-fg': '#7008e7', // violet-700
       'transition-soft': '#cbfbf1', // teal-100
@@ -792,8 +642,8 @@ describe('tokens del tema', () => {
    * Y los del tema OSCURO, que no tenían red. El comentario de arriba explica por qué el
    * contraste solo no alcanza: solo ve un cambio cuando cruza un umbral o toca una excepción
    * fijada. Medido durante la revisión de este PR: **poner el velo del modal en blanco, o el
-   * acento oscuro en verde, dejaba TODO este archivo en verde**. Los cuatro tokens que no
-   * entran en ningún par (los de `SIN_PAR`) no tenían absolutamente nada que los mirara.
+   * acento oscuro en verde, dejaba TODO este archivo en verde**. Los tokens que no entran
+   * en ningún par (los de `SIN_PAR`) no tenían absolutamente nada que los mirara.
    *
    * Estos valores NO se recalculan desde la paleta de Tailwind, como los del claro: son
    * tonos propios elegidos sobre azul marino, así que este literal es toda su red.
@@ -829,7 +679,7 @@ describe('tokens del tema', () => {
       'warning-soft-strong': '#4a3614',
       'warning-fg': '#fcd34d',
       'warning-border': '#6b4f18',
-      'warning-border-strong': '#8a6a1c',
+      'warning-border-strong': '#927224',
       'progress-soft': '#251f3a',
       'progress-fg': '#c4b4ff',
       'transition-soft': '#00312d',
@@ -895,24 +745,20 @@ describe('tokens del tema', () => {
    */
   it('el conjunto de pares medidos es exactamente este', () => {
     expect(PAIRS.map(key).sort()).toEqual([
-      'accent-border/accent-soft',
-      'accent-border/surface',
       'accent-hover/accent-soft',
       'accent-hover/accent-soft-strong',
       'accent-hover/canvas',
       'accent-hover/surface',
       'accent-hover/surface-muted',
       'accent-hover/surface-subtle',
-      'accent-soft-strong/accent-soft',
       'accent/accent-soft',
       'accent/canvas',
       'accent/surface',
       'border-strong/canvas',
       'border-strong/surface',
+      'danger-border-strong/canvas',
       'danger-border-strong/danger-soft',
       'danger-border-strong/surface',
-      'danger-border/canvas',
-      'danger-border/surface',
       'danger-fg/danger-soft',
       'danger-fg/danger-soft-strong',
       'danger-fg/surface',
@@ -958,14 +804,13 @@ describe('tokens del tema', () => {
       'on-solid/transition',
       'on-solid/transition-hover',
       'progress-fg/progress-soft',
-      'success-border/success-soft',
       'success-fg/success-soft',
       'success-fg/surface',
       'success/surface',
       'surface-subtle/surface',
       'transition-fg/transition-soft',
       'warning-border-strong/surface',
-      'warning-border/warning-soft',
+      'warning-border-strong/warning-soft',
       'warning-fg/surface',
       'warning-fg/warning-soft',
       'warning-fg/warning-soft-strong',
@@ -985,26 +830,9 @@ describe('tokens del tema', () => {
    */
   it('el conjunto de excepciones del tema claro es exactamente este', () => {
     expect(Object.keys(EXCEPCIONES.claro).sort()).toEqual([
-      'accent-border/accent-soft',
-      'accent-border/surface',
-      'accent-soft-strong/accent-soft',
-      'border-strong/canvas',
-      'border-strong/surface',
-      'danger-border-strong/danger-soft',
-      'danger-border-strong/surface',
-      'danger-border/canvas',
-      'danger-border/surface',
-      'fg-muted/accent-soft',
-      'fg-muted/surface-muted',
       'fg-subtle/accent-soft',
-      'fg-subtle/canvas',
-      'fg-subtle/surface',
-      'fg-subtle/surface-subtle',
       'on-solid/accent-disabled',
-      'success-border/success-soft',
       'surface-subtle/surface',
-      'warning-border-strong/surface',
-      'warning-border/warning-soft',
       'warning/warning-soft-hover',
     ])
   })
@@ -1015,39 +843,22 @@ describe('tokens del tema', () => {
    */
   it('el conjunto de excepciones del tema oscuro es exactamente este', () => {
     expect(Object.keys(EXCEPCIONES.oscuro).sort()).toEqual([
-      'accent-border/accent-soft',
-      'accent-border/surface',
-      'accent-soft-strong/accent-soft',
-      'danger-border/canvas',
-      'danger-border/surface',
       'on-solid/accent-disabled',
-      'success-border/success-soft',
       'surface-subtle/surface',
-      'warning-border/warning-soft',
     ])
   })
 
   /**
-   * Las doce del tema claro que el oscuro ARREGLA. Se afirman por nombre y no por número
+   * Las dos del tema claro que el oscuro ARREGLA. Se afirman por nombre y no por número
    * para que nadie las pierda de vista: si mañana una vuelve a fallar en oscuro, este caso
    * lo dice, y si alguien la arregla también en claro, hay que sacarla de las dos listas.
    */
-  it('el tema oscuro arregla exactamente estas doce del claro', () => {
+  it('el tema oscuro arregla exactamente estas dos del claro', () => {
     const arregladas = Object.keys(EXCEPCIONES.claro)
       .filter((k) => !(k in EXCEPCIONES.oscuro))
       .sort()
     expect(arregladas).toEqual([
-      'border-strong/canvas',
-      'border-strong/surface',
-      'danger-border-strong/danger-soft',
-      'danger-border-strong/surface',
-      'fg-muted/accent-soft',
-      'fg-muted/surface-muted',
       'fg-subtle/accent-soft',
-      'fg-subtle/canvas',
-      'fg-subtle/surface',
-      'fg-subtle/surface-subtle',
-      'warning-border-strong/surface',
       'warning/warning-soft-hover',
     ])
   })
@@ -1093,16 +904,12 @@ describe('los umbrales son los de la norma', () => {
     const noTextuales = PAIRS.filter((pair) => pair.min === AA_NON_TEXT).map(key).sort()
     expect(noTextuales).toEqual(
       [
-      'accent-border/accent-soft',
-      'accent-border/surface',
-      'accent-soft-strong/accent-soft',
       'accent/canvas',
       'border-strong/canvas',
       'border-strong/surface',
+      'danger-border-strong/canvas',
       'danger-border-strong/danger-soft',
       'danger-border-strong/surface',
-      'danger-border/canvas',
-      'danger-border/surface',
       'focus/accent-soft',
       'focus/canvas',
       'focus/danger-soft',
@@ -1111,10 +918,9 @@ describe('los umbrales son los de la norma', () => {
       'focus/surface-subtle',
       'focus/warning-soft',
       'focus/warning-soft-strong',
-      'success-border/success-soft',
       'surface-subtle/surface',
       'warning-border-strong/surface',
-      'warning-border/warning-soft',
+      'warning-border-strong/warning-soft',
     ].sort(),
     )
   })
@@ -1268,3 +1074,33 @@ describe('el modo de alto contraste', () => {
     )
   })
 })
+
+/**
+ * La pastilla informativa contra la fila que la contiene.
+ *
+ * No es un mínimo de la norma y por eso no está entre los pares: lo que comunica es la palabra
+ * que la pastilla lleva escrita, no su relleno. Es una invariante de DISEÑO, y existe porque ya
+ * se rompió una vez: un barrido mandó los dos azules suaves al mismo token y la pastilla, que se
+ * dibuja dentro de una fila del mismo tono, pasó de separarse 1.12 a 1.00, o sea a desaparecer.
+ * De ahí salió el token propio.
+ *
+ * Hasta este PR eso lo cuidaba un par con umbral de norma, que era la herramienta equivocada: el
+ * par se declaraba incumplimiento cuando no lo es. Al sacarlo, la separación se quedó sin nada que
+ * la mirara, y la guarda de cobertura no puede verlo porque el token sigue apareciendo en otro par.
+ * Lo levantó la revisión. Acá se afirma lo que de verdad se quiere: que la separación no se pierda.
+ */
+describe('la pastilla informativa no se funde con su fila', () => {
+  it('conserva la separación por la que su token existe', () => {
+    expect(
+      Number(contrastRatio(colors['accent-soft-strong'], colors['accent-soft']).toFixed(2)),
+      'si los dos azules suaves se juntan, la pastilla desaparece dentro de la fila',
+    ).toBe(1.12)
+  })
+
+  it('y en el tema oscuro también, que tiene su propio par de tonos', () => {
+    expect(
+      Number(contrastRatio(colorsOscuro['accent-soft-strong'], colorsOscuro['accent-soft']).toFixed(2)),
+    ).toBeGreaterThan(1)
+  })
+})
+

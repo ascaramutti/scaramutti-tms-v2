@@ -42,9 +42,16 @@ export const FIELD_FOCUS_INVALID = 'focus:ring-danger focus:border-danger'
 /** El color del texto de sugerencia, que solo tienen los que aceptan placeholder. */
 export const FIELD_PLACEHOLDER = 'placeholder:text-fg-subtle'
 
-/** El deshabilitado, que solo tiene el campo de texto. */
+/**
+ * El deshabilitado, que solo tiene el campo de texto.
+ *
+ * Lleva opacidad además del tono: el texto apagado y el tipeado se distinguen por el color, y esa
+ * distancia depende de dos tokens que pueden moverse por otro motivo. El fondo tampoco ayuda, que
+ * separa 1.05 del normal, y el borde es el mismo en los dos estados. Con opacidad el estado se lee
+ * pase lo que pase con la escala de grises, y es como el resto del árbol ya lo marca.
+ */
 export const FIELD_DISABLED =
-  'disabled:bg-surface-subtle disabled:text-fg-subtle disabled:cursor-not-allowed'
+  'disabled:bg-surface-subtle disabled:text-fg-subtle disabled:opacity-60 disabled:cursor-not-allowed'
 
 /**
  * Dos espaciados, los dos que el árbol ya tenía: el cómodo lo usan los 81 campos de los
