@@ -86,7 +86,7 @@ export function DataTable<T>({
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando" className="text-blue-600" />
+        <Spinner size={28} label="Cargando" className="text-accent" />
       </div>
     )
   }
@@ -98,7 +98,7 @@ export function DataTable<T>({
         role="alert"
         className="flex flex-col items-center justify-center px-6 py-16 text-center"
       >
-        <p className="text-sm font-medium text-slate-700">
+        <p className="text-sm font-medium text-fg-body">
           {errorMessage ?? 'No se pudieron cargar los datos.'}
         </p>
         {onRetry && (
@@ -125,13 +125,13 @@ export function DataTable<T>({
     <div className="space-y-3">
       {/* Error con data previa (ej. refetch al paginar falló): aviso no destructivo. */}
       {isError && (
-        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
           <span>{errorMessage ?? 'No se pudieron actualizar los datos.'}</span>
           {onRetry && (
             <button
               type="button"
               onClick={onRetry}
-              className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
             >
               Reintentar
             </button>
@@ -141,16 +141,16 @@ export function DataTable<T>({
 
       <Card padding="none">
         <div className="overflow-x-auto" aria-busy={isFetching}>
-          <table className={cn('min-w-full divide-y divide-slate-200', isFetching && 'opacity-60')}>
+          <table className={cn('min-w-full divide-y divide-border', isFetching && 'opacity-60')}>
             {caption && <caption className="sr-only">{caption}</caption>}
-            <thead className="bg-slate-50">
+            <thead className="bg-surface-subtle">
               <tr>
                 {columns.map((col) => (
                   <th
                     key={col.key}
                     scope="col"
                     className={cn(
-                      'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500',
+                      'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-fg-muted',
                       ALIGN_CLASSES[col.align ?? 'left'],
                     )}
                   >
@@ -159,13 +159,13 @@ export function DataTable<T>({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {data.map((row) => (
                 <tr
                   key={keyExtractor(row)}
                   className={cn(
                     clickable &&
-                      'cursor-pointer hover:bg-slate-50 focus:bg-slate-50 focus:outline-none',
+                      'cursor-pointer hover:bg-surface-subtle focus:bg-surface-subtle focus:outline-none',
                   )}
                   onClick={clickable ? () => onRowClick(row) : undefined}
                   onKeyDown={
@@ -186,7 +186,7 @@ export function DataTable<T>({
                     <td
                       key={col.key}
                       className={cn(
-                        'px-4 py-3 align-middle text-sm text-slate-700',
+                        'px-4 py-3 align-middle text-sm text-fg-body',
                         ALIGN_CLASSES[col.align ?? 'left'],
                         col.className,
                       )}
@@ -203,8 +203,8 @@ export function DataTable<T>({
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
-            <span className="text-sm text-slate-600">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <span className="text-sm text-fg-body">
               Mostrando {from}–{to} de {total}
             </span>
             {/* Las dos flechas NO usan `Button`, y no es un olvido: son una cuarta forma.
@@ -218,7 +218,7 @@ export function DataTable<T>({
                 onClick={() => onPageChange(page - 1)}
                 disabled={isFirst}
                 aria-label="Página anterior"
-                className="inline-flex items-center rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -227,7 +227,7 @@ export function DataTable<T>({
                 onClick={() => onPageChange(page + 1)}
                 disabled={isLast}
                 aria-label="Página siguiente"
-                className="inline-flex items-center rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <ChevronRight className="h-5 w-5" aria-hidden="true" />
               </button>

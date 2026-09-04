@@ -25,16 +25,16 @@ export function QuotationDetailHeader({
   expiresAt,
 }: QuotationDetailHeaderProps) {
   return (
-    <header className="border-b border-slate-200 pb-5">
+    <header className="border-b border-border pb-5">
       <BackLink to="/cotizaciones">Cotizaciones</BackLink>
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-2xl font-semibold text-slate-900">{code}</h1>
+        <h1 className="text-2xl font-semibold text-fg">{code}</h1>
         <Badge variant="info">{QUOTATION_TYPE_LABELS[quotationType]}</Badge>
         <QuotationStatusBadge status={status} isExpired={isExpired} />
       </div>
 
-      <p className="mt-1 text-sm text-slate-500">
+      <p className="mt-1 text-sm text-fg-muted">
         Emitida el {formatDate(createdAt)} · Válida hasta {formatDate(expiresAt)}
       </p>
     </header>

@@ -15,7 +15,7 @@ import { Spinner } from '../ui/Spinner'
  */
 export function SessionLoading() {
   return (
-    <div className="flex min-h-[50vh] items-center justify-center gap-3 text-slate-500">
+    <div className="flex min-h-[50vh] items-center justify-center gap-3 text-fg-muted">
       <Spinner label="Cargando sesión" />
       <span className="text-sm">Cargando sesión…</span>
     </div>

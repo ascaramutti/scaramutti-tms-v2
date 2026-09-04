@@ -28,7 +28,7 @@ interface ProtectedRouteProps {
  * para sus dos roles, operaciones para el despachador.
  */
 const exitLinkClasses =
-  'mt-6 inline-block rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white hover:bg-blue-700 transition-colors'
+  'mt-6 inline-block rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid hover:bg-accent-hover transition-colors'
 
 function AccessDenied({
   role,
@@ -47,15 +47,15 @@ function AccessDenied({
   // HTML inválido y duplicaría el landmark para screen readers.
   return (
     <div className="flex items-center justify-center px-4 py-24">
-      <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-8 text-center max-w-md">
-        <h1 className="text-xl font-semibold text-slate-900">
+      <div className="bg-surface rounded-2xl ring-1 ring-border p-8 text-center max-w-md">
+        <h1 className="text-xl font-semibold text-fg">
           {actionName
             ? `No puedes ${actionName}`
             : moduleName
               ? `Sin acceso a ${moduleName}`
               : 'Sin acceso a este módulo'}
         </h1>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-fg-muted">
           {actionName
             ? 'Tu rol no tiene permisos para esta acción.'
             : 'Tu rol no tiene permisos para este módulo.'}

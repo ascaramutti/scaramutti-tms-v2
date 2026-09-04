@@ -26,7 +26,7 @@ export function SidebarNavItem({ icon: Icon, label, to, activeWhen }: SidebarNav
     return (
       <li className="list-none">
         <span
-          className={cn(baseClasses, 'cursor-not-allowed text-slate-400')}
+          className={cn(baseClasses, 'cursor-not-allowed text-fg-subtle')}
           title="Próximamente"
           aria-disabled="true"
         >
@@ -54,8 +54,8 @@ export function SidebarNavItem({ icon: Icon, label, to, activeWhen }: SidebarNav
         className={cn(
           baseClasses,
           isActive
-            ? 'bg-blue-50 text-blue-700'
-            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+            ? 'bg-accent-soft text-accent-hover'
+            : 'text-fg-body hover:bg-surface-muted hover:text-fg',
         )}
       >
         <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />

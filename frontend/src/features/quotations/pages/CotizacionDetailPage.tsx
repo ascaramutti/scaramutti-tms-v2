@@ -51,7 +51,7 @@ export function CotizacionDetailPage() {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div className="flex justify-center py-16">
-          <Spinner size={28} label="Cargando cotización" className="text-blue-600" />
+          <Spinner size={28} label="Cargando cotización" className="text-accent" />
         </div>
       </div>
     )
@@ -62,7 +62,7 @@ export function CotizacionDetailPage() {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div role="alert" className="flex flex-col items-center justify-center px-6 py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(error, 'No se pudo cargar la cotización.')}
           </p>
           <div className="mt-4 flex gap-2">

@@ -13,16 +13,16 @@ export function SidebarFooter() {
   const labelId = useId()
 
   return (
-    <section aria-labelledby={labelId} className="border-t border-slate-200 pt-4">
-      <h2 id={labelId} className="px-3 mb-1 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+    <section aria-labelledby={labelId} className="border-t border-border pt-4">
+      <h2 id={labelId} className="px-3 mb-1 text-xs font-semibold text-fg-subtle uppercase tracking-wider">
         Sesión
       </h2>
       <div className="px-3 mb-3">
-        <p className="text-sm font-medium text-slate-900 leading-tight truncate">
+        <p className="text-sm font-medium text-fg leading-tight truncate">
           {user?.fullName ?? '—'}
         </p>
         {user?.position && (
-          <p className="text-xs text-slate-500 leading-tight truncate mt-0.5">
+          <p className="text-xs text-fg-muted leading-tight truncate mt-0.5">
             {user.position}
           </p>
         )}
@@ -30,7 +30,7 @@ export function SidebarFooter() {
       <button
         type="button"
         onClick={clearSession}
-        className="w-full inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+        className="w-full inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-fg-body hover:bg-surface-muted hover:text-fg transition-colors"
       >
         <LogOut className="w-4 h-4" aria-hidden="true" />
         Cerrar sesión

@@ -380,7 +380,7 @@ describe('CotizacionEditPage', () => {
     // compartido casi pinta de gris, porque su constante se llamaba igual que la
     // compartida y decía otra cosa. Sin esta aserción, volverlo gris deja los veintitrés
     // casos de este archivo en verde: medido.
-    expect(recargar.className).toMatch(/border-red-300/)
+    expect(recargar.className).toMatch(/border-danger-border-strong/)
     // No navega: sigue en el wizard.
     expect(screen.queryByText(/DETALLE COTIZACION/i)).not.toBeInTheDocument()
   })

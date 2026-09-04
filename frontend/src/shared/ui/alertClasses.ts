@@ -45,7 +45,11 @@ const BORDE: Record<AlertVariant, string> = {
   info: 'border border-accent-border',
   // `success` ENTRA SIN NINGÚN USO: hoy no hay una sola alerta de éxito en el árbol
   // (`grep -rhoE "bg-(emerald|green)-50\\b" src --include=*.tsx` da cero; sin el
-  // límite de palabra da 1, que es el `bg-emerald-500` del `Stepper`). Se agrega porque el
+  // límite de palabra daba 1 hasta el barrido, que era el verde 500 del `Stepper`, y desde
+  // que ese círculo usa el token da cero también. El tono NO se nombra entero acá a
+  // propósito: Tailwind escanea los comentarios, y con el nombre completo esta línea era
+  // el único motivo por el que esa regla seguía compilándose, sin un solo elemento que la
+  // usara; lo levantó la revisión de este PR). Se agrega porque el
   // token existe y las notificaciones de `sonner` usan ese rol. Su borde estrena
   // `success-border` en este mismo PR, en vez de reusar el tono suave: un borde del mismo
   // color que el fondo no es un borde. Cuando aparezca el primer uso real hay que mirarlo

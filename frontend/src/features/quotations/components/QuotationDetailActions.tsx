@@ -103,7 +103,7 @@ export function QuotationDetailActions({
   return (
     <div className="flex flex-col items-end gap-2">
       {staleConflict && (
-        <Alert variant="warning" role="alert" className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-amber-800">
+        <Alert variant="warning" role="alert" className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-warning-fg">
           <span>La cotización fue modificada por otra persona. Recargá para ver la versión actual.</span>
           <Button variant="secondary" onClick={handleReload}>
             <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -144,7 +144,7 @@ export function QuotationDetailActions({
                 Decorativo (aria-hidden): el motivo ya viaja en el aria-label del botón. */}
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-blue-700 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100"
+              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-accent-hover px-2 py-1 text-xs font-medium text-on-solid opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100"
             >
               {notEditableReason}
             </span>
@@ -178,7 +178,7 @@ export function QuotationDetailActions({
         </Button>
       </div>
       {pdfError && (
-        <p role="alert" className="text-sm font-medium text-red-600">
+        <p role="alert" className="text-sm font-medium text-danger">
           {pdfError}
         </p>
       )}

@@ -25,7 +25,7 @@ interface Step1InfoGeneralProps {
   immutableFields?: ReadonlyArray<ImmutableField>
 }
 
-const SECTION_TITLE = 'text-sm font-semibold uppercase tracking-wide text-slate-500'
+const SECTION_TITLE = 'text-sm font-semibold uppercase tracking-wide text-fg-muted'
 // En el grid de 4 columnas (lg) "Fecha tentativa (opcional)" envuelve a 2 líneas: reservar 2
 // líneas de alto con el texto abajo mantiene los inputs alineados, sin aire extra en mobile.
 const COMMERCIAL_LABEL = 'lg:flex lg:items-end lg:min-h-[2.5rem]'

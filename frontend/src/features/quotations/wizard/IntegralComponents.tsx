@@ -14,7 +14,7 @@ interface IntegralComponentsProps {
 }
 
 const ADD_COMPONENT =
-  'inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-sm font-medium text-blue-700 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500'
+  'inline-flex items-center gap-1.5 rounded-lg border border-accent-border bg-accent-soft px-3 py-1.5 text-sm font-medium text-accent-hover hover:bg-accent-soft-strong focus:outline-none focus:ring-2 focus:ring-focus'
 
 /**
  * Sección "Componentes del Servicio Integral": lista anidada (`useFieldArray` sobre
@@ -47,10 +47,10 @@ export function IntegralComponents({ parentIndex, serviceTypes, currencyCode }: 
     <Card padding="md" elevated={false}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-600">
+          <h3 className="text-sm font-semibold uppercase tracking-wide text-fg-body">
             Componentes del Servicio Integral
           </h3>
-          <p className="text-xs text-slate-500" aria-live="polite">
+          <p className="text-xs text-fg-muted" aria-live="polite">
             {`Mínimo 2 componentes · ${components.length} agregado${components.length === 1 ? '' : 's'}`}
           </p>
         </div>
@@ -61,13 +61,13 @@ export function IntegralComponents({ parentIndex, serviceTypes, currencyCode }: 
       </div>
 
       {components.length > 0 && compositionHint && (
-        <p aria-live="polite" className="mt-2 text-sm text-red-600">
+        <p aria-live="polite" className="mt-2 text-sm text-danger">
           {compositionHint}
         </p>
       )}
 
       {components.length === 0 ? (
-        <p className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
+        <p className="mt-3 rounded-lg border border-dashed border-border-strong bg-surface-subtle px-4 py-6 text-center text-sm text-fg-muted">
           Agrega los componentes del paquete (al menos uno de transporte y uno complementario).
         </p>
       ) : (

@@ -26,7 +26,7 @@ function collectStandby(items: QuotationItemResponse[]): StandbyEntry[] {
   return result
 }
 
-const TH = 'px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500'
+const TH = 'px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted'
 
 /** Tabla de stand-by por ítem. No se renderiza si ningún ítem tiene stand-by. */
 export function QuotationStandbyTable({ items, currencyCode }: QuotationStandbyTableProps) {
@@ -37,11 +37,11 @@ export function QuotationStandbyTable({ items, currencyCode }: QuotationStandbyT
 
   return (
     <section>
-      <h2 className="text-base font-semibold text-slate-900">Stand-By</h2>
+      <h2 className="text-base font-semibold text-fg">Stand-By</h2>
       <Card padding="none" className="mt-3 overflow-x-auto">
         <table className="min-w-full">
           <caption className="sr-only">Costos de stand-by por ítem</caption>
-          <thead className="bg-slate-50">
+          <thead className="bg-surface-subtle">
             <tr>
               <th scope="col" className={`${TH} text-left`}>
                 Ítem
@@ -56,11 +56,11 @@ export function QuotationStandbyTable({ items, currencyCode }: QuotationStandbyT
           </thead>
           <tbody>
             {entries.map(({ item, standby }) => (
-              <tr key={item.id} className="border-t border-slate-100">
-                <td className="px-3 py-2.5 text-sm text-slate-800">
+              <tr key={item.id} className="border-t border-border">
+                <td className="px-3 py-2.5 text-sm text-fg">
                   Ítem {item.displayLabel} ({item.serviceType.name})
                 </td>
-                <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-900">
+                <td className="px-3 py-2.5 text-right text-sm tabular-nums text-fg">
                   {formatCurrency(standby.pricePerDay, currencyCode)}
                 </td>
                 <td className="px-3 py-2.5 text-center">

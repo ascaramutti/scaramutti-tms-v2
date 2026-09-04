@@ -13,7 +13,7 @@ interface QuotationItemsSectionProps {
   igv: number
 }
 
-const TH = 'px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500'
+const TH = 'px-3 py-2 text-xs font-semibold uppercase tracking-wide text-fg-muted'
 const TD = 'px-3 py-2.5 align-top text-sm'
 
 /** Fila de un ítem root (facturable): muestra precio al cliente y total con IGV. */
@@ -21,30 +21,30 @@ function RootRow({ item, currencyCode }: { item: QuotationItemResponse; currency
   const integral = isIntegralItem(item)
   const subtext = itemSubtext(item)
   return (
-    <tr className={cn('border-t border-slate-100', integral && 'bg-blue-50')}>
-      <td className={cn(TD, 'text-slate-500')}>{item.displayLabel}</td>
+    <tr className={cn('border-t border-border', integral && 'bg-accent-soft')}>
+      <td className={cn(TD, 'text-fg-muted')}>{item.displayLabel}</td>
       <td className={TD}>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium text-slate-900">{item.serviceType.name}</span>
+          <span className="font-medium text-fg">{item.serviceType.name}</span>
           {integral && <Badge variant="info">Integral</Badge>}
         </div>
-        {subtext && <p className="mt-0.5 text-xs text-slate-500">{subtext}</p>}
+        {subtext && <p className="mt-0.5 text-xs text-fg-muted">{subtext}</p>}
         {item.insuredAmount != null && (
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-fg-muted">
             Valor asegurado: {formatCurrency(item.insuredAmount, currencyCode)}
           </p>
         )}
-        {item.observations && <p className="mt-0.5 text-xs text-slate-500">{item.observations}</p>}
+        {item.observations && <p className="mt-0.5 text-xs text-fg-muted">{item.observations}</p>}
       </td>
       <td className={cn(TD, 'text-right tabular-nums')}>{item.quantity}</td>
       <td className={cn(TD, 'text-right tabular-nums')}>
         {item.unitPrice != null ? formatCurrency(item.unitPrice, currencyCode) : '—'}
       </td>
       <td className={cn(TD, 'text-right tabular-nums')}>{formatCurrency(item.subtotal, currencyCode)}</td>
-      <td className={cn(TD, 'text-right tabular-nums text-slate-500')}>
+      <td className={cn(TD, 'text-right tabular-nums text-fg-muted')}>
         {formatCurrency(itemIgvAmount(item), currencyCode)}
       </td>
-      <td className={cn(TD, 'text-right font-semibold tabular-nums text-slate-900')}>
+      <td className={cn(TD, 'text-right font-semibold tabular-nums text-fg')}>
         {formatCurrency(itemTotalWithIgv(item), currencyCode)}
       </td>
     </tr>
@@ -58,27 +58,27 @@ function ChildRow({ item, currencyCode }: { item: QuotationItemResponse; currenc
   // el Integral sirva de referencia: sin esto no se sabe qué se cargó en el hijo de transporte.
   const subtext = itemSubtext(item)
   return (
-    <tr className="border-t border-dashed border-slate-100">
+    <tr className="border-t border-dashed border-border">
       <td className={TD} />
       <td className={cn(TD, 'pl-6')}>
         <div>
-          <span className="text-slate-400" aria-hidden="true">
+          <span className="text-fg-subtle" aria-hidden="true">
             ↳
           </span>
-          <span className="ml-1.5 font-medium text-slate-400">{item.displayLabel}</span>
-          <span className="ml-2 text-slate-700">{item.serviceType.name}</span>
+          <span className="ml-1.5 font-medium text-fg-subtle">{item.displayLabel}</span>
+          <span className="ml-2 text-fg-body">{item.serviceType.name}</span>
         </div>
-        {subtext && <p className="ml-7 mt-0.5 text-xs text-slate-500">{subtext}</p>}
+        {subtext && <p className="ml-7 mt-0.5 text-xs text-fg-muted">{subtext}</p>}
       </td>
       <td className={cn(TD, 'text-right tabular-nums')}>{item.quantity}</td>
-      <td className={cn(TD, 'text-right tabular-nums text-slate-600')}>
+      <td className={cn(TD, 'text-right tabular-nums text-fg-body')}>
         {item.internalReferencePrice
           ? formatCurrency(item.internalReferencePrice, currencyCode)
           : '—'}
       </td>
-      <td className={cn(TD, 'text-right text-slate-400')}>—</td>
-      <td className={cn(TD, 'text-right text-slate-400')}>—</td>
-      <td className={cn(TD, 'text-right text-slate-400')}>—</td>
+      <td className={cn(TD, 'text-right text-fg-subtle')}>—</td>
+      <td className={cn(TD, 'text-right text-fg-subtle')}>—</td>
+      <td className={cn(TD, 'text-right text-fg-subtle')}>—</td>
     </tr>
   )
 }
@@ -91,11 +91,11 @@ export function QuotationItemsSection({ items, currencyCode, subtotal, igv }: Qu
   const igvPercent = items[0]?.igvPercentage
   return (
     <section>
-      <h2 className="text-base font-semibold text-slate-900">Detalle de ítems</h2>
+      <h2 className="text-base font-semibold text-fg">Detalle de ítems</h2>
       <Card padding="none" className="mt-3 overflow-x-auto">
         <table className="min-w-full">
           <caption className="sr-only">Detalle de ítems de la cotización</caption>
-          <thead className="bg-slate-50">
+          <thead className="bg-surface-subtle">
             <tr>
               <th scope="col" className={cn(TH, 'text-left')}>
                 #
@@ -131,18 +131,18 @@ export function QuotationItemsSection({ items, currencyCode, subtotal, igv }: Qu
               </Fragment>
             ))}
           </tbody>
-          <tfoot className="border-t border-slate-200 bg-slate-50">
+          <tfoot className="border-t border-border bg-surface-subtle">
             <tr>
               <td colSpan={5} />
-              <td className={cn(TD, 'text-right font-medium text-slate-500')}>Subtotal</td>
-              <td className={cn(TD, 'text-right tabular-nums text-slate-900')}>
+              <td className={cn(TD, 'text-right font-medium text-fg-muted')}>Subtotal</td>
+              <td className={cn(TD, 'text-right tabular-nums text-fg')}>
                 {formatCurrency(subtotal, currencyCode)}
               </td>
             </tr>
             <tr>
               <td colSpan={5} />
-              <td className={cn(TD, 'text-right font-medium text-slate-500')}>IGV</td>
-              <td className={cn(TD, 'text-right tabular-nums text-slate-900')}>
+              <td className={cn(TD, 'text-right font-medium text-fg-muted')}>IGV</td>
+              <td className={cn(TD, 'text-right tabular-nums text-fg')}>
                 {formatCurrency(igv, currencyCode)}
               </td>
             </tr>

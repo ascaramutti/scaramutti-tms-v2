@@ -121,7 +121,7 @@ export function FleetUnitField({
         error={error}
       />
       {isError && (
-        <p role="alert" className="mt-1 text-xs text-amber-700">
+        <p role="alert" className="mt-1 text-xs text-warning">
           {loadErrorText}
         </p>
       )}

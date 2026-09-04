@@ -20,8 +20,8 @@ export function EmptyState({ icon: Icon = Inbox, title, description, action }: E
   return (
     <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
       <Icon className="h-12 w-12 text-slate-300" aria-hidden="true" />
-      <p className="mt-4 text-sm font-medium text-slate-700">{title}</p>
-      {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+      <p className="mt-4 text-sm font-medium text-fg-body">{title}</p>
+      {description && <p className="mt-1 text-sm text-fg-muted">{description}</p>}
       {action && <div className="mt-4">{action}</div>}
     </div>
   )

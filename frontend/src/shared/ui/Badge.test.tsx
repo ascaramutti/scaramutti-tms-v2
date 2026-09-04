@@ -68,7 +68,7 @@ describe('Badge · el filete del marcador interno', () => {
       </Badge>,
     )
     expect(clases(screen.getByText('x'))).toEqual(
-      new Set(`${FORMA} ${ESPERADAS.info} border border-blue-200`.split(' ')),
+      new Set(`${FORMA} ${ESPERADAS.info} border border-accent-border`.split(' ')),
     )
   })
 
@@ -79,17 +79,18 @@ describe('Badge · el filete del marcador interno', () => {
 })
 
 /**
- * El color crudo que queda, medido sobre la fuente y no sobre el render: es UNO, es el filete
- * de la pastilla interna, y está escrito con su motivo. Sin este caso, el día que alguien
- * agregue otro color suelto nadie lo va a ver, que es exactamente cómo llegaron los ocho
- * literales que la revisión del PR de los campos encontró tapando a su token.
+ * Que NO quede ningún color crudo, medido sobre la fuente y no sobre el render. El filete de
+ * la pastilla interna era el último y el barrido lo unió al borde de la caja informativa, así
+ * que ahora el conjunto tiene que estar vacío. Sin este caso, el día que alguien agregue un
+ * color suelto nadie lo va a ver, que es exactamente cómo llegaron los ocho literales que la
+ * revisión del PR de los campos encontró tapando a su token.
  */
 describe('Badge · lo que queda sin token', () => {
-  it('el único color crudo del archivo es el filete de la pastilla interna', () => {
+  it('no queda ningún color crudo en el archivo', () => {
     const fuente = readFileSync(join(process.cwd(), 'src', 'shared', 'ui', 'Badge.tsx'), 'utf8')
     const crudos = [
       ...fuente.matchAll(/\b(?:bg|text|border|ring)-(?:blue|amber|slate|rose|teal|violet|emerald)-\d{2,3}\b/g),
     ].map((m) => m[0])
-    expect(crudos).toEqual(['border-blue-200'])
+    expect(crudos).toEqual([])
   })
 })

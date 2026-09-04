@@ -166,7 +166,7 @@ export function Combobox({
   return (
     <div>
       {label && (
-        <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-fg-body">
           {label}
         </label>
       )}
@@ -174,20 +174,20 @@ export function Combobox({
         {selected ? (
           <div
             className={cn(
-              'flex items-center justify-between rounded-lg border bg-slate-50 px-3.5 py-2.5',
-              error ? 'border-red-300' : 'border-slate-300',
+              'flex items-center justify-between rounded-lg border bg-surface-subtle px-3.5 py-2.5',
+              error ? 'border-danger-border-strong' : 'border-border-strong',
             )}
           >
             <div>
-              <p className="text-sm font-medium text-slate-900">{selected.label}</p>
-              {selected.sublabel && <p className="text-xs text-slate-500">{selected.sublabel}</p>}
+              <p className="text-sm font-medium text-fg">{selected.label}</p>
+              {selected.sublabel && <p className="text-xs text-fg-muted">{selected.sublabel}</p>}
             </div>
             {!disabled && (
               <button
                 type="button"
                 onClick={clearSelection}
                 aria-label="Quitar selección"
-                className="text-slate-400 hover:text-slate-600"
+                className="text-fg-subtle hover:text-fg-body"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -196,7 +196,7 @@ export function Combobox({
         ) : (
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
               aria-hidden="true"
             />
             <input
@@ -219,22 +219,22 @@ export function Combobox({
               onBlur={onBlur}
               onKeyDown={handleKeyDown}
               className={cn(
-                'w-full rounded-lg border bg-white py-2.5 pl-9 pr-9 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
-                error ? 'border-red-300' : 'border-slate-300',
+                'w-full rounded-lg border bg-surface py-2.5 pl-9 pr-9 text-sm text-fg placeholder:text-fg-subtle focus:border-focus focus:outline-none focus:ring-2 focus:ring-focus',
+                error ? 'border-danger-border-strong' : 'border-border-strong',
               )}
             />
             {loading && (
               <Spinner
                 size={16}
                 label="Buscando"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle"
               />
             )}
           </div>
         )}
 
         {open && (
-          <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+          <div className="absolute z-10 mt-1 max-h-60 w-full overflow-y-auto rounded-lg border border-border bg-surface shadow-lg">
             {/* El aviso de "sin resultados" va FUERA del listbox: ese rol exige al
                 menos un hijo con rol de opción, y un texto no lo es. Adentro, axe
                 marca dos violaciones (una crítica) cada vez que el desplegable se
@@ -248,7 +248,7 @@ export function Combobox({
               // Y no se muestra MIENTRAS carga: la condición anterior era solo
               // "no hay opciones", así que durante el pedido del catálogo la
               // pantalla afirmaba que no había ninguna.
-              <p role="status" className="px-3.5 py-3 text-sm text-slate-500">
+              <p role="status" className="px-3.5 py-3 text-sm text-fg-muted">
                 {emptyText}
               </p>
             )}
@@ -265,12 +265,12 @@ export function Combobox({
                   onClick={() => select(option)}
                   onMouseEnter={() => setHighlighted(index)}
                   className={cn(
-                    'w-full px-3.5 py-2.5 text-left text-sm hover:bg-slate-50',
-                    index === highlighted && 'bg-slate-100',
+                    'w-full px-3.5 py-2.5 text-left text-sm hover:bg-surface-subtle',
+                    index === highlighted && 'bg-surface-muted',
                   )}
                 >
-                  <p className="font-medium text-slate-900">{option.label}</p>
-                  {option.sublabel && <p className="text-xs text-slate-500">{option.sublabel}</p>}
+                  <p className="font-medium text-fg">{option.label}</p>
+                  {option.sublabel && <p className="text-xs text-fg-muted">{option.sublabel}</p>}
                 </button>
               </li>
             ))}
@@ -285,8 +285,8 @@ export function Combobox({
                   }}
                   onMouseEnter={() => setHighlighted(options.length)}
                   className={cn(
-                    'flex w-full items-center gap-1.5 border-t border-slate-100 px-3.5 py-2.5 text-left text-sm font-medium text-blue-700 hover:bg-slate-50',
-                    highlighted === options.length && 'bg-slate-100',
+                    'flex w-full items-center gap-1.5 border-t border-border px-3.5 py-2.5 text-left text-sm font-medium text-accent-hover hover:bg-surface-subtle',
+                    highlighted === options.length && 'bg-surface-muted',
                   )}
                 >
                   <Plus className="h-4 w-4" aria-hidden="true" />
@@ -299,12 +299,12 @@ export function Combobox({
         )}
       </div>
       {showHint && (
-        <p id={hintId} className="mt-1 text-xs text-slate-500">
+        <p id={hintId} className="mt-1 text-xs text-fg-muted">
           {minCharsHint}
         </p>
       )}
       {error && (
-        <p id={errorId} role="alert" className="mt-1.5 text-sm text-red-600">
+        <p id={errorId} role="alert" className="mt-1.5 text-sm text-danger">
           {error}
         </p>
       )}

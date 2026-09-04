@@ -19,12 +19,12 @@ export function PageHeader({ title, description, action, divider }: PageHeaderPr
     <header
       className={cn(
         'flex flex-wrap items-start justify-between gap-4',
-        divider && 'border-b border-slate-200 pb-5',
+        divider && 'border-b border-border pb-5',
       )}
     >
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+        <h1 className="text-2xl font-semibold text-fg">{title}</h1>
+        {description && <p className="mt-1 text-sm text-fg-muted">{description}</p>}
       </div>
       {action && <div className="flex-shrink-0">{action}</div>}
     </header>

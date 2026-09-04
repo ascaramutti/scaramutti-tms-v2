@@ -39,13 +39,14 @@ const VARIANT_CLASSES: Record<BadgeVariant, string> = {
 }
 
 /**
- * El filete del marcador "interno". Queda en color crudo a propósito: blue-200 no tiene
- * token, y el borde de la caja informativa, que es el único azul de borde que sí lo tiene,
- * es un paso más oscuro. Inventar un token para un solo filete decorativo es peor que
- * dejarlo escrito con su motivo, que es el mismo criterio con el que el PR de los tokens
- * dejó suelto el relleno del primario deshabilitado.
+ * El filete del marcador "interno". Nació con un azul de la paleta escrito a mano, un paso
+ * más claro que este token, porque ese tono no tenía ninguno; el barrido de colores sueltos
+ * lo unió al borde de la caja informativa, que cumple el mismo rol (un filete azul sobre
+ * relleno azul suave). Ruling del dueño 2026-09-03. El tono no se nombra acá a propósito:
+ * Tailwind escanea los comentarios y nombrar una utilidad la publica en el CSS aunque ya no
+ * la use nadie, que es como este archivo estrenó una regla muerta en el PR del botón.
  */
-const INFO_BORDER = 'border border-blue-200'
+const INFO_BORDER = 'border border-accent-border'
 
 /**
  * Etiqueta de estado reutilizable (pill). El color nunca es el único portador

@@ -48,7 +48,7 @@ export function CotizacionesTable({
       key: 'code',
       header: 'Código',
       render: (quotation) => (
-        <span className="font-semibold text-blue-700">{quotation.code}</span>
+        <span className="font-semibold text-accent-hover">{quotation.code}</span>
       ),
     },
     {
@@ -61,8 +61,8 @@ export function CotizacionesTable({
       header: 'Cliente',
       render: (quotation) => (
         <div>
-          <p className="font-medium text-slate-900">{quotation.client.name}</p>
-          <p className="text-xs text-slate-500">{quotation.client.ruc}</p>
+          <p className="font-medium text-fg">{quotation.client.name}</p>
+          <p className="text-xs text-fg-muted">{quotation.client.ruc}</p>
         </div>
       ),
     },
@@ -82,7 +82,7 @@ export function CotizacionesTable({
       header: 'Total',
       align: 'right',
       render: (quotation) => (
-        <span className="font-medium tabular-nums text-slate-900">
+        <span className="font-medium tabular-nums text-fg">
           {formatCurrency(quotation.totalAmount, quotation.currencyCode)}
         </span>
       ),
@@ -98,7 +98,7 @@ export function CotizacionesTable({
       key: 'createdAt',
       header: 'Fecha',
       render: (quotation) => (
-        <span className="text-slate-500">{formatDate(quotation.createdAt)}</span>
+        <span className="text-fg-muted">{formatDate(quotation.createdAt)}</span>
       ),
     },
   ]

@@ -130,14 +130,14 @@ export function ItemCard({
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-focus"
         >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft-strong text-sm font-semibold text-accent-hover">
             {position}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-slate-900">Ítem {position}</span>
-            <span className="block truncate text-xs text-slate-500">
+            <span className="block text-sm font-semibold text-fg">Ítem {position}</span>
+            <span className="block truncate text-xs text-fg-muted">
               {typeName ?? 'Sin tipo de servicio'}
             </span>
           </span>
@@ -145,7 +145,7 @@ export function ItemCard({
             <span
               className={cn(
                 'flex shrink-0 items-center gap-1 text-xs font-medium',
-                isComplete ? 'text-emerald-600' : 'text-red-500',
+                isComplete ? 'text-success-fg' : 'text-danger',
               )}
             >
               {isComplete ? (
@@ -156,27 +156,27 @@ export function ItemCard({
               <span className="hidden sm:inline">{isComplete ? 'Completo' : 'Faltan datos'}</span>
             </span>
           )}
-          <span className="shrink-0 text-sm font-semibold text-slate-900">
+          <span className="shrink-0 text-sm font-semibold text-fg">
             {formatCurrency(total, currencyCode)}
           </span>
           {expanded ? (
-            <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <ChevronUp className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
           ) : (
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
           )}
         </button>
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Eliminar ítem ${position}`}
-          className="shrink-0 text-slate-400 hover:text-red-600"
+          className="shrink-0 text-fg-subtle hover:text-danger"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 
       {expanded && (
-        <div className="space-y-4 border-t border-slate-100 p-5 pt-4">
+        <div className="space-y-4 border-t border-border p-5 pt-4">
           <div>
             <label htmlFor={`item-${index}-serviceType`} className={FIELD_LABEL}>
               Tipo de servicio
@@ -201,14 +201,14 @@ export function ItemCard({
               })}
             </select>
             {itemErrors?.serviceTypeId?.message && (
-              <p role="alert" className="mt-1.5 text-sm text-red-600">
+              <p role="alert" className="mt-1.5 text-sm text-danger">
                 {itemErrors.serviceTypeId.message}
               </p>
             )}
           </div>
 
           {!hasServiceType ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-fg-muted">
               Elige un tipo de servicio para completar el ítem.
             </p>
           ) : (
@@ -338,7 +338,7 @@ export function ItemCard({
                   className={cn(CONTROL, 'resize-none', itemErrors?.observations ? 'border-danger-border-strong' : 'border-border-strong')}
                 />
                 {itemErrors?.observations?.message && (
-                  <p role="alert" className="mt-1.5 text-sm text-red-600">
+                  <p role="alert" className="mt-1.5 text-sm text-danger">
                     {itemErrors.observations.message}
                   </p>
                 )}

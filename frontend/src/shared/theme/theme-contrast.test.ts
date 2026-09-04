@@ -93,6 +93,8 @@ const PAIRS: Pair[] = [
   { fg: 'on-solid', bg: 'accent-hover', min: AA_TEXT, what: 'texto del botón primario al pasar el mouse' },
   { fg: 'on-solid', bg: 'danger', min: AA_TEXT, what: 'texto del botón destructivo' },
   { fg: 'on-solid', bg: 'danger-hover', min: AA_TEXT, what: 'texto del botón destructivo con el mouse encima' },
+  { fg: 'on-solid', bg: 'transition', min: AA_TEXT, what: 'texto del botón de aceptar una cotización' },
+  { fg: 'on-solid', bg: 'transition-hover', min: AA_TEXT, what: 'ese mismo botón con el mouse encima' },
   { fg: 'on-solid', bg: 'success', min: AA_TEXT, what: 'PREVENTIVO: el único relleno sólido verde es Stepper.tsx:64 y es emerald-500, no este token' },
   { fg: 'accent', bg: 'surface', min: AA_TEXT, what: 'enlace y texto de acento sobre tarjeta' },
   { fg: 'accent', bg: 'canvas', min: AA_NON_TEXT, what: 'anillo del spinner de carga sobre el fondo de página' },
@@ -110,6 +112,7 @@ const PAIRS: Pair[] = [
   { fg: 'danger-fg', bg: 'surface', min: AA_TEXT, what: 'texto de peligro en su tono fuerte, sobre tarjeta' },
   { fg: 'danger-fg', bg: 'danger-soft', min: AA_TEXT, what: 'texto de la alerta de peligro' },
   { fg: 'danger-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde de un control en error' },
+  { fg: 'warning-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde punteado de la tarjeta de componente integral, y borde del botón de forzar' },
   { fg: 'warning', bg: 'surface', min: AA_TEXT, what: 'aviso de campo sobre tarjeta' },
   { fg: 'warning', bg: 'warning-soft', min: AA_TEXT, what: 'pastilla de aviso de Badge, y el valor del tile de stock bajo con el filtro activo' },
   { fg: 'warning', bg: 'warning-soft-strong', min: AA_TEXT, what: 'texto del chip que quita el filtro de stock bajo' },
@@ -247,6 +250,16 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
     note:
       'Las celdas secundarias de la fila de un servicio integral, que se pinta azul suave ' +
       '(QuotationItemsSection.tsx:23 y sus text-slate-500). Queda a 0.12 del mínimo.',
+  },
+  'warning-border-strong/surface': {
+    ratio: 1.45,
+    note:
+      'amber-300 sobre blanco: el borde punteado de la tarjeta de componente integral ' +
+      '(ChildItemCard.tsx) y el del botón de forzar de ResourceConflictAlert, que tienen ' +
+      'relleno propio dentro de una caja del mismo tono, así que el borde es su único ' +
+      'límite. Mismo régimen que el borde del control en error y el mismo incumplimiento ' +
+      'anterior a este archivo. Existe como token propio, y no colapsado al marco de la ' +
+      'alerta, justamente para no bajarlo de 1.45 a 1.21 en el barrido.',
   },
   'danger-border-strong/surface': {
     ratio: 1.92,
@@ -518,9 +531,12 @@ describe('tokens del tema', () => {
       'warning-fg': '#973c00', // amber-800
       'success-border': '#a4f4cf', // emerald-200
       'warning-border': '#fee685', // amber-200
+      'warning-border-strong': '#ffd230', // amber-300
       'progress-soft': '#ede9fe', // violet-100
       'progress-fg': '#7008e7', // violet-700
       'transition-soft': '#cbfbf1', // teal-100
+      'transition': '#00786f', // teal-700
+      'transition-hover': '#005f5a', // teal-800
       'transition-fg': '#00786f', // teal-700
       'success': '#007a55', // emerald-700
       'success-soft': '#d0fae5', // emerald-100
@@ -639,6 +655,8 @@ describe('tokens del tema', () => {
       'on-solid/danger',
       'on-solid/danger-hover',
       'on-solid/success',
+      'on-solid/transition',
+      'on-solid/transition-hover',
       'progress-fg/progress-soft',
       'success-border/success-soft',
       'success-fg/success-soft',
@@ -646,6 +664,7 @@ describe('tokens del tema', () => {
       'success/surface',
       'surface-subtle/surface',
       'transition-fg/transition-soft',
+      'warning-border-strong/surface',
       'warning-border/warning-soft',
       'warning-fg/surface',
       'warning-fg/warning-soft',
@@ -680,6 +699,7 @@ describe('tokens del tema', () => {
       'fg-subtle/surface-subtle',
       'success-border/success-soft',
       'surface-subtle/surface',
+      'warning-border-strong/surface',
       'warning-border/warning-soft',
     ])
   })
@@ -729,6 +749,7 @@ describe('los umbrales son los de la norma', () => {
       'focus/surface',
       'success-border/success-soft',
       'surface-subtle/surface',
+      'warning-border-strong/surface',
       'warning-border/warning-soft',
     ].sort(),
     )

@@ -94,17 +94,17 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
         aria-modal="true"
         aria-labelledby={titleId}
         onSubmit={(event) => event.stopPropagation()}
-        className={cn('relative w-full rounded-xl bg-white shadow-xl', SIZES[size])}
+        className={cn('relative w-full rounded-xl bg-surface shadow-xl', SIZES[size])}
       >
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <h2 id={titleId} className="text-lg font-semibold text-slate-900">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h2 id={titleId} className="text-lg font-semibold text-fg">
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="text-slate-400 hover:text-slate-600"
+            className="text-fg-subtle hover:text-fg-body"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>

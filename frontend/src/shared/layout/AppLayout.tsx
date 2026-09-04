@@ -8,7 +8,7 @@ import { Sidebar } from './Sidebar'
  */
 export function AppLayout() {
   return (
-    <div className="min-h-screen flex bg-slate-50">
+    <div className="min-h-screen flex bg-canvas">
       <Sidebar />
       <main className="flex-1 overflow-x-hidden">
         <Outlet />

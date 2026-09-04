@@ -84,7 +84,7 @@ describe('QuotationStatusActions', () => {
     // la única forma de relleno que quedó fuera del componente compartido, y moverla a la
     // primaria dejaba los otros diez casos de este archivo en verde. El literal va escrito acá
     // a mano a propósito, para no derivarlo de la misma fuente que mide.
-    expect(clases(/aceptada/i).has('bg-teal-600')).toBe(true)
+    expect(clases(/aceptada/i).has('bg-transition')).toBe(true)
     expect(clases(/aceptada/i).has('bg-danger')).toBe(false)
     // Y las dos traen la clase que las apaga mientras hay una transición en vuelo.
     expect(rechazar.has('disabled:opacity-60')).toBe(true)

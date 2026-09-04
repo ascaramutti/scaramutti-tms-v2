@@ -55,16 +55,16 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
         let circleClass: string
         let content: React.ReactNode
         if (hasError) {
-          circleClass = 'border-red-500 bg-white text-red-500'
+          circleClass = 'border-danger bg-surface text-danger'
           content = <AlertCircle className="h-4 w-4" aria-hidden="true" />
         } else if (isActive) {
-          circleClass = 'border-blue-600 bg-blue-600 text-white'
+          circleClass = 'border-accent bg-accent text-on-solid'
           content = index + 1
         } else if (isCompleted) {
-          circleClass = 'border-emerald-500 bg-emerald-500 text-white'
+          circleClass = 'border-success bg-success text-on-solid'
           content = <Check className="h-4 w-4" aria-hidden="true" />
         } else {
-          circleClass = 'border-slate-300 bg-white text-slate-400'
+          circleClass = 'border-border-strong bg-surface text-fg-subtle'
           content = index + 1
         }
 
@@ -78,7 +78,7 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
                 className={cn(
                   'absolute left-1/2 h-0.5 w-full',
                   CONNECTOR_TOP,
-                  status !== undefined ? 'bg-blue-600' : 'bg-slate-300',
+                  status !== undefined ? 'bg-accent' : 'bg-slate-300',
                 )}
               />
             )}
@@ -95,7 +95,7 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
             >
               <span
                 className={cn(
-                  'flex items-center justify-center rounded-full border-2 bg-white text-sm font-medium transition-colors',
+                  'flex items-center justify-center rounded-full border-2 bg-surface text-sm font-medium transition-colors',
                   CIRCLE_SIZE,
                   circleClass,
                 )}
@@ -107,7 +107,7 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
                   // whitespace-pre-line respeta los `\n` del label para partir los nombres largos
                   // en 2 líneas; text-center los alinea bajo el círculo. px-1 evita que rocen al vecino.
                   'mt-1 whitespace-pre-line px-1 text-center text-xs',
-                  isVisited ? 'font-medium text-blue-700' : 'text-slate-400',
+                  isVisited ? 'font-medium text-accent-hover' : 'text-fg-subtle',
                 )}
               >
                 {step.label}
