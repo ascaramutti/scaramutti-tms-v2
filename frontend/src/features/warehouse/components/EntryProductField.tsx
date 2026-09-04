@@ -114,7 +114,7 @@ export function EntryProductField({
         onCreateClick={canCreate ? () => setModalOpen(true) : undefined}
       />
       {isError && (
-        <p role="alert" className="mt-1 text-xs text-amber-700">
+        <p role="alert" className="mt-1 text-xs text-warning">
           No se pudieron buscar productos. Intenta de nuevo.
         </p>
       )}

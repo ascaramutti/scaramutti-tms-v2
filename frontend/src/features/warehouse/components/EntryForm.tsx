@@ -204,7 +204,7 @@ export function EntryForm(props: EntryFormProps) {
   if (currencies.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando catálogos" className="text-blue-600" />
+        <Spinner size={28} label="Cargando catálogos" className="text-accent" />
       </div>
     )
   }
@@ -212,7 +212,7 @@ export function EntryForm(props: EntryFormProps) {
   if (currencies.isError) {
     return (
       <div role="alert" className="flex flex-col items-center px-6 py-16 text-center">
-        <p className="text-sm font-medium text-slate-700">
+        <p className="text-sm font-medium text-fg-body">
           {getApiErrorMessage(currencies.error, 'No se pudieron cargar las monedas.')}
         </p>
         <Button variant="secondary" onClick={() => currencies.refetch()} className="mt-4">
@@ -228,7 +228,7 @@ export function EntryForm(props: EntryFormProps) {
     <FormProvider {...form}>
       <form onSubmit={onSubmit} noValidate className="space-y-6">
         {props.mode === 'edit' && versionConflict && (
-          <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+          <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
             <span>
               {getApiErrorMessage(
                 updateInvoice.error,
@@ -239,7 +239,7 @@ export function EntryForm(props: EntryFormProps) {
             <button
               type="button"
               onClick={props.onReloadRequested}
-              className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
             >
               Descartar y recargar
             </button>
@@ -247,7 +247,7 @@ export function EntryForm(props: EntryFormProps) {
         )}
 
         {missingEtag && (
-          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
             No se puede guardar: falta la versión de la entrada. Recarga la página e intenta de nuevo.
           </Alert>
         )}
@@ -266,16 +266,16 @@ export function EntryForm(props: EntryFormProps) {
         )}
 
         <Card as="section" className="space-y-4">
-          <h2 className="text-sm font-semibold text-slate-900">Factura</h2>
+          <h2 className="text-sm font-semibold text-fg">Factura</h2>
 
           {props.mode === 'edit' ? (
             <div>
-              <p className="mb-1.5 block text-sm font-medium text-slate-700">Proveedor</p>
-              <p className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500">
+              <p className="mb-1.5 block text-sm font-medium text-fg-body">Proveedor</p>
+              <p className="rounded-lg border border-border bg-surface-subtle px-3.5 py-2.5 text-sm text-fg-muted">
                 {props.invoice.supplier.name}
                 {props.invoice.supplier.ruc ? ` · RUC ${props.invoice.supplier.ruc}` : ''}
               </p>
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-fg-muted">
                 El proveedor no se puede cambiar al editar la factura.
               </p>
             </div>
@@ -354,14 +354,14 @@ export function EntryForm(props: EntryFormProps) {
           <button
             type="button"
             onClick={props.onCancel}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="rounded-lg border border-border-strong bg-surface px-4 py-2.5 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isPending || missingEtag}
-            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isCreate
               ? isPending

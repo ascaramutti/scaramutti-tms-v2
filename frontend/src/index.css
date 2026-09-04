@@ -288,6 +288,11 @@
      asimetría que la revisión del PR 1 dejó anotada. */
   --color-danger-hover: #c10007;  /* red-700     */
   --color-danger-soft: #fef2f2;   /* red-50      */
+  /* El rojo suave FUERTE, tercero de la misma serie que el azul y el ámbar y por el mismo
+     motivo: es el relleno con el que responde al mouse el botón de descartar, que vive
+     DENTRO de la alerta roja. Con el fondo suave a secas el hover no se distinguiría del
+     panel que lo contiene. Ruling del dueño 2026-09-04. */
+  --color-danger-soft-strong: #ffe2e2; /* red-100 */
   --color-danger-fg: #c10007;     /* red-700     */
   --color-danger-border: #ffc9c9; /* red-200     */
   /* El borde de un control en estado de error. Token propio y no el marco de la

@@ -145,7 +145,7 @@ function AssignResourcesForm({ onClose, serviceId, serviceCode }: AssignResource
   return (
     <Modal isOpen onClose={onClose} title="Asignar recursos" size="lg">
       <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-fg-muted">
           Al asignar, el viaje pasa a pendiente de inicio.
         </p>
 
@@ -204,7 +204,7 @@ function AssignResourcesForm({ onClose, serviceId, serviceCode }: AssignResource
         )}
 
         {genericError && (
-          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
             {genericError}
           </Alert>
         )}
@@ -216,7 +216,7 @@ function AssignResourcesForm({ onClose, serviceId, serviceCode }: AssignResource
           <Button variant="primary" type="submit" disabled={isPending}>
             {isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> Asignando…
+                <Spinner size={16} className="mr-2 text-on-solid" /> Asignando…
               </>
             ) : (
               'Asignar recursos'

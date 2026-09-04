@@ -76,17 +76,17 @@ export function ChangePasswordPage() {
 
   return (
     <div className="mx-auto max-w-xl px-6 py-12">
-      <div className="bg-white rounded-2xl ring-1 ring-slate-200 p-8">
+      <div className="bg-surface rounded-2xl ring-1 ring-border p-8">
         {/* Header */}
         <div className="flex justify-center mb-6">
-          <div className="bg-blue-600 p-3 rounded-2xl shadow-md">
-            <KeyRound className="w-7 h-7 text-white" aria-hidden="true" />
+          <div className="bg-accent p-3 rounded-2xl shadow-md">
+            <KeyRound className="w-7 h-7 text-on-solid" aria-hidden="true" />
           </div>
         </div>
 
         <div className="text-center mb-8">
-          <h1 className="text-2xl font-semibold text-slate-900">Cambiar contraseña</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-2xl font-semibold text-fg">Cambiar contraseña</h1>
+          <p className="text-sm text-fg-muted mt-1">
             Ingresa tu contraseña actual y la nueva
           </p>
         </div>
@@ -125,7 +125,7 @@ export function ChangePasswordPage() {
               type="button"
               onClick={goToLanding}
               disabled={isPending}
-              className="px-4 py-2.5 text-sm font-medium text-slate-700 rounded-lg hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 text-sm font-medium text-fg-body rounded-lg hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
@@ -133,9 +133,9 @@ export function ChangePasswordPage() {
               type="submit"
               disabled={isPending}
               className={cn(
-                'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm',
-                'bg-blue-600 hover:bg-blue-700 active:bg-blue-800',
-                'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm',
+                'bg-accent hover:bg-accent-hover active:bg-accent-hover',
+                'focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2',
                 'disabled:bg-blue-400 disabled:cursor-not-allowed',
                 'transition-colors',
               )}

@@ -78,13 +78,13 @@ function EntryCancelForm({ onClose, invoice, onReloadRequested }: EntryCancelMod
   return (
     <Modal isOpen onClose={onClose} title="Anular entrada">
       <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-4">
-        <Alert as="p" variant="warning" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-amber-800">
+        <Alert as="p" variant="warning" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-warning-fg">
           Anular esta factura descuenta del stock los ítems que sumó. Esta acción no se puede
           deshacer.
         </Alert>
 
         {versionConflict && (
-          <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+          <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
             <span>
               {getApiErrorMessage(
                 cancelInvoice.error,
@@ -95,7 +95,7 @@ function EntryCancelForm({ onClose, invoice, onReloadRequested }: EntryCancelMod
             <button
               type="button"
               onClick={onReloadRequested}
-              className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
             >
               Descartar y recargar
             </button>
@@ -103,13 +103,13 @@ function EntryCancelForm({ onClose, invoice, onReloadRequested }: EntryCancelMod
         )}
 
         {missingEtag && (
-          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
             No se puede anular: falta la versión de la entrada. Recarga la página e intenta de nuevo.
           </Alert>
         )}
 
         {backendError && (
-          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
             {backendError}
           </Alert>
         )}
@@ -123,18 +123,18 @@ function EntryCancelForm({ onClose, invoice, onReloadRequested }: EntryCancelMod
           register={register('reason')}
         />
 
-        <div className="flex justify-end gap-3 border-t border-slate-200 pt-4">
+        <div className="flex justify-end gap-3 border-t border-border pt-4">
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="rounded-lg border border-border-strong bg-surface px-4 py-2.5 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Cancelar
           </button>
           <button
             type="submit"
             disabled={isSubmitting || cancelInvoice.isPending || missingEtag}
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-red-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-danger-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelInvoice.isPending && <Spinner size={16} label="Anulando" />}
             {cancelInvoice.isPending ? 'Anulando…' : 'Anular factura'}

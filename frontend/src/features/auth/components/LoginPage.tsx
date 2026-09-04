@@ -76,20 +76,20 @@ export function LoginPage() {
   const isPending = loginMutation.isPending || isSubmitting
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
+    <main className="min-h-screen flex items-center justify-center bg-surface-subtle px-4 py-8">
       <section className="w-full max-w-md">
-        <div className="bg-white rounded-2xl shadow-xl shadow-slate-200 ring-1 ring-slate-200 p-8">
+        <div className="bg-surface rounded-2xl shadow-xl shadow-slate-200 ring-1 ring-border p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <div className="bg-blue-600 p-3 rounded-2xl shadow-md">
-              <LogIn className="w-7 h-7 text-white" aria-hidden="true" />
+            <div className="bg-accent p-3 rounded-2xl shadow-md">
+              <LogIn className="w-7 h-7 text-on-solid" aria-hidden="true" />
             </div>
           </div>
 
           {/* Headings — h1 describe la acción de la pantalla, no rebrandea Scaramutti TMS (eso ya está en el sidebar y title del browser) */}
           <div className="text-center mb-8">
-            <h1 className="text-2xl font-semibold text-slate-900">Iniciar sesión</h1>
-            <p className="text-sm text-slate-500 mt-1">Accedé al sistema con tus credenciales</p>
+            <h1 className="text-2xl font-semibold text-fg">Iniciar sesión</h1>
+            <p className="text-sm text-fg-muted mt-1">Accedé al sistema con tus credenciales</p>
           </div>
 
           <form onSubmit={onSubmit} noValidate aria-busy={isPending} className="space-y-5">
@@ -118,9 +118,9 @@ export function LoginPage() {
               type="submit"
               disabled={isPending}
               className={cn(
-                'w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-white shadow-sm',
-                'bg-blue-600 hover:bg-blue-700 active:bg-blue-800',
-                'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+                'w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm',
+                'bg-accent hover:bg-accent-hover active:bg-accent-hover',
+                'focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2',
                 'disabled:bg-blue-400 disabled:cursor-not-allowed',
                 'transition-colors',
               )}
@@ -137,7 +137,7 @@ export function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-xs text-slate-400">
+        <p className="mt-6 text-center text-xs text-fg-subtle">
           Transportes Scaramutti S.A.C.
         </p>
       </section>

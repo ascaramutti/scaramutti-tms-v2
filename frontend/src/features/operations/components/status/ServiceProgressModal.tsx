@@ -104,7 +104,7 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
         <div>
           <label
             htmlFor="service-progress-datetime"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             {SERVICE_PROGRESS_DATE_TIME_LABEL[transition]}
           </label>
@@ -135,11 +135,11 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
               isPending && 'cursor-not-allowed bg-surface-subtle text-fg-muted',
             )}
           />
-          <p id={dateTimeHelperId} className="mt-1.5 text-xs text-slate-500">
+          <p id={dateTimeHelperId} className="mt-1.5 text-xs text-fg-muted">
             Hora de Perú. Viene puesta la de ahora; se puede corregir.
           </p>
           {errors.dateTime && (
-            <p id={dateTimeErrorId} role="alert" className="mt-1.5 text-sm text-red-600">
+            <p id={dateTimeErrorId} role="alert" className="mt-1.5 text-sm text-danger">
               {errors.dateTime.message}
             </p>
           )}
@@ -183,7 +183,7 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
           <Button variant="primary" type="submit" disabled={isPending}>
             {isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> {presentation.pendingLabel}
+                <Spinner size={16} className="mr-2 text-on-solid" /> {presentation.pendingLabel}
               </>
             ) : (
               presentation.submitLabel

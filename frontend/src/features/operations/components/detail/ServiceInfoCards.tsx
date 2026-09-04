@@ -134,7 +134,7 @@ export function ServiceInfoCards({ service, showPrice }: ServiceInfoCardsProps) 
           unas observaciones que solo tengan espacios cuentan como no tenerlas. */}
       {service.observations?.trim() && (
         <DetailCard title="Observaciones" headingId="service-observations-heading">
-          <p className="mt-2 whitespace-pre-line break-words text-sm text-slate-700">
+          <p className="mt-2 whitespace-pre-line break-words text-sm text-fg-body">
             {service.observations.trim()}
           </p>
         </DetailCard>

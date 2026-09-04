@@ -33,7 +33,7 @@ export function DetailCard({ title, headingId, action, children }: DetailCardPro
   return (
     <Card as="section" padding="md" aria-labelledby={headingId}>
       <div className="flex items-start justify-between gap-3">
-        <h2 id={headingId} className="text-sm font-semibold text-slate-900">
+        <h2 id={headingId} className="text-sm font-semibold text-fg">
           {title}
         </h2>
         {action}
@@ -62,8 +62,8 @@ export function Field({
 }) {
   return (
     <div className={className}>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</dt>
+      <dd className="mt-0.5 text-sm text-fg">{value}</dd>
     </div>
   )
 }

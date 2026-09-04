@@ -100,7 +100,7 @@ export function ProductCategoryField({
         disabled={disabled}
       />
       {categoriesError && (
-        <p role="alert" className="mt-1 text-xs text-amber-700">
+        <p role="alert" className="mt-1 text-xs text-warning">
           No se pudieron cargar las categorías. La del producto se conserva al guardar.
         </p>
       )}

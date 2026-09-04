@@ -99,7 +99,7 @@ export function KardexTable({
       key: 'movedAt',
       header: 'Fecha',
       render: (movement) => (
-        <span className="whitespace-nowrap text-slate-500">{formatDateTime(movement.movedAt)}</span>
+        <span className="whitespace-nowrap text-fg-muted">{formatDateTime(movement.movedAt)}</span>
       ),
     },
     {
@@ -121,7 +121,7 @@ export function KardexTable({
         movement.movementType !== 'APERTURA' && movement.sourceId != null ? (
           <Link
             to={`${MOVEMENT_SOURCE_PATHS[movement.movementType]}/${movement.sourceId}`}
-            className="rounded font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="rounded font-medium text-accent hover:text-accent-hover hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             {movement.reference}
           </Link>
@@ -133,7 +133,7 @@ export function KardexTable({
       key: 'registeredBy',
       header: 'Registró',
       render: (movement) => (
-        <span className="text-slate-500">{movement.registeredBy.fullName}</span>
+        <span className="text-fg-muted">{movement.registeredBy.fullName}</span>
       ),
     },
     {
@@ -157,7 +157,7 @@ export function KardexTable({
       header: 'Saldo',
       align: 'right',
       render: (movement) => (
-        <span className="font-semibold tabular-nums text-slate-900">
+        <span className="font-semibold tabular-nums text-fg">
           {formatQuantity(movement.balance)} {unitCode}
         </span>
       ),

@@ -33,8 +33,8 @@ export function EntryDetailItemsTable({
       header: 'Producto',
       render: (item) => (
         <div>
-          <p className="font-medium text-slate-900">{item.product.name}</p>
-          <p className="text-xs text-slate-500">
+          <p className="font-medium text-fg">{item.product.name}</p>
+          <p className="text-xs text-fg-muted">
             {item.product.code ? `${item.product.code} · ` : ''}
             {item.product.unitCode}
           </p>
@@ -60,7 +60,7 @@ export function EntryDetailItemsTable({
       header: 'Subtotal',
       align: 'right',
       render: (item) => (
-        <span className="font-medium tabular-nums text-slate-900">
+        <span className="font-medium tabular-nums text-fg">
           {formatCurrency(item.subtotal, currencyCode)}
         </span>
       ),
@@ -69,7 +69,7 @@ export function EntryDetailItemsTable({
 
   return (
     <section aria-labelledby="entry-items-heading" className="space-y-3">
-      <h2 id="entry-items-heading" className="text-lg font-semibold text-slate-900">
+      <h2 id="entry-items-heading" className="text-lg font-semibold text-fg">
         Ítems
       </h2>
       <DataTable
@@ -86,9 +86,9 @@ export function EntryDetailItemsTable({
         caption="Ítems de la factura de compra"
       />
       <div className="flex justify-end px-1">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-fg-body">
           Total de la factura:{' '}
-          <span className="font-semibold tabular-nums text-slate-900">
+          <span className="font-semibold tabular-nums text-fg">
             {formatCurrency(total, currencyCode)}
           </span>
         </p>

@@ -135,10 +135,10 @@ export function OpeningBalanceForm({ onCreated }: OpeningBalanceFormProps) {
             {productWithMovements && (
               // Va en su propio `role="alert"`: el error del combobox se anuncia sin
               // el link, y sin esto el lector de pantalla nunca se entera de la salida.
-              <p role="alert" className="mt-1 text-xs text-slate-500">
+              <p role="alert" className="mt-1 text-xs text-fg-muted">
                 <Link
                   to={`/cotizaciones/almacen/productos/${productWithMovements.id}`}
-                  className="font-medium text-blue-700 underline underline-offset-2 hover:no-underline"
+                  className="font-medium text-accent-hover underline underline-offset-2 hover:no-underline"
                 >
                   Ver el kardex de {productWithMovements.name}
                 </Link>
@@ -174,7 +174,7 @@ export function OpeningBalanceForm({ onCreated }: OpeningBalanceFormProps) {
           <button
             type="submit"
             disabled={isPending}
-            className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {isPending ? 'Registrando…' : 'Registrar corte inicial'}
           </button>

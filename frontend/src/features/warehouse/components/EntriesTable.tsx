@@ -49,9 +49,9 @@ export function EntriesTable({
       header: 'N° factura',
       render: (invoice) => (
         <div>
-          <p className="font-medium tabular-nums text-slate-900">{invoice.invoiceNumber}</p>
+          <p className="font-medium tabular-nums text-fg">{invoice.invoiceNumber}</p>
           {invoice.guideNumber && (
-            <p className="text-xs text-slate-500">Guía {invoice.guideNumber}</p>
+            <p className="text-xs text-fg-muted">Guía {invoice.guideNumber}</p>
           )}
         </div>
       ),
@@ -63,8 +63,8 @@ export function EntriesTable({
       // auditoría útil, pero una séptima columna aprieta la tabla sin necesidad.
       render: (invoice) => (
         <div>
-          <p className="text-slate-900">{invoice.supplier.name}</p>
-          <p className="text-xs text-slate-500">Registró {invoice.registeredBy.fullName}</p>
+          <p className="text-fg">{invoice.supplier.name}</p>
+          <p className="text-xs text-fg-muted">Registró {invoice.registeredBy.fullName}</p>
         </div>
       ),
     },
@@ -78,7 +78,7 @@ export function EntriesTable({
       header: 'Ítems',
       align: 'right',
       render: (invoice) => (
-        <span className="tabular-nums text-slate-700">{invoice.itemsCount}</span>
+        <span className="tabular-nums text-fg-body">{invoice.itemsCount}</span>
       ),
     },
     {
@@ -86,7 +86,7 @@ export function EntriesTable({
       header: 'Total',
       align: 'right',
       render: (invoice) => (
-        <span className="tabular-nums text-slate-900">
+        <span className="tabular-nums text-fg">
           {formatCurrency(invoice.total, invoice.currencyCode)}
         </span>
       ),
@@ -100,7 +100,7 @@ export function EntriesTable({
           <div>
             <Badge variant="danger">Anulada</Badge>
             {invoice.cancelReason && (
-              <p className="mt-1 text-xs text-slate-500">{invoice.cancelReason}</p>
+              <p className="mt-1 text-xs text-fg-muted">{invoice.cancelReason}</p>
             )}
           </div>
         ) : (

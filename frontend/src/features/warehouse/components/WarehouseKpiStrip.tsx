@@ -36,7 +36,7 @@ export function WarehouseKpiStrip({
     <div className="space-y-3">
       {/* Los KPIs son informativos: si fallan, se degrada el strip y la tabla sigue trabajando. */}
       {isError && (
-        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
           <span>{errorMessage ?? 'No se pudieron cargar los indicadores del almacén.'}</span>
           <button
             type="button"
@@ -44,7 +44,7 @@ export function WarehouseKpiStrip({
             // Nombre propio: si el listado también falla, su botón "Reintentar"
             // queda en la misma pantalla y serían dos nombres idénticos.
             aria-label="Reintentar cargar los indicadores"
-            className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
           >
             Reintentar
           </button>
@@ -69,8 +69,8 @@ export function WarehouseKpiStrip({
           // accionable sería además el único que un lector de pantalla no puede leer.
           aria-label={`Con stock bajo: ${data?.lowStockCount ?? 'sin dato'}. Filtrar: solo stock bajo`}
           className={cn(
-            'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
-            lowOnly ? 'border-amber-400 bg-amber-50' : 'hover:bg-slate-50',
+            'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2',
+            lowOnly ? 'border-warning bg-warning-soft' : 'hover:bg-surface-subtle',
           )}
           icon={AlertTriangle}
           label="Con stock bajo"

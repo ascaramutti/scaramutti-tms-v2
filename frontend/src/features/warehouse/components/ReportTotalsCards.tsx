@@ -22,22 +22,22 @@ export function ReportTotalsCards({ report }: ReportTotalsCardsProps) {
       className="grid grid-cols-1 gap-4 sm:grid-cols-3"
     >
       <Card>
-        <p className="text-2xl font-semibold tabular-nums text-slate-900">
+        <p className="text-2xl font-semibold tabular-nums text-fg">
           {formatCurrency(report.totalPEN, 'PEN')}
         </p>
-        <p className="mt-0.5 text-sm text-slate-500">{meta.amountLabel('soles')}</p>
+        <p className="mt-0.5 text-sm text-fg-muted">{meta.amountLabel('soles')}</p>
       </Card>
       <Card>
-        <p className="text-2xl font-semibold tabular-nums text-slate-900">
+        <p className="text-2xl font-semibold tabular-nums text-fg">
           {formatCurrency(report.totalUSD, 'USD')}
         </p>
-        <p className="mt-0.5 text-sm text-slate-500">{meta.amountLabel('dólares')}</p>
+        <p className="mt-0.5 text-sm text-fg-muted">{meta.amountLabel('dólares')}</p>
       </Card>
       <Card>
-        <p className="text-2xl font-semibold tabular-nums text-slate-900">
+        <p className="text-2xl font-semibold tabular-nums text-fg">
           {formatQuantity(report.totalCount)}
         </p>
-        <p className="mt-0.5 text-sm text-slate-500">Total de {meta.countLabel}</p>
+        <p className="mt-0.5 text-sm text-fg-muted">Total de {meta.countLabel}</p>
       </Card>
     </div>
   )

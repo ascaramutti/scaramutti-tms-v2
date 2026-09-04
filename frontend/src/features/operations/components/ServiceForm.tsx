@@ -62,7 +62,7 @@ const DUPLICATE_SERVICE_CODE = 'OPS-007'
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card as="section">
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
+      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-fg-muted">{title}</h2>
       <div className="space-y-4">{children}</div>
     </Card>
   )
@@ -189,7 +189,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
   if (currenciesQuery.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando monedas" className="text-blue-600" />
+        <Spinner size={28} label="Cargando monedas" className="text-accent" />
       </div>
     )
   }
@@ -201,7 +201,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
   if (currenciesQuery.isError || currencyOptions.length === 0) {
     return (
       <div role="alert" className="flex flex-col items-center px-6 py-16 text-center">
-        <p className="text-sm font-medium text-slate-700">
+        <p className="text-sm font-medium text-fg-body">
           {currenciesQuery.isError
             ? getApiErrorMessage(currenciesQuery.error, 'No se pudieron cargar las monedas.')
             : 'No hay monedas configuradas. Sin moneda no se puede registrar un servicio.'}
@@ -216,7 +216,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {errors.root?.message && (
-        <Alert as="p" variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-amber-800">
+        <Alert as="p" variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-warning-fg">
           {errors.root.message}
         </Alert>
       )}
@@ -235,7 +235,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
           <div>
             <label
               htmlFor="service-trip-scope"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
+              className="mb-1.5 block text-sm font-medium text-fg-body"
             >
               Ámbito del viaje
             </label>
@@ -266,7 +266,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
               )}
             />
             {errors.tripScope?.message && (
-              <p id="service-trip-scope-error" role="alert" className="mt-1.5 text-sm text-red-600">
+              <p id="service-trip-scope-error" role="alert" className="mt-1.5 text-sm text-danger">
                 {errors.tripScope.message}
               </p>
             )}
@@ -287,7 +287,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
               <p
                 id="service-tentative-date-past"
                 role="alert"
-                className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-700"
+                className="mt-1.5 flex items-center gap-1.5 text-xs text-warning"
               >
                 <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
                 La fecha ya pasó. Se registra igual (viaje cargado en retrospectiva).

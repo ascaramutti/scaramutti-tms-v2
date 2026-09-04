@@ -48,9 +48,9 @@ export function WithdrawalsTable({
       header: 'Producto',
       render: (withdrawal) => (
         <div>
-          <p className="font-medium text-slate-900">{withdrawal.product.name}</p>
+          <p className="font-medium text-fg">{withdrawal.product.name}</p>
           {withdrawal.product.code && (
-            <p className="text-xs text-slate-500">{withdrawal.product.code}</p>
+            <p className="text-xs text-fg-muted">{withdrawal.product.code}</p>
           )}
         </div>
       ),
@@ -60,7 +60,7 @@ export function WithdrawalsTable({
       header: 'Cantidad',
       align: 'right',
       render: (withdrawal) => (
-        <span className="tabular-nums text-slate-900">
+        <span className="tabular-nums text-fg">
           {formatQuantity(withdrawal.quantity)} {withdrawal.product.unitCode}
         </span>
       ),
@@ -71,8 +71,8 @@ export function WithdrawalsTable({
       // Quién registró va como sublínea de auditoría, no en su propia columna.
       render: (withdrawal) => (
         <div>
-          <p className="text-slate-900">{withdrawal.receivedBy.fullName}</p>
-          <p className="text-xs text-slate-500">Registró {withdrawal.registeredBy.fullName}</p>
+          <p className="text-fg">{withdrawal.receivedBy.fullName}</p>
+          <p className="text-xs text-fg-muted">Registró {withdrawal.registeredBy.fullName}</p>
         </div>
       ),
     },
@@ -81,9 +81,9 @@ export function WithdrawalsTable({
       header: 'Unidad',
       render: (withdrawal) =>
         withdrawal.fleetUnit ? (
-          <span className="text-slate-700">{fleetUnitLabel(withdrawal.fleetUnit)}</span>
+          <span className="text-fg-body">{fleetUnitLabel(withdrawal.fleetUnit)}</span>
         ) : (
-          <span className="text-slate-400">Sin unidad</span>
+          <span className="text-fg-subtle">Sin unidad</span>
         ),
     },
     {
@@ -100,7 +100,7 @@ export function WithdrawalsTable({
           <div>
             <Badge variant="danger">Anulado</Badge>
             {withdrawal.cancelReason && (
-              <p className="mt-1 text-xs text-slate-500">{withdrawal.cancelReason}</p>
+              <p className="mt-1 text-xs text-fg-muted">{withdrawal.cancelReason}</p>
             )}
           </div>
         ) : (

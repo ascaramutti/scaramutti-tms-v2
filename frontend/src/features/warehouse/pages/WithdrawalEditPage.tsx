@@ -54,7 +54,7 @@ export function WithdrawalEditPage() {
           action={
             <Link
               to={WITHDRAWALS_PATH}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Ir a retiros
             </Link>
@@ -72,7 +72,7 @@ export function WithdrawalEditPage() {
   if (withdrawal.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando retiro" className="text-blue-600" />
+        <Spinner size={28} label="Cargando retiro" className="text-accent" />
       </div>
     )
   }
@@ -82,13 +82,13 @@ export function WithdrawalEditPage() {
       <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
         <BackLink to={detailPath}>Volver al retiro</BackLink>
         <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(withdrawal.error, 'No se pudo cargar el retiro.')}
           </p>
           <button
             type="button"
             onClick={() => withdrawal.refetch()}
-            className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="mt-4 inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Reintentar
           </button>
