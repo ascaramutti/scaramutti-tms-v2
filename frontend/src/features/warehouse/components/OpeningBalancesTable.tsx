@@ -50,9 +50,9 @@ export function OpeningBalancesTable({
       header: 'Producto',
       render: (balance) => (
         <div>
-          <p className="font-medium text-slate-900">{balance.product.name}</p>
+          <p className="font-medium text-fg">{balance.product.name}</p>
           {balance.product.code && (
-            <p className="text-xs text-slate-500">{balance.product.code}</p>
+            <p className="text-xs text-fg-muted">{balance.product.code}</p>
           )}
         </div>
       ),
@@ -64,7 +64,7 @@ export function OpeningBalancesTable({
       // El 0 es un valor legítimo (se contó y no había existencias) y se muestra
       // como tal: nada de guiones ni celdas vacías.
       render: (balance) => (
-        <span className="tabular-nums text-slate-900">
+        <span className="tabular-nums text-fg">
           {formatQuantity(balance.quantity)} {balance.product.unitCode}
         </span>
       ),
@@ -74,9 +74,9 @@ export function OpeningBalancesTable({
       header: 'Observaciones',
       render: (balance) =>
         balance.observations ? (
-          <span className="text-slate-700">{balance.observations}</span>
+          <span className="text-fg-body">{balance.observations}</span>
         ) : (
-          <span className="text-slate-400">Sin observaciones</span>
+          <span className="text-fg-subtle">Sin observaciones</span>
         ),
     },
     {
@@ -84,8 +84,8 @@ export function OpeningBalancesTable({
       header: 'Registró',
       render: (balance) => (
         <div>
-          <p className="text-slate-900">{balance.registeredBy.fullName}</p>
-          <p className="text-xs text-slate-500">{formatDateTime(balance.registeredAt)}</p>
+          <p className="text-fg">{balance.registeredBy.fullName}</p>
+          <p className="text-xs text-fg-muted">{formatDateTime(balance.registeredAt)}</p>
         </div>
       ),
     },

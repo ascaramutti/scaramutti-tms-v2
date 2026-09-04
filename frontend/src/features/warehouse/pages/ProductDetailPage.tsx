@@ -59,7 +59,7 @@ export function ProductDetailPage() {
           action={
             <Link
               to={STOCK_LIST_PATH}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Ir a existencias
             </Link>
@@ -72,7 +72,7 @@ export function ProductDetailPage() {
   if (product.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando producto" className="text-blue-600" />
+        <Spinner size={28} label="Cargando producto" className="text-accent" />
       </div>
     )
   }
@@ -82,13 +82,13 @@ export function ProductDetailPage() {
       <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
         <BackLink to={STOCK_LIST_PATH}>Volver a existencias</BackLink>
         <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(product.error, 'No se pudo cargar el producto.')}
           </p>
           <button
             type="button"
             onClick={() => product.refetch()}
-            className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="mt-4 inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Reintentar
           </button>
@@ -111,7 +111,7 @@ export function ProductDetailPage() {
           <button
             type="button"
             onClick={() => setEditOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />
             Editar
@@ -125,15 +125,15 @@ export function ProductDetailPage() {
 
       {data.observations && (
         <Card as="section" padding="md" aria-labelledby="product-observations-heading">
-          <h2 id="product-observations-heading" className="text-sm font-semibold text-slate-900">
+          <h2 id="product-observations-heading" className="text-sm font-semibold text-fg">
             Observaciones
           </h2>
-          <p className="mt-2 whitespace-pre-line text-sm text-slate-700">{data.observations}</p>
+          <p className="mt-2 whitespace-pre-line text-sm text-fg-body">{data.observations}</p>
         </Card>
       )}
 
       <section aria-labelledby="product-kardex-heading" className="space-y-3">
-        <h2 id="product-kardex-heading" className="text-lg font-semibold text-slate-900">
+        <h2 id="product-kardex-heading" className="text-lg font-semibold text-fg">
           Kardex
         </h2>
         <KardexTable

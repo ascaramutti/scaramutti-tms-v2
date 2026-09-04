@@ -160,7 +160,7 @@ function ServiceExitForm({ onClose, transition, service, role }: ServiceExitModa
             fondo del diálogo, y esto es lo que evita actuar sobre el viaje equivocado.
             Y no se dice "terminal": desde que reabrir existe, esa palabra significaría
             para el lector algo que dejó de ser cierto. */}
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-fg-body">
           Viaje <span className="font-medium">{service.code}</span> de {service.client.name}.{' '}
           {SERVICE_EXIT_TRANSITION_PROMPT[transition]}
           {showsReopenNote && ` ${REOPEN_AVAILABLE_NOTE}`}
@@ -229,7 +229,7 @@ function ServiceExitForm({ onClose, transition, service, role }: ServiceExitModa
           >
             {isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> {presentation.pendingLabel}
+                <Spinner size={16} className="mr-2 text-on-solid" /> {presentation.pendingLabel}
               </>
             ) : (
               presentation.submitLabel

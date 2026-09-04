@@ -37,10 +37,10 @@ export function ProductAttributesField({
 
   return (
     <fieldset className="space-y-2">
-      <legend className="mb-1.5 text-sm font-medium text-slate-700">Características</legend>
+      <legend className="mb-1.5 text-sm font-medium text-fg-body">Características</legend>
 
       {fields.length === 0 && (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-fg-muted">
           Sin características. Agrega las que ayuden a identificar el producto (rosca, medida,
           viscosidad).
         </p>
@@ -61,7 +61,7 @@ export function ProductAttributesField({
                 className={cn(inputClasses, keyError ? 'border-danger-border-strong' : 'border-border-strong')}
               />
               {keyError && (
-                <p role="alert" className="mt-1 text-xs text-red-600">
+                <p role="alert" className="mt-1 text-xs text-danger">
                   {keyError}
                 </p>
               )}
@@ -76,7 +76,7 @@ export function ProductAttributesField({
                 className={cn(inputClasses, valueError ? 'border-danger-border-strong' : 'border-border-strong')}
               />
               {valueError && (
-                <p role="alert" className="mt-1 text-xs text-red-600">
+                <p role="alert" className="mt-1 text-xs text-danger">
                   {valueError}
                 </p>
               )}
@@ -86,7 +86,7 @@ export function ProductAttributesField({
               onClick={() => remove(index)}
               disabled={disabled}
               aria-label={`Quitar la característica ${index + 1}`}
-              className="mt-1 rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="mt-1 rounded-lg p-2 text-fg-subtle hover:bg-surface-muted hover:text-fg-body focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
             </button>
@@ -98,7 +98,7 @@ export function ProductAttributesField({
         type="button"
         onClick={() => append({ key: '', value: '' })}
         disabled={disabled}
-        className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+        className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
         Agregar característica

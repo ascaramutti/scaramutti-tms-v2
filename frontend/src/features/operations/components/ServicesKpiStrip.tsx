@@ -34,7 +34,7 @@ function ratioValue(ratio: { active: number; total: number } | undefined) {
       {/* El denominador es el padrón vigente de ESE recurso (todos los
           conductores de alta, o todos los tractos), no los principales: ser
           principal es un rol por asignación, no un atributo del recurso. */}
-      <span className="text-base font-normal text-slate-500"> de {ratio.total} de alta</span>
+      <span className="text-base font-normal text-fg-muted"> de {ratio.total} de alta</span>
     </>
   )
 }
@@ -63,7 +63,7 @@ export function ServicesKpiStrip({
     <div className="space-y-3">
       {/* Los indicadores son contexto: si fallan, se degrada el strip y la tabla sigue trabajando. */}
       {isError && (
-        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
           <span>{errorMessage ?? 'No se pudieron cargar los indicadores operativos.'}</span>
           <button
             type="button"
@@ -71,7 +71,7 @@ export function ServicesKpiStrip({
             // Nombre propio: si el listado también falla, su botón "Reintentar"
             // queda en la misma pantalla y serían dos nombres idénticos.
             aria-label="Reintentar cargar los indicadores"
-            className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
           >
             Reintentar
           </button>
@@ -140,12 +140,12 @@ export function ServicesKpiStrip({
         />
       </div>
 
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-fg-muted">
         Estos indicadores no dependen de los filtros del listado.
       </p>
 
       {data && (
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-fg-muted">
           {/* `weekCycle.end` es el martes INCLUSIVE (la etiqueta), no el miércoles
               exclusivo con el que se consulta: se imprime tal cual viene.
               Son date-only y van por `formatDateOnly`: pasarlos por `new Date()`

@@ -23,7 +23,7 @@ interface ServiceTimelineProps {
 export function ServiceTimeline({ events }: ServiceTimelineProps) {
   if (events.length === 0) {
     return (
-      <p className="text-sm text-slate-500">
+      <p className="text-sm text-fg-muted">
         Este viaje todavía no tiene movimientos registrados.
       </p>
     )
@@ -34,10 +34,10 @@ export function ServiceTimeline({ events }: ServiceTimelineProps) {
       {events.map((event) => {
         const { label, badgeVariant } = SERVICE_EVENT_PRESENTATION[event.eventType]
         return (
-          <li key={event.id} className="border-l-2 border-slate-200 pl-4">
+          <li key={event.id} className="border-l-2 border-border pl-4">
             <div className="flex flex-wrap items-center gap-2">
               <Badge variant={badgeVariant}>{label}</Badge>
-              <span className="text-xs text-slate-500">
+              <span className="text-xs text-fg-muted">
                 {event.createdBy.fullName} · {formatDateTime(event.createdAt)}
               </span>
             </div>
@@ -54,7 +54,7 @@ export function ServiceTimeline({ events }: ServiceTimelineProps) {
                 dibujan una línea en blanco antes o después del texto. Se recortan
                 los de los BORDES y se conservan los de adentro, que son los que
                 separan. */}
-            <p className="mt-1 whitespace-pre-line break-words text-sm text-slate-900">
+            <p className="mt-1 whitespace-pre-line break-words text-sm text-fg">
               {event.note.trim()}
             </p>
           </li>

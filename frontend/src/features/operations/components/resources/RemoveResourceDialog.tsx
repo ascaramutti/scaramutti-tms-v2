@@ -61,23 +61,23 @@ function RemoveResourceConfirm({
   return (
     <Modal isOpen onClose={onClose} title="Quitar refuerzo" size="sm">
       <div className="space-y-4">
-        <div className="rounded-lg bg-slate-50 px-4 py-3">
-          <p className="text-sm font-medium text-slate-900">
+        <div className="rounded-lg bg-surface-subtle px-4 py-3">
+          <p className="text-sm font-medium text-fg">
             {describeAdditionalResource(resource)}
           </p>
-          <p className="mt-0.5 text-sm text-slate-700">{resource.reason}</p>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-sm text-fg-body">{resource.reason}</p>
+          <p className="mt-0.5 text-xs text-fg-muted">
             {resource.assignedBy.fullName} · {formatDateTime(resource.assignedAt)}
           </p>
         </div>
 
-        <p className="text-sm text-slate-700">
+        <p className="text-sm text-fg-body">
           Se quita del viaje de forma permanente. El motivo y quién lo cargó quedan en la
           bitácora.
         </p>
 
         {error && (
-          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
             {error}
           </Alert>
         )}
@@ -93,7 +93,7 @@ function RemoveResourceConfirm({
           >
             {removeResource.isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> Quitando…
+                <Spinner size={16} className="mr-2 text-on-solid" /> Quitando…
               </>
             ) : (
               'Quitar refuerzo'

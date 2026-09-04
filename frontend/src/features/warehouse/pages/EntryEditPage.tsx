@@ -53,7 +53,7 @@ export function EntryEditPage() {
           action={
             <Link
               to={ENTRIES_PATH}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+              className="inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Ir a entradas
             </Link>
@@ -71,7 +71,7 @@ export function EntryEditPage() {
   if (invoice.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando entrada" className="text-blue-600" />
+        <Spinner size={28} label="Cargando entrada" className="text-accent" />
       </div>
     )
   }
@@ -81,13 +81,13 @@ export function EntryEditPage() {
       <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
         <BackLink to={detailPath}>Volver a la entrada</BackLink>
         <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(invoice.error, 'No se pudo cargar la entrada.')}
           </p>
           <button
             type="button"
             onClick={() => invoice.refetch()}
-            className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="mt-4 inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Reintentar
           </button>

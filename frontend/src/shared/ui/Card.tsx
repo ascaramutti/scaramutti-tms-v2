@@ -24,8 +24,8 @@ type CardProps<E extends ElementType> = {
 
 /**
  * Tarjeta compartida. Reemplaza a la forma que 57 sitios escribían a mano, con los mismos
- * valores expresados en tokens del tema: `bg-white` pasa a `bg-surface` y `border-slate-200`
- * a `border-border`, los dos con el mismo valor, así que en modo claro no cambia un pixel.
+ * valores expresados en tokens del tema: el blanco pasa al de superficie y el gris del filete
+ * al de borde, los dos con el mismo valor, así que en modo claro no cambia un pixel.
  *
  * El `rounded-xl` y el `shadow-sm` no se tokenizan: no son color.
  */

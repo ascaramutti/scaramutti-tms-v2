@@ -57,7 +57,7 @@ export function OpeningBalancesPage() {
         <Card as="section" aria-labelledby="opening-balance-form-heading">
           <h2
             id="opening-balance-form-heading"
-            className="mb-4 text-sm font-semibold text-slate-900"
+            className="mb-4 text-sm font-semibold text-fg"
           >
             Registrar corte inicial
           </h2>
@@ -76,7 +76,7 @@ export function OpeningBalancesPage() {
       ) : (
         // Un espacio vacío se leería como una pantalla rota: se dice por qué no
         // está el formulario. La autoridad real es el 403 del backend.
-        <p className="rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-sm text-slate-600">
+        <p className="rounded-xl border border-border bg-surface-subtle px-5 py-4 text-sm text-fg-body">
           El corte inicial lo registra un administrador. Acá puedes consultar las
           aperturas ya cargadas.
         </p>
@@ -85,7 +85,7 @@ export function OpeningBalancesPage() {
       <section aria-labelledby="opening-balances-list-heading" className="space-y-4">
         <h2
           id="opening-balances-list-heading"
-          className="text-sm font-semibold text-slate-900"
+          className="text-sm font-semibold text-fg"
         >
           Cortes iniciales registrados
         </h2>

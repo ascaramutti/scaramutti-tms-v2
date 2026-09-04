@@ -94,7 +94,7 @@ export function ServiceClientField({
       <div>
         <label
           htmlFor="service-client-ruc"
-          className="mb-1.5 block text-sm font-medium text-slate-700"
+          className="mb-1.5 block text-sm font-medium text-fg-body"
         >
           RUC
         </label>

@@ -198,7 +198,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
       {props.mode === 'edit' && versionConflict && (
-        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-amber-800">
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
           <span>
             {getApiErrorMessage(
               updateWithdrawal.error,
@@ -209,7 +209,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
           <button
             type="button"
             onClick={props.onReloadRequested}
-            className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
           >
             Descartar y recargar
           </button>
@@ -217,7 +217,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
       )}
 
       {missingEtag && (
-        <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
+        <Alert as="p" bordered={false} role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
           No se puede guardar: falta la versión del retiro. Recarga la página e intenta de nuevo.
         </Alert>
       )}
@@ -236,7 +236,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
       )}
 
       <Card as="section" className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900">Salida</h2>
+        <h2 className="text-sm font-semibold text-fg">Salida</h2>
 
         {/* Producto ocupa la mayor parte del ancho (necesita sitio para buscar); la
             cantidad es un campo corto que va a su lado. */}
@@ -244,14 +244,14 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
           <div className="sm:col-span-2">
             {props.mode === 'edit' ? (
               <div>
-                <p className="mb-1.5 block text-sm font-medium text-slate-700">Producto</p>
-                <p className="rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-500">
+                <p className="mb-1.5 block text-sm font-medium text-fg-body">Producto</p>
+                <p className="rounded-lg border border-border bg-surface-subtle px-3.5 py-2.5 text-sm text-fg-muted">
                   {props.withdrawal.product.name}
                   {props.withdrawal.product.code
                     ? ` · ${props.withdrawal.product.code} · ${props.withdrawal.product.unitCode}`
                     : ''}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-fg-muted">
                   El producto no se puede cambiar: si es el equivocado, anula el retiro y registra
                   otro.
                 </p>
@@ -279,7 +279,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
         </div>
 
         {selectedProduct && (
-          <p className="text-xs text-slate-500" aria-live="polite">
+          <p className="text-xs text-fg-muted" aria-live="polite">
             {stockQuery.isLoading
               ? 'Cargando stock disponible…'
               : stockQuery.isError
@@ -292,7 +292,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
         )}
 
         {exceedsStock && (
-          <p role="alert" className="text-xs text-amber-700">
+          <p role="alert" className="text-xs text-warning">
             La cantidad supera el stock disponible ({formatQuantity(available)}{' '}
             {selectedProduct?.unitCode}). Puedes guardarlo igual: si al confirmar no alcanza, el
             sistema lo rechaza.
@@ -301,7 +301,7 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
       </Card>
 
       <Card as="section" className="space-y-4">
-        <h2 className="text-sm font-semibold text-slate-900">Destino</h2>
+        <h2 className="text-sm font-semibold text-fg">Destino</h2>
 
         {/* Receptor y unidad al mismo nivel: son los dos datos del destino del retiro. */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-start">
@@ -339,14 +339,14 @@ export function WithdrawalForm(props: WithdrawalFormProps) {
         <button
           type="button"
           onClick={props.onCancel}
-          className="rounded-lg border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="rounded-lg border border-border-strong bg-surface px-4 py-2.5 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           Cancelar
         </button>
         <button
           type="submit"
           disabled={isPending || missingEtag}
-          className="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {isEdit
             ? isPending

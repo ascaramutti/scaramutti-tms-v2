@@ -12,8 +12,8 @@ interface ProductInfoCardsProps {
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</dt>
+      <dd className="mt-0.5 text-sm text-fg">{value}</dd>
     </div>
   )
 }
@@ -29,7 +29,7 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
       <Card as="section" padding="md" aria-labelledby="product-stock-heading">
-        <h2 id="product-stock-heading" className="text-sm font-semibold text-slate-900">
+        <h2 id="product-stock-heading" className="text-sm font-semibold text-fg">
           Existencias
         </h2>
         <p className="mt-3">
@@ -39,13 +39,13 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
             low={product.lowStock}
           />
         </p>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-fg-muted">
           Mínimo {formatQuantity(product.minStock)} {product.unitOfMeasure.code}
         </p>
       </Card>
 
       <Card as="section" padding="md" aria-labelledby="product-info-heading">
-        <h2 id="product-info-heading" className="text-sm font-semibold text-slate-900">
+        <h2 id="product-info-heading" className="text-sm font-semibold text-fg">
           Ficha
         </h2>
         <dl className="mt-3 space-y-3">
@@ -64,11 +64,11 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
       </Card>
 
       <Card as="section" padding="md" aria-labelledby="product-attributes-heading">
-        <h2 id="product-attributes-heading" className="text-sm font-semibold text-slate-900">
+        <h2 id="product-attributes-heading" className="text-sm font-semibold text-fg">
           Características
         </h2>
         {attributes.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">Sin características registradas.</p>
+          <p className="mt-3 text-sm text-fg-muted">Sin características registradas.</p>
         ) : (
           <dl className="mt-3 space-y-3">
             {attributes.map(([key, value]) => (

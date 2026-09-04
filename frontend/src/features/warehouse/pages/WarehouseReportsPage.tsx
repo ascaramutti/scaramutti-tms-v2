@@ -69,12 +69,12 @@ export function WarehouseReportsPage() {
       <ReportFilterBar value={filters} onChange={setFilters} />
 
       {isError && (
-        <Alert role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-red-800">
+        <Alert role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-danger-fg">
           <span>{getApiErrorMessage(error, 'No se pudo generar el reporte.')}</span>
           <button
             type="button"
             onClick={() => refetch()}
-            className="shrink-0 font-medium text-red-900 underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-danger-fg underline underline-offset-2 hover:no-underline"
           >
             Reintentar
           </button>
@@ -105,11 +105,11 @@ export function WarehouseReportsPage() {
       >
         {isLoading ? (
           <div className="flex justify-center py-16">
-            <Spinner size={28} label="Generando reporte" className="text-blue-600" />
+            <Spinner size={28} label="Generando reporte" className="text-accent" />
           </div>
         ) : data ? (
           <>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-fg-muted">
               Del {formatDateOnly(data.dateFrom)} al {formatDateOnly(data.dateTo)}
             </p>
             <ReportTotalsCards report={data} />
@@ -126,7 +126,7 @@ export function WarehouseReportsPage() {
         ) : null}
       </div>
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-fg-subtle">
         El valor de las salidas usa el último precio de compra de cada producto como referencia, y se
         muestra <strong>por moneda tal como se registró</strong>: almacén no convierte ni valoriza.
         La barra es referencia visual del ranking.

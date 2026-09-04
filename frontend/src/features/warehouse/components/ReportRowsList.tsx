@@ -55,25 +55,25 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
 
   return (
     <Card as="section" padding="none">
-      <h2 className="border-b border-slate-200 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+      <h2 className="border-b border-border px-5 py-4 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         {meta.label}
       </h2>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-border">
         {report.rows.map((row, index) => {
           const amounts = amountsLabel(row)
           const detail = detailLabel(row, report.cut)
           return (
             <li key={`${row.label}-${index}`} className="px-5 py-3.5">
               <div className="flex items-baseline justify-between gap-4">
-                <p className="text-sm font-medium text-slate-900">
+                <p className="text-sm font-medium text-fg">
                   {row.label}
                   {detail && (
-                    <span className="ml-2 text-xs font-normal text-slate-400">{detail}</span>
+                    <span className="ml-2 text-xs font-normal text-fg-subtle">{detail}</span>
                   )}
                 </p>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-fg">
                   {amounts}
-                  <span className="ml-2 text-xs font-normal text-slate-500">
+                  <span className="ml-2 text-xs font-normal text-fg-muted">
                     {formatQuantity(row.count)} {meta.countLabel}
                   </span>
                 </p>
@@ -85,7 +85,7 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
                 aria-hidden="true"
               >
                 <div
-                  className="h-full rounded-full bg-blue-600"
+                  className="h-full rounded-full bg-accent"
                   // El mínimo del 3% hace visible una fila de monto chico, pero
                   // el cero se dibuja vacío: un producto sin precio de compra de
                   // referencia no debe verse igual que uno con monto.

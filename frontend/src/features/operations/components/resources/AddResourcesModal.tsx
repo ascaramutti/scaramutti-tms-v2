@@ -118,7 +118,7 @@ function AddResourcesForm({ onClose, serviceId, serviceCode }: AddResourcesModal
   return (
     <Modal isOpen onClose={onClose} title="Agregar refuerzo" size="lg">
       <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-fg-muted">
           Recursos de apoyo para un viaje que ya está en ruta. Los principales no se
           reemplazan: el refuerzo se suma.
         </p>
@@ -126,7 +126,7 @@ function AddResourcesForm({ onClose, serviceId, serviceCode }: AddResourcesModal
         {/* El error de "al menos uno" es del GRUPO, así que se muestra una vez arriba
             de los tres campos y no repetido bajo cada uno. */}
         {errors.driverId?.message && (
-          <p role="alert" className="text-xs text-red-600">
+          <p role="alert" className="text-xs text-danger">
             {errors.driverId.message}
           </p>
         )}
@@ -184,7 +184,7 @@ function AddResourcesForm({ onClose, serviceId, serviceCode }: AddResourcesModal
         )}
 
         {genericError && (
-          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-red-700">
+          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
             {genericError}
           </Alert>
         )}
@@ -196,7 +196,7 @@ function AddResourcesForm({ onClose, serviceId, serviceCode }: AddResourcesModal
           <Button variant="primary" type="submit" disabled={isPending}>
             {isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> Agregando…
+                <Spinner size={16} className="mr-2 text-on-solid" /> Agregando…
               </>
             ) : (
               'Agregar refuerzo'

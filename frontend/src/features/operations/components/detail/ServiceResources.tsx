@@ -116,15 +116,15 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         {service.additionalResources.length === 0 ? (
           // Es el caso NORMAL, no un borde: ninguno de los 905 viajes migrados
           // tiene refuerzos, así que esto es lo que se va a ver casi siempre.
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-fg-muted">
             Este viaje no tiene recursos de refuerzo.
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
             {service.additionalResources.map((resource) => (
-              <li key={resource.id} className="border-l-2 border-slate-200 pl-4">
+              <li key={resource.id} className="border-l-2 border-border pl-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm text-slate-900">
+                  <p className="text-sm text-fg">
                     {describeAdditionalResource(resource)}
                   </p>
                   {canReinforce && (
@@ -137,14 +137,14 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
                       aria-label={`Quitar refuerzo: ${describeAdditionalResource(resource)}`}
                       // `-m-1 p-1` agranda el objetivo de clic sin correr la fila:
                       // el texto solo mide 16px de alto.
-                      className="-m-1 shrink-0 rounded p-1 text-xs font-medium text-red-700 hover:text-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                      className="-m-1 shrink-0 rounded p-1 text-xs font-medium text-danger-fg hover:text-danger-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
                     >
                       Quitar
                     </button>
                   )}
                 </div>
-                <p className="mt-0.5 text-sm text-slate-700">{resource.reason}</p>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-sm text-fg-body">{resource.reason}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">
                   {resource.assignedBy.fullName} · {formatDateTime(resource.assignedAt)}
                 </p>
               </li>

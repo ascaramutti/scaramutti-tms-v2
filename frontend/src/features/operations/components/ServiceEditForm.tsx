@@ -56,7 +56,7 @@ const FORM_FIELDS = [
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <Card as="section">
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
+      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-fg-muted">{title}</h2>
       <div className="space-y-4">{children}</div>
     </Card>
   )
@@ -98,7 +98,7 @@ function RealDateTimeField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-fg-body">
         {label}
       </label>
       <input
@@ -117,7 +117,7 @@ function RealDateTimeField({
         className={cn('w-full', fieldClasses({ invalid: !!error }), error && FIELD_FOCUS_INVALID)}
       />
       {error && (
-        <p id={`${id}-error`} role="alert" className="mt-1.5 text-sm text-red-600">
+        <p id={`${id}-error`} role="alert" className="mt-1.5 text-sm text-danger">
           {error}
         </p>
       )}
@@ -173,7 +173,7 @@ export function ServiceEditForm({ service, onReload, onSaved, onCancel }: Servic
   if (currenciesQuery.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando monedas" className="text-blue-600" />
+        <Spinner size={28} label="Cargando monedas" className="text-accent" />
       </div>
     )
   }
@@ -236,7 +236,7 @@ interface EditFieldsProps extends ServiceEditFormProps {
 function CatalogAlert({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div role="alert" className="flex flex-col items-center px-6 py-16 text-center">
-      <p className="text-sm font-medium text-slate-700">{message}</p>
+      <p className="text-sm font-medium text-fg-body">{message}</p>
       <Button variant="secondary" onClick={onRetry} className="mt-4">
         Reintentar
       </Button>
@@ -368,13 +368,13 @@ function EditFields({
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {missingEtag && (
-        <Alert as="p" role="alert" className="rounded-xl px-4 py-3 text-sm text-red-700">
+        <Alert as="p" role="alert" className="rounded-xl px-4 py-3 text-sm text-danger-fg">
           No se puede guardar: falta la versión del viaje. Recarga la página e intenta de nuevo.
         </Alert>
       )}
 
       {errors.root?.message && (
-        <Alert variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-amber-800">
+        <Alert variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-warning-fg">
           <p>{errors.root.message}</p>
           {stale && (
             /*
@@ -497,7 +497,7 @@ function EditFields({
         <Section title="Fechas reales">
           {/* Solo las que el viaje YA tiene: acá se corrigen, no se fijan. Un viaje que
               todavía no arrancó no muestra ningún campo, y el bloque entero desaparece. */}
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-fg-muted">
             Se corrigen en hora de Perú. Las fija el viaje al iniciarse y al cerrarse; acá solo se
             enmiendan.
           </p>

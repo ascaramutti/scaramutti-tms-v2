@@ -111,6 +111,7 @@ const PAIRS: Pair[] = [
   { fg: 'danger', bg: 'canvas', min: AA_TEXT, what: 'mensaje de error sobre el fondo de página, y anillo de foco del destructivo sobre el lienzo' },
   { fg: 'danger-fg', bg: 'surface', min: AA_TEXT, what: 'texto de peligro en su tono fuerte, sobre tarjeta' },
   { fg: 'danger-fg', bg: 'danger-soft', min: AA_TEXT, what: 'texto de la alerta de peligro' },
+  { fg: 'danger-fg', bg: 'danger-soft-strong', min: AA_TEXT, what: 'texto del botón de descartar cuando responde al mouse, dentro de la alerta' },
   { fg: 'danger-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde de un control en error' },
   { fg: 'warning-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde punteado de la tarjeta de componente integral, y borde del botón de forzar' },
   { fg: 'warning', bg: 'surface', min: AA_TEXT, what: 'aviso de campo sobre tarjeta' },
@@ -178,7 +179,7 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
     ratio: 2.51,
     note:
       'El mismo gris sobre el fondo de página. El caso más claro es la razón social del pie del ' +
-      'login (LoginPage.tsx:140), que es texto corriente sobre bg-slate-50.',
+      'login (LoginPage.tsx), que es texto corriente sobre el gris del lienzo.',
   },
   'surface-subtle/surface': {
     ratio: 1.05,
@@ -249,7 +250,7 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
     ratio: 4.38,
     note:
       'Las celdas secundarias de la fila de un servicio integral, que se pinta azul suave ' +
-      '(QuotationItemsSection.tsx:23 y sus text-slate-500). Queda a 0.12 del mínimo.',
+      '(QuotationItemsSection.tsx y su texto secundario). Queda a 0.12 del mínimo.',
   },
   'warning-border-strong/surface': {
     ratio: 1.45,
@@ -521,6 +522,7 @@ describe('tokens del tema', () => {
       'danger': '#e7000b', // red-600
       'danger-hover': '#c10007', // red-700
       'danger-soft': '#fef2f2', // red-50
+      'danger-soft-strong': '#ffe2e2', // red-100
       'danger-fg': '#c10007', // red-700
       'accent-border': '#8ec5ff', // blue-300
       'danger-border': '#ffc9c9', // red-200
@@ -623,6 +625,7 @@ describe('tokens del tema', () => {
       'danger-border/canvas',
       'danger-border/surface',
       'danger-fg/danger-soft',
+      'danger-fg/danger-soft-strong',
       'danger-fg/surface',
       'danger/canvas',
       'danger/surface',
