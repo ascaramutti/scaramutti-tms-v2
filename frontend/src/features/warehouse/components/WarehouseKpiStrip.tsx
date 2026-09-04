@@ -69,7 +69,7 @@ export function WarehouseKpiStrip({
           // accionable sería además el único que un lector de pantalla no puede leer.
           aria-label={`Con stock bajo: ${data?.lowStockCount ?? 'sin dato'}. Filtrar: solo stock bajo`}
           className={cn(
-            'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2',
+            'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
             lowOnly ? 'border-warning bg-warning-soft' : 'hover:bg-surface-subtle',
           )}
           icon={AlertTriangle}

@@ -419,7 +419,7 @@ describe('CotizacionWizardPage', () => {
     // Y se ve apagado. La clase que lo apaga dejó de vivir dentro de la constante y ahora es
     // una prop suelta del componente compartido.
     expect(screen.getByRole('button', { name: /agregar ítem/i }).className).toContain(
-      'disabled:bg-blue-300',
+      'disabled:bg-accent-disabled',
     )
   })
 

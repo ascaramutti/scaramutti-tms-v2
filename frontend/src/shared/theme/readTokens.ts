@@ -18,10 +18,10 @@
  * extraen, y `parseHex` rechaza lo que no sepa medir.
  * El nombre viene sin el prefijo `--color-`: `fg`, `surface`, `danger-soft`.
  *
- * Lee un solo bloque a propósito, para medir un tema y no una mezcla de dos.
- * Cuando existan los valores del modo oscuro, van en su propio selector y hay
- * que leerlos aparte; la prueba de contraste tiene un caso que falla el día que
- * aparezcan, justamente para que nadie lo dé por resuelto.
+ * Lee un solo bloque a propósito, para medir un tema y no una mezcla de dos. Los valores
+ * del modo oscuro viven en su propio selector desde el PR del tema oscuro y se leen con
+ * `parseThemeOverrides`, acá abajo; la prueba de contraste exige que los temas publicados
+ * sean exactamente dos y mide los dos.
  *
  * Acepta el `@theme` con cualquier cantidad de modificadores a propósito: si alguien cambia
  * la declaración, esta función tiene que seguir leyéndola para que la prueba de
@@ -49,6 +49,30 @@ export function parseThemeColors(css: string): Record<string, string> {
   }
   const colors: Record<string, string> = {}
   for (const [, name, value] of block[1].matchAll(
+    /--color-([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/g,
+  )) {
+    colors[name] = value
+  }
+  return colors
+}
+
+/**
+ * Los mismos pares, pero de un bloque que redefine el tema con un selector, como el del
+ * modo oscuro. Se lee aparte de `parseThemeColors` a propósito: aquella mide LA
+ * DECLARACIÓN del tema y esta mide una REDEFINICIÓN, y mezclarlas devolvería una paleta
+ * que no es la de ningún tema.
+ *
+ * El selector se pasa entero y se escapa, así que el día que haya un tercer tema (alto
+ * contraste, por ejemplo) esta función sirve igual sin tocarla.
+ */
+export function parseThemeOverrides(css: string, selector: string): Record<string, string> {
+  const escapado = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const bloque = new RegExp(escapado + '\\s*\\{([\\s\\S]*?)\\n\\}').exec(css)
+  if (!bloque) {
+    throw new Error(`No se encontró un bloque ${selector} en el CSS recibido.`)
+  }
+  const colors: Record<string, string> = {}
+  for (const [, name, value] of bloque[1].matchAll(
     /--color-([a-z0-9-]+)\s*:\s*(#[0-9a-fA-F]{3,8})\s*;/g,
   )) {
     colors[name] = value

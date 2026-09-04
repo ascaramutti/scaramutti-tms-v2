@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseThemeColors } from './readTokens'
+import { parseThemeColors, parseThemeOverrides } from './readTokens'
 
 /**
  * El parser tiene tres decisiones que un cambio descuidado puede revertir sin
@@ -45,5 +45,73 @@ describe('parseThemeColors', () => {
     // Devolver {} haría que la prueba de contraste no midiera nada y quedara en
     // verde, que es el peor resultado posible para una prueba.
     expect(() => parseThemeColors('body { margin: 0 }')).toThrow(/no se encontró/i)
+  })
+})
+
+/**
+ * `parseThemeOverrides` alimenta las aserciones de contraste del tema oscuro, una por cada uno
+ * de sus pares, y entró sin una sola prueba propia. Las tres decisiones que un cambio
+ * descuidado puede revertir son las mismas que las de su hermana, más una que es peor: si en vez de LANZAR devolviera un
+ * objeto vacío, la paleta oscura quedaría sin valores, cada par mediría `undefined` contra
+ * `undefined` y la suite decidiría sola si eso es verde.
+ */
+describe('parseThemeOverrides', () => {
+  const css = `
+:root {
+  --color-fg: #111111;
+}
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --color-fg: #eeeeee;
+  --color-canvas: #000000;
+}
+`
+
+  it('lee el bloque del selector pedido y no el otro', () => {
+    expect(parseThemeOverrides(css, ":root[data-theme='dark']")).toEqual({
+      fg: '#eeeeee',
+      canvas: '#000000',
+    })
+  })
+
+  /**
+   * El escapado, medido contra un señuelo. La versión anterior de este caso repetía la llamada
+   * del caso de arriba y afirmaba menos, así que sacar el escapado no lo mataba a él: hacía
+   * lanzar a la función y caía primero el otro. Acá el patrón sin escapar SÍ encuentra algo, y
+   * encuentra el bloque equivocado, que es el modo de falla que de verdad importa.
+   */
+  it('escapa el selector en vez de tratarlo como un patrón', () => {
+    const conSeñuelo = `
+:rootXtema-oscuro {
+  --color-fg: #ff0000;
+}
+:root.tema-oscuro {
+  --color-fg: #eeeeee;
+}
+`
+    // El punto sin escapar es un comodín y el señuelo va primero: sin escapar, esto devuelve
+    // el rojo.
+    expect(parseThemeOverrides(conSeñuelo, ':root.tema-oscuro')).toEqual({ fg: '#eeeeee' })
+  })
+
+  it('ignora lo que no es un color', () => {
+    expect(parseThemeOverrides(css, ":root[data-theme='dark']")).not.toHaveProperty('scheme')
+  })
+
+  it('LANZA si el bloque no está, en vez de devolver una paleta vacía', () => {
+    // Es la diferencia entre fallar y medir aire: con `{}` cada par de contraste compararía
+    // `undefined` contra `undefined`.
+    expect(() => parseThemeOverrides(css, ":root[data-theme='alto-contraste']")).toThrow(
+      /no se encontró/i,
+    )
+  })
+
+  it('se detiene en el cierre de su bloque y no arrastra el siguiente', () => {
+    const dos = css + `
+:root[data-theme='otro'] {
+  --color-fg: #abcdef;
+}
+`
+    expect(parseThemeOverrides(dos, ":root[data-theme='dark']").fg).toBe('#eeeeee')
   })
 })

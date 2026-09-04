@@ -142,7 +142,7 @@ function WithdrawalCancelForm({
           <button
             type="submit"
             disabled={isSubmitting || cancelWithdrawal.isPending || missingEtag}
-            className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-danger-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-danger-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelWithdrawal.isPending && <Spinner size={16} label="Anulando" />}
             {cancelWithdrawal.isPending ? 'Anulando…' : 'Anular retiro'}

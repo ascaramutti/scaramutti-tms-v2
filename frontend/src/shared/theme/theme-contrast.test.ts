@@ -2,9 +2,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { compileGlobalCss } from './compileCss'
-import { contrastRatio } from './contrast'
-import { readTailwindPalette } from './palette'
-import { parseThemeColors } from './readTokens'
+import { contrastRatio, parseHex } from './contrast'
+import { readTailwindPalette, toHex } from './palette'
+import { parseThemeColors, parseThemeOverrides } from './readTokens'
 
 /**
  * Mide el contraste de cada par texto/fondo que el tema declara.
@@ -22,22 +22,26 @@ import { parseThemeColors } from './readTokens'
  *   grep -rho "toHaveNoViolations" --include=*.test.ts --include=*.test.tsx src
  *
  * ALCANCE, y conviene ser exacto porque el verde de acá se lee como un permiso:
- * esta prueba mide los pares ENTRE TOKENS. No mide, ni puede, los colores
- * crudos que todavía viven sueltos en los componentes, y hay incumplimientos
- * ahí: el paso ya completado del asistente pinta blanco sobre un verde medio (2.47:1)
- * y la tarjeta de ítem usa un rojo y un verde de un tono más claro que el del
- * token (3.81:1 y 3.65:1). Los levanta el PR de barrido, no este archivo.
+ * esta prueba mide los pares ENTRE TOKENS. Durante toda la serie eso dejaba afuera
+ * los colores escritos a mano, que eran donde estaban los peores incumplimientos:
+ * el paso ya completado del asistente pintaba blanco sobre un verde medio (2.47:1)
+ * y la tarjeta de ítem usaba un rojo y un verde más claros que su token. El barrido
+ * los convirtió a todos y la guarda del tope los deja en cero, así que ya no hay un
+ * afuera de este tipo: hoy cada color de la pantalla es un token y entra acá o entra
+ * en la lista de los que no se miden, con su razón.
  *
  * Tampoco mide que un par declarado sea el que la pantalla usa de verdad. Si
  * mañana una pantalla combina dos tokens que acá no están juntos, nadie lo va a
  * medir: LA LISTA HAY QUE MANTENERLA. La guarda de cobertura de más abajo lo
  * fuerza a medias, exigiendo que todo token aparezca al menos una vez.
  *
- * Ojo al escribir comentarios acá: Tailwind escanea este archivo buscando
- * nombres de clase, así que nombrar una utilidad del tema en una frase la crea
- * de verdad en el CSS de producción. Medido: una primera versión de este
- * comentario que nombraba dos utilidades las hizo aparecer en el bundle. Por eso
- * los tokens se nombran acá en prosa y sin su prefijo.
+ * Sobre nombrar utilidades en los comentarios: Tailwind las publica desde
+ * cualquier archivo que escanee, con uso real o sin él, y una primera versión de
+ * este comentario que nombraba dos las hizo aparecer en el bundle. Esta carpeta
+ * quedó fuera del escaneo justamente por eso, y hay una guarda que lo afirma
+ * sobre la lista de archivos que el escáner devuelve, no sobre la directiva. Aun
+ * así los tokens se nombran acá en prosa: la exclusión se puede caer, y esta
+ * costumbre es lo que hace que caerse no publique nada.
  */
 
 /** Texto normal, WCAG 2.1 AA, criterio 1.4.3. */
@@ -80,6 +84,7 @@ const PAIRS: Pair[] = [
   { fg: 'fg-subtle', bg: 'surface', min: AA_TEXT, what: 'placeholder del input' },
   { fg: 'fg-subtle', bg: 'canvas', min: AA_TEXT, what: 'texto apagado sobre el fondo de página' },
   { fg: 'fg-subtle', bg: 'surface-subtle', min: AA_TEXT, what: 'texto de un control deshabilitado' },
+  { fg: 'fg-subtle', bg: 'accent-soft', min: AA_TEXT, what: 'el guion de "sin observaciones" dentro de la caja de notas de la cotización' },
   { fg: 'surface-subtle', bg: 'surface', min: AA_NON_TEXT, what: 'foco de teclado de la fila clickeable' },
   { fg: 'danger-border', bg: 'surface', min: AA_NON_TEXT, what: 'marco de la alerta de peligro' },
   { fg: 'danger-border', bg: 'canvas', min: AA_NON_TEXT, what: 'borde del botón de anular, que va sobre el fondo de página' },
@@ -91,11 +96,12 @@ const PAIRS: Pair[] = [
   { fg: 'border-strong', bg: 'canvas', min: AA_NON_TEXT, what: 'borde del botón secundario, que va sobre el fondo de página' },
   { fg: 'on-solid', bg: 'accent', min: AA_TEXT, what: 'texto del botón primario' },
   { fg: 'on-solid', bg: 'accent-hover', min: AA_TEXT, what: 'texto del botón primario al pasar el mouse' },
+  { fg: 'on-solid', bg: 'accent-disabled', min: AA_TEXT, what: 'texto del botón primario apagado, en los siete lugares que lo tienen' },
   { fg: 'on-solid', bg: 'danger', min: AA_TEXT, what: 'texto del botón destructivo' },
   { fg: 'on-solid', bg: 'danger-hover', min: AA_TEXT, what: 'texto del botón destructivo con el mouse encima' },
   { fg: 'on-solid', bg: 'transition', min: AA_TEXT, what: 'texto del botón de aceptar una cotización' },
   { fg: 'on-solid', bg: 'transition-hover', min: AA_TEXT, what: 'ese mismo botón con el mouse encima' },
-  { fg: 'on-solid', bg: 'success', min: AA_TEXT, what: 'PREVENTIVO: el único relleno sólido verde es Stepper.tsx:64 y es emerald-500, no este token' },
+  { fg: 'on-solid', bg: 'success', min: AA_TEXT, what: 'el número dentro del círculo de un paso ya completado del asistente, que es el único relleno sólido verde con texto encima' },
   { fg: 'accent', bg: 'surface', min: AA_TEXT, what: 'enlace y texto de acento sobre tarjeta' },
   { fg: 'accent', bg: 'canvas', min: AA_NON_TEXT, what: 'anillo del spinner de carga sobre el fondo de página' },
   { fg: 'accent', bg: 'accent-soft', min: AA_TEXT, what: 'texto de la alerta informativa' },
@@ -117,6 +123,8 @@ const PAIRS: Pair[] = [
   { fg: 'warning', bg: 'surface', min: AA_TEXT, what: 'aviso de campo sobre tarjeta' },
   { fg: 'warning', bg: 'warning-soft', min: AA_TEXT, what: 'pastilla de aviso de Badge, y el valor del tile de stock bajo con el filtro activo' },
   { fg: 'warning', bg: 'warning-soft-strong', min: AA_TEXT, what: 'texto del chip que quita el filtro de stock bajo' },
+  { fg: 'warning', bg: 'warning-soft-hover', min: AA_TEXT, what: 'ese mismo chip con el mouse encima' },
+  { fg: 'warning-fg', bg: 'warning-soft-strong', min: AA_TEXT, what: 'texto del botón de forzar con el mouse encima, dentro del banner ámbar' },
   { fg: 'warning-fg', bg: 'warning-soft', min: AA_TEXT, what: 'texto de la alerta de aviso' },
   { fg: 'success', bg: 'surface', min: AA_TEXT, what: 'PREVENTIVO: no hay texto ni relleno con el tono sólido todavía' },
   { fg: 'success-fg', bg: 'surface', min: AA_TEXT, what: 'texto de entrada en el kardex' },
@@ -129,23 +137,42 @@ const PAIRS: Pair[] = [
 ]
 
 /**
- * Los dos tokens que NO entran en ningún par, con su razón. La guarda de
- * cobertura exige que esta lista y la de los tokens sin par coincidan exacto,
- * así que agregar un token obliga a decidir: o se mide, o se justifica acá.
+ * Los tokens que NO entran en ningún par, con su razón. La guarda de cobertura
+ * exige que esta lista y la de los tokens sin par coincidan exacto, así que
+ * agregar un token obliga a decidir: o se mide, o se justifica acá.
  *
- * El único que queda es un borde puramente decorativo. WCAG 1.4.11 pide 3:1 al elemento
- * que COMUNICA algo (el borde de un control, el anillo de foco); un filete que
- * separa una tarjeta del fondo, o que enmarca una alerta cuyo mensaje ya se lee
- * por el texto y el color de fondo, no comunica nada por sí solo. Afirmarlos
+ * El criterio que los junta es que ninguno COMUNICA por sí solo, que es lo que WCAG 1.4.11
+ * pide medir con 3:1 (el borde de un control, el anillo de foco). Un filete que separa una
+ * tarjeta del fondo, la sombra que la eleva, el velo que apaga lo de atrás y el trazo que
+ * acompaña a un dato que ya se lee no dicen nada que no esté dicho de otra forma. Afirmarlos
  * contra un número inventado sería una prueba que no prueba nada.
  *
- * `danger-border` y `warning-border` estuvieron acá y salieron, por la misma
- * razón: en los dos casos hay un botón con relleno propio cuyo borde es el único
+ * Una advertencia sobre esta lista, que la revisión de este PR levantó: creció de una entrada
+ * a cuatro y su justificación se quedó describiendo la versión de una. La guarda de cobertura
+ * no puede verlo, porque los dos lados se mueven juntos; lo único que lo ataja es leerla al
+ * agregar.
+ *
+ * `danger-border` y `warning-border` estuvieron acá y salieron, por la razón
+ * inversa: en los dos casos hay un botón con relleno propio cuyo borde es el único
  * límite del control. Los dos se miden y los dos fallan, como `border-strong`.
- * Queda `border` solo, que es filete de tarjeta contra el fondo y nada más.
  */
 const SIN_PAR: Record<string, string> = {
-  border: 'filete de tarjeta y tabla contra el fondo: separación decorativa',
+  border:
+    'filete de tarjeta y tabla contra el fondo: separación decorativa. Y con él queda declarado el par que la tarjeta forma con la página, que la revisión buscó y no encontró en ninguna lista: no se mide a propósito, porque lo que separa una tarjeta del fondo no es su luminancia (1.05 en claro, 1.14 en oscuro) sino este filete y su sombra. Ponerle un mínimo sería inventarle un número a una decisión de dibujo.',
+  overlay:
+    'el velo del modal. No se mide como par porque nunca se dibuja a su valor pleno: el ' +
+    'sitio le pone la opacidad, y lo que importa es cuánto separa a la tarjeta del fondo, ' +
+    'que está medido acá y en el documento de diseño, componiéndolo a la opacidad que el ' +
+    'sitio aplica y sobre el lienzo, que es donde se dibuja: **4.83 en claro y 1.25 en ' +
+    'oscuro**, donde lo que recorta la tarjeta es su filete, con 1.74 contra el velo.',
+  elevation:
+    'el color de la sombra de una tarjeta elevada. Una sombra no comunica un estado ni lleva ' +
+    'texto encima: es profundidad. Su único uso además está sobre una tarjeta que ya se ' +
+    'recorta con un filete propio, así que la sombra tampoco es lo que la separa del fondo.',
+  trace:
+    'el trazo decorativo que no es texto ni borde: el ícono de una pantalla sin datos, que es ' +
+    '`aria-hidden`, y la línea que une dos pasos del asistente, que acompaña a un número que ' +
+    'sí se lee. Ninguno de los dos comunica solo, que es lo que 1.4.11 pide medir.',
 }
 
 /**
@@ -163,7 +190,7 @@ const SIN_PAR: Record<string, string> = {
  * número deja de coincidir, esta prueba falla y quien lo arregló tiene que
  * borrar la línea. Una excepción que no se puede olvidar.
  */
-const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
+const EXCEPCIONES_CLARO: Record<string, { ratio: number; note: string }> = {
   'fg-subtle/surface': {
     ratio: 2.63,
     note:
@@ -195,6 +222,16 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
       'El marco de las nueve alertas de peligro. Los otros dos usos de este token son el borde ' +
       'del botón de anular, que no va sobre tarjeta sino sobre el fondo de página y se mide ' +
       'aparte.',
+  },
+  'fg-subtle/accent-soft': {
+    ratio: 2.42,
+    note:
+      'El guion que ocupa el lugar de una observación vacía, dentro de la caja azul de notas. ' +
+      'El sitio le pone opacidad a la caja, así que sobre la tarjeta el par real da 2.50, un ' +
+      'pelo mejor que el del token pleno y igual de lejos del mínimo. Lo levantó la revisión ' +
+      'de este PR barriendo los pares que la lista no tenía: los dos tokens ya aparecían por ' +
+      'separado en otros pares, así que la guarda de cobertura no podía verlo. El tema oscuro ' +
+      'lo arregla sin que nadie lo buscara, y por eso no tiene entrada gemela.',
   },
   'fg-subtle/surface-subtle': {
     ratio: 2.51,
@@ -290,6 +327,22 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
       'de todos los inputs, que sí viven en tarjeta blanca. El botón secundario usa el mismo ' +
       'token pero se dibuja sobre el fondo de página, y se mide aparte.',
   },
+  'on-solid/accent-disabled': {
+    ratio: 2.64,
+    note:
+      'El texto del botón primario APAGADO. WCAG exime los controles inactivos, así que no es ' +
+      'un incumplimiento; se declara igual porque es el peor par que se dibuja a propósito. ' +
+      'Este PR lo MEJORA: los tres modales de alta al vuelo y los tres controles del asistente ' +
+      'lo tenían en 1.81, que es un botón que el usuario no puede leer mientras espera, y los ' +
+      'siete usos de hoy pasan a este tono.',
+  },
+  'warning/warning-soft-hover': {
+    ratio: 4.04,
+    note:
+      'El texto del chip de filtro cuando el mouse está encima. Queda a 0.46 del mínimo, y es ' +
+      'anterior a este PR: el relleno de hover ya era ese tono escrito a mano. En oscuro el ' +
+      'mismo par da 4.56 y pasa.',
+  },
   'fg-muted/surface-muted': {
     ratio: 4.35,
     note:
@@ -299,10 +352,102 @@ const KNOWN_FAILURES: Record<string, { ratio: number; note: string }> = {
   },
 }
 
+/**
+ * Las excepciones del TEMA OSCURO. Son NUEVE, y las nueve ya fallaban en claro: **el tema
+ * oscuro no estrena ni un incumplimiento**. Al revés, arregla DOCE de las VEINTIUNA del claro,
+ * entre ellas el texto de sugerencia de los campos, que es el peor par de TEXTO sobre
+ * superficie del claro (2.63) y en oscuro llega a 5.25. (No es el peor par del sistema a
+ * secas: ese es el realce de fila, con 1.05, y así lo dice la nota de ese par doscientas
+ * líneas más arriba.)
+ *
+ * Las nueve que quedan son las mismas de siempre: filetes decorativos que acompañan a un
+ * fondo y no comunican solos, más el realce de fila, la pastilla dentro de su fila y el
+ * botón apagado. SIETE de las nueve MEJORAN respecto del claro; bajan DOS, las dos del
+ * marco de la caja informativa, y las dos siguen en el mismo régimen.
+ *
+ * Los conteos de este bloque los fijan las listas congeladas de más abajo: si alguno se
+ * escribe de memoria y queda viejo, esas listas siguen en verde y este texto miente. Pasó
+ * con la primera versión, con cuatro números.
+ */
+const EXCEPCIONES_OSCURO: Record<string, { ratio: number; note: string }> = {
+  'surface-subtle/surface': {
+    ratio: 1.06,
+    note:
+      'El realce de la fila clickeable, que también es su único indicador de foco de teclado. ' +
+      'En claro da 1.05: el tema oscuro no lo arregla ni lo empeora, y quien elija cambiarlo ' +
+      'tiene que saber que está eligiendo un indicador de foco.',
+  },
+  'danger-border/surface': {
+    ratio: 1.68,
+    note: 'El marco de las alertas de peligro sobre tarjeta. En claro da 1.45: mejora y no alcanza.',
+  },
+  'danger-border/canvas': {
+    ratio: 1.91,
+    note: 'El mismo marco contra el fondo de página. En claro da 1.39: mejora y no alcanza.',
+  },
+  'accent-border/accent-soft': {
+    ratio: 1.57,
+    note:
+      'El filete de la caja informativa contra su propio fondo. Es de los dos únicos pares que ' +
+      'BAJAN en oscuro (1.67 en claro), y se acepta por lo mismo que en claro: el filete ' +
+      'acompaña al color de fondo, que es el que comunica.',
+  },
+  'accent-border/surface': {
+    ratio: 1.73,
+    note: 'La misma caja contra la tarjeta que la contiene. El otro par que baja (1.81 en claro).',
+  },
+  'success-border/success-soft': {
+    ratio: 1.84,
+    note:
+      'El marco del aviso de éxito, que sigue sin existir en pantalla. En claro da 1.13, que ' +
+      'es el más bajo de la familia: en oscuro mejora bastante y sigue sin llegar.',
+  },
+  'warning-border/warning-soft': {
+    ratio: 1.82,
+    note: 'El borde del botón de forzar dentro del banner ámbar. En claro da 1.20.',
+  },
+  'on-solid/accent-disabled': {
+    ratio: 3.89,
+    note:
+      'El mismo botón apagado en oscuro. Mejora respecto del claro (2.64) y sigue sin llegar; ' +
+      'WCAG exime los controles inactivos. Se eligió un tono que se distingue del primario ' +
+      'activo (1.74 entre los dos) para que "apagado" se siga leyendo como apagado.',
+  },
+  'accent-soft-strong/accent-soft': {
+    ratio: 1.13,
+    note:
+      'La pastilla informativa contra la fila que la contiene. Es el número que ese token ' +
+      'existe para conservar, y en oscuro se conserva igual: 1.12 en claro, 1.13 acá.',
+  },
+}
+
+const EXCEPCIONES: Record<Tema, Record<string, { ratio: number; note: string }>> = {
+  claro: EXCEPCIONES_CLARO,
+  oscuro: EXCEPCIONES_OSCURO,
+}
+
 const cssPath = join(process.cwd(), 'src', 'index.css')
 const css = readFileSync(cssPath, 'utf8')
 const colors = parseThemeColors(css)
+/**
+ * El selector del tema oscuro se escribe UNA sola vez, acá: si alguien lo cambia en el CSS,
+ * esta lectura lanza y el archivo entero falla al importar, en vez de medir media paleta.
+ */
+export const SELECTOR_OSCURO = ":root[data-theme='dark']"
+const colorsOscuro = parseThemeOverrides(css, SELECTOR_OSCURO)
+
+/**
+ * Las dos paletas, con el mismo juego de nombres. Todo lo que se mide abajo se mide en las
+ * dos: un tema que no se mide es un tema donde el contraste se rompe sin que nadie lo vea.
+ */
+const PALETAS = { claro: colors, oscuro: colorsOscuro } as const
+type Tema = keyof typeof PALETAS
+
 const key = (pair: Pair) => `${pair.fg}/${pair.bg}`
+
+/** El cuerpo del bloque oscuro dentro de un CSS ya compilado, para medir DENTRO y no "en algún lado". */
+const bloqueOscuro = (css: string) =>
+  new RegExp(SELECTOR_OSCURO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^{}]*)\\}').exec(css)?.[1] ?? ''
 
 describe('declaración del tema', () => {
   /**
@@ -338,26 +483,45 @@ describe('declaración del tema', () => {
     // token con mayúscula o guion bajo sería invisible de LOS DOS lados de la
     // comparación y la igualdad se cumpliría al vacío. Medido: un
     // `--color-Intruso` pasaba en verde y se publicaba.
-    const enElCss = new Map(
-      [...compilado.matchAll(/--color-([A-Za-z0-9_-]+)\s*:\s*([^;}]+)[;}]/g)].map((m) => [
-        m[1],
-        m[2].trim(),
-      ]),
-    )
+    // Con DOS temas ya no alcanza con recorrer el archivo entero: los dos bloques declaran
+    // los mismos nombres con valores distintos, así que un mapa plano se queda con el
+    // último y la comparación mediría un solo tema. Se lee cada bloque por separado, con
+    // la misma función que lee el CSS fuente.
+    const publicadoEnBloque = (recorte: string) =>
+      new Map(
+        [...recorte.matchAll(/--color-([A-Za-z0-9_-]+)\s*:\s*([^;}]+)[;}]/g)].map((m) => [
+          m[1],
+          m[2].trim(),
+        ]),
+      )
+    const bloqueOscuroCss = new RegExp(
+      SELECTOR_OSCURO.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*\\{([^{}]*)\\}',
+    ).exec(compilado)
+    expect(bloqueOscuroCss, 'el bloque del tema oscuro no llegó al CSS publicado').not.toBeNull()
+    const enElCssOscuro = publicadoEnBloque(bloqueOscuroCss![1])
+    // Lo claro se mide sobre el CSS SIN el bloque oscuro, para que el segundo no le pise
+    // los valores al primero.
+    const enElCss = publicadoEnBloque(compilado.replace(bloqueOscuroCss![0], ''))
+
     // El CSS trae además la paleta de Tailwind, que el escáner arrastra al
     // compilar con las clases reales. Lo que se afirma es que CADA token del
     // tema esté publicado y con su valor, no que sean los únicos.
-    const publicados = Object.keys(colors)
-      .map((n) => `${n}: ${enElCss.get(n)}`)
-      .sort()
-    expect(publicados).toEqual(
-      Object.entries(colors)
-        .map(([n, v]) => `${n}: ${v}`)
-        .sort(),
-    )
+    for (const [tema, paleta, publicado] of [
+      ['claro', colors, enElCss],
+      ['oscuro', colorsOscuro, enElCssOscuro],
+    ] as const) {
+      const publicados = Object.keys(paleta)
+        .map((n) => `${n}: ${publicado.get(n)}`)
+        .sort()
+      expect(publicados, `el tema ${tema} no llegó completo al CSS publicado`).toEqual(
+        Object.entries(paleta)
+          .map(([n, v]) => `${n}: ${v}`)
+          .sort(),
+      )
+    }
 
     // Y que la variable se REFERENCIE en la utilidad en vez de hornearse: el
-    // modificador `inline` publica los 27 tokens igual y mete el literal en cada
+    // modificador `inline` publica los 45 tokens igual y mete el literal en cada
     // clase, con lo que redefinir el tema no cambiaría un pixel. Es el fallo
     // silencioso que este archivo declara como el peligroso, y el conjunto de
     // nombres no lo veía.
@@ -378,21 +542,34 @@ describe('declaración del tema', () => {
   })
 
   /**
-   * Forzador para el PR del modo oscuro. Cuando entren los valores oscuros, en
-   * el archivo que sea y con la forma que sea, esta guarda falla y obliga a
-   * extender la medición en vez de dejar la suite en verde midiendo la mitad,
-   * que es justo donde el contraste se rompe.
+   * Esta guarda nació al revés: exigía que NO hubiera un segundo tema, para forzar que el
+   * PR del modo oscuro extendiera la medición en vez de dejar la suite en verde midiendo la
+   * mitad. Cumplió: falló el día que apareció el bloque oscuro. Ahora exige lo contrario,
+   * que los temas publicados sean EXACTAMENTE dos y que los dos declaren el mismo juego de
+   * nombres, que es la forma de que un tema no se quede corto sin que nadie lo note.
    */
-  it('todavía no se publica un segundo tema, y cuando se publique hay que medirlo acá', () => {
-    // Cualquier atributo de tema, cualquier clase que lo nombre, la consulta de
-    // preferencia del sistema, y un segundo bloque de tokens en otro selector.
-    // Medido: con solo `[data-theme` se colaban `[data-mode="dark"]`,
-    // `.theme-dark`, `html[data-appearance=dark]` y un segundo `@theme static`.
-    expect(compilado).not.toMatch(/\[data-(theme|mode|appearance)|dark|prefers-color-scheme/i)
-    // Un segundo lugar que declare tokens es un segundo tema, se llame como se
-    // llame: las variables del tema viven en un solo bloque.
+  it('se publican exactamente dos temas, y los dos declaran los mismos tokens', () => {
     const bloquesConTokens = [...compilado.matchAll(/\{[^{}]*--color-[a-z0-9-]+\s*:/g)]
-    expect(bloquesConTokens).toHaveLength(1)
+    expect(
+      bloquesConTokens,
+      'un tercer lugar que declare tokens es un tercer tema, se llame como se llame',
+    ).toHaveLength(2)
+    expect(Object.keys(colorsOscuro).sort()).toEqual(Object.keys(colors).sort())
+    // Sin esto el navegador pinta con el tema claro lo que no controlamos: las barras de
+    // desplazamiento, el autocompletado y los selectores nativos de fecha, que esta
+    // aplicación usa. Quedan claros sobre fondo oscuro y se leen como un defecto.
+    expect(bloqueOscuro(compilado), 'el `color-scheme` va DENTRO del bloque oscuro: suelto se lo come también el tema claro y deja las barras y los selectores de fecha oscuros sobre página blanca').toMatch(
+      /color-scheme:\s*dark/,
+    )
+    // Y la mitad de la guarda vieja que la reescritura había perdido: **ninguna variante
+    // `dark:` ni ninguna consulta de preferencia del sistema**. Las dos siguen al sistema
+    // operativo y NO al atributo, o sea que le pasan por encima a la elección del usuario:
+    // quien tenga el sistema en oscuro y elija claro se llevaría los tokens claros con las
+    // utilidades oscuras encima. Lo levantó la revisión de este PR.
+    expect(
+      compilado,
+      'el tema se maneja por atributo: una variante `dark:` o una media query sigue al sistema y pisa la elección del usuario',
+    ).not.toMatch(/prefers-color-scheme|\.dark\\:/)
   })
 
   /**
@@ -428,16 +605,50 @@ describe('declaración del tema', () => {
   })
 
   /**
+   * El hermano del anterior, y por el mismo motivo: **el cableado del proveedor del tema no
+   * lo afirma nadie**. Cada prueba que lo necesita se lo pone a sí misma, así que sacarlo del
+   * arranque deja la suite entera en verde y la aplicación en blanco: el pie de la barra
+   * llama a `useTheme`, que lanza fuera del proveedor, y ese pie se pinta en TODA pantalla
+   * autenticada. Medido durante la revisión de este PR: sin el proveedor en el arranque,
+   * ocho archivos y 231 casos seguían pasando.
+   *
+   * Estructural igual que el del CSS, con la misma advertencia: afirma que las líneas estén.
+   */
+  it('el proveedor del tema envuelve la aplicación de verdad', () => {
+    const main = readFileSync(join(process.cwd(), 'src', 'main.tsx'), 'utf8')
+    // Sin anclas de línea: un formateador que parta el import en varias líneas no cambia nada
+    // y la versión anclada ponía la suite en rojo con el código intacto.
+    expect(main).toMatch(
+      /import\s*\{[^}]*\bThemeProvider\b[^}]*\}\s*from\s*['"]\.\/shared\/ui\/theme\/ThemeContext['"]/,
+    )
+    expect(main).toMatch(/<ThemeProvider>/)
+    expect(main).toMatch(/<\/ThemeProvider>/)
+
+    // Y lo que las etiquetas solas NO dicen: qué queda adentro. Dejar el proveedor envolviendo
+    // cualquier cosa y la aplicación afuera compila y deja la suite entera en verde, y da la
+    // misma pantalla en blanco que borrarlo, porque el pie de la barra llama al contexto y
+    // lanza fuera de él. Lo midió la revisión de este PR.
+    const adentro = main.slice(
+      main.indexOf('<ThemeProvider>') + '<ThemeProvider>'.length,
+      main.indexOf('</ThemeProvider>'),
+    )
+    expect(adentro, 'la aplicación tiene que quedar DENTRO del proveedor').toContain(
+      '<RouterProvider',
+    )
+    // Y las notificaciones también: `sonner` trae su propio tema y no mira el atributo.
+    expect(adentro, 'las notificaciones también van adentro').toContain('<ThemedToaster')
+  })
+
+  /**
    * La directiva que saca la carpeta del tema del escaneo, afirmada sobre la
    * lectura que hace TAILWIND (`compile()` devuelve sus fuentes ya parseadas) y
    * no sobre un regex nuestro.
    *
    * ALCANCE, con precisión: esto afirma qué patrones de exclusión hay y cuáles
-   * son, no qué archivos terminan escaneados. Lo segundo SÍ se puede medir sin
-   * un build completo, con el `Scanner` de `@tailwindcss/oxide` (hoy transitiva
-   * de `@tailwindcss/vite`), en unos 60 ms; no se hizo acá para no sumar una
-   * dependencia declarada a este PR, y queda anotado como la mejora natural de
-   * esta guarda. Una versión anterior de este comentario decía que el efecto no
+   * son, no qué archivos terminan escaneados. Lo segundo se afirma aparte, en la
+   * guarda de los colores escritos a mano, que toma su corpus del escáner y
+   * exige que esta carpeta no aparezca en él: ahí se mide el efecto y acá la
+   * declaración. Una versión anterior de este comentario decía que el efecto no
    * se podía medir en una prueba unitaria: era falso, y se corrige acá.
    *
    * Lo que sí ataja como está: que la directiva desaparezca, que se recorte a
@@ -470,6 +681,7 @@ describe('declaración del tema', () => {
       'compileCss.ts',
       'contrast.test.ts',
       'contrast.ts',
+      'no-raw-colors.test.ts',
       'palette.test.ts',
       'palette.ts',
       'readTokens.test.ts',
@@ -518,6 +730,7 @@ describe('tokens del tema', () => {
       'accent-soft': '#eff6ff', // blue-50
       'accent-soft-strong': '#dbeafe', // blue-100
       'on-solid': '#ffffff', // white
+      'accent-disabled': '#51a2ff', // blue-400
       'focus': '#2b7fff', // blue-500
       'danger': '#e7000b', // red-600
       'danger-hover': '#c10007', // red-700
@@ -532,6 +745,10 @@ describe('tokens del tema', () => {
       'warning-soft-strong': '#fef3c6', // amber-100
       'warning-fg': '#973c00', // amber-800
       'success-border': '#a4f4cf', // emerald-200
+      'overlay': '#0f172b', // slate-900
+      'elevation': '#e2e8f0', // slate-200
+      'warning-soft-hover': '#fee685', // amber-200
+      'trace': '#cad5e2', // slate-300
       'warning-border': '#fee685', // amber-200
       'warning-border-strong': '#ffd230', // amber-300
       'progress-soft': '#ede9fe', // violet-100
@@ -555,10 +772,70 @@ describe('tokens del tema', () => {
    *
    * Acá el valor se recalcula desde los `oklch()` del Tailwind INSTALADO, o sea
    * la versión que fija el lockfile, usando el nombre que cada línea del CSS
-   * declara en su comentario. Los 27 dan byte a byte: no hay tolerancia ni
+   * declara en su comentario. Los 45 dan byte a byte: no hay tolerancia ni
    * aproximación. Si un upgrade de Tailwind mueve un color de la paleta, esto lo
    * dice, que es la otra mitad de lo que este caso protege.
    */
+  /**
+   * Y los del tema OSCURO, que no tenían red. El comentario de arriba explica por qué el
+   * contraste solo no alcanza: solo ve un cambio cuando cruza un umbral o toca una excepción
+   * fijada. Medido durante la revisión de este PR: **poner el velo del modal en blanco, o el
+   * acento oscuro en verde, dejaba TODO este archivo en verde**. Los cuatro tokens que no
+   * entran en ningún par (los de `SIN_PAR`) no tenían absolutamente nada que los mirara.
+   *
+   * Estos valores NO se recalculan desde la paleta de Tailwind, como los del claro: son
+   * tonos propios elegidos sobre azul marino, así que este literal es toda su red.
+   */
+  it('los valores del tema oscuro son exactamente estos', () => {
+    expect(colorsOscuro).toEqual({
+      'canvas': '#0b1626',
+      'surface': '#132238',
+      'surface-subtle': '#16273f',
+      'surface-muted': '#1b2f4a',
+      'fg': '#eef3fa',
+      'fg-body': '#cfdbeb',
+      'fg-muted': '#a4b6d0',
+      'fg-subtle': '#8195b4',
+      'border': '#263a58',
+      'border-strong': '#526f9c',
+      'accent': '#5b9bff',
+      'accent-hover': '#7cb0ff',
+      'accent-soft': '#12294a',
+      'accent-soft-strong': '#0e2036',
+      'accent-border': '#1e4976',
+      'on-solid': '#08121f',
+      'focus': '#dbeafe',
+      'danger': '#f87171',
+      'danger-hover': '#fca5a5',
+      'danger-soft': '#3a1620',
+      'danger-soft-strong': '#310c10',
+      'danger-fg': '#fca5a5',
+      'danger-border': '#7f2436',
+      'danger-border-strong': '#d4667c',
+      'warning': '#fbbf24',
+      'warning-soft': '#3a2a10',
+      'warning-soft-strong': '#4a3614',
+      'warning-fg': '#fcd34d',
+      'warning-border': '#6b4f18',
+      'warning-border-strong': '#8a6a1c',
+      'progress-soft': '#251f3a',
+      'progress-fg': '#c4b4ff',
+      'transition-soft': '#00312d',
+      'transition': '#46ecd5',
+      'transition-hover': '#96f7e4',
+      'transition-fg': '#46ecd5',
+      'success': '#34d399',
+      'success-soft': '#0d2f27',
+      'success-fg': '#6ee7b7',
+      'success-border': '#1c5c46',
+      'accent-disabled': '#4c74a5',
+      'overlay': '#000000',
+      'elevation': '#000000',
+      'warning-soft-hover': '#6b4f1d',
+      'trace': '#44577a',
+    })
+  })
+
   it('cada token vale lo que la paleta de Tailwind dice que vale', () => {
     const paleta = readTailwindPalette(
       join(process.cwd(), 'node_modules', 'tailwindcss', 'theme.css'),
@@ -640,6 +917,7 @@ describe('tokens del tema', () => {
       'fg-muted/surface-muted',
       'fg-muted/surface-subtle',
       'fg-muted/warning-soft',
+      'fg-subtle/accent-soft',
       'fg-subtle/canvas',
       'fg-subtle/surface',
       'fg-subtle/surface-subtle',
@@ -654,6 +932,7 @@ describe('tokens del tema', () => {
       'focus/canvas',
       'focus/surface',
       'on-solid/accent',
+      'on-solid/accent-disabled',
       'on-solid/accent-hover',
       'on-solid/danger',
       'on-solid/danger-hover',
@@ -671,8 +950,10 @@ describe('tokens del tema', () => {
       'warning-border/warning-soft',
       'warning-fg/surface',
       'warning-fg/warning-soft',
+      'warning-fg/warning-soft-strong',
       'warning/surface',
       'warning/warning-soft',
+      'warning/warning-soft-hover',
       'warning/warning-soft-strong',
     ])
   })
@@ -684,8 +965,8 @@ describe('tokens del tema', () => {
    * real deja la suite en verde. Tres regresiones de AA absorbidas sin señal.
    * Congelar el conjunto convierte eso en un cambio que hay que defender.
    */
-  it('el conjunto de excepciones es exactamente este', () => {
-    expect(Object.keys(KNOWN_FAILURES).sort()).toEqual([
+  it('el conjunto de excepciones del tema claro es exactamente este', () => {
+    expect(Object.keys(EXCEPCIONES.claro).sort()).toEqual([
       'accent-border/accent-soft',
       'accent-border/surface',
       'accent-soft-strong/accent-soft',
@@ -697,19 +978,75 @@ describe('tokens del tema', () => {
       'danger-border/surface',
       'fg-muted/accent-soft',
       'fg-muted/surface-muted',
+      'fg-subtle/accent-soft',
       'fg-subtle/canvas',
       'fg-subtle/surface',
       'fg-subtle/surface-subtle',
+      'on-solid/accent-disabled',
       'success-border/success-soft',
       'surface-subtle/surface',
       'warning-border-strong/surface',
       'warning-border/warning-soft',
+      'warning/warning-soft-hover',
     ])
+  })
+
+  /**
+   * Y el del oscuro, que es un conjunto DISTINTO y por eso se congela aparte: si fueran la
+   * misma lista, arreglar un par en un tema y romperlo en el otro se compensaría solo.
+   */
+  it('el conjunto de excepciones del tema oscuro es exactamente este', () => {
+    expect(Object.keys(EXCEPCIONES.oscuro).sort()).toEqual([
+      'accent-border/accent-soft',
+      'accent-border/surface',
+      'accent-soft-strong/accent-soft',
+      'danger-border/canvas',
+      'danger-border/surface',
+      'on-solid/accent-disabled',
+      'success-border/success-soft',
+      'surface-subtle/surface',
+      'warning-border/warning-soft',
+    ])
+  })
+
+  /**
+   * Las doce del tema claro que el oscuro ARREGLA. Se afirman por nombre y no por número
+   * para que nadie las pierda de vista: si mañana una vuelve a fallar en oscuro, este caso
+   * lo dice, y si alguien la arregla también en claro, hay que sacarla de las dos listas.
+   */
+  it('el tema oscuro arregla exactamente estas doce del claro', () => {
+    const arregladas = Object.keys(EXCEPCIONES.claro)
+      .filter((k) => !(k in EXCEPCIONES.oscuro))
+      .sort()
+    expect(arregladas).toEqual([
+      'border-strong/canvas',
+      'border-strong/surface',
+      'danger-border-strong/danger-soft',
+      'danger-border-strong/surface',
+      'fg-muted/accent-soft',
+      'fg-muted/surface-muted',
+      'fg-subtle/accent-soft',
+      'fg-subtle/canvas',
+      'fg-subtle/surface',
+      'fg-subtle/surface-subtle',
+      'warning-border-strong/surface',
+      'warning/warning-soft-hover',
+    ])
+  })
+
+  it('el tema oscuro no estrena ninguna excepción propia', () => {
+    const propias = Object.keys(EXCEPCIONES.oscuro).filter((k) => !(k in EXCEPCIONES.claro))
+    expect(
+      propias,
+      'una excepción que solo existe en oscuro es un incumplimiento que estrena este tema',
+    ).toEqual([])
   })
 
   it('no quedan excepciones declaradas sobre pares que ya no existen', () => {
     const declarados = new Set(PAIRS.map(key))
-    const huerfanas = Object.keys(KNOWN_FAILURES).filter((k) => !declarados.has(k))
+    const huerfanas = Object.entries(EXCEPCIONES).flatMap(([tema, mapa]) =>
+      Object.keys(mapa).filter((k) => !declarados.has(k)).map((k) => `${tema}: ${k}`),
+    )
     expect(huerfanas).toEqual([])
   })
 })
@@ -759,17 +1096,26 @@ describe('los umbrales son los de la norma', () => {
   })
 })
 
-describe('contraste del tema claro', () => {
-  const conocidos = PAIRS.filter((pair) => key(pair) in KNOWN_FAILURES)
-  const exigidos = PAIRS.filter((pair) => !(key(pair) in KNOWN_FAILURES))
+/**
+ * La misma tabla de pares, medida en los DOS temas. Está escrito como un bucle sobre las
+ * paletas y no duplicado a mano por un motivo concreto: dos copias de esta lista se
+ * desincronizan en el primer par que alguien agregue, y el tema que quede sin ese par va a
+ * pasar en verde midiendo de menos. Lo único que difiere por tema son las excepciones.
+ */
+describe.each(Object.keys(PALETAS) as Tema[])('contraste del tema %s', (tema) => {
+  const paleta = PALETAS[tema]
+  const excepciones = EXCEPCIONES[tema]
+  const conocidos = PAIRS.filter((pair) => key(pair) in excepciones)
+  const exigidos = PAIRS.filter((pair) => !(key(pair) in excepciones))
 
   it.each(exigidos.map((pair) => [key(pair), pair] as const))(
     '%s llega al mínimo',
     (_name, pair) => {
-      const ratio = contrastRatio(colors[pair.fg], colors[pair.bg])
+      const ratio = contrastRatio(paleta[pair.fg], paleta[pair.bg])
       expect(
         ratio,
-        `${pair.fg} sobre ${pair.bg} (${pair.what}) da ${ratio.toFixed(2)}:1 y necesita ${pair.min}:1`,
+        `${pair.fg} sobre ${pair.bg} (${pair.what}) da ${ratio.toFixed(2)}:1 en el tema ${tema} ` +
+          `y necesita ${pair.min}:1`,
       ).toBeGreaterThanOrEqual(pair.min)
     },
   )
@@ -777,17 +1123,74 @@ describe('contraste del tema claro', () => {
   it.each(conocidos.map((pair) => [key(pair), pair] as const))(
     '%s sigue siendo una excepción conocida',
     (name, pair) => {
-      const esperado = KNOWN_FAILURES[name]
-      const ratio = contrastRatio(colors[pair.fg], colors[pair.bg])
+      const esperado = excepciones[name]
+      const ratio = contrastRatio(paleta[pair.fg], paleta[pair.bg])
       expect(
         Number(ratio.toFixed(2)),
-        `${name} cambió de ${esperado.ratio}:1 a ${ratio.toFixed(2)}:1. Si lo arreglaste, ` +
-          `borrá su entrada de KNOWN_FAILURES: la excepción ya no corresponde.`,
+        `${name} cambió de ${esperado.ratio}:1 a ${ratio.toFixed(2)}:1 en el tema ${tema}. Si lo ` +
+          `arreglaste, borrá su entrada: la excepción ya no corresponde.`,
       ).toBe(esperado.ratio)
       expect(
         ratio,
-        `${name} ya llega a ${pair.min}:1. Borrá su entrada de KNOWN_FAILURES.`,
+        `${name} ya llega a ${pair.min}:1 en el tema ${tema}. Borrá su entrada.`,
       ).toBeLessThan(pair.min)
     },
   )
+})
+
+/**
+ * El velo del modal, que es el único par que ningún par entre tokens puede medir: el sitio le
+ * pone la opacidad, así que lo que el ojo ve es una MEZCLA y no un token. Por eso `overlay`
+ * está en la lista de los que no se miden, y su justificación cita tres números.
+ *
+ * Hasta la segunda ronda de revisión esos tres números eran prosa suelta, y estaban mal en los
+ * tres archivos donde aparecían, cada uno de una forma distinta: se habían calculado a una
+ * opacidad que el componente ya no aplicaba. Acá se calculan, y de las dos fuentes que pueden
+ * cambiar: la opacidad sale del propio componente y los colores del CSS.
+ *
+ * Se compone sobre el LIENZO, que es lo que hay detrás de un modal abierto.
+ */
+describe('el velo del modal', () => {
+  const modal = readFileSync(join(process.cwd(), 'src', 'shared', 'ui', 'Modal.tsx'), 'utf8')
+  const opacidad = Number(/bg-overlay\/(\d{1,3})\b/.exec(modal)?.[1]) / 100
+
+  /** El velo sobre su fondo, en el espacio en el que el navegador mezcla: sRGB sin linealizar. */
+  function componer(frente: string, fondo: string, alfa: number): string {
+    const f = parseHex(frente)
+    const b = parseHex(fondo)
+    return toHex([0, 1, 2].map((i) => Math.round(f[i] * alfa + b[i] * (1 - alfa))) as unknown as ReturnType<typeof parseHex>)
+  }
+
+  it('la opacidad se pudo leer del componente', () => {
+    expect(opacidad, 'sin opacidad legible los números de abajo no miden nada').toBeGreaterThan(0)
+  })
+
+  it('en claro la tarjeta salta sola contra el velo', () => {
+    const velo = componer(colors.overlay, colors.canvas, opacidad)
+    expect(Number(contrastRatio(colors.surface, velo).toFixed(2))).toBe(4.83)
+  })
+
+  /**
+   * Y en oscuro no: el velo apaga un fondo que YA era oscuro, así que la tarjeta queda casi
+   * pegada a él. Lo que la recorta es su filete, y por eso el panel lleva uno. Este par de
+   * aserciones es la justificación de ese borde, medida: si algún día la tarjeta sola
+   * alcanzara, el borde pasaría a ser decorativo y esto lo diría.
+   */
+  it('en oscuro la tarjeta no alcanza y el filete es el que separa', () => {
+    const velo = componer(colorsOscuro.overlay, colorsOscuro.canvas, opacidad)
+    const tarjeta = Number(contrastRatio(colorsOscuro.surface, velo).toFixed(2))
+    const filete = Number(contrastRatio(colorsOscuro.border, velo).toFixed(2))
+    expect(tarjeta).toBe(1.25)
+    expect(filete).toBe(1.74)
+    expect(filete, 'si la tarjeta separara más que su filete, el filete sobraría').toBeGreaterThan(
+      tarjeta,
+    )
+  })
+
+  it('el panel lleva el filete que esos números justifican', () => {
+    expect(
+      modal,
+      'sin filete, en oscuro nada separa la tarjeta del velo',
+    ).toMatch(/border\s+border-border/)
+  })
 })

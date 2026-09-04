@@ -134,7 +134,7 @@ function EntryCancelForm({ onClose, invoice, onReloadRequested }: EntryCancelMod
           <button
             type="submit"
             disabled={isSubmitting || cancelInvoice.isPending || missingEtag}
-            className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-danger-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-flex items-center gap-2 rounded-lg bg-danger px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-danger-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-60"
           >
             {cancelInvoice.isPending && <Spinner size={16} label="Anulando" />}
             {cancelInvoice.isPending ? 'Anulando…' : 'Anular factura'}

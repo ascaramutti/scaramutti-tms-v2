@@ -18,10 +18,14 @@
  * en `theme-contrast.test.ts`.
  *
  * Y sobre el alcance, con precisión: esto compila `index.css` con el compilador
- * de Tailwind y la lista de clases que el escáner encuentra en `src/`. NO es el
- * bundle que Vite publica: que el pipeline invoque a este compilador no lo
- * afirma nada acá. Lo que sí vale es que las directivas y los comentarios no
- * sobreviven, y que las utilidades salen con la forma que van a tener.
+ * de Tailwind y la lista de clases que el escáner encuentra desde la RAÍZ del
+ * frontend, que es de donde las toma el build de verdad. Escanear solo `src/`
+ * dejaba afuera al `index.html` y a los archivos de configuración: la revisión
+ * midió que una variante que sigue al sistema operativo puesta en el `index.html`
+ * llegaba a la hoja publicada con todas las guardas en verde. NO es el bundle que
+ * Vite publica: que el pipeline invoque a este compilador no lo afirma nada acá.
+ * Lo que sí vale es que las directivas y los comentarios no sobreviven, y que las
+ * utilidades salen con la forma que van a tener.
  */
 import { readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
@@ -43,6 +47,13 @@ export interface CssCompilado {
    * archivo por nuestra cuenta.
    */
   fuentes: { base: string; pattern: string; negated: boolean }[]
+  /**
+   * Y los archivos que el escáner terminó leyendo, con las exclusiones ya
+   * aplicadas. Es el corpus real, y sirve para que una guarda que persigue clases
+   * escritas a mano no tenga que enumerarlo a mano: una lista escrita a mano
+   * envejece calladita, y lo que se le escapa se publica igual.
+   */
+  archivos: string[]
 }
 
 export async function compileGlobalCss(
@@ -64,15 +75,19 @@ export async function compileGlobalCss(
     },
   })
   // El escáner necesita una fuente positiva explícita: `compilador.sources` trae
-  // solo la negada de `@source not`, y sin nada positivo el barrido da cero.
+  // solo la negada de `@source not`, y sin nada positivo el barrido da cero. La
+  // raíz y no `src`, porque es lo que escanea el build: el `index.html` y los
+  // archivos de configuración publican una clase igual que un componente.
   const escaner = new Scanner({
     sources: [
-      { base: join(raizFrontend, 'src'), pattern: '**/*', negated: false },
+      { base: raizFrontend, pattern: '**/*', negated: false },
       ...compilador.sources,
     ],
   })
+  const clases = escaner.scan()
   return {
-    css: compilador.build([...escaner.scan(), ...clasesExtra]),
+    css: compilador.build([...clases, ...clasesExtra]),
     fuentes: compilador.sources,
+    archivos: escaner.files,
   }
 }

@@ -148,7 +148,7 @@ export function CargoTypeCreateModal({ initialName = '', onClose, onCreated }: C
             type="submit"
             variant="primary"
             disabled={isSubmitting}
-            className="gap-2 disabled:cursor-not-allowed disabled:bg-blue-300"
+            className="gap-2 disabled:cursor-not-allowed disabled:bg-accent-disabled"
           >
             {isSubmitting ? (
               <>
