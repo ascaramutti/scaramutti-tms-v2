@@ -58,7 +58,7 @@ export function CotizacionesListPage() {
           <button
             type="button"
             onClick={() => navigate('/cotizaciones/nueva')}
-            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2"
+            className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-canvas"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             Nueva cotización

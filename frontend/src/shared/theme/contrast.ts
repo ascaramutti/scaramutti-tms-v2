@@ -2,8 +2,8 @@
  * Contraste WCAG 2.1 entre dos colores sRGB.
  *
  * Vive en `src/` y no en el archivo de prueba porque la regla que mide (que un
- * texto se lea sobre su fondo) es del sistema de diseño, no del test. Cuando el
- * modo oscuro entre, el mismo cálculo va a medir sus pares.
+ * texto se lea sobre su fondo) es del sistema de diseño, no del test. El modo
+ * oscuro ya entró, y el mismo cálculo mide sus pares.
  *
  * Solo acepta `#rrggbb` y `#rgb`: los tokens del tema se escriben así a
  * propósito, para que esta medición no dependa de convertir espacios de color.

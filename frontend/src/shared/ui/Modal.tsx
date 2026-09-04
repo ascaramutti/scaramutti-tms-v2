@@ -87,14 +87,21 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-slate-900/50" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 bg-overlay/60" onClick={onClose} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
         onSubmit={(event) => event.stopPropagation()}
-        className={cn('relative w-full rounded-xl bg-surface shadow-xl', SIZES[size])}
+        // El filete NO es decorativo: en modo oscuro es lo único que separa la tarjeta del
+        // velo. El velo apaga el fondo, que en claro basta para que la tarjeta blanca salte
+        // (4.83), pero sobre un fondo ya oscuro no puede (1.25): ahí el límite lo pone este
+        // borde (1.74). Los tres salen de componer el velo a la opacidad que este archivo
+        // aplica y sobre el LIENZO, que es donde se dibuja, y los calcula la prueba del tema
+        // leyendo esa opacidad de acá: mientras eran prosa estuvieron mal en tres archivos a
+        // la vez, cada uno de una forma distinta.
+        className={cn('relative w-full rounded-xl border border-border bg-surface shadow-xl', SIZES[size])}
       >
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 id={titleId} className="text-lg font-semibold text-fg">

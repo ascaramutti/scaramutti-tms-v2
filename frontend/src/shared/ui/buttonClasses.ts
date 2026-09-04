@@ -12,11 +12,11 @@ const TAMANOS: Record<ButtonSize, string> = {
 
 const VARIANTES: Record<ButtonVariant, string> = {
   primary:
-    'bg-accent text-on-solid shadow-sm hover:bg-accent-hover focus:ring-focus focus:ring-offset-2',
+    'bg-accent text-on-solid shadow-sm hover:bg-accent-hover focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface',
   secondary:
     'border border-border-strong bg-surface text-fg-body hover:bg-surface-subtle focus:ring-focus',
   danger:
-    'bg-danger text-on-solid shadow-sm hover:bg-danger-hover focus:ring-danger focus:ring-offset-2',
+    'bg-danger text-on-solid shadow-sm hover:bg-danger-hover focus:ring-danger focus:ring-offset-2 focus:ring-offset-surface',
 }
 
 /**

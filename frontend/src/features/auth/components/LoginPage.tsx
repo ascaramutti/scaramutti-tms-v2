@@ -78,7 +78,7 @@ export function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-surface-subtle px-4 py-8">
       <section className="w-full max-w-md">
-        <div className="bg-surface rounded-2xl shadow-xl shadow-slate-200 ring-1 ring-border p-8">
+        <div className="bg-surface rounded-2xl shadow-xl shadow-elevation ring-1 ring-border p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <div className="bg-accent p-3 rounded-2xl shadow-md">
@@ -120,8 +120,8 @@ export function LoginPage() {
               className={cn(
                 'w-full inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm',
                 'bg-accent hover:bg-accent-hover active:bg-accent-hover',
-                'focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2',
-                'disabled:bg-blue-400 disabled:cursor-not-allowed',
+                'focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface',
+                'disabled:bg-accent-disabled disabled:cursor-not-allowed',
                 'transition-colors',
               )}
             >

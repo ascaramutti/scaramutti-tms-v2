@@ -121,7 +121,7 @@ export function StockFilterBar({
             type="button"
             onClick={() => set('lowOnly', false)}
             aria-label="Quitar filtro: solo stock bajo"
-            className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft-strong px-2.5 py-0.5 text-xs font-medium text-warning hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft-strong px-2.5 py-0.5 text-xs font-medium text-warning hover:bg-warning-soft-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Solo stock bajo
             <X className="h-3.5 w-3.5" aria-hidden="true" />

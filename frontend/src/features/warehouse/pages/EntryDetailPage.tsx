@@ -114,7 +114,7 @@ export function EntryDetailPage() {
             <div className="flex gap-2">
               <Link
                 to={`${ENTRIES_PATH}/${data.id}/editar`}
-                className="inline-flex items-center gap-2 rounded-lg border border-border-strong bg-surface px-4 py-2.5 text-sm font-medium text-fg-body shadow-sm hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2"
+                className="inline-flex items-center gap-2 rounded-lg border border-border-strong bg-surface px-4 py-2.5 text-sm font-medium text-fg-body shadow-sm hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <Pencil className="h-4 w-4" aria-hidden="true" />
                 Editar
@@ -122,7 +122,7 @@ export function EntryDetailPage() {
               <button
                 type="button"
                 onClick={() => setCancelOpen(true)}
-                className="inline-flex items-center gap-2 rounded-lg border border-danger-border bg-surface px-4 py-2.5 text-sm font-medium text-danger-fg shadow-sm hover:bg-danger-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2"
+                className="inline-flex items-center gap-2 rounded-lg border border-danger-border bg-surface px-4 py-2.5 text-sm font-medium text-danger-fg shadow-sm hover:bg-danger-soft focus:outline-none focus-visible:ring-2 focus-visible:ring-danger focus-visible:ring-offset-2 focus-visible:ring-offset-canvas"
               >
                 <Ban className="h-4 w-4" aria-hidden="true" />
                 Anular

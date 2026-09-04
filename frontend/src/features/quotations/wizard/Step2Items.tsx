@@ -98,7 +98,7 @@ export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootIte
           variant="primary"
           onClick={handleAdd}
           disabled={atMax}
-          className="gap-2 disabled:cursor-not-allowed disabled:bg-blue-300"
+          className="gap-2 disabled:cursor-not-allowed disabled:bg-accent-disabled"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Agregar ítem

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { Sidebar } from './Sidebar'
 import { AuthProvider } from '../auth/AuthContext'
+import { ThemeProvider } from '../ui/theme/ThemeContext'
 import { tokenStorage } from '../auth/tokenStorage'
 import { server } from '../../test/mocks/server'
 import type { UserResponse, UserRole } from '../../api'
@@ -32,11 +33,13 @@ function renderSidebarAs(role: UserRole, initialPath = '/cotizaciones') {
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={[initialPath]}>
-          <Sidebar />
-        </MemoryRouter>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={[initialPath]}>
+            <Sidebar />
+          </MemoryRouter>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   )
 }

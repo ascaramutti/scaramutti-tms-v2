@@ -78,7 +78,7 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
                 className={cn(
                   'absolute left-1/2 h-0.5 w-full',
                   CONNECTOR_TOP,
-                  status !== undefined ? 'bg-accent' : 'bg-slate-300',
+                  status !== undefined ? 'bg-accent' : 'bg-trace',
                 )}
               />
             )}

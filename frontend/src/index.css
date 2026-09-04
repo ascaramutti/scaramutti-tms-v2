@@ -128,16 +128,14 @@
      bg-emerald-100 y text-emerald-700 de Badge,
        y el text-emerald-700 del kardex           -> ~-success-soft, ~-success-fg
 
-   SIN TOKEN Y A PROPÓSITO: `disabled:bg-blue-300`, en CINCO lugares de producto:
-     `grep -rn "disabled:bg-blue-300" src --include=*.tsx | grep -v "\.test\."`. (Se filtran
-     las pruebas a propósito: cada aserción que cuida esa clase suma una línea, así que el
-     comando sin filtro devuelve un número que envejece con cada test nuevo.) Es el
-     relleno del primario deshabilitado y no hay token que lo cubra: el mapa no tiene un
-     `accent-disabled`, y agregarlo sin medir los otros deshabilitados sería inventar un
-     rol. Los otros deshabilitados usan TRES recetas de opacidad (`disabled:opacity-40`,
-     `-50` y `-60`) en 13 declaraciones, que son 16 sitios de aplicación porque tres
-     constantes `DISABLED` se aplican en seis lugares. Queda crudo hasta que el PR de los
-     colores sueltos mida las tres.
+   RESUELTO, y así se lee esta entrada: el relleno del primario deshabilitado estuvo crudo a
+     propósito mientras no hubiera con qué medirlo. La condición era mirarlo junto a los otros
+     deshabilitados en vez de inventarle un rol, y eso pasó en el PR del modo oscuro: los otros
+     usan TRES recetas de opacidad, que se quedan como están porque una opacidad es lo correcto
+     para un control inactivo, y los dos azules apagados que había (uno en los modales de alta al
+     vuelo y el asistente, otro más claro todavía en las pantallas de sesión) eran el único caso
+     que necesitaba valor propio por tema. Los dos pasaron a `accent-disabled`, que es el token
+     que aparece más abajo en este mismo archivo.
 
    LOS 81 USOS QUE CAMBIAN DE TONO al aplicar el mapa, con su antes y después. Las
    tres cifras de cada fila son la foto del PR 1, lo medido en la base del primer
@@ -213,8 +211,10 @@
    queda sin destino y mapearlo a danger sería cambio visual. Se nombra acá por la
    misma razón que el text-slate-300.
 
-   Un uso que se queda sin token y es correcto así: text-slate-300, una sola vez,
-   en el ícono de EmptyState.tsx:22, que es aria-hidden y por lo tanto decorativo.
+   Ese uso sin token también se resolvió en el PR del modo oscuro. El ícono decorativo pasó a
+   `trace`, el token del trazo que no es texto ni borde, junto con la línea que une dos pasos del
+   asistente. Sigue sin medirse contra un umbral, por la misma razón por la que no tenía token:
+   es decorativo y no comunica solo. Lo que le faltaba, y ahora tiene, es un valor por tema.
 
    Trece pares del tema claro quedan por debajo de su umbral de WCAG AA (4.5:1
    los de texto, 3:1 los de elemento de interfaz). Nueve son anteriores a este
@@ -272,6 +272,13 @@
      antes que tono crudo o prestado. */
   --color-accent-border: #8ec5ff; /* blue-300  */
   --color-on-solid: #ffffff;      /* white     */
+  /* El relleno del primario APAGADO. Unifica los dos tonos que convivían para el mismo rol,
+     uno en los cinco modales de alta al vuelo y otro en las dos pantallas de sesión. Se
+     eligió el más oscuro de los dos: con el otro, el texto encima daba 1.81 y el botón que
+     el usuario está esperando no se leía. WCAG exime los controles inactivos, así que no es
+     un incumplimiento, pero un estado que no se lee no es un estado. Ruling del dueño
+     2026-09-04. */
+  --color-accent-disabled: #51a2ff; /* blue-400 */
 
   /* Anillo de foco. Separado del acento porque el foco tiene que poder subir de
      contraste sin que cambie el color de los botones. */
@@ -340,6 +347,125 @@
   --color-success-soft: #d0fae5;  /* emerald-100 */
   --color-success-fg: #007a55;    /* emerald-700 */
   --color-success-border: #a4f4cf;/* emerald-200 */
+
+  /* Tres roles que no son ni texto, ni relleno de estado, ni borde, y que hasta este PR
+     vivían escritos a mano porque prestarles el token de otro rol es lo que este archivo
+     rechaza desde el principio. Los tres necesitan un valor propio en oscuro, que es lo que
+     los trajo acá. Ruling del dueño 2026-09-04. */
+  /* El velo que apaga el fondo detrás de un modal. En claro la tarjeta blanca salta contra
+     él (4.83); en oscuro NINGÚN velo llega a eso, porque el fondo ya es oscuro, y lo que
+     recorta la tarjeta pasa a ser su borde (1.74 contra el velo). Se acepta con ese número
+     a la vista. La opacidad la pone el sitio, no el token.
+
+     Y esto SÍ cambia el tema claro, que es la excepción a la regla de que el barrido no
+     mueve un pixel: el sitio pasa de aplicar la mitad a aplicar tres quintos, así que el
+     velo de todos los modales queda un paso más oscuro y la tarjeta separa 4.83 donde antes
+     separaba 3.54. Es la segunda de las dos sustituciones que cambian el aspecto del claro,
+     junto con el primario apagado, y va con el mismo ruling del dueño de esa fecha: el
+     documento de diseño había razonado el velo a esa opacidad y el código embarcaba la
+     anterior, así que los números que se habían dado eran de otro velo que el que se veía. */
+  --color-overlay: #0f172b;       /* slate-900 */
+  /* La sombra de una tarjeta elevada. Un solo uso hoy, el de la pantalla de ingreso, que
+     además ya lleva un filete: la sombra acompaña. */
+  --color-elevation: #e2e8f0;        /* slate-200 */
+  /* El relleno del chip de filtro cuando el mouse está encima, un paso por encima de su
+     relleno en reposo. */
+  --color-warning-soft-hover: #fee685; /* amber-200 */
+  /* El trazo decorativo que no es texto ni borde: el ícono de una pantalla sin datos y la
+     línea que une dos pasos del asistente. Los dos hacen lo mismo y por eso comparten
+     token. */
+  --color-trace: #cad5e2;         /* slate-300 */
+}
+
+/* ============================================================================
+   EL TEMA OSCURO.
+
+   Redefine las MISMAS 45 variables, y nada más: ni una utilidad, ni una regla
+   de componente, ni una variante en el marcado. Por eso el modo oscuro no
+   agrega una sola clase a ningún archivo de `src`.
+
+   Va como selector de atributo y NO como un segundo `@theme`: un segundo bloque
+   de tema no redefine al primero, lo pelea, y `@theme inline` hornearía el valor
+   en cada utilidad y dejaría el atributo sin efecto. Acá son variables CSS
+   comunes, que es exactamente lo que la cascada sabe resolver.
+
+   `color-scheme` no es decorativo: sin él el navegador pinta con el tema claro
+   todo lo que no controlamos, y en esta aplicación eso incluye las barras de
+   desplazamiento, el autocompletado y los selectores nativos de fecha, que se
+   usan en varios formularios. Quedan blancos sobre fondo oscuro y se leen como
+   un defecto.
+
+   Los valores no se eligieron acá: son los que el dueño aprobó mirando el
+   prototipo, y están en la tabla de la sección 2.2 del documento de diseño con
+   su color de partida. Medidos los 72 pares del tema contra esta paleta: NINGUNO
+   empeora respecto del tema claro al punto de romper un mínimo que hoy cumple, y
+   DOCE de las veintiuna excepciones conocidas del tema claro pasan a cumplir, entre
+   ellas el texto de sugerencia de los campos, que es el peor par de TEXTO sobre
+   superficie del tema claro (2.63) y en oscuro llega a 5.25. El detalle, par por
+   par, está en la prueba de contraste, que los mide en los dos temas.
+
+   Los números de este comentario salen de correr, desde `frontend/`:
+   `npx vitest run src/shared/theme/theme-contrast.test.ts`, cuyas listas congeladas
+   son las que los fijan. La primera versión decía 40, 68, diez y dieciocho: cuatro
+   conteos escritos de memoria, los cuatro mal, y los levantó la revisión. Los dos
+   últimos volvieron a moverse cuando una ronda posterior encontró un par de texto
+   que ninguna lista tenía y entró con su excepción: por eso se miden, no se recuerdan.
+   ============================================================================ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-canvas: #0b1626;
+  --color-surface: #132238;
+  --color-surface-subtle: #16273f;
+  --color-surface-muted: #1b2f4a;
+  --color-fg: #eef3fa;
+  --color-fg-body: #cfdbeb;
+  --color-fg-muted: #a4b6d0;
+  --color-fg-subtle: #8195b4;
+  --color-border: #263a58;
+  --color-border-strong: #526f9c;
+  --color-accent: #5b9bff;
+  --color-accent-hover: #7cb0ff;
+  --color-accent-soft: #12294a;
+  --color-accent-soft-strong: #0e2036;
+  --color-accent-border: #1e4976;
+  --color-on-solid: #08121f;
+  /* El foco NO comparte valor con el hover del acento, que es lo que pasaba con el valor de
+     la tabla original: los dos daban #7cb0ff y un anillo sobre un relleno de ese tono se
+     pierde. Este reproduce la separación que el tema claro ya tiene entre esos dos roles
+     (1.81 acá, 1.82 en claro). Ruling del dueño 2026-09-04, tras la revisión. */
+  --color-focus: #dbeafe;
+  --color-danger: #f87171;
+  --color-danger-hover: #fca5a5;
+  --color-danger-soft: #3a1620;
+  --color-danger-soft-strong: #310c10;
+  --color-danger-fg: #fca5a5;
+  --color-danger-border: #7f2436;
+  --color-danger-border-strong: #d4667c;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #3a2a10;
+  --color-warning-soft-strong: #4a3614;
+  --color-warning-fg: #fcd34d;
+  --color-warning-border: #6b4f18;
+  --color-warning-border-strong: #8a6a1c;
+  --color-progress-soft: #251f3a;
+  --color-progress-fg: #c4b4ff;
+  --color-transition-soft: #00312d;
+  --color-transition: #46ecd5;
+  --color-transition-hover: #96f7e4;
+  --color-transition-fg: #46ecd5;
+  --color-success: #34d399;
+  --color-success-soft: #0d2f27;
+  --color-success-fg: #6ee7b7;
+  --color-success-border: #1c5c46;
+
+  --color-accent-disabled: #4c74a5;
+  /* Negro y no el gris de texto: en oscuro el velo tiene que RESTAR luz, y el tono del texto
+     sobre un lienzo ya oscuro no resta nada (1.01 de separación, medido). */
+  --color-overlay: #000000;
+  --color-elevation: #000000;
+  --color-warning-soft-hover: #6b4f1d;
+  --color-trace: #44577a;
 }
 
 @layer base {

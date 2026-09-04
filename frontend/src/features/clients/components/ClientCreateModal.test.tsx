@@ -122,12 +122,12 @@ describe('ClientCreateModal', () => {
   })
 
   it('el botón de crear trae la clase que lo apaga cuando queda deshabilitado', () => {
-    // La clase que lo apaga (`disabled:bg-blue-300`) vivía dentro de la constante y se
+    // La clase que lo apaga vivía dentro de la constante y se
     // aplicaba entera; ahora es una prop aparte del componente compartido. Sin esta línea,
     // soltarla dejaba el botón apagado para el DOM y encendido para el ojo.
     renderModal()
     expect(screen.getByRole('button', { name: /crear cliente/i }).className).toContain(
-      'disabled:bg-blue-300',
+      'disabled:bg-accent-disabled',
     )
   })
 

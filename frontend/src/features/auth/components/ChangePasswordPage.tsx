@@ -125,7 +125,7 @@ export function ChangePasswordPage() {
               type="button"
               onClick={goToLanding}
               disabled={isPending}
-              className="px-4 py-2.5 text-sm font-medium text-fg-body rounded-lg hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2.5 text-sm font-medium text-fg-body rounded-lg hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>
@@ -135,8 +135,8 @@ export function ChangePasswordPage() {
               className={cn(
                 'inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm',
                 'bg-accent hover:bg-accent-hover active:bg-accent-hover',
-                'focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2',
-                'disabled:bg-blue-400 disabled:cursor-not-allowed',
+                'focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface',
+                'disabled:bg-accent-disabled disabled:cursor-not-allowed',
                 'transition-colors',
               )}
             >

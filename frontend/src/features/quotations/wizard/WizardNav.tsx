@@ -15,7 +15,7 @@ interface WizardNavProps {
 }
 
 const PRIMARY =
-  'inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300'
+  'inline-flex items-center gap-2 rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-canvas disabled:cursor-not-allowed disabled:bg-accent-disabled'
 const SECONDARY =
   'inline-flex items-center rounded-lg border border-border-strong bg-surface px-5 py-2.5 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus:ring-2 focus:ring-focus'
 

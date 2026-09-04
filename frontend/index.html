@@ -11,6 +11,40 @@
       rel="stylesheet"
     />
     <title>Scaramutti TMS v2</title>
+    <!--
+      El tema se escribe ANTES de que React monte. Si esto viviera en un efecto, cada carga
+      empezaría en claro y corregiría después: un destello blanco, que de noche es justo lo
+      que molesta. Es sincrónico y sin dependencias a propósito.
+
+      Repite la precedencia de `themeStorage.ts` (elección guardada, preferencia del sistema,
+      claro) porque corre antes de que exista un módulo. Si una cambia, cambian las dos; hay
+      una prueba que compara las dos fuentes para que no se separen.
+    -->
+    <script>
+      (function () {
+        try {
+          var elegido = null
+          try {
+            elegido = window.localStorage.getItem('scaramutti.theme')
+          } catch (e) {
+            // Un almacenamiento bloqueado no es una elección: se sigue de largo hacia la
+            // preferencia del sistema, igual que el módulo. Si este catch abarcara también al
+            // `matchMedia`, quien navega con el almacenamiento bloqueado y el sistema en oscuro
+            // recibiría la primera pintura en claro y una corrección al montar, que es
+            // exactamente el destello que este script existe para evitar.
+          }
+          var tema =
+            elegido === 'light' || elegido === 'dark'
+              ? elegido
+              : window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+                ? 'dark'
+                : 'light'
+          document.documentElement.setAttribute('data-theme', tema)
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'light')
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

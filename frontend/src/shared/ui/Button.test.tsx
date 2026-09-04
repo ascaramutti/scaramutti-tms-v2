@@ -28,13 +28,13 @@ import { buttonClasses } from './buttonClasses'
 const ESPERADAS = {
   primary:
     'inline-flex items-center rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-solid ' +
-    'shadow-sm hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2',
+    'shadow-sm hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface',
   secondary:
     'inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 ' +
     'text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus:ring-2 focus:ring-focus',
   danger:
     'inline-flex items-center rounded-lg bg-danger px-4 py-2 text-sm font-medium text-on-solid ' +
-    'shadow-sm hover:bg-danger-hover focus:outline-none focus:ring-2 focus:ring-danger focus:ring-offset-2',
+    'shadow-sm hover:bg-danger-hover focus:outline-none focus:ring-2 focus:ring-danger focus:ring-offset-2 focus:ring-offset-surface',
 } as const
 
 const clases = (el: HTMLElement) => new Set(el.className.split(/\s+/).filter(Boolean))
@@ -98,9 +98,9 @@ describe('Button · las clases son las de las constantes que reemplaza', () => {
       // comentarios, y nombrar una utilidad que el código no usa la publica en el CSS. Pasó
       // con la primera redacción de este bloque: cinco reglas muertas en el bundle.
       //
-      // Es del componente, no del `<button>` que llega al DOM: cuatro llamadores pasan
-      // `disabled:bg-blue-300` por `className` y siguen crudos a propósito (no hay token
-      // para blue-300 y agregarlo sería un cambio de tono).
+      // Es del componente, no del `<button>` que llega al DOM: varios llamadores pasan el
+      // relleno del apagado por `className`. Desde el PR del modo oscuro ese relleno tiene
+      // su token, así que ya no queda ningún color suelto ahí.
       const TOKENS = [
         'accent', 'accent-hover', 'accent-soft', 'danger', 'danger-hover', 'focus',
         'fg-body', 'on-solid', 'surface', 'surface-subtle', 'border-strong',

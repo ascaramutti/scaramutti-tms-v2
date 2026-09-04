@@ -320,7 +320,7 @@ describe('EntryCreatePage', () => {
     // El botón trae la clase que lo apaga mientras envía: pasó de vivir dentro de la
     // constante a ser una prop suelta del componente compartido.
     expect(screen.getByRole('button', { name: /crear proveedor/i }).className).toContain(
-      'disabled:bg-blue-300',
+      'disabled:bg-accent-disabled',
     )
     await user.click(screen.getByRole('button', { name: /crear proveedor/i }))
     await waitFor(() => expect(sink.body).toEqual({

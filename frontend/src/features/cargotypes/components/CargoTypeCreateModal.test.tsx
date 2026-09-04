@@ -42,7 +42,7 @@ describe('CargoTypeCreateModal', () => {
     // botón quedaría deshabilitado para el DOM y encendido para el ojo.
     renderModal()
     expect(screen.getByRole('button', { name: /crear tipo de carga/i }).className).toContain(
-      'disabled:bg-blue-300',
+      'disabled:bg-accent-disabled',
     )
   })
 
