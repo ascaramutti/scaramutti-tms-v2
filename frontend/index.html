@@ -12,6 +12,15 @@
     />
     <title>Scaramutti TMS v2</title>
     <!--
+      El color de la barra del navegador en el móvil. NO se declara con dos etiquetas y una
+      consulta de preferencia del sistema, que es como suele hacerse: eso sigue al sistema
+      operativo y le pasa por encima a lo que el usuario eligió, que es justo lo que este
+      tema no hace en ningún otro lado. Lo escribe el script de abajo con el tema ya
+      resuelto, y lo vuelve a escribir el proveedor cuando el usuario toca el interruptor.
+      El valor es el del fondo de página de cada tema; hay una prueba que lo ata a él.
+    -->
+    <meta name="theme-color" content="#f8fafc" />
+    <!--
       El tema se escribe ANTES de que React monte. Si esto viviera en un efecto, cada carga
       empezaría en claro y corregiría después: un destello blanco, que de noche es justo lo
       que molesta. Es sincrónico y sin dependencias a propósito.
@@ -40,6 +49,8 @@
                 ? 'dark'
                 : 'light'
           document.documentElement.setAttribute('data-theme', tema)
+          var barra = document.querySelector('meta[name="theme-color"]')
+          if (barra) barra.setAttribute('content', tema === 'dark' ? '#0b1626' : '#f8fafc')
         } catch (e) {
           document.documentElement.setAttribute('data-theme', 'light')
         }

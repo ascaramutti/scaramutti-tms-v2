@@ -194,6 +194,50 @@ describe('el interruptor', () => {
   })
 })
 
+/**
+ * La barra del navegador en el móvil. Vive fuera de la página, así que ninguna hoja de estilos la
+ * alcanza: la escribe el atributo de una etiqueta, y por eso hace falta código. El valor sale del
+ * token del fondo de página ya resuelto y no de un literal, para que no se separe del tema.
+ *
+ * La suite corre con el CSS apagado, así que el token no está calculado: se le pone a mano el
+ * valor que tendría, que es lo que permite medir el mecanismo sin depender de la hoja.
+ */
+describe('el color de la barra del navegador', () => {
+  it('sigue al tema que el usuario elige', async () => {
+    const meta = document.createElement('meta')
+    meta.setAttribute('name', 'theme-color')
+    meta.setAttribute('content', '#f8fafc')
+    document.head.appendChild(meta)
+    document.documentElement.style.setProperty('--color-canvas', '#0b1626')
+    fingirSistema(false)
+    render(
+      <ThemeProvider>
+        <Sonda />
+      </ThemeProvider>,
+    )
+
+    await userEvent.click(screen.getByRole('button'))
+
+    expect(meta.getAttribute('content'), 'la barra se quedó con el color del tema anterior').toBe(
+      '#0b1626',
+    )
+    document.documentElement.style.removeProperty('--color-canvas')
+    meta.remove()
+  })
+
+  it('no rompe cuando el documento no trae la etiqueta', () => {
+    expect(document.querySelector('meta[name="theme-color"]')).toBeNull()
+    fingirSistema(true)
+    expect(() =>
+      render(
+        <ThemeProvider>
+          <Sonda />
+        </ThemeProvider>,
+      ),
+    ).not.toThrow()
+  })
+})
+
 describe('la persistencia', () => {
   it('la elección sobrevive a recargar', async () => {
     fingirSistema(false)
@@ -261,6 +305,8 @@ describe('el script que evita el destello', () => {
    */
   describe('la precedencia de la copia, ejecutada', () => {
     const cuerpo = /<script>([\s\S]*?)<\/script>/.exec(html)?.[1] ?? ''
+    /** Lo último que el script escribe en la barra del navegador, para poder afirmarlo. */
+    let pintado: string | null = null
 
     /** `'lanza'` es el almacenamiento bloqueado: cookies apagadas o `dom.storage` en falso. */
     type Guardado = string | null | 'lanza'
@@ -268,6 +314,7 @@ describe('el script que evita el destello', () => {
 
     function correr(guardado: Guardado, sistemaOscuro: Sistema) {
       let escrito: string | null = null
+      const barra = { setAttribute: (_: string, v: string) => (pintado = v) }
       const ventana = {
         localStorage: {
           getItem: () => {
@@ -277,13 +324,30 @@ describe('el script que evita el destello', () => {
         },
         matchMedia: sistemaOscuro === 'sin matchMedia' ? undefined : () => ({ matches: sistemaOscuro }),
       }
-      const documento = { documentElement: { setAttribute: (_: string, v: string) => (escrito = v) } }
+      // `querySelector` incluido: el script también escribe el color de la barra del navegador,
+      // y sin él la copia lanza y estas pruebas medirían el `catch` en vez del camino bueno.
+      const documento = {
+        documentElement: { setAttribute: (_: string, v: string) => (escrito = v) },
+        querySelector: () => barra,
+      }
       new Function('window', 'document', cuerpo)(ventana, documento)
       return escrito
     }
 
     it('el cuerpo del script se pudo extraer', () => {
       expect(cuerpo).toContain('scaramutti.theme')
+    })
+
+    /**
+     * Y que pinte la barra del navegador en la primera carga, no solo al montar React: si esperara
+     * al proveedor, quien abre la aplicación en oscuro desde el móvil ve la barra clara hasta que
+     * la aplicación monta, que es el mismo destello que este script existe para evitar.
+     */
+    it('pinta la barra del navegador con el tema resuelto', () => {
+      correr('dark', false)
+      expect(pintado).toBe('#0b1626')
+      correr('light', true)
+      expect(pintado).toBe('#f8fafc')
     })
 
     it('lo guardado le gana al sistema', () => {

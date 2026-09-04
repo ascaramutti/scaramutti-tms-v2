@@ -138,7 +138,7 @@ export function OpeningBalanceForm({ onCreated }: OpeningBalanceFormProps) {
               <p role="alert" className="mt-1 text-xs text-fg-muted">
                 <Link
                   to={`/cotizaciones/almacen/productos/${productWithMovements.id}`}
-                  className="font-medium text-accent-hover underline underline-offset-2 hover:no-underline"
+                  className="font-medium text-accent-hover underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   Ver el kardex de {productWithMovements.name}
                 </Link>

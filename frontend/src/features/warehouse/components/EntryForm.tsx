@@ -239,7 +239,7 @@ export function EntryForm(props: EntryFormProps) {
             <button
               type="button"
               onClick={props.onReloadRequested}
-              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
+              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Descartar y recargar
             </button>

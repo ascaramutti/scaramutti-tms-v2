@@ -4,6 +4,7 @@ import { SessionLoading } from './SessionLoading'
 import { useAuth } from './AuthContext'
 import { landingLabelFor, landingPathFor } from './roleLanding'
 import type { UserRole } from '../../api'
+import { cn } from '../utils/cn'
 
 interface ProtectedRouteProps {
   children: ReactNode
@@ -62,7 +63,7 @@ function AccessDenied({
         </p>
         {/* Todos los landings viven en esta SPA: navega el router, sin
             recargar la app entera para cambiar de módulo. */}
-        <Link to={landing} className={exitLinkClasses}>
+        <Link to={landing} className={cn(exitLinkClasses, 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-surface')}>
           {label}
         </Link>
       </div>

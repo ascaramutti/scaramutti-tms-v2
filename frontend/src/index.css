@@ -468,6 +468,22 @@
   --color-trace: #44577a;
 }
 
+/* El modo de alto contraste del sistema operativo, que es el único que la aplicación no controla.
+   Ahí el navegador fuerza `box-shadow: none`, así que **todo anillo de foco desaparece**; y el
+   `outline-style: none` que cada control declara para no ver dos marcas a la vez SOBREVIVE. El
+   resultado sin esta regla es el peor de los dos mundos: los controles se quedan sin ninguna señal
+   de foco justo en el modo que existe para que las señales se vean.
+
+   Va por elemento enfocado y no sitio por sitio a propósito: hay 81 declaraciones de `outline-none`
+   en el árbol y esta regla las cubre a todas, incluidas las que se escriban mañana. El color es una
+   palabra del sistema, no un token: en este modo el navegador ignora los colores del autor. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
+}
+
 @layer base {
   html {
     font-family: var(--font-sans);

@@ -52,6 +52,7 @@ export function SidebarNavItem({ icon: Icon, label, to, activeWhen }: SidebarNav
         to={to}
         aria-current={isActive ? 'page' : undefined}
         className={cn(
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
           baseClasses,
           isActive
             ? 'bg-accent-soft text-accent-hover'

@@ -169,7 +169,7 @@ export function ItemCard({
           type="button"
           onClick={onRemove}
           aria-label={`Eliminar ítem ${position}`}
-          className="shrink-0 text-fg-subtle hover:text-danger"
+          className="shrink-0 text-fg-subtle hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
