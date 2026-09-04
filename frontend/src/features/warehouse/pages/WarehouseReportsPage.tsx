@@ -74,7 +74,7 @@ export function WarehouseReportsPage() {
           <button
             type="button"
             onClick={() => refetch()}
-            className="shrink-0 font-medium text-danger-fg underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-danger-fg underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Reintentar
           </button>
@@ -101,7 +101,11 @@ export function WarehouseReportsPage() {
         // El panel no tiene contenido enfocable propio: sin esto, el teclado no
         // puede alcanzar los resultados desde el tablist.
         tabIndex={0}
-        className="space-y-6"
+        // Contorno y no anillo, por el mismo motivo que la fila de una tabla: un anillo es una
+        // sombra, y una sombra hacia adentro se pinta debajo del fondo de los hijos. Los de este
+        // panel son tarjetas opacas a todo el ancho, así que del anillo solo sobrevivirían la
+        // línea de arriba y los pedacitos entre tarjeta y tarjeta. El contorno se pinta después.
+        className="space-y-6 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
       >
         {isLoading ? (
           <div className="flex justify-center py-16">

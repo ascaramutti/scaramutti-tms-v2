@@ -53,7 +53,19 @@ export function resolveTheme(): Theme {
   return themeStorage.get() ?? systemTheme() ?? 'light'
 }
 
-/** Escribe el atributo en el documento. Es lo único que hace visible un cambio de tema. */
+/**
+ * Escribe el atributo en el documento. Es lo único que hace visible un cambio de tema.
+ *
+ * Y de paso el color de la barra del navegador en el móvil, que vive fuera de la página y no lo
+ * alcanza ninguna hoja de estilos. El valor NO se escribe a mano acá: se lee del token del fondo
+ * de página ya resuelto, así que cambiar el tema en el CSS lo cambia también en la barra. El
+ * script del `head` sí lo lleva escrito, porque corre antes de que exista un módulo, y hay una
+ * prueba que ata esos dos literales a estos tokens.
+ */
 export function applyTheme(theme: Theme): void {
   document.documentElement.setAttribute(THEME_ATTRIBUTE, theme)
+  const barra = document.querySelector('meta[name="theme-color"]')
+  if (!barra) return
+  const fondo = getComputedStyle(document.documentElement).getPropertyValue('--color-canvas').trim()
+  if (fondo) barra.setAttribute('content', fondo)
 }

@@ -45,7 +45,7 @@ export function SidebarFooter() {
         type="button"
         onClick={toggleTheme}
         aria-pressed={oscuro}
-        className="w-full inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-fg-body hover:bg-surface-muted hover:text-fg transition-colors"
+        className="w-full inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-fg-body hover:bg-surface-muted hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         {oscuro ? (
           <Sun className="w-4 h-4" aria-hidden="true" />
@@ -57,7 +57,7 @@ export function SidebarFooter() {
       <button
         type="button"
         onClick={clearSession}
-        className="w-full inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-fg-body hover:bg-surface-muted hover:text-fg transition-colors"
+        className="w-full inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-fg-body hover:bg-surface-muted hover:text-fg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
       >
         <LogOut className="w-4 h-4" aria-hidden="true" />
         Cerrar sesión

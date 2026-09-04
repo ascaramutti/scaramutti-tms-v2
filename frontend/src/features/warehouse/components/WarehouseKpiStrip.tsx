@@ -44,7 +44,7 @@ export function WarehouseKpiStrip({
             // Nombre propio: si el listado también falla, su botón "Reintentar"
             // queda en la misma pantalla y serían dos nombres idénticos.
             aria-label="Reintentar cargar los indicadores"
-            className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Reintentar
           </button>

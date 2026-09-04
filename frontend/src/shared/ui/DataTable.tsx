@@ -131,7 +131,7 @@ export function DataTable<T>({
             <button
               type="button"
               onClick={onRetry}
-              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline"
+              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Reintentar
             </button>
@@ -164,8 +164,17 @@ export function DataTable<T>({
                 <tr
                   key={keyExtractor(row)}
                   className={cn(
+                    // El foco de la fila va por CONTORNO y no por anillo: la tabla se dibuja con
+                    // los bordes colapsados, y con eso la sombra de un anillo no se pinta sobre
+                    // una fila. El contorno sí, y de hecho el navegador lo dibujaba acá hasta que
+                    // alguien lo apagó dejando como única señal un tinte de fondo que no se ve.
+                    // Va hacia adentro para que el contenedor no lo recorte: la tabla vive dentro de
+                    // un desbordamiento horizontal, y basta con que UN eje deje de ser visible para
+                    // que el otro tampoco lo sea, así que la primera y la última fila perderían el
+                    // tramo de arriba y el de abajo.
                     clickable &&
-                      'cursor-pointer hover:bg-surface-subtle focus:bg-surface-subtle focus:outline-none',
+                      'cursor-pointer hover:bg-surface-subtle focus-visible:bg-surface-subtle ' +
+                  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus',
                   )}
                   onClick={clickable ? () => onRowClick(row) : undefined}
                   onKeyDown={
@@ -218,7 +227,7 @@ export function DataTable<T>({
                 onClick={() => onPageChange(page - 1)}
                 disabled={isFirst}
                 aria-label="Página anterior"
-                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -227,7 +236,7 @@ export function DataTable<T>({
                 onClick={() => onPageChange(page + 1)}
                 disabled={isLast}
                 aria-label="Página siguiente"
-                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <ChevronRight className="h-5 w-5" aria-hidden="true" />
               </button>

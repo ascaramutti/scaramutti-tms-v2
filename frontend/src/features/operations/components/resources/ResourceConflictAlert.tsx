@@ -136,7 +136,7 @@ export function ResourceConflictAlert({
               onClick={onForce}
               disabled={isPending}
               aria-describedby={forceConsequence ? FORCE_CONSEQUENCE_ID : undefined}
-              className="mt-3 rounded-lg border border-warning-border-strong bg-surface px-3 py-1.5 text-xs font-medium text-warning-fg hover:bg-warning-soft-strong disabled:opacity-50"
+              className="mt-3 rounded-lg border border-warning-border-strong bg-surface px-3 py-1.5 text-xs font-medium text-warning-fg hover:bg-warning-soft-strong disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {forceLabel}
             </button>

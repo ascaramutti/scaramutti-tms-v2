@@ -111,7 +111,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
             type="button"
             onClick={onClose}
             aria-label="Cerrar"
-            className="text-fg-subtle hover:text-fg-body"
+            className="text-fg-subtle hover:text-fg-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             <X className="h-5 w-5" aria-hidden="true" />
           </button>

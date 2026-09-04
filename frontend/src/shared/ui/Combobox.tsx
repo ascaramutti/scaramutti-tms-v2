@@ -187,7 +187,7 @@ export function Combobox({
                 type="button"
                 onClick={clearSelection}
                 aria-label="Quitar selección"
-                className="text-fg-subtle hover:text-fg-body"
+                className="text-fg-subtle hover:text-fg-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
               </button>
@@ -265,6 +265,7 @@ export function Combobox({
                   onClick={() => select(option)}
                   onMouseEnter={() => setHighlighted(index)}
                   className={cn(
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
                     'w-full px-3.5 py-2.5 text-left text-sm hover:bg-surface-subtle',
                     index === highlighted && 'bg-surface-muted',
                   )}
@@ -285,6 +286,7 @@ export function Combobox({
                   }}
                   onMouseEnter={() => setHighlighted(options.length)}
                   className={cn(
+                    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-focus',
                     'flex w-full items-center gap-1.5 border-t border-border px-3.5 py-2.5 text-left text-sm font-medium text-accent-hover hover:bg-surface-subtle',
                     highlighted === options.length && 'bg-surface-muted',
                   )}

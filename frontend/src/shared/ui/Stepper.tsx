@@ -89,6 +89,7 @@ export function Stepper({ steps, currentStep, stepStatus = {}, onStepClick }: St
               aria-current={isActive ? 'step' : undefined}
               aria-label={stateLabel ? `${accessibleLabel}${stateLabel}` : undefined}
               className={cn(
+                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
                 'relative z-10 flex w-full flex-col items-center bg-transparent',
                 isClickable ? 'cursor-pointer' : 'cursor-default',
               )}

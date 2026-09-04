@@ -133,6 +133,15 @@ const PAIRS: Pair[] = [
   { fg: 'transition-fg', bg: 'transition-soft', min: AA_TEXT, what: 'texto de la pastilla de la cotización aceptada y del cambio de estado en la bitácora' },
   { fg: 'focus', bg: 'surface', min: AA_NON_TEXT, what: 'anillo de foco sobre tarjeta' },
   { fg: 'focus', bg: 'canvas', min: AA_NON_TEXT, what: 'anillo de foco sobre el fondo' },
+  // Los seis fondos que el anillo toca de verdad y que nadie medía. Los levantó la revisión del PR
+  // del foco de teclado: la lista tenía los dos obvios, y el par que sostiene el arreglo principal
+  // (el contorno de la fila enfocada, que cae sobre el realce y no sobre la tarjeta) no estaba.
+  { fg: 'focus', bg: 'surface-subtle', min: AA_NON_TEXT, what: 'el contorno de la fila enfocada, que cae sobre su propio realce' },
+  { fg: 'focus', bg: 'surface-muted', min: AA_NON_TEXT, what: 'el anillo de la opción resaltada del combo' },
+  { fg: 'focus', bg: 'accent-soft', min: AA_NON_TEXT, what: 'el anillo del ítem activo de la barra de navegación' },
+  { fg: 'focus', bg: 'warning-soft', min: AA_NON_TEXT, what: 'el anillo de los botones de texto dentro de un aviso ámbar' },
+  { fg: 'focus', bg: 'danger-soft', min: AA_NON_TEXT, what: 'el anillo del botón de texto dentro de un aviso rojo' },
+  { fg: 'focus', bg: 'warning-soft-strong', min: AA_NON_TEXT, what: 'el anillo del botón de forzar, enfocado y con el mouse encima: el par más ajustado del foco' },
   { fg: 'border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'borde del input sobre tarjeta' },
 ]
 
@@ -211,10 +220,12 @@ const EXCEPCIONES_CLARO: Record<string, { ratio: number; note: string }> = {
   'surface-subtle/surface': {
     ratio: 1.05,
     note:
-      'El realce de la fila clickeable de DataTable.tsx:170-186 es también su ÚNICO indicador de ' +
-      'foco de teclado, porque la fila lleva focus:outline-none. A 1.05 no se ve. Quien elija el ' +
-      'valor oscuro de este token tiene que saber que está eligiendo un indicador de foco, no un ' +
-      'realce cosmético.',
+      'El realce de la fila clickeable con el mouse encima, y también cuando el teclado la ' +
+      'alcanza. A 1.05 no se distingue de la fila en reposo, y durante un tiempo fue la ÚNICA ' +
+      'señal de foco que la fila tenía, porque además apagaba el contorno del navegador: el ' +
+      'teclado no podía usarse. Eso se arregló dándole contorno propio con el token de foco, que ' +
+      'sí se mide, así que hoy este par vuelve a ser lo que siempre debió ser, un realce ' +
+      'decorativo que acompaña.',
   },
   'danger-border/surface': {
     ratio: 1.45,
@@ -373,9 +384,9 @@ const EXCEPCIONES_OSCURO: Record<string, { ratio: number; note: string }> = {
   'surface-subtle/surface': {
     ratio: 1.06,
     note:
-      'El realce de la fila clickeable, que también es su único indicador de foco de teclado. ' +
-      'En claro da 1.05: el tema oscuro no lo arregla ni lo empeora, y quien elija cambiarlo ' +
-      'tiene que saber que está eligiendo un indicador de foco.',
+      'El realce de la fila clickeable, que acompaña al contorno de foco sin ser él. En claro da ' +
+      '1.05: el tema oscuro no lo arregla ni lo empeora, y no hace falta que lo arregle, porque ' +
+      'lo que señala el foco es el contorno y ese sí se mide.',
   },
   'danger-border/surface': {
     ratio: 1.68,
@@ -681,6 +692,7 @@ describe('declaración del tema', () => {
       'compileCss.ts',
       'contrast.test.ts',
       'contrast.ts',
+      'focus-declarado.test.ts',
       'no-raw-colors.test.ts',
       'palette.test.ts',
       'palette.ts',
@@ -929,8 +941,14 @@ describe('tokens del tema', () => {
       'fg/surface-muted',
       'fg/surface-subtle',
       'fg/warning-soft',
+      'focus/accent-soft',
       'focus/canvas',
+      'focus/danger-soft',
       'focus/surface',
+      'focus/surface-muted',
+      'focus/surface-subtle',
+      'focus/warning-soft',
+      'focus/warning-soft-strong',
       'on-solid/accent',
       'on-solid/accent-disabled',
       'on-solid/accent-hover',
@@ -1085,8 +1103,14 @@ describe('los umbrales son los de la norma', () => {
       'danger-border-strong/surface',
       'danger-border/canvas',
       'danger-border/surface',
+      'focus/accent-soft',
       'focus/canvas',
+      'focus/danger-soft',
       'focus/surface',
+      'focus/surface-muted',
+      'focus/surface-subtle',
+      'focus/warning-soft',
+      'focus/warning-soft-strong',
       'success-border/success-soft',
       'surface-subtle/surface',
       'warning-border-strong/surface',
@@ -1192,5 +1216,55 @@ describe('el velo del modal', () => {
       modal,
       'sin filete, en oscuro nada separa la tarjeta del velo',
     ).toMatch(/border\s+border-border/)
+  })
+})
+
+/**
+ * El color de la barra del navegador en el móvil. Vive en una etiqueta del documento, fuera del
+ * alcance de cualquier hoja de estilos, así que el script del `head` lo lleva escrito a mano: es
+ * la única forma de ponerlo antes de que exista un módulo. Dos valores escritos a mano son dos
+ * valores que se separan del tema, y por eso se atan acá.
+ */
+describe('el color de la barra del navegador', () => {
+  const html = readFileSync(join(process.cwd(), 'index.html'), 'utf8')
+
+  it('los dos literales del script son el fondo de página de cada tema', () => {
+    const escritos = [...html.matchAll(/tema === 'dark' \? '(#[0-9a-f]{6})' : '(#[0-9a-f]{6})'/g)]
+    expect(escritos, 'no se encontró la línea que escribe el color de la barra').toHaveLength(1)
+    const [, oscuro, claro] = escritos[0]
+    expect(oscuro).toBe(colorsOscuro.canvas)
+    expect(claro).toBe(colors.canvas)
+  })
+
+  it('la etiqueta existe en el documento y arranca en el tema claro', () => {
+    const inicial = /<meta name="theme-color" content="(#[0-9a-f]{6})" \/>/.exec(html)
+    expect(inicial, 'sin la etiqueta, el script no tiene qué escribir').not.toBeNull()
+    expect(inicial![1]).toBe(colors.canvas)
+  })
+})
+
+/**
+ * El modo de alto contraste del sistema, que es el único estado que la aplicación no controla.
+ * Ahí el navegador borra las sombras, y con ellas todo anillo de foco; el `outline-none` que cada
+ * control declara para no ver dos marcas sobrevive. Sin una regla que devuelva un contorno, los
+ * controles quedan sin ninguna señal justo en el modo que existe para que se vean.
+ *
+ * No hay forma de afirmarlo desde una pantalla: la suite corre con el CSS apagado y `forced-colors`
+ * lo decide el sistema operativo. Lo que sí se puede afirmar es que la regla llegue al CSS
+ * publicado, que es lo que se perdería si alguien la borra.
+ */
+describe('el modo de alto contraste', () => {
+  it('el CSS publicado devuelve un contorno cuando el sistema borra las sombras', async () => {
+    const { css } = await compileGlobalCss(process.cwd())
+    // La consulta ENTERA, no la palabra: una mutación que la dejaba en `forced-colors: none`
+    // sobrevivía a una versión anterior de esta prueba, y ese es justo el modo en el que la regla
+    // NO tiene que aplicar. La medió la tabla de mutaciones.
+    const i = css.indexOf('@media (forced-colors: active)')
+    expect(i, 'sin esta regla, en alto contraste no queda ninguna señal de foco').toBeGreaterThan(-1)
+    const regla = css.slice(i, i + 160)
+    expect(regla).toMatch(/:focus-visible/)
+    expect(regla, 'el contorno tiene que declarar un color del sistema, no un token').toMatch(
+      /outline:\s*2px solid CanvasText/,
+    )
   })
 })
