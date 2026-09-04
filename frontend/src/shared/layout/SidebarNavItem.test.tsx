@@ -27,6 +27,10 @@ describe('SidebarNavItem', () => {
     expect(span).toHaveAttribute('title', 'Próximamente')
     // Texto para lectores de pantalla
     expect(screen.getByText('(próximamente)', { exact: false })).toBeInTheDocument()
+    // Y que se VEA apagado, que es lo que el lector de pantalla no cubre. La opacidad no está
+    // de adorno: el tono apagado y el navegable se separan poco, y esa distancia depende de dos
+    // tokens que se mueven por otro motivo. Sin esta línea, sacarla no rompe nada.
+    expect(span?.className.split(/\s+/)).toContain('opacity-60')
   })
 
   it('marca el link activo cuando la ruta coincide', () => {
