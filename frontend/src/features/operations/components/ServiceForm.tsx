@@ -6,11 +6,11 @@ import { TriangleAlert } from 'lucide-react'
 import type { CargoTypeResponse, ClientResponse, Problem, ServiceDetailResponse } from '../../../api'
 import { useAuth } from '../../../shared/auth/AuthContext'
 import { DateField } from '../../../shared/ui/DateField'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 import { SelectField, type SelectOption } from '../../../shared/ui/SelectField'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { Textarea } from '../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { cn } from '../../../shared/utils/cn'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
@@ -31,6 +31,9 @@ import {
 import { canCreateCatalogEntry } from '../status/operationsPermissions'
 import { isPastInLima, todayInLima } from '../utils/limaDate'
 import { ServiceClientField } from './ServiceClientField'
+import { Button } from '../../../shared/ui/Button'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 /** Campos que aceptan un error de campo del backend. */
 const FORM_FIELDS = [
@@ -58,10 +61,10 @@ const DUPLICATE_SERVICE_CODE = 'OPS-007'
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
+    <Card as="section">
+      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-fg-muted">{title}</h2>
       <div className="space-y-4">{children}</div>
-    </section>
+    </Card>
   )
 }
 
@@ -186,7 +189,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
   if (currenciesQuery.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando monedas" className="text-blue-600" />
+        <Spinner size={28} label="Cargando monedas" className="text-accent" />
       </div>
     )
   }
@@ -198,18 +201,14 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
   if (currenciesQuery.isError || currencyOptions.length === 0) {
     return (
       <div role="alert" className="flex flex-col items-center px-6 py-16 text-center">
-        <p className="text-sm font-medium text-slate-700">
+        <p className="text-sm font-medium text-fg-body">
           {currenciesQuery.isError
             ? getApiErrorMessage(currenciesQuery.error, 'No se pudieron cargar las monedas.')
             : 'No hay monedas configuradas. Sin moneda no se puede registrar un servicio.'}
         </p>
-        <button
-          type="button"
-          onClick={() => void currenciesQuery.refetch()}
-          className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        >
+        <Button variant="secondary" onClick={() => void currenciesQuery.refetch()} className="mt-4">
           Reintentar
-        </button>
+        </Button>
       </div>
     )
   }
@@ -217,12 +216,9 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {errors.root?.message && (
-        <p
-          role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-        >
+        <Alert as="p" variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-warning-fg">
           {errors.root.message}
-        </p>
+        </Alert>
       )}
 
       <Section title="Viaje">
@@ -239,7 +235,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
           <div>
             <label
               htmlFor="service-trip-scope"
-              className="mb-1.5 block text-sm font-medium text-slate-700"
+              className="mb-1.5 block text-sm font-medium text-fg-body"
             >
               Ámbito del viaje
             </label>
@@ -258,10 +254,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
                   onBlur={field.onBlur}
                   aria-invalid={Boolean(errors.tripScope)}
                   aria-describedby={errors.tripScope ? 'service-trip-scope-error' : undefined}
-                  className={cn(
-                    'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
-                    errors.tripScope ? 'border-red-300' : 'border-slate-300',
-                  )}
+                  className={cn('w-full', fieldClasses({ invalid: Boolean(errors.tripScope) }))}
                 >
                   <option value="">Elige el ámbito</option>
                   {TRIP_SCOPE_OPTIONS.map((option) => (
@@ -273,7 +266,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
               )}
             />
             {errors.tripScope?.message && (
-              <p id="service-trip-scope-error" role="alert" className="mt-1.5 text-sm text-red-600">
+              <p id="service-trip-scope-error" role="alert" className="mt-1.5 text-sm text-danger">
                 {errors.tripScope.message}
               </p>
             )}
@@ -294,7 +287,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
               <p
                 id="service-tentative-date-past"
                 role="alert"
-                className="mt-1.5 flex items-center gap-1.5 text-xs text-amber-700"
+                className="mt-1.5 flex items-center gap-1.5 text-xs text-warning"
               >
                 <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
                 La fecha ya pasó. Se registra igual (viaje cargado en retrospectiva).
@@ -418,10 +411,10 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
       </Section>
 
       <div className="flex justify-end gap-2">
-        <button type="button" onClick={onCancel} className={SECONDARY_BUTTON} disabled={isSubmitting}>
+        <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
-        </button>
-        <button type="submit" disabled={isSubmitting} className={PRIMARY_BUTTON}>
+        </Button>
+        <Button variant="primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? (
             <>
               <Spinner size={16} label="Registrando" />
@@ -430,7 +423,7 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
           ) : (
             'Registrar servicio'
           )}
-        </button>
+        </Button>
       </div>
     </form>
   )

@@ -3,8 +3,6 @@ import { Download, FileBarChart2 } from 'lucide-react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { Spinner } from '../../../shared/ui/Spinner'
-import { PRIMARY_BUTTON } from '../../../shared/ui/buttonStyles'
-import { cn } from '../../../shared/utils/cn'
 import { csvBlob } from '../../../shared/utils/csv'
 import { downloadBlob } from '../../../shared/utils/downloadBlob'
 import { formatDateOnly } from '../../../shared/utils/formatters'
@@ -20,6 +18,8 @@ import {
 } from '../schemas/report-filters.schema'
 import { buildReportCsv, reportCsvFilename } from '../utils/reportCsv'
 import { reportCutMeta } from '../utils/reportCuts'
+import { Button } from '../../../shared/ui/Button'
+import { Alert } from '../../../shared/ui/Alert'
 
 /**
  * Reportes del almacén: los 4 cortes agregados de `GET /warehouse/reports`.
@@ -54,34 +54,31 @@ export function WarehouseReportsPage() {
         description="Consumo y compras agregados por período — la base del costo de mantenimiento por unidad."
         divider
         action={
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={handleExport}
             disabled={!canExport}
-            className={cn(PRIMARY_BUTTON, !canExport && 'cursor-not-allowed opacity-50')}
+            className={!canExport ? 'cursor-not-allowed opacity-50' : undefined}
           >
             <Download className="mr-2 h-4 w-4" aria-hidden="true" />
             Exportar CSV
-          </button>
+          </Button>
         }
       />
 
       <ReportFilterBar value={filters} onChange={setFilters} />
 
       {isError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
-        >
+        <Alert role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-danger-fg">
           <span>{getApiErrorMessage(error, 'No se pudo generar el reporte.')}</span>
           <button
             type="button"
             onClick={() => refetch()}
-            className="shrink-0 font-medium text-red-900 underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-danger-fg underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Reintentar
           </button>
-        </div>
+        </Alert>
       )}
 
       {/* El cambio de corte o de rango no mueve el foco: hay que anunciarlo. Se
@@ -104,15 +101,19 @@ export function WarehouseReportsPage() {
         // El panel no tiene contenido enfocable propio: sin esto, el teclado no
         // puede alcanzar los resultados desde el tablist.
         tabIndex={0}
-        className="space-y-6"
+        // Contorno y no anillo, por el mismo motivo que la fila de una tabla: un anillo es una
+        // sombra, y una sombra hacia adentro se pinta debajo del fondo de los hijos. Los de este
+        // panel son tarjetas opacas a todo el ancho, así que del anillo solo sobrevivirían la
+        // línea de arriba y los pedacitos entre tarjeta y tarjeta. El contorno se pinta después.
+        className="space-y-6 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus"
       >
         {isLoading ? (
           <div className="flex justify-center py-16">
-            <Spinner size={28} label="Generando reporte" className="text-blue-600" />
+            <Spinner size={28} label="Generando reporte" className="text-accent" />
           </div>
         ) : data ? (
           <>
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-fg-muted">
               Del {formatDateOnly(data.dateFrom)} al {formatDateOnly(data.dateTo)}
             </p>
             <ReportTotalsCards report={data} />
@@ -129,7 +130,7 @@ export function WarehouseReportsPage() {
         ) : null}
       </div>
 
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-fg-subtle">
         El valor de las salidas usa el último precio de compra de cada producto como referencia, y se
         muestra <strong>por moneda tal como se registró</strong>: almacén no convierte ni valoriza.
         La barra es referencia visual del ranking.

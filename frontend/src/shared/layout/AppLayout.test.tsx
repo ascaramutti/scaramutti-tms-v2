@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AppLayout } from './AppLayout'
 import { AuthProvider } from '../auth/AuthContext'
+import { ThemeProvider } from '../ui/theme/ThemeContext'
 import { tokenStorage } from '../auth/tokenStorage'
 
 function renderLayout() {
@@ -12,15 +13,17 @@ function renderLayout() {
   })
   return render(
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <MemoryRouter initialEntries={['/']}>
-          <Routes>
-            <Route element={<AppLayout />}>
-              <Route path="/" element={<div>CONTENIDO HIJO</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <MemoryRouter initialEntries={['/']}>
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<div>CONTENIDO HIJO</div>} />
+              </Route>
+            </Routes>
+          </MemoryRouter>
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   )
 }

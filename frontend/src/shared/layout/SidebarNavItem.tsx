@@ -26,7 +26,11 @@ export function SidebarNavItem({ icon: Icon, label, to, activeWhen }: SidebarNav
     return (
       <li className="list-none">
         <span
-          className={cn(baseClasses, 'cursor-not-allowed text-slate-400')}
+          // La opacidad y no solo el color: el tono apagado y el navegable se separan poco, y esa
+          // distancia depende de dos tokens que pueden moverse por otro motivo. Con opacidad, el
+          // estado se lee igual pase lo que pase con la escala de grises, que es como el resto del
+          // árbol ya marca lo deshabilitado. Lo levantó una revisión midiendo esa separación.
+          className={cn(baseClasses, 'cursor-not-allowed text-fg-subtle opacity-60')}
           title="Próximamente"
           aria-disabled="true"
         >
@@ -52,10 +56,11 @@ export function SidebarNavItem({ icon: Icon, label, to, activeWhen }: SidebarNav
         to={to}
         aria-current={isActive ? 'page' : undefined}
         className={cn(
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus',
           baseClasses,
           isActive
-            ? 'bg-blue-50 text-blue-700'
-            : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900',
+            ? 'bg-accent-soft text-accent-hover'
+            : 'text-fg-body hover:bg-surface-muted hover:text-fg',
         )}
       >
         <Icon className="w-4 h-4 flex-shrink-0" aria-hidden="true" />

@@ -3,6 +3,9 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '../utils/cn'
 import { Spinner } from './Spinner'
 import { EmptyState } from './EmptyState'
+import { Button } from './Button'
+import { Card } from './Card'
+import { Alert } from './Alert'
 
 export interface Column<T> {
   /** Clave única de la columna (no necesariamente un campo de `T`). */
@@ -83,7 +86,7 @@ export function DataTable<T>({
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando" className="text-blue-600" />
+        <Spinner size={28} label="Cargando" className="text-accent" />
       </div>
     )
   }
@@ -95,17 +98,13 @@ export function DataTable<T>({
         role="alert"
         className="flex flex-col items-center justify-center px-6 py-16 text-center"
       >
-        <p className="text-sm font-medium text-slate-700">
+        <p className="text-sm font-medium text-fg-body">
           {errorMessage ?? 'No se pudieron cargar los datos.'}
         </p>
         {onRetry && (
-          <button
-            type="button"
-            onClick={onRetry}
-            className="mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
+          <Button variant="secondary" onClick={onRetry} className="mt-4">
             Reintentar
-          </button>
+          </Button>
         )}
       </div>
     )
@@ -126,35 +125,32 @@ export function DataTable<T>({
     <div className="space-y-3">
       {/* Error con data previa (ej. refetch al paginar falló): aviso no destructivo. */}
       {isError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
           <span>{errorMessage ?? 'No se pudieron actualizar los datos.'}</span>
           {onRetry && (
             <button
               type="button"
               onClick={onRetry}
-              className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+              className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               Reintentar
             </button>
           )}
-        </div>
+        </Alert>
       )}
 
-      <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+      <Card padding="none">
         <div className="overflow-x-auto" aria-busy={isFetching}>
-          <table className={cn('min-w-full divide-y divide-slate-200', isFetching && 'opacity-60')}>
+          <table className={cn('min-w-full divide-y divide-border', isFetching && 'opacity-60')}>
             {caption && <caption className="sr-only">{caption}</caption>}
-            <thead className="bg-slate-50">
+            <thead className="bg-surface-subtle">
               <tr>
                 {columns.map((col) => (
                   <th
                     key={col.key}
                     scope="col"
                     className={cn(
-                      'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-slate-500',
+                      'px-4 py-3 text-xs font-semibold uppercase tracking-wide text-fg-muted',
                       ALIGN_CLASSES[col.align ?? 'left'],
                     )}
                   >
@@ -163,13 +159,22 @@ export function DataTable<T>({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-border">
               {data.map((row) => (
                 <tr
                   key={keyExtractor(row)}
                   className={cn(
+                    // El foco de la fila va por CONTORNO y no por anillo: la tabla se dibuja con
+                    // los bordes colapsados, y con eso la sombra de un anillo no se pinta sobre
+                    // una fila. El contorno sí, y de hecho el navegador lo dibujaba acá hasta que
+                    // alguien lo apagó dejando como única señal un tinte de fondo que no se ve.
+                    // Va hacia adentro para que el contenedor no lo recorte: la tabla vive dentro de
+                    // un desbordamiento horizontal, y basta con que UN eje deje de ser visible para
+                    // que el otro tampoco lo sea, así que la primera y la última fila perderían el
+                    // tramo de arriba y el de abajo.
                     clickable &&
-                      'cursor-pointer hover:bg-slate-50 focus:bg-slate-50 focus:outline-none',
+                      'cursor-pointer hover:bg-surface-subtle focus-visible:bg-surface-subtle ' +
+                  'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-focus',
                   )}
                   onClick={clickable ? () => onRowClick(row) : undefined}
                   onKeyDown={
@@ -190,7 +195,7 @@ export function DataTable<T>({
                     <td
                       key={col.key}
                       className={cn(
-                        'px-4 py-3 align-middle text-sm text-slate-700',
+                        'px-4 py-3 align-middle text-sm text-fg-body',
                         ALIGN_CLASSES[col.align ?? 'left'],
                         col.className,
                       )}
@@ -207,17 +212,22 @@ export function DataTable<T>({
         </div>
 
         {totalPages > 1 && (
-          <div className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
-            <span className="text-sm text-slate-600">
+          <div className="flex items-center justify-between border-t border-border px-4 py-3">
+            <span className="text-sm text-fg-body">
               Mostrando {from}–{to} de {total}
             </span>
+            {/* Las dos flechas NO usan `Button`, y no es un olvido: son una cuarta forma.
+                No tienen relleno ni anillo de foco, y su señal de deshabilitado es
+                `disabled:opacity-40`; ninguna de las tres variantes las reproduce, y
+                pasarlas a `secondary` les agregaría borde y fondo. Entran el día que exista
+                una variante sin relleno, que es cuando `size="icon"` tendrá su primer uso. */}
             <div className="flex gap-1">
               <button
                 type="button"
                 onClick={() => onPageChange(page - 1)}
                 disabled={isFirst}
                 aria-label="Página anterior"
-                className="inline-flex items-center rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <ChevronLeft className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -226,14 +236,14 @@ export function DataTable<T>({
                 onClick={() => onPageChange(page + 1)}
                 disabled={isLast}
                 aria-label="Página siguiente"
-                className="inline-flex items-center rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                className="inline-flex items-center rounded-lg p-1.5 text-fg-body hover:bg-surface-muted disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 <ChevronRight className="h-5 w-5" aria-hidden="true" />
               </button>
             </div>
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }

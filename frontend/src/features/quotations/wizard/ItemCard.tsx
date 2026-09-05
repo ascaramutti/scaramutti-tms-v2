@@ -9,6 +9,8 @@ import { IntegralComponents } from './IntegralComponents'
 import { itemTotal } from './itemCalc'
 import { itemSchema, type ItemServiceKind, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
+import { Card } from '../../../shared/ui/Card'
+import { fieldClasses, fieldReadonlyClasses, FIELD_LABEL as SHARED_FIELD_LABEL } from '../../../shared/ui/fieldClasses'
 
 interface ItemCardProps {
   index: number
@@ -23,11 +25,9 @@ interface ItemCardProps {
   onRemove: () => void
 }
 
-const FIELD_LABEL = 'mb-1.5 block text-sm font-medium text-slate-700'
-const CONTROL =
-  'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
-const READONLY =
-  'w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-600 focus:outline-none'
+const FIELD_LABEL = SHARED_FIELD_LABEL
+const CONTROL = cn('w-full', fieldClasses())
+const READONLY = cn('w-full', fieldReadonlyClasses())
 
 /** Empty → `null` (campos numéricos opcionales). */
 function nullableNum(value: string): number | null {
@@ -123,21 +123,21 @@ export function ItemCard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white shadow-sm">
+    <Card padding="none">
       {/* Header colapsable: resumen + estado + total. */}
       <div className="flex items-center gap-2 p-4">
         <button
           type="button"
           onClick={onToggle}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left focus:outline-none focus:ring-2 focus:ring-focus"
         >
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-semibold text-blue-700">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent-soft-strong text-sm font-semibold text-accent-hover">
             {position}
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-sm font-semibold text-slate-900">Ítem {position}</span>
-            <span className="block truncate text-xs text-slate-500">
+            <span className="block text-sm font-semibold text-fg">Ítem {position}</span>
+            <span className="block truncate text-xs text-fg-muted">
               {typeName ?? 'Sin tipo de servicio'}
             </span>
           </span>
@@ -145,7 +145,7 @@ export function ItemCard({
             <span
               className={cn(
                 'flex shrink-0 items-center gap-1 text-xs font-medium',
-                isComplete ? 'text-emerald-600' : 'text-red-500',
+                isComplete ? 'text-success-fg' : 'text-danger',
               )}
             >
               {isComplete ? (
@@ -156,27 +156,27 @@ export function ItemCard({
               <span className="hidden sm:inline">{isComplete ? 'Completo' : 'Faltan datos'}</span>
             </span>
           )}
-          <span className="shrink-0 text-sm font-semibold text-slate-900">
+          <span className="shrink-0 text-sm font-semibold text-fg">
             {formatCurrency(total, currencyCode)}
           </span>
           {expanded ? (
-            <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <ChevronUp className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
           ) : (
-            <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+            <ChevronDown className="h-4 w-4 shrink-0 text-fg-subtle" aria-hidden="true" />
           )}
         </button>
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Eliminar ítem ${position}`}
-          className="shrink-0 text-slate-400 hover:text-red-600"
+          className="shrink-0 text-fg-subtle hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
       </div>
 
       {expanded && (
-        <div className="space-y-4 border-t border-slate-100 p-5 pt-4">
+        <div className="space-y-4 border-t border-border p-5 pt-4">
           <div>
             <label htmlFor={`item-${index}-serviceType`} className={FIELD_LABEL}>
               Tipo de servicio
@@ -187,7 +187,7 @@ export function ItemCard({
               onChange={(event) => handleServiceTypeChange(event.target.value)}
               onBlur={() => trigger(`items.${index}.serviceTypeId`)}
               aria-invalid={!!itemErrors?.serviceTypeId}
-              className={cn(CONTROL, itemErrors?.serviceTypeId ? 'border-red-300' : 'border-slate-300')}
+              className={cn(CONTROL, itemErrors?.serviceTypeId ? 'border-danger-border-strong' : 'border-border-strong')}
             >
               <option value="">Selecciona</option>
               {serviceTypes.map((type) => {
@@ -201,14 +201,14 @@ export function ItemCard({
               })}
             </select>
             {itemErrors?.serviceTypeId?.message && (
-              <p role="alert" className="mt-1.5 text-sm text-red-600">
+              <p role="alert" className="mt-1.5 text-sm text-danger">
                 {itemErrors.serviceTypeId.message}
               </p>
             )}
           </div>
 
           {!hasServiceType ? (
-            <p className="text-sm text-slate-500">
+            <p className="text-sm text-fg-muted">
               Elige un tipo de servicio para completar el ítem.
             </p>
           ) : (
@@ -322,7 +322,7 @@ export function ItemCard({
                       if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault()
                     }}
                     aria-label={`Total del ítem ${position}`}
-                    className={cn(CONTROL, 'border-slate-300')}
+                    className={CONTROL}
                   />
                 </div>
               </div>
@@ -335,10 +335,10 @@ export function ItemCard({
                   id={`item-${index}-observations`}
                   rows={2}
                   {...register(`items.${index}.observations`)}
-                  className={cn(CONTROL, 'resize-none', itemErrors?.observations ? 'border-red-300' : 'border-slate-300')}
+                  className={cn(CONTROL, 'resize-none', itemErrors?.observations ? 'border-danger-border-strong' : 'border-border-strong')}
                 />
                 {itemErrors?.observations?.message && (
-                  <p role="alert" className="mt-1.5 text-sm text-red-600">
+                  <p role="alert" className="mt-1.5 text-sm text-danger">
                     {itemErrors.observations.message}
                   </p>
                 )}
@@ -347,6 +347,6 @@ export function ItemCard({
           )}
         </div>
       )}
-    </div>
+    </Card>
   )
 }

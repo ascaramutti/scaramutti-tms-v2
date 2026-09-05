@@ -32,7 +32,7 @@ interface ServicesTableProps {
 function renderPrice(row: ServiceSummaryResponse) {
   if (row.price == null || !row.currencyCode) return '—'
   return (
-    <span className="font-medium tabular-nums text-slate-900">
+    <span className="font-medium tabular-nums text-fg">
       {formatCurrency(row.price, row.currencyCode)}
     </span>
   )
@@ -69,15 +69,15 @@ export function ServicesTable({
     {
       key: 'code',
       header: 'Código',
-      render: (row) => <span className="font-semibold text-blue-700">{row.code}</span>,
+      render: (row) => <span className="font-semibold text-accent-hover">{row.code}</span>,
     },
     {
       key: 'client',
       header: 'Cliente',
       render: (row) => (
         <div>
-          <span className="block font-medium text-slate-900">{row.client.name}</span>
-          <span className="block text-xs text-slate-500">{row.client.ruc}</span>
+          <span className="block font-medium text-fg">{row.client.name}</span>
+          <span className="block text-xs text-fg-muted">{row.client.ruc}</span>
         </div>
       ),
     },
@@ -86,12 +86,12 @@ export function ServicesTable({
       header: 'Ruta',
       render: (row) => (
         <div>
-          <span className="block text-slate-900">
+          <span className="block text-fg">
             {row.origin} → {row.destination}
           </span>
           {/* El ámbito va en mayúsculas por CSS, no como literal: un lector de
               pantalla deletrea las mayúsculas escritas a mano ("P-R-O-V…"). */}
-          <span className="block text-xs font-bold uppercase tracking-wide text-slate-600">
+          <span className="block text-xs font-bold uppercase tracking-wide text-fg-body">
             {TRIP_SCOPE_LABELS[row.tripScope]}
           </span>
         </div>
@@ -103,11 +103,11 @@ export function ServicesTable({
       render: (row) =>
         row.driver || row.tractor ? (
           <div>
-            <span className="block text-slate-900">{row.driver?.fullName ?? '—'}</span>
-            <span className="block text-xs text-slate-500">{row.tractor?.plate ?? '—'}</span>
+            <span className="block text-fg">{row.driver?.fullName ?? '—'}</span>
+            <span className="block text-xs text-fg-muted">{row.tractor?.plate ?? '—'}</span>
           </div>
         ) : (
-          <span className="text-slate-500">Sin asignar</span>
+          <span className="text-fg-muted">Sin asignar</span>
         ),
     },
   ]
@@ -135,7 +135,7 @@ export function ServicesTable({
       // Date-only: va por `formatDateOnly`. Pasarla por `formatDate` la
       // interpretaría como medianoche UTC y en Lima mostraría el día anterior.
       render: (row) => (
-        <span className="text-slate-500">{formatDateOnly(row.tentativeDate)}</span>
+        <span className="text-fg-muted">{formatDateOnly(row.tentativeDate)}</span>
       ),
     },
   )
@@ -171,7 +171,7 @@ export function ServicesTable({
       {/* El orden no coincide con ninguna columna visible: la fecha que se muestra
           es la tentativa. Decirlo solo en el `caption`, que es sr-only, lo deja
           fuera del alcance de quien mira la pantalla. */}
-      <p className="text-xs text-slate-500">
+      <p className="text-xs text-fg-muted">
         Ordenados por fecha de registro, los más recientes primero.
       </p>
     </div>

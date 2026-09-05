@@ -2,18 +2,18 @@ import type { WarehouseProductResponse } from '../../../api'
 import { Badge } from '../../../shared/ui/Badge'
 import { formatDate, formatQuantity } from '../../../shared/utils/formatters'
 import { StockLevel } from './StockLevel'
+import { Card } from '../../../shared/ui/Card'
 
 interface ProductInfoCardsProps {
   product: WarehouseProductResponse
 }
 
-const cardClasses = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</dt>
+      <dd className="mt-0.5 text-sm text-fg">{value}</dd>
     </div>
   )
 }
@@ -28,8 +28,8 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      <section className={cardClasses} aria-labelledby="product-stock-heading">
-        <h2 id="product-stock-heading" className="text-sm font-semibold text-slate-900">
+      <Card as="section" padding="md" aria-labelledby="product-stock-heading">
+        <h2 id="product-stock-heading" className="text-sm font-semibold text-fg">
           Existencias
         </h2>
         <p className="mt-3">
@@ -39,13 +39,13 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
             low={product.lowStock}
           />
         </p>
-        <p className="mt-2 text-sm text-slate-500">
+        <p className="mt-2 text-sm text-fg-muted">
           Mínimo {formatQuantity(product.minStock)} {product.unitOfMeasure.code}
         </p>
-      </section>
+      </Card>
 
-      <section className={cardClasses} aria-labelledby="product-info-heading">
-        <h2 id="product-info-heading" className="text-sm font-semibold text-slate-900">
+      <Card as="section" padding="md" aria-labelledby="product-info-heading">
+        <h2 id="product-info-heading" className="text-sm font-semibold text-fg">
           Ficha
         </h2>
         <dl className="mt-3 space-y-3">
@@ -61,14 +61,14 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
             value={`${product.createdBy.fullName} · ${formatDate(product.createdAt)}`}
           />
         </dl>
-      </section>
+      </Card>
 
-      <section className={cardClasses} aria-labelledby="product-attributes-heading">
-        <h2 id="product-attributes-heading" className="text-sm font-semibold text-slate-900">
+      <Card as="section" padding="md" aria-labelledby="product-attributes-heading">
+        <h2 id="product-attributes-heading" className="text-sm font-semibold text-fg">
           Características
         </h2>
         {attributes.length === 0 ? (
-          <p className="mt-3 text-sm text-slate-500">Sin características registradas.</p>
+          <p className="mt-3 text-sm text-fg-muted">Sin características registradas.</p>
         ) : (
           <dl className="mt-3 space-y-3">
             {attributes.map(([key, value]) => (
@@ -76,7 +76,7 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
             ))}
           </dl>
         )}
-      </section>
+      </Card>
     </div>
   )
 }
@@ -84,5 +84,5 @@ export function ProductInfoCards({ product }: ProductInfoCardsProps) {
 /** Distintivo del producto dado de baja. La baja todavía no se hace desde la UI,
  * pero un producto inactivo puede llegar por URL o desde el kardex. */
 export function ProductInactiveBadge() {
-  return <Badge variant="slate">Inactivo</Badge>
+  return <Badge>Inactivo</Badge>
 }

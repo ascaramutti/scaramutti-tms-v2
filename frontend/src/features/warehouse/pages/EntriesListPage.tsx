@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
-import { PRIMARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { cn } from '../../../shared/utils/cn'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { useLastGoodPage } from '../../../shared/hooks/useLastGoodPage'
@@ -14,6 +13,7 @@ import {
   useWarehousePurchaseInvoicesList,
 } from '../hooks/useWarehousePurchaseInvoicesList'
 import { EMPTY_ENTRY_FILTERS, type EntryFilters } from '../schemas/entry-filters.schema'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 
 const PAGE_SIZE = 10
 const SEARCH_DEBOUNCE_MS = 300
@@ -60,7 +60,7 @@ export function EntriesListPage() {
         description="Compras por factura · cada ítem registrado suma stock."
         divider
         action={
-          <Link to="/cotizaciones/almacen/entradas/nueva" className={cn(PRIMARY_BUTTON, 'gap-1.5')}>
+          <Link to="/cotizaciones/almacen/entradas/nueva" className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Registrar entrada
           </Link>

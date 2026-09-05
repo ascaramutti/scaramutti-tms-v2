@@ -25,6 +25,7 @@ import {
 } from './quotation-wizard.schema'
 import type { WizardCatalogs } from './useWizardCatalogs'
 import type { ClientResponse, QuotationConditionResponse } from '../../../api'
+import { Alert } from '../../../shared/ui/Alert'
 
 // Índices de paso (evitan números mágicos al renderizar/validar — el orden importa).
 const STEP_STANDBY = 2
@@ -41,8 +42,21 @@ const WIZARD_STEPS: StepperStep[] = [
   { label: 'Resumen' },
 ]
 
-const SECONDARY_BUTTON =
-  'inline-flex items-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-500'
+/**
+ * Botón de contorno rojo: destructivo pero secundario, una forma que no es ninguna de las
+ * tres variantes de `Button`. No es única: hay cuatro botones así en cuatro archivos, y
+ * entre ellos conviven tres formas distintas, que difieren en el paso del borde rojo, en el
+ * espaciado, en el relleno del hover y en si el anillo aparece al hacer clic o solo al
+ * llegar con el tabulador. Unificarlas es un cambio de aspecto, no una mudanza, así que no
+ * entra en este PR: queda anotado para cuando se decida la forma buena.
+ *
+ * El nombre anterior de esta constante era `SECONDARY_BUTTON`, igual que el de la constante
+ * compartida que `Button` reemplazó, y eran cosas distintas: esta pinta de rojo, aquella de
+ * gris. Ese nombre fue lo que casi la convierte en gris durante la mudanza. Buscar por
+ * nombre de constante no es buscar por valor.
+ */
+const RECOVER_DRAFT_BUTTON =
+  'inline-flex items-center rounded-lg border border-danger-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-danger-fg hover:bg-danger-soft focus:outline-none focus:ring-2 focus:ring-danger'
 
 export interface WizardFormProps {
   catalogs: WizardCatalogs
@@ -241,17 +255,14 @@ export function WizardForm({
             )}
           </div>
           {bannerMessage && (
-            <div
-              role="alert"
-              className="space-y-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-            >
+            <Alert role="alert" className="space-y-3 rounded-lg px-4 py-3 text-sm text-danger-fg">
               <p>{bannerMessage}</p>
               {showRecover && (
-                <button type="button" onClick={onRecover} className={SECONDARY_BUTTON}>
+                <button type="button" onClick={onRecover} className={RECOVER_DRAFT_BUTTON}>
                   Recargar cotización
                 </button>
               )}
-            </div>
+            </Alert>
           )}
           <WizardNav
             isFirst={currentStep === 0}

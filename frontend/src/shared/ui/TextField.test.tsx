@@ -63,6 +63,27 @@ describe('TextField', () => {
     expect(alert).toHaveAttribute('id', 'field-error')
   })
 
+  it('en error, el foco también se pinta de rojo, no solo el borde', () => {
+    // El campo de texto es el ÚNICO de los cinco que cambia el anillo de foco cuando hay
+    // error: el select y el de fecha solo cambian el borde. Es una pieza aparte del molde
+    // justamente por eso, y sin esta línea se puede soltar sin que nada falle.
+    render(<TestForm error="mal" />)
+    const clases = screen.getByLabelText(/campo de prueba/i).className.split(/\s+/)
+    expect(clases).toContain('border-danger-border-strong')
+    expect(clases).toContain('focus:ring-danger')
+    expect(clases).toContain('focus:border-danger')
+  })
+
+  it('deshabilitado, se ve apagado y no solo por el tono', () => {
+    // El texto apagado y el tipeado se distinguen por el color, y esa distancia depende de dos
+    // tokens que pueden moverse por otro motivo; el fondo tampoco ayuda, que separa 1.05 del
+    // normal. La opacidad es la señal que sobrevive a cualquier ajuste de la escala de grises.
+    render(<TestForm disabled />)
+    const clases = screen.getByLabelText(/campo de prueba/i).className.split(/\s+/)
+    expect(clases).toContain('disabled:opacity-60')
+    expect(clases).toContain('disabled:text-fg-subtle')
+  })
+
   it('sin error: no aplica aria-invalid ni aria-describedby', () => {
     render(<TestForm />)
     const input = screen.getByLabelText(/campo de prueba/i)

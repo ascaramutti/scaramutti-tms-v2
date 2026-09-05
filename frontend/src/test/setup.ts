@@ -46,6 +46,9 @@ if (typeof window !== 'undefined') {
 
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => {
+  // El tema se escribe en el `<html>`, que vive entre pruebas: sin limpiarlo, una prueba
+  // que afirme la ausencia del atributo se rompe por lo que hizo la anterior.
+  document.documentElement.removeAttribute('data-theme')
   cleanup()
   server.resetHandlers()
   memoryLocalStorage.clear()

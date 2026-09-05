@@ -2,10 +2,10 @@ import { useForm, useWatch } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
+import { FIELD_FOCUS_INVALID, fieldClasses } from '../../../../shared/ui/fieldClasses'
 import { Modal } from '../../../../shared/ui/Modal'
 import { Spinner } from '../../../../shared/ui/Spinner'
 import { Textarea } from '../../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { cn } from '../../../../shared/utils/cn'
 import { stripControlChars } from '../../../../shared/utils/sanitizeText'
 import { useChangeServiceStatus } from '../../hooks/useChangeServiceStatus'
@@ -24,6 +24,7 @@ import {
 } from '../../schemas/service-status.schema'
 import { nowInLimaForInput } from '../../utils/limaDate'
 import { ServiceStatusErrorAlert } from './ServiceStatusErrorAlert'
+import { Button } from '../../../../shared/ui/Button'
 
 interface ServiceProgressModalProps {
   isOpen: boolean
@@ -103,7 +104,7 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
         <div>
           <label
             htmlFor="service-progress-datetime"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             {SERVICE_PROGRESS_DATE_TIME_LABEL[transition]}
           </label>
@@ -125,21 +126,20 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
             aria-describedby={dateTimeDescribedBy}
             {...register('dateTime')}
             className={cn(
-              'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2',
-              errors.dateTime
-                ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-                : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500',
+              'w-full',
+              fieldClasses({ invalid: Boolean(errors.dateTime) }),
+              errors.dateTime && FIELD_FOCUS_INVALID,
               // Mismas clases que le pone el `Textarea` compartido a su estado
               // deshabilitado: sin esto, con el pedido en vuelo un campo se apaga y el
               // de al lado conserva aspecto de editable.
-              isPending && 'cursor-not-allowed bg-slate-50 text-slate-500',
+              isPending && 'cursor-not-allowed bg-surface-subtle text-fg-muted',
             )}
           />
-          <p id={dateTimeHelperId} className="mt-1.5 text-xs text-slate-500">
+          <p id={dateTimeHelperId} className="mt-1.5 text-xs text-fg-muted">
             Hora de Perú. Viene puesta la de ahora; se puede corregir.
           </p>
           {errors.dateTime && (
-            <p id={dateTimeErrorId} role="alert" className="mt-1.5 text-sm text-red-600">
+            <p id={dateTimeErrorId} role="alert" className="mt-1.5 text-sm text-danger">
               {errors.dateTime.message}
             </p>
           )}
@@ -177,18 +177,18 @@ function ServiceProgressForm({ onClose, transition, service }: ServiceProgressMo
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={onClose}>
             Volver
-          </button>
-          <button type="submit" disabled={isPending} className={PRIMARY_BUTTON}>
+          </Button>
+          <Button variant="primary" type="submit" disabled={isPending}>
             {isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> {presentation.pendingLabel}
+                <Spinner size={16} className="mr-2 text-on-solid" /> {presentation.pendingLabel}
               </>
             ) : (
               presentation.submitLabel
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

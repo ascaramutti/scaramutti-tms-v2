@@ -2,7 +2,6 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
 import { Download, Eye, Loader2, Pencil, RefreshCw } from 'lucide-react'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { getApiErrorMessage, isPreconditionFailedError } from '../../../shared/utils/getApiErrorMessage'
 import { useQuotationPdf } from '../hooks/useQuotationPdf'
 import { getPdfErrorMessage, openQuotationPdf, saveQuotationPdf } from '../utils/quotationPdf'
@@ -11,6 +10,9 @@ import { RejectQuotationModal } from '../status/RejectQuotationModal'
 import { isQuotationEditable } from '../status/quotationStatusPresentation'
 import { QUOTATION_STATUS_LABELS } from '../utils/quotationLabels'
 import type { QuotationStatus } from '../../../api'
+import { Button } from '../../../shared/ui/Button'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
+import { Alert } from '../../../shared/ui/Alert'
 
 type PdfMode = 'preview' | 'download'
 
@@ -101,16 +103,13 @@ export function QuotationDetailActions({
   return (
     <div className="flex flex-col items-end gap-2">
       {staleConflict && (
-        <div
-          role="alert"
-          className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg px-4 py-3 text-sm text-warning-fg">
           <span>La cotización fue modificada por otra persona. Recargá para ver la versión actual.</span>
-          <button type="button" onClick={handleReload} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={handleReload}>
             <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
             Recargar
-          </button>
-        </div>
+          </Button>
+        </Alert>
       )}
 
       <div className="flex flex-wrap items-center justify-end gap-2">
@@ -122,37 +121,40 @@ export function QuotationDetailActions({
           onStatusError={handleStatusError}
         />
         {editable ? (
-          <Link to={`/cotizaciones/${quotationId}/editar`} className={SECONDARY_BUTTON}>
+          <Link
+            to={`/cotizaciones/${quotationId}/editar`}
+            className={buttonClasses({ variant: 'secondary' })}
+          >
             <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
             Editar
           </Link>
         ) : (
           <span className="group relative inline-flex">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               disabled
               aria-disabled
               aria-label={`Editar — ${notEditableReason}`}
-              className={`${SECONDARY_BUTTON} ${DISABLED}`}
+              className={DISABLED}
             >
               <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
               Editar
-            </button>
+            </Button>
             {/* Tooltip propio: aparece al instante con el hover (el `title` nativo tarda ~1s).
                 Decorativo (aria-hidden): el motivo ya viaja en el aria-label del botón. */}
             <span
               aria-hidden="true"
-              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-blue-700 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100"
+              className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-2 -translate-x-1/2 whitespace-nowrap rounded-md bg-accent-hover px-2 py-1 text-xs font-medium text-on-solid opacity-0 shadow-lg transition-opacity duration-100 group-hover:opacity-100"
             >
               {notEditableReason}
             </span>
           </span>
         )}
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={() => handlePdf('preview')}
           disabled={isPending}
-          className={`${SECONDARY_BUTTON} ${DISABLED}`}
+          className={DISABLED}
         >
           {pendingMode === 'preview' ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
@@ -160,12 +162,12 @@ export function QuotationDetailActions({
             <Eye className="mr-2 h-4 w-4" aria-hidden="true" />
           )}
           Previsualizar PDF
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          variant="primary"
           onClick={() => handlePdf('download')}
           disabled={isPending}
-          className={`${PRIMARY_BUTTON} ${DISABLED}`}
+          className={DISABLED}
         >
           {pendingMode === 'download' ? (
             <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
@@ -173,10 +175,10 @@ export function QuotationDetailActions({
             <Download className="mr-2 h-4 w-4" aria-hidden="true" />
           )}
           Descargar PDF
-        </button>
+        </Button>
       </div>
       {pdfError && (
-        <p role="alert" className="text-sm font-medium text-red-600">
+        <p role="alert" className="text-sm font-medium text-danger">
           {pdfError}
         </p>
       )}

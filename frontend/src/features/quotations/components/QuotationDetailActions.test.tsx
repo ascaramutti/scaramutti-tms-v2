@@ -20,6 +20,7 @@ import {
 } from '../../../test/mocks/handlers/quotations'
 import type { ChangeStatusBody } from '../../../test/mocks/handlers/quotations'
 import type { QuotationStatus, UserRole } from '../../../api'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 
 interface RenderOptions {
   status?: QuotationStatus
@@ -63,15 +64,29 @@ describe('QuotationDetailActions', () => {
   })
 
   // ----- PDF (sin cambios de comportamiento) -----
-  it('renderiza los botones Previsualizar y Descargar', () => {
+  it('renderiza los botones Previsualizar y Descargar, con Descargar como principal', () => {
     renderActions()
-    expect(screen.getByRole('button', { name: /previsualizar pdf/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /descargar pdf/i })).toBeInTheDocument()
+    const previsualizar = screen.getByRole('button', { name: /previsualizar pdf/i })
+    const descargar = screen.getByRole('button', { name: /descargar pdf/i })
+    expect(previsualizar).toBeInTheDocument()
+    expect(descargar).toBeInTheDocument()
+    // La jerarquía entre los dos es la decisión, no la presencia: descargar es lo que el
+    // usuario viene a hacer y previsualizar es el paso previo. Intercambiarlos deja los
+    // veintidós casos de este archivo en verde: medido. Por inclusión, porque los dos suman
+    // sus clases de `disabled:`.
+    const clases = (el: HTMLElement) => new Set(el.className.split(/\s+/))
+    expect(clases(descargar).has('bg-accent')).toBe(true)
+    expect(clases(previsualizar).has('bg-accent')).toBe(false)
+    expect(clases(previsualizar).has('border-border-strong')).toBe(true)
   })
 
-  it('muestra el botón Editar enlazando al wizard de edición', () => {
+  it('muestra Editar como enlace secundario al wizard de edición', () => {
     renderActions()
     expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', '/cotizaciones/1/editar')
+    // Con su variante: es el secundario de la barra, al lado del azul de Descargar PDF.
+    expect(screen.getByRole('link', { name: /editar/i }).className).toBe(
+      buttonClasses({ variant: 'secondary' }),
+    )
   })
 
   it('estado editable (SENT): Editar sigue siendo un link al wizard', () => {
@@ -90,6 +105,10 @@ describe('QuotationDetailActions', () => {
       const editar = screen.getByRole('button', { name: /editar/i })
       const reason = new RegExp(`no se puede editar una cotización ${label}`, 'i')
       expect(editar).toBeDisabled()
+      // Y `aria-disabled`, que es el atributo que la mudanza al componente compartido pasó
+      // del marcado al `...rest`. Sin esta línea, perderlo no rompía nada: la suite busca
+      // por rol y nombre accesible, y ese camino no lo mira.
+      expect(editar).toHaveAttribute('aria-disabled')
       // Tooltip propio (inmediato) con el motivo — reemplaza al `title` nativo (lento).
       expect(screen.getByText(reason)).toBeInTheDocument()
       // El motivo también viaja en el nombre accesible.
@@ -156,7 +175,7 @@ describe('QuotationDetailActions', () => {
     )
   })
 
-  it('deshabilita ambos botones de PDF mientras genera', async () => {
+  it('deshabilita ambos botones de PDF mientras genera, y los dos se ven apagados', async () => {
     server.use(quotationPdfSlow(50))
     vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     renderActions()
@@ -165,6 +184,13 @@ describe('QuotationDetailActions', () => {
 
     await waitFor(() => expect(screen.getByRole('button', { name: /descargar pdf/i })).toBeDisabled())
     expect(screen.getByRole('button', { name: /previsualizar pdf/i })).toBeDisabled()
+    // Y se VE deshabilitado: sin esto, quitarles la clase de opacidad dejaba los botones
+    // apagados solo para el DOM y encendidos para el ojo, con la suite en verde.
+    for (const nombre of [/descargar pdf/i, /previsualizar pdf/i]) {
+      expect(screen.getByRole('button', { name: nombre }).className).toContain(
+        'disabled:opacity-60',
+      )
+    }
     await waitFor(() => expect(screen.getByRole('button', { name: /descargar pdf/i })).toBeEnabled())
   })
 

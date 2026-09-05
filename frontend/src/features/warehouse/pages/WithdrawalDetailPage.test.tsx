@@ -191,7 +191,11 @@ describe('WithdrawalDetailPage', () => {
   it('muestra el botón Anular si el retiro está activo', async () => {
     server.use(warehouseWithdrawalDetail())
     renderDetalle()
-    expect(await screen.findByRole('button', { name: /anular/i })).toBeEnabled()
+    const boton = await screen.findByRole('button', { name: /anular/i })
+    expect(boton).toBeEnabled()
+    // Con el borde de CONTROL y no con el marco de la alerta, igual que su gemelo de entradas:
+    // el marco decora una caja, este borde es el único límite del botón.
+    expect(boton.className).toMatch(/border-danger-border-strong/)
   })
 
   it('no muestra el botón Anular si el retiro ya está anulado', async () => {

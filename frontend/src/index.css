@@ -1,7 +1,514 @@
 @import "tailwindcss";
 
-@theme {
+/* Nada de la carpeta del tema aporta clases al CSS de producción.
+   Tailwind escanea buscando nombres de clase y no distingue código de comentario
+   ni de literal: nombrar una utilidad en un test, o en la frase que la explica,
+   la crea de verdad en el bundle. Medido dos veces al escribir este archivo: un
+   comentario que nombraba dos utilidades del tema las agregó, y la palabra del
+   modificador de abajo agregó una regla de posición.
+   La exclusión toma la carpeta entera y no solo sus pruebas, y la razón es
+   concreta: dos de los cuatro módulos de apoyo nombran la palabra `static` en un
+   comentario, que es una utilidad de Tailwind. Medido: acotar el glob a las
+   pruebas devuelve `.static{position:static}` al bundle (35567 contra 35543
+   bytes). Verificado que es seguro: ningún archivo fuera de la carpeta los
+   importa. Consecuencia que conviene saber: acá no puede vivir código de
+   pantalla, porque sus clases no se publicarían y el build no diría nada; hay
+   una guarda en la prueba que lo impide.
+
+   Extenderla a todos los tests es probablemente lo correcto y saca ~1.5 kB del
+   bundle, pero eso cambia qué clases se publican y merece su propio PR, con el
+   diff a la vista. */
+@source not "./shared/theme/**";
+
+/* ============================================================================
+   Tokens semánticos del tema.
+
+   Los colores se nombran por FUNCIÓN ("la superficie de una tarjeta") y no por
+   tono ("blanco"), porque el nombre tiene que seguir siendo cierto cuando el
+   valor cambie: el modo oscuro redefine estas mismas variables y no toca una
+   sola clase del marcado.
+
+   Los valores de acá son los que la aplicación YA usa. Se midieron contando las
+   clases crudas del árbol, no se eligieron:
+     SRC=$(find src \( -name "*.tsx" -o -name "*.ts" \) ! -name "*.test.*")
+     PROP='bg|text|border|ring|divide|placeholder|from|to|via|outline|decoration|accent|fill|stroke|caret|shadow'
+     PAL='slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|white|black'
+     cat $SRC | grep -oE "($PROP)-($PAL)(-[0-9]{2,3})?" | sort | uniq -c | sort -rn
+   Al escribir esto, ese comando da 1246 clases crudas en 116 archivos de
+   producción (acotado a las seis familias que este mapa cubre, 1227). Por eso
+   hay CUATRO niveles de texto y DOS de borde: no es ruido, son roles distintos
+   y usados de forma consistente. Aplanarlos sería un cambio visual.
+
+   Los hexadecimales son la conversión a sRGB de los oklch() de Tailwind 4
+   (node_modules/tailwindcss/theme.css). El comentario de cada línea dice de qué
+   color de la paleta sale, para que el reemplazo sea comprobable.
+
+   Dos cosas sobre la declaracion, las dos medidas contra el Tailwind 4.3.0 de
+   este proyecto y no leídas de la documentación:
+
+   1. Va `@theme static` y no `@theme` a secas. Sin `static`, Tailwind descarta
+      del CSS final toda variable que ninguna utilidad use, y como este archivo
+      llega antes que los componentes que lo van a usar, las 27 quedarían
+      afuera: el CSS compilado sale idéntico al de antes, byte por byte. Con
+      `static` se emiten siempre.
+   2. NO usar `@theme inline`. Esa variante hornea el valor dentro de cada
+      utilidad. Con ella el modo oscuro no funcionaría y el fallo sería
+      silencioso, porque el CSS compila igual. Con `@theme` las utilidades
+      emiten var(--color-...), que es lo que permite redefinir el valor en un
+      solo lugar y dar vuelta la aplicacion entera.
+
+   MAPA para los PRs de extracción y para el barrido de colores sueltos. A la
+   izquierda lo que está escrito en los componentes, a la derecha el token.
+
+   ⚠️ LOS NÚMEROS ENTRE PARÉNTESIS SON UNA FOTO, NO UN CONTADOR VIVO. Se midieron
+   sobre `develop` al escribir este mapa (PR 1, 2026-09-02) y cada PR de extracción
+   consume una parte, así que quedan altos: el PR del botón, por ejemplo, bajó
+   text-slate-700 de 111 a 104, ring-blue-500 de 75 a 64 y bg-blue-600 de 23 a 19.
+   NO se actualizan fila por fila, porque mantener veinte números a mano en cada PR es
+   una fuente de error mayor que volver a medir. Antes de usar una cifra, re-medila:
+
+     git grep -o -- "<la clase>" HEAD -- frontend/src | grep -v index.css | wc -l
+
+   Ese comando cuenta también las menciones dentro de comentarios y de aserciones, que
+   los PRs de mudanza escriben para explicar lo que dejan afuera. Hoy hay una sola
+   (`bg-white` dentro de la nota de `EntryDetailPage`), así que ese conteo da 98 y los
+   usos reales son 97; si la diferencia importa, hay que mirar las líneas, no el total.
+
+   Lo que el mapa sí fija y no cambia es la CORRESPONDENCIA clase -> token, que es
+   para lo que existe.
+
+   ⚠️ EL MAPA ES DE MUCHOS A UNO, Y ESO CAMBIA TONOS. Cada token es un solo valor,
+   así que donde una fila junta dos tonos, uno de los dos se pierde. Aplicar el
+   mapa entero cambia el valor de 81 usos, listados abajo. El dueño lo aceptó el
+   2026-09-02, con dos excepciones que se convirtieron en tokens propios porque
+   bajaban el contraste: el borde de error de un control y el realce sutil de
+   fila. "Los valores son los que la aplicación ya usa" vale token por token, NO
+   uso por uso.
+
+     bg-slate-50 de AppLayout y LoginPage (2)     -> bg-canvas
+     bg-white (104)                               -> bg-surface
+     bg-slate-50 restante (63: 30 hover del botón
+       secundario, 21 cajas inertes y de solo
+       lectura, 5 hover de otras cosas (una sola
+       es fila de tabla), 4 encabezados y pie de
+       tabla, 2 deshabilitado, 1 focus)           -> bg-surface-subtle
+     bg-slate-100 (12)                            -> bg-surface-muted
+     text-slate-900 (109), text-slate-800 (2)     -> text-fg
+     text-slate-700 (111), text-slate-600 (22)    -> text-fg-body
+     text-slate-500 (126)                         -> text-fg-muted
+     text-slate-400 (46, de los cuales 9 son
+       placeholder, 2 deshabilitado, unos 18
+       íconos, y el RESTO texto corriente, que a
+       2.63 es un incumplimiento liso)            -> text-fg-subtle
+     border-slate-200 (73), -100 (5), divide-~    -> border-border
+     border-slate-300 (67)                        -> border-border-strong
+     bg-blue-600 (23), text-blue-600 (24)         -> ~-accent
+     ring-blue-500 (75), focus:border-blue-500 (19) -> ~-focus
+     hover:bg-blue-700 (15), bg-blue-700 sólido
+       (1, QuotationDetailActions), text-blue-700 (16) -> ~-accent-hover
+     bg-blue-50 (8), bg-blue-100 (7)              -> ~-accent-soft
+     border-blue-300 de la caja informativa (3)    -> border-accent-border
+     text-white (32) sobre un relleno de color    -> text-on-solid
+     hover:bg-red-700 (3, el hover del
+       relleno destructivo)                       -> ~-danger-hover
+     text-red-600 (32), bg-red-600 (3),
+       ring-red-500 (14, entre focus y focus-visible),
+       focus:border-red-500 (6)                   -> ~-danger
+     bg-red-50 (20)                               -> bg-danger-soft
+     text-red-700 (19), text-red-800 (6)          -> text-danger-fg
+     border-red-200 (11)                          -> border-danger-border
+     border-red-300 (23), borde de error de un
+       control                                    -> border-danger-border-strong
+     text-amber-700 (16)                          -> text-warning
+     bg-amber-50 (15), bg-amber-100 (3)           -> bg-warning-soft
+     text-amber-800 (14), text-amber-900 (12)     -> text-warning-fg
+     border-amber-200 (13), -300 (2)              -> border-warning-border
+     Los divide-slate-100 (2) van con border-slate-100: son el separador de
+     filas de DataTable y de ReportRowsList.
+     bg-emerald-100 y text-emerald-700 de Badge,
+       y el text-emerald-700 del kardex           -> ~-success-soft, ~-success-fg
+
+   RESUELTO, y así se lee esta entrada: el relleno del primario deshabilitado estuvo crudo a
+     propósito mientras no hubiera con qué medirlo. La condición era mirarlo junto a los otros
+     deshabilitados en vez de inventarle un rol, y eso pasó en el PR del modo oscuro: los otros
+     usan TRES recetas de opacidad, que se quedan como están porque una opacidad es lo correcto
+     para un control inactivo, y los dos azules apagados que había (uno en los modales de alta al
+     vuelo y el asistente, otro más claro todavía en las pantallas de sesión) eran el único caso
+     que necesitaba valor propio por tema. Los dos pasaron a `accent-disabled`, que es el token
+     que aparece más abajo en este mismo archivo.
+
+   LOS 81 USOS QUE CAMBIAN DE TONO al aplicar el mapa, con su antes y después. Las
+   tres cifras de cada fila son la foto del PR 1, lo medido en la base del primer
+   barrido (b24725a) y lo que queda hoy. Se cuentan así, desde `frontend/`:
+   `find src -name '*.tsx' -o -name '*.ts' | xargs grep -oh "<la clase>" | wc -l`.
+   El total medido hoy es 32, y baja PR a PR: la foto daba 81, la base del barrido
+   daba 52. DOS FILAS DEJARON DE SER COLAPSOS y por eso están en cero sin haber
+   cambiado ningún tono: `bg-blue-100` y `bg-amber-100` tienen desde el PR 5 su token
+   propio (`accent-soft-strong` y `warning-soft-strong`), así que se convierten sin
+   moverse. El resto sí cambió de tono donde dice la fila.
+     text-slate-600 -> slate-700      22 · 16 ·  7
+     ring-red-500 -> red-600          14 ·  7 ·  6
+     text-amber-900 -> amber-800      12 · 12 · 11
+     bg-blue-100 -> ya no colapsa      7 ·  1 ·  0
+     focus:border-red-500 -> red-600   6 ·  0 ·  0
+     text-red-800 -> red-700           6 ·  6 ·  6
+     border-slate-100 -> slate-200     5 ·  5 ·  0
+     bg-amber-100 -> ya no colapsa     3 ·  0 ·  0
+     text-slate-800 -> slate-900       2 ·  2 ·  0
+     border-amber-300 -> amber-200     2 ·  1 ·  1
+     divide-slate-100 -> slate-200     2 ·  2 ·  1
+   Dos de esos merecen mirarse al hacerlos. De los 12 text-amber-900, ocho son el
+   enlace subrayado DENTRO del banner ámbar cuyo texto es text-amber-800, así que
+   tras el barrido el enlace se distingue solo por el subrayado (8.73 -> 6.84 sobre
+   el fondo real, que es amber-50). Los otros cuatro son de ResourceConflictAlert y
+   NO son enlaces: son el cuerpo de la alerta, la tabla de conflictos, el párrafo
+   de consecuencia y un botón sobre blanco; ahí el colapso baja el texto principal
+   de la alerta sin que nada lo distinga de lo que era. Y los 20 del foco rojo
+   dejan el anillo y el borde del mismo color, que es lo que se buscaba, pero un
+   paso más oscuro que hoy.
+
+   Hubo TRES que no cambiaban un tono sino que borraban un elemento, y las tres se
+   RESOLVIERON con los dos tonos suaves fuertes que declara este archivo (ruling
+   del dueño 2026-09-03, mismo criterio que el borde de error). Salían de juntar
+   dos tonos suaves en un token: (1) la fila de un servicio integral es bg-blue-50
+   (QuotationItemsSection.tsx) y adentro va una pastilla informativa que era
+   bg-blue-100 sin borde, así que la pastilla pasaba de separarse a 1.12 a no
+   separarse (1.00) y desaparecía dentro de la fila; hoy la pastilla usa
+   `accent-soft-strong` y conserva el 1.12. (2) El botón de forzar de
+   ResourceConflictAlert vive dentro del banner ámbar y su relleno de hover era
+   bg-amber-100, que tras el barrido habría sido exactamente el color del banner
+   (1.07 -> 1.00); hoy usa `warning-soft-strong` y conserva el 1.07. Su borde
+   sigue siendo amber-300 crudo y ese caso QUEDA ABIERTO para el barrido: el mapa
+   lo manda a amber-200 y ahí sí cae de 1.40 a 1.20 contra el banner. (3) El botón
+   de IntegralComponents.tsx es bg-blue-50 con hover:bg-blue-100 y también queda
+   abierto: es un hover de botón, no una pastilla, y el token que lo arregla ya
+   existe, pero cambiarlo es del barrido que toque ese archivo.
+
+   `success` a secas no sale de ningún relleno sólido: hoy no existe alerta de
+   éxito. Vale lo mismo que `success-fg` a propósito, y el par que lo mide es el
+   texto del kardex.
+
+   El mapa NO cubre todos los colores del árbol, y la partición cierra así:
+     1178 usos mapeados (41 clases)
+     +  49 sueltos de estas mismas familias (25 clases)
+     = 1227 de las seis familias con las seis propiedades
+     +  19 de familias y propiedades que el mapa ni mira (rose, sky, teal,
+          orange y violet, más un shadow-slate-200)
+     = 1246, el censo del encabezado
+   Entre los 19, la variante de peligro de Badge, que es rose y no red. Los levanta
+   el PR de barrido, decidiendo caso por caso. Para listarlos, escribí las clases
+   de este mapa una por línea en `mapeadas.txt` (son las 37 escritas a la
+   IZQUIERDA de las flechas más las 4 formas cortas `border-slate-100`,
+   `border-amber-300`, `divide-slate-100` y `divide-slate-200`, 41 en total) y
+   corré:
+     SEIS='(bg|text|border|ring|divide|placeholder)-(slate|blue|red|amber|emerald|white)(-[0-9]{2,3})?'
+     cat $SRC | grep -oE "$SEIS" | sort > todos.txt
+     grep -vxF -f mapeadas.txt todos.txt | sort | uniq -c | sort -rn   # los 49, por clase
+
+   M2: hay un uso que el mapa ABSORBE sin cubrirlo, y por eso no aparece en ese
+   censo: el séptimo border-red-500, el del círculo de paso en error
+   (Stepper.tsx:58). La fila solo declara la forma con focus:, así que el sólido
+   queda sin destino y mapearlo a danger sería cambio visual. Se nombra acá por la
+   misma razón que el text-slate-300.
+
+   Ese uso sin token también se resolvió en el PR del modo oscuro. El ícono decorativo pasó a
+   `trace`, el token del trazo que no es texto ni borde, junto con la línea que une dos pasos del
+   asistente. Sigue sin medirse contra un umbral, por la misma razón por la que no tenía token:
+   es decorativo y no comunica solo. Lo que le faltaba, y ahora tiene, es un valor por tema.
+
+   Trece pares del tema claro quedan por debajo de su umbral de WCAG AA (4.5:1
+   los de texto, 3:1 los de elemento de interfaz). Nueve son anteriores a este
+   archivo y cuatro los hace visibles un token nuevo (el borde de control en
+   error y el realce sutil de fila, dos pares cada uno). Uno de los trece, el
+   texto de un control deshabilitado,
+   no es un incumplimiento: WCAG exime los controles inactivos, y se mide igual
+   para que el par quede declarado. Están
+   declarados como excepciones conocidas en
+   src/shared/theme/theme-contrast.test.ts, cada una con su cociente medido y su
+   lugar, y se arreglan en un PR propio, porque arreglarlos cambia el aspecto del
+   modo claro. El número sale de contar ese objeto, no de acá.
+   ============================================================================ */
+
+@theme static {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+
+  /* Fondo de la página y superficies. `surface-subtle` vale lo mismo que
+     `canvas` a propósito: es el realce de una fila con el mouse encima o el
+     fondo de una caja de solo lectura, y hoy los dos son el mismo gris. Existe
+     aparte porque colapsarlo a `surface-muted` oscurecía 63 usos y dejaba el
+     texto secundario del hover de fila en 4.35, bajo AA, en 35 lugares.
+     Ruling del dueño 2026-09-02. */
+  --color-canvas: #f8fafc;        /* slate-50  */
+  --color-surface: #ffffff;       /* white     */
+  --color-surface-subtle: #f8fafc;/* slate-50  */
+  --color-surface-muted: #f1f5f9; /* slate-100 */
+
+  /* Texto, de más a menos énfasis, y la escala se lee en ese orden: cada uno separa menos que
+     el anterior. Los dos del medio se corrieron un paso cada uno el 2026-09-05, porque el de
+     sugerencia daba 2.42 en su peor fondo contra los 4.5 que pide la norma.
+
+     Se corrieron LOS DOS y no solo el de abajo, que fue la primera idea y estaba mal: mover
+     solo el de sugerencia lo dejaba más oscuro que el secundario, o sea el rol de menos
+     énfasis pintando más fuerte que el de más. Y no era solo estético: el ítem de menú
+     deshabilitado y el texto de un campo deshabilitado se distinguen del habilitado SOLO por
+     este token, y con la escala dada vuelta pasaban a separarse 1.37 y 2.35. Cruzando los dos
+     pasos la jerarquía queda en orden, esas dos señales suben, y encima queda una excepción
+     menos. Lo levantó la revisión midiendo las dos asignaciones.
+
+     Queda una sola excepción de esta familia: el texto de sugerencia dentro de la caja de
+     notas, que da 4.38. No hay a dónde moverlo sin volver a romper el orden. */
+  --color-fg: #0f172b;            /* slate-900 */
+  --color-fg-body: #314158;       /* slate-700 */
+  --color-fg-muted: #45556c;      /* slate-600 */
+  --color-fg-subtle: #62748e;     /* slate-500 */
+
+  /* Bordes: el de las tarjetas y tablas, y el de los controles.
+
+     El de los controles vale lo mismo que el texto de sugerencia, y no es un descuido ni un
+     token compartido: son dos roles con el mismo valor, como ya pasa con el verde de éxito y
+     el de su texto. Se separan porque uno puede moverse sin el otro. Llegó acá porque es el
+     borde de TODOS los campos y el del botón secundario, o sea lo único que dice dónde
+     empieza el control, y a 1.49 contra la tarjeta no lo decía. Ahora da 4.76. */
+  --color-border: #e2e8f0;        /* slate-200 */
+  --color-border-strong: #62748e; /* slate-500 */
+
+  /* Acento. `on-solid` es el texto y los íconos que van ENCIMA de cualquier
+     relleno sólido de color (botón primario y destructivo): existe como token
+     propio porque es el que se da vuelta en el modo oscuro. */
+  --color-accent: #155dfc;        /* blue-600  */
+  --color-accent-hover: #1447e6;  /* blue-700  */
+  --color-accent-soft: #eff6ff;   /* blue-50   */
+  /* El azul suave FUERTE, un paso por encima del anterior. Existe por la misma razón que
+     `danger-border-strong`: el mapa mandaba los dos azules suaves al mismo token y la
+     pastilla informativa, que se dibuja DENTRO de la fila azul de un servicio integral,
+     pasaba de separarse 1.12 a 1.00, o sea a desaparecer. Ruling del dueño 2026-09-03,
+     mismo criterio que `danger-border-strong` y `accent-border`. */
+  --color-accent-soft-strong: #dbeafe; /* blue-100 */
+  /* El borde de la caja informativa, espejo de `danger-border` y `warning-border`. Lo
+     pidió el PR de `Card` y `Alert`: sin él, la variante informativa quedaba con un
+     `border-blue-300` crudo, que es justo lo que el mapa existe para evitar. Ruling del
+     dueño 2026-09-03, mismo criterio que `danger-hover` en el PR del botón: token propio
+     antes que tono crudo o prestado. */
+  --color-accent-border: #8ec5ff; /* blue-300  */
+  --color-on-solid: #ffffff;      /* white     */
+  /* El relleno del primario APAGADO. Unifica los dos tonos que convivían para el mismo rol,
+     uno en los cinco modales de alta al vuelo y otro en las dos pantallas de sesión. Se
+     eligió el más oscuro de los dos: con el otro, el texto encima daba 1.81 y el botón que
+     el usuario está esperando no se leía. WCAG exime los controles inactivos, así que no es
+     un incumplimiento, pero un estado que no se lee no es un estado. Ruling del dueño
+     2026-09-04. */
+  --color-accent-disabled: #51a2ff; /* blue-400 */
+
+  /* Anillo de foco. Separado del acento porque el foco tiene que poder subir de
+     contraste sin que cambie el color de los botones. */
+  --color-focus: #2b7fff;         /* blue-500  */
+
+  /* Estados. Cada uno con la misma forma: el color sólido, el fondo suave de la
+     alerta, el texto sobre ese fondo y su borde. `success` no lleva borde: hoy
+     no existe ninguna alerta de éxito que lo necesite. */
+  --color-danger: #e7000b;        /* red-600     */
+  /* El hover del relleno destructivo, espejo de `accent-hover`. Vale lo mismo
+     que `danger-fg`, y existe aparte a propósito: son dos roles distintos, y
+     prestarle a un botón el token del texto de una alerta lo rompe de costado el
+     día que ese texto se ajuste por contraste. Ruling 2026-09-02, cierra la
+     asimetría que la revisión del PR 1 dejó anotada. */
+  --color-danger-hover: #c10007;  /* red-700     */
+  --color-danger-soft: #fef2f2;   /* red-50      */
+  /* El rojo suave FUERTE, tercero de la misma serie que el azul y el ámbar y por el mismo
+     motivo: es el relleno con el que responde al mouse el botón de descartar, que vive
+     DENTRO de la alerta roja. Con el fondo suave a secas el hover no se distinguiría del
+     panel que lo contiene. Ruling del dueño 2026-09-04. */
+  --color-danger-soft-strong: #ffe2e2; /* red-100 */
+  --color-danger-fg: #c10007;     /* red-700     */
+  --color-danger-border: #ffc9c9; /* red-200     */
+  /* El borde de un control en estado de error, el del botón de descartar y, desde el PR del
+     contraste claro, también el de los botones de anular de almacén, que antes usaban el
+     marco de la alerta y por eso no se podían arreglar sin cambiarla a ella. Token propio
+     porque es un elemento de interfaz (WCAG 1.4.11): el marco decora, este delimita.
+     Pasa de 1.92 a 3.81 contra la tarjeta, 3.48 contra la alerta roja y 3.64 contra la
+     página. Ruling del dueño 2026-09-02, valor corregido el 2026-09-05. */
+  --color-danger-border-strong: #fb2c36; /* red-500 */
+
+  --color-warning: #bb4d00;        /* amber-700  */
+  --color-warning-soft: #fffbeb;   /* amber-50   */
+  /* El ámbar suave fuerte, espejo del azul de arriba: es el relleno del chip que quita el
+     filtro de stock bajo, y colapsarlo al fondo del banner lo dejaba sin relleno propio.
+     Ruling del dueño 2026-09-03. */
+  --color-warning-soft-strong: #fef3c6; /* amber-100 */
+  --color-warning-fg: #973c00;     /* amber-800  */
+  --color-warning-border: #fee685; /* amber-200  */
+  /* El borde que es el ÚNICO límite de un elemento, espejo exacto de `danger-border-strong`
+     y por el mismo motivo: colapsarlo al marco de la alerta lo deja casi invisible. Son el
+     borde punteado de la tarjeta de componente integral y el del botón de forzar de
+     operaciones, los dos con relleno propio dentro de una caja del mismo tono. Pasa de 1.45
+     a 3.20 contra la tarjeta y de 1.40 a 3.09 contra el banner ámbar, que es el par que
+     nadie había listado. Ruling del dueño 2026-09-04, valor corregido el 2026-09-05. */
+  --color-warning-border-strong: #e17100; /* amber-600 */
+
+  /* Las dos variantes de pastilla que sobreviven al recorte de las decorativas, con nombre
+     por función y no por color. `progress` es el viaje en movimiento y `transition` es el
+     cambio de estado (la cotización aceptada y la entrada de bitácora que registra un
+     cambio). Existen como tokens y no como color crudo porque el modo oscuro necesita su
+     par, igual que los estados. Ruling del dueño 2026-09-03, que corrige la decisión 4:
+     de cuatro decorativas quedan dos con nombre, `slate` era un renombre de la neutra y
+     el rosa se funde en el rojo de peligro. */
+  --color-progress-soft: #ede9fe; /* violet-100 */
+  --color-progress-fg: #7008e7;   /* violet-700 */
+  --color-transition-soft: #cbfbf1; /* teal-100 */
+  /* El relleno sólido de la misma familia, para la acción de aceptar una cotización, que es
+     la que produce el estado que la pastilla `transition` muestra. Espejo de `accent` y
+     `accent-hover`. Vale lo mismo que `transition-fg` a propósito, como pasa entre
+     `danger-hover` y `danger-fg`: son dos roles distintos y separarlos es lo que permite
+     ajustar uno sin romper el otro. El botón queda un paso más oscuro que hoy y eso ARREGLA
+     un incumplimiento heredado: el blanco sobre teal-600 daba 3.67 y sobre este da 5.36.
+     Ruling del dueño 2026-09-03. */
+  --color-transition: #00786f;      /* teal-700 */
+  --color-transition-hover: #005f5a; /* teal-800 */
+  --color-transition-fg: #00786f; /* teal-700 */
+
+  --color-success: #007a55;       /* emerald-700 */
+  --color-success-soft: #d0fae5;  /* emerald-100 */
+  --color-success-fg: #007a55;    /* emerald-700 */
+  --color-success-border: #a4f4cf;/* emerald-200 */
+
+  /* Tres roles que no son ni texto, ni relleno de estado, ni borde, y que hasta este PR
+     vivían escritos a mano porque prestarles el token de otro rol es lo que este archivo
+     rechaza desde el principio. Los tres necesitan un valor propio en oscuro, que es lo que
+     los trajo acá. Ruling del dueño 2026-09-04. */
+  /* El velo que apaga el fondo detrás de un modal. En claro la tarjeta blanca salta contra
+     él (4.83); en oscuro NINGÚN velo llega a eso, porque el fondo ya es oscuro, y lo que
+     recorta la tarjeta pasa a ser su borde (1.74 contra el velo). Se acepta con ese número
+     a la vista. La opacidad la pone el sitio, no el token.
+
+     Y esto SÍ cambia el tema claro, que es la excepción a la regla de que el barrido no
+     mueve un pixel: el sitio pasa de aplicar la mitad a aplicar tres quintos, así que el
+     velo de todos los modales queda un paso más oscuro y la tarjeta separa 4.83 donde antes
+     separaba 3.54. Es la segunda de las dos sustituciones que cambian el aspecto del claro,
+     junto con el primario apagado, y va con el mismo ruling del dueño de esa fecha: el
+     documento de diseño había razonado el velo a esa opacidad y el código embarcaba la
+     anterior, así que los números que se habían dado eran de otro velo que el que se veía. */
+  --color-overlay: #0f172b;       /* slate-900 */
+  /* La sombra de una tarjeta elevada. Un solo uso hoy, el de la pantalla de ingreso, que
+     además ya lleva un filete: la sombra acompaña. */
+  --color-elevation: #e2e8f0;        /* slate-200 */
+  /* El relleno del chip de filtro cuando el mouse está encima, un paso por encima de su
+     relleno en reposo. */
+  --color-warning-soft-hover: #fee685; /* amber-200 */
+  /* El trazo decorativo que no es texto ni borde: el ícono de una pantalla sin datos y la
+     línea que une dos pasos del asistente. Los dos hacen lo mismo y por eso comparten
+     token. */
+  --color-trace: #cad5e2;         /* slate-300 */
+}
+
+/* ============================================================================
+   EL TEMA OSCURO.
+
+   Redefine las MISMAS 45 variables, y nada más: ni una utilidad, ni una regla
+   de componente, ni una variante en el marcado. Por eso el modo oscuro no
+   agrega una sola clase a ningún archivo de `src`.
+
+   Va como selector de atributo y NO como un segundo `@theme`: un segundo bloque
+   de tema no redefine al primero, lo pelea, y `@theme inline` hornearía el valor
+   en cada utilidad y dejaría el atributo sin efecto. Acá son variables CSS
+   comunes, que es exactamente lo que la cascada sabe resolver.
+
+   `color-scheme` no es decorativo: sin él el navegador pinta con el tema claro
+   todo lo que no controlamos, y en esta aplicación eso incluye las barras de
+   desplazamiento, el autocompletado y los selectores nativos de fecha, que se
+   usan en varios formularios. Quedan blancos sobre fondo oscuro y se leen como
+   un defecto.
+
+   Los valores no se eligieron acá: son los que el dueño aprobó mirando el
+   prototipo, y están en la tabla de la sección 2.2 del documento de diseño con
+   su color de partida. Medidos los 73 pares del tema contra esta paleta: NINGUNO
+   empeora respecto del tema claro al punto de romper un mínimo que hoy cumple. La
+   distancia entre los dos temas se achicó mucho con el PR del contraste claro, que
+   arregló DIECISIETE de las veintiuna excepciones que el claro arrastraba: hoy le
+   quedan CUATRO y al oscuro dos, y de esas cuatro el oscuro cumple DOS. El detalle,
+   par por par, está en la prueba de contraste, que los mide en los dos temas.
+
+   Los números de este comentario salen de correr, desde `frontend/`:
+   `npx vitest run src/shared/theme/theme-contrast.test.ts`, cuyas listas congeladas
+   son las que los fijan. La primera versión decía 40, 68, diez y dieciocho: cuatro
+   conteos escritos de memoria, los cuatro mal, y los levantó la revisión. Los dos
+   últimos volvieron a moverse cuando una ronda posterior encontró un par de texto
+   que ninguna lista tenía y entró con su excepción: por eso se miden, no se recuerdan.
+   ============================================================================ */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-canvas: #0b1626;
+  --color-surface: #132238;
+  --color-surface-subtle: #16273f;
+  --color-surface-muted: #1b2f4a;
+  --color-fg: #eef3fa;
+  --color-fg-body: #cfdbeb;
+  --color-fg-muted: #a4b6d0;
+  --color-fg-subtle: #8195b4;
+  --color-border: #263a58;
+  --color-border-strong: #526f9c;
+  --color-accent: #5b9bff;
+  --color-accent-hover: #7cb0ff;
+  --color-accent-soft: #12294a;
+  --color-accent-soft-strong: #0e2036;
+  --color-accent-border: #1e4976;
+  --color-on-solid: #08121f;
+  /* El foco NO comparte valor con el hover del acento, que es lo que pasaba con el valor de
+     la tabla original: los dos daban #7cb0ff y un anillo sobre un relleno de ese tono se
+     pierde. Este reproduce la separación que el tema claro ya tiene entre esos dos roles
+     (1.81 acá, 1.82 en claro). Ruling del dueño 2026-09-04, tras la revisión. */
+  --color-focus: #dbeafe;
+  --color-danger: #f87171;
+  --color-danger-hover: #fca5a5;
+  --color-danger-soft: #3a1620;
+  --color-danger-soft-strong: #310c10;
+  --color-danger-fg: #fca5a5;
+  --color-danger-border: #7f2436;
+  --color-danger-border-strong: #d4667c;
+  --color-warning: #fbbf24;
+  --color-warning-soft: #3a2a10;
+  --color-warning-soft-strong: #4a3614;
+  --color-warning-fg: #fcd34d;
+  --color-warning-border: #6b4f18;
+  /* Corregido el 2026-09-05: el valor aprobado daba 2.74 contra el banner ámbar, y ese par
+     no estaba en la lista, así que el fallo no lo veía nadie. Es el borde del botón de
+     forzar, o sea el único límite de un control, que es lo que este tema se comprometió a
+     que se vea. El empujón lo lleva a 3.07 sin acercarlo a ninguno de sus vecinos. */
+  --color-warning-border-strong: #927224;
+  --color-progress-soft: #251f3a;
+  --color-progress-fg: #c4b4ff;
+  --color-transition-soft: #00312d;
+  --color-transition: #46ecd5;
+  --color-transition-hover: #96f7e4;
+  --color-transition-fg: #46ecd5;
+  --color-success: #34d399;
+  --color-success-soft: #0d2f27;
+  --color-success-fg: #6ee7b7;
+  --color-success-border: #1c5c46;
+
+  --color-accent-disabled: #4c74a5;
+  /* Negro y no el gris de texto: en oscuro el velo tiene que RESTAR luz, y el tono del texto
+     sobre un lienzo ya oscuro no resta nada (1.01 de separación, medido). */
+  --color-overlay: #000000;
+  --color-elevation: #000000;
+  --color-warning-soft-hover: #6b4f1d;
+  --color-trace: #44577a;
+}
+
+/* El modo de alto contraste del sistema operativo, que es el único que la aplicación no controla.
+   Ahí el navegador fuerza `box-shadow: none`, así que **todo anillo de foco desaparece**; y el
+   `outline-style: none` que cada control declara para no ver dos marcas a la vez SOBREVIVE. El
+   resultado sin esta regla es el peor de los dos mundos: los controles se quedan sin ninguna señal
+   de foco justo en el modo que existe para que las señales se vean.
+
+   Va por elemento enfocado y no sitio por sitio a propósito: hay 81 declaraciones de `outline-none`
+   en el árbol y esta regla las cubre a todas, incluidas las que se escriban mañana. El color es una
+   palabra del sistema, no un token: en este modo el navegador ignora los colores del autor. */
+@media (forced-colors: active) {
+  :focus-visible {
+    outline: 2px solid CanvasText;
+    outline-offset: 2px;
+  }
 }
 
 @layer base {

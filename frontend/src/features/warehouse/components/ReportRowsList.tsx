@@ -1,6 +1,7 @@
 import type { WarehouseReportResponse, WarehouseReportRowResponse } from '../../../api'
 import { formatCurrency, formatDateOnly, formatQuantity } from '../../../shared/utils/formatters'
 import { reportCutMeta } from '../utils/reportCuts'
+import { Card } from '../../../shared/ui/Card'
 
 interface ReportRowsListProps {
   report: WarehouseReportResponse
@@ -53,26 +54,26 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
   const maxWeight = report.rows.reduce((max, row) => Math.max(max, rowWeight(row)), 1)
 
   return (
-    <section className="rounded-xl border border-slate-200 bg-white shadow-sm">
-      <h2 className="border-b border-slate-200 px-5 py-4 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <Card as="section" padding="none">
+      <h2 className="border-b border-border px-5 py-4 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         {meta.label}
       </h2>
-      <ul className="divide-y divide-slate-100">
+      <ul className="divide-y divide-border">
         {report.rows.map((row, index) => {
           const amounts = amountsLabel(row)
           const detail = detailLabel(row, report.cut)
           return (
             <li key={`${row.label}-${index}`} className="px-5 py-3.5">
               <div className="flex items-baseline justify-between gap-4">
-                <p className="text-sm font-medium text-slate-900">
+                <p className="text-sm font-medium text-fg">
                   {row.label}
                   {detail && (
-                    <span className="ml-2 text-xs font-normal text-slate-400">{detail}</span>
+                    <span className="ml-2 text-xs font-normal text-fg-subtle">{detail}</span>
                   )}
                 </p>
-                <p className="shrink-0 text-sm font-semibold tabular-nums text-slate-900">
+                <p className="shrink-0 text-sm font-semibold tabular-nums text-fg">
                   {amounts}
-                  <span className="ml-2 text-xs font-normal text-slate-500">
+                  <span className="ml-2 text-xs font-normal text-fg-muted">
                     {formatQuantity(row.count)} {meta.countLabel}
                   </span>
                 </p>
@@ -80,11 +81,11 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
               {/* Decorativa: repite montos que ya están en texto dos líneas
                   arriba, así que se oculta en vez de anunciarse por segunda vez. */}
               <div
-                className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
+                className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted"
                 aria-hidden="true"
               >
                 <div
-                  className="h-full rounded-full bg-blue-600"
+                  className="h-full rounded-full bg-accent"
                   // El mínimo del 3% hace visible una fila de monto chico, pero
                   // el cero se dibuja vacío: un producto sin precio de compra de
                   // referencia no debe verse igual que uno con monto.
@@ -100,6 +101,6 @@ export function ReportRowsList({ report }: ReportRowsListProps) {
           )
         })}
       </ul>
-    </section>
+    </Card>
   )
 }

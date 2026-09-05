@@ -1,4 +1,7 @@
 import type { QuotationResponse } from '../../../api'
+import { Badge } from '../../../shared/ui/Badge'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 /**
  * Sección de lectura del motivo de rechazo en el Detalle. Espeja la observación interna de
@@ -19,18 +22,18 @@ export function QuotationRejectionReasonSection({ quotation }: { quotation: Quot
 
   return (
     <section>
-      <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-900">
+      <h2 className="flex flex-wrap items-center gap-2 text-base font-semibold text-fg">
         Motivo del rechazo
-        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+        <Badge variant="info" bordered>
           <span aria-hidden="true">🔒</span>
           interno
-        </span>
+        </Badge>
       </h2>
-      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-        <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
-          <p className="whitespace-pre-wrap break-words text-sm text-blue-900">{rejectionReason}</p>
-        </div>
-      </div>
+      <Card className="mt-3">
+        <Alert variant="info" role={undefined} className="rounded-lg p-4">
+          <p className="whitespace-pre-wrap break-words text-sm text-accent-hover">{rejectionReason}</p>
+        </Alert>
+      </Card>
     </section>
   )
 }

@@ -53,8 +53,8 @@ export function Step4Resumen({
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Resumen final</h2>
-        <p className="text-xs text-slate-500">Revisa los datos antes de guardar la cotización.</p>
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">Resumen final</h2>
+        <p className="text-xs text-fg-muted">Revisa los datos antes de guardar la cotización.</p>
       </div>
 
       <Step4SummaryCard selectedClient={selectedClient} currencies={currencies} paymentTerms={paymentTerms} />
@@ -62,7 +62,7 @@ export function Step4Resumen({
       {mappedItems.length === 0 ? (
         <div
           role="alert"
-          className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500"
+          className="rounded-lg border border-dashed border-border-strong bg-surface-subtle px-6 py-10 text-center text-sm text-fg-muted"
         >
           Agrega ítems en el paso 2 para ver el resumen.
         </div>

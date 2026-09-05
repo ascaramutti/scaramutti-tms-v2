@@ -96,7 +96,7 @@ export function SupplierField({ selected, onSelectedChange }: SupplierFieldProps
         onCreateClick={canCreate ? () => setModalOpen(true) : undefined}
       />
       {isError && (
-        <p role="alert" className="mt-1 text-xs text-amber-700">
+        <p role="alert" className="mt-1 text-xs text-warning">
           No se pudieron buscar proveedores. Intenta de nuevo.
         </p>
       )}

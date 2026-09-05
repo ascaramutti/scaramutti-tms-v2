@@ -16,7 +16,7 @@ export function BackLink({ to, children }: BackLinkProps) {
   return (
     <Link
       to={to}
-      className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-slate-500 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      className="inline-flex items-center gap-1.5 rounded text-sm font-medium text-fg-muted hover:text-fg-body focus:outline-none focus:ring-2 focus:ring-focus"
     >
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       {children}

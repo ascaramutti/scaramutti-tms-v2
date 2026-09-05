@@ -6,7 +6,6 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Modal } from '../../../../shared/ui/Modal'
 import { Spinner } from '../../../../shared/ui/Spinner'
 import { Textarea } from '../../../../shared/ui/Textarea'
-import { DANGER_BUTTON, PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { stripControlChars } from '../../../../shared/utils/sanitizeText'
 import { useChangeServiceStatus } from '../../hooks/useChangeServiceStatus'
 import { operationsKeys } from '../../queryKeys'
@@ -36,6 +35,7 @@ import {
 } from '../../utils/serviceResourceConflict'
 import { ResourceConflictAlert } from '../resources/ResourceConflictAlert'
 import { ServiceStatusErrorAlert } from './ServiceStatusErrorAlert'
+import { Button } from '../../../../shared/ui/Button'
 
 interface ServiceExitModalProps {
   isOpen: boolean
@@ -160,7 +160,7 @@ function ServiceExitForm({ onClose, transition, service, role }: ServiceExitModa
             fondo del diálogo, y esto es lo que evita actuar sobre el viaje equivocado.
             Y no se dice "terminal": desde que reabrir existe, esa palabra significaría
             para el lector algo que dejó de ser cierto. */}
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-fg-body">
           Viaje <span className="font-medium">{service.code}</span> de {service.client.name}.{' '}
           {SERVICE_EXIT_TRANSITION_PROMPT[transition]}
           {showsReopenNote && ` ${REOPEN_AVAILABLE_NOTE}`}
@@ -215,26 +215,26 @@ function ServiceExitForm({ onClose, transition, service, role }: ServiceExitModa
         <div className="flex justify-end gap-3 pt-2">
           {/* "Volver" y no "Cancelar": es la única pantalla del sistema donde esa
               palabra nombra las dos cosas a la vez. */}
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={onClose}>
             Volver
-          </button>
+          </Button>
           {/* Reabrir REPARA: se llega desde un botón primario en la barra y sería
               incoherente que acá se pintara de alarma. Las otras dos sí sacan el viaje
               del circuito. */}
-          <button
+          <Button
             ref={submitButton}
             type="submit"
+            variant={transition === 'REOPENED' ? 'primary' : 'danger'}
             disabled={isPending}
-            className={transition === 'REOPENED' ? PRIMARY_BUTTON : DANGER_BUTTON}
           >
             {isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> {presentation.pendingLabel}
+                <Spinner size={16} className="mr-2 text-on-solid" /> {presentation.pendingLabel}
               </>
             ) : (
               presentation.submitLabel
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

@@ -18,7 +18,7 @@ interface StockLevelProps {
 export function StockLevel({ stock, unitCode, low }: StockLevelProps) {
   return (
     <span className="inline-flex items-center justify-end gap-2">
-      <span className={cn('font-medium tabular-nums', low ? 'text-amber-700' : 'text-slate-900')}>
+      <span className={cn('font-medium tabular-nums', low ? 'text-warning' : 'text-fg')}>
         {formatQuantity(stock)} {unitCode}
       </span>
       {low && <Badge variant="warning">Bajo</Badge>}

@@ -6,9 +6,7 @@ import { quotationFormToRequest } from '../wizard/quotationFormToRequest'
 import { useWizardCatalogs } from '../wizard/useWizardCatalogs'
 import { WizardForm } from '../wizard/WizardForm'
 import type { WizardFormInput } from '../wizard/quotation-wizard.schema'
-
-const SECONDARY_BUTTON =
-  'mt-4 inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-blue-500'
+import { Button } from '../../../shared/ui/Button'
 
 /**
  * Página de CREACIÓN de cotización. Wrapper delgado: gatea con spinner/error la carga de
@@ -24,7 +22,7 @@ export function CotizacionWizardPage() {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div className="flex justify-center py-16">
-          <Spinner size={28} label="Cargando formulario" className="text-blue-600" />
+          <Spinner size={28} label="Cargando formulario" className="text-accent" />
         </div>
       </div>
     )
@@ -34,12 +32,12 @@ export function CotizacionWizardPage() {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <div role="alert" className="flex flex-col items-center justify-center px-6 py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(catalogs.error, 'No se pudo cargar el formulario de cotización.')}
           </p>
-          <button type="button" onClick={catalogs.refetch} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={catalogs.refetch} className="mt-4">
             Reintentar
-          </button>
+          </Button>
         </div>
       </div>
     )

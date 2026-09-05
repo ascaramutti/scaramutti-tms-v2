@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { Card } from '../../../../shared/ui/Card'
 
 /**
  * Las piezas con las que se arman las fichas del detalle de un viaje.
@@ -30,18 +31,15 @@ interface DetailCardProps {
 /** Tarjeta con su encabezado, anunciada como sección propia. */
 export function DetailCard({ title, headingId, action, children }: DetailCardProps) {
   return (
-    <section
-      className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-      aria-labelledby={headingId}
-    >
+    <Card as="section" padding="md" aria-labelledby={headingId}>
       <div className="flex items-start justify-between gap-3">
-        <h2 id={headingId} className="text-sm font-semibold text-slate-900">
+        <h2 id={headingId} className="text-sm font-semibold text-fg">
           {title}
         </h2>
         {action}
       </div>
       {children}
-    </section>
+    </Card>
   )
 }
 
@@ -64,8 +62,8 @@ export function Field({
 }) {
   return (
     <div className={className}>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</dt>
+      <dd className="mt-0.5 text-sm text-fg">{value}</dd>
     </div>
   )
 }

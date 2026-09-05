@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import { Plus, Truck } from 'lucide-react'
 import type { ServiceDetailResponse } from '../../../../api'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { formatDateTime } from '../../../../shared/utils/formatters'
 import { describeAdditionalResource } from '../../status/resourcePresentation'
 import { AddResourcesModal } from '../resources/AddResourcesModal'
 import { AssignResourcesModal } from '../resources/AssignResourcesModal'
 import { RemoveResourceDialog } from '../resources/RemoveResourceDialog'
 import { DetailCard, Field } from './DetailCard'
+import { Button } from '../../../../shared/ui/Button'
 
 interface ServiceResourcesProps {
   service: ServiceDetailResponse
@@ -55,14 +55,14 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         headingId="service-resources-heading"
         action={
           canAssign ? (
-            <button
-              type="button"
+            <Button
+              variant="primary"
               onClick={() => setIsAssignOpen(true)}
-              className={`${PRIMARY_BUTTON} shrink-0`}
+              className="shrink-0"
             >
               <Truck className="mr-2 h-4 w-4" aria-hidden="true" />
               Asignar recursos
-            </button>
+            </Button>
           ) : undefined
         }
       >
@@ -102,29 +102,29 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         headingId="service-additional-heading"
         action={
           canReinforce ? (
-            <button
-              type="button"
+            <Button
+              variant="secondary"
               onClick={() => setIsAddOpen(true)}
-              className={`${SECONDARY_BUTTON} shrink-0`}
+              className="shrink-0"
             >
               <Plus className="mr-2 h-4 w-4" aria-hidden="true" />
               Agregar refuerzo
-            </button>
+            </Button>
           ) : undefined
         }
       >
         {service.additionalResources.length === 0 ? (
           // Es el caso NORMAL, no un borde: ninguno de los 905 viajes migrados
           // tiene refuerzos, así que esto es lo que se va a ver casi siempre.
-          <p className="mt-2 text-sm text-slate-500">
+          <p className="mt-2 text-sm text-fg-muted">
             Este viaje no tiene recursos de refuerzo.
           </p>
         ) : (
           <ul className="mt-3 space-y-3">
             {service.additionalResources.map((resource) => (
-              <li key={resource.id} className="border-l-2 border-slate-200 pl-4">
+              <li key={resource.id} className="border-l-2 border-border pl-4">
                 <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm text-slate-900">
+                  <p className="text-sm text-fg">
                     {describeAdditionalResource(resource)}
                   </p>
                   {canReinforce && (
@@ -137,14 +137,14 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
                       aria-label={`Quitar refuerzo: ${describeAdditionalResource(resource)}`}
                       // `-m-1 p-1` agranda el objetivo de clic sin correr la fila:
                       // el texto solo mide 16px de alto.
-                      className="-m-1 shrink-0 rounded p-1 text-xs font-medium text-red-700 hover:text-red-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+                      className="-m-1 shrink-0 rounded p-1 text-xs font-medium text-danger-fg hover:text-danger-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
                     >
                       Quitar
                     </button>
                   )}
                 </div>
-                <p className="mt-0.5 text-sm text-slate-700">{resource.reason}</p>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-sm text-fg-body">{resource.reason}</p>
+                <p className="mt-0.5 text-xs text-fg-muted">
                   {resource.assignedBy.fullName} · {formatDateTime(resource.assignedAt)}
                 </p>
               </li>

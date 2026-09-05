@@ -51,17 +51,17 @@ export function QuotationTypeCards({ control, onTypeChange, disabled = false }: 
                 aria-pressed={selected}
                 aria-disabled={disabled}
                 className={cn(
-                  'flex flex-col items-center gap-2 rounded-xl border-2 p-5 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500',
-                  selected ? 'border-blue-600 bg-blue-50' : 'border-slate-200 hover:border-slate-300',
-                  disabled && 'cursor-not-allowed opacity-70 hover:border-slate-200',
+                  'flex flex-col items-center gap-2 rounded-xl border-2 p-5 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-focus',
+                  selected ? 'border-accent bg-accent-soft' : 'border-border hover:border-border-strong',
+                  disabled && 'cursor-not-allowed opacity-70 hover:border-border',
                 )}
               >
                 <Icon
-                  className={cn('h-7 w-7', selected ? 'text-blue-600' : 'text-slate-400')}
+                  className={cn('h-7 w-7', selected ? 'text-accent' : 'text-fg-subtle')}
                   aria-hidden="true"
                 />
-                <span className="text-sm font-semibold text-slate-900">{label}</span>
-                <span className="text-xs text-slate-500">{description}</span>
+                <span className="text-sm font-semibold text-fg">{label}</span>
+                <span className="text-xs text-fg-muted">{description}</span>
               </button>
             )
           })}

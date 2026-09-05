@@ -8,6 +8,7 @@ import { CargoTypeField } from '../../cargotypes/components/CargoTypeField'
 import { componentReferenceSubtotal } from './itemCalc'
 import { type ChildServiceKind, type WizardFormInput } from './quotation-wizard.schema'
 import type { QuotationServiceTypeResponse } from '../../../api'
+import { fieldClasses, fieldReadonlyClasses, FIELD_LABEL as SHARED_FIELD_LABEL } from '../../../shared/ui/fieldClasses'
 
 interface ChildItemCardProps {
   /** Índice del ítem padre (el Integral) en `items`. */
@@ -22,11 +23,9 @@ interface ChildItemCardProps {
   onRemove: () => void
 }
 
-const FIELD_LABEL = 'mb-1.5 block text-sm font-medium text-slate-700'
-const CONTROL =
-  'w-full rounded-lg border bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
-const READONLY =
-  'w-full cursor-default rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600 focus:outline-none'
+const FIELD_LABEL = SHARED_FIELD_LABEL
+const CONTROL = cn('w-full', fieldClasses({ density: 'compact' }))
+const READONLY = cn('w-full', fieldReadonlyClasses({ density: 'compact' }))
 
 /** Empty → `null` (campos numéricos opcionales). */
 function nullableNum(value: string): number | null {
@@ -64,10 +63,10 @@ function NumberCell({ label, ariaLabel, register, error, min = 0, step = 0.01 }:
           if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault()
         }}
         {...register}
-        className={cn(CONTROL, error ? 'border-red-300' : 'border-slate-300')}
+        className={cn(CONTROL, error ? 'border-danger-border-strong' : 'border-border-strong')}
       />
       {error && (
-        <p role="alert" className="mt-1 text-xs text-red-600">
+        <p role="alert" className="mt-1 text-xs text-danger">
           {error}
         </p>
       )}
@@ -130,15 +129,15 @@ export function ChildItemCard({
   return (
     <div
       data-testid="integral-child"
-      className="rounded-lg border-l-2 border-dashed border-orange-300 bg-slate-50/60 pl-4"
+      className="rounded-lg border-l-2 border-dashed border-warning-border-strong bg-surface-subtle/60 pl-4"
     >
       <div className="flex items-center justify-between gap-2 px-2 py-2">
-        <span className="text-sm font-semibold text-slate-700">Componente {position}</span>
+        <span className="text-sm font-semibold text-fg-body">Componente {position}</span>
         <button
           type="button"
           onClick={onRemove}
           aria-label={`Eliminar componente ${position}`}
-          className="shrink-0 text-slate-400 hover:text-red-600"
+          className="shrink-0 text-fg-subtle hover:text-danger focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -155,7 +154,7 @@ export function ChildItemCard({
             onChange={(event) => handleServiceTypeChange(event.target.value)}
             onBlur={() => trigger(`${base}.serviceTypeId`)}
             aria-invalid={!!childErrors?.serviceTypeId}
-            className={cn(CONTROL, childErrors?.serviceTypeId ? 'border-red-300' : 'border-slate-300')}
+            className={cn(CONTROL, childErrors?.serviceTypeId ? 'border-danger-border-strong' : 'border-border-strong')}
           >
             <option value="">Selecciona</option>
             {serviceTypes.map((type) => (
@@ -165,7 +164,7 @@ export function ChildItemCard({
             ))}
           </select>
           {childErrors?.serviceTypeId?.message && (
-            <p role="alert" className="mt-1 text-xs text-red-600">
+            <p role="alert" className="mt-1 text-xs text-danger">
               {childErrors.serviceTypeId.message}
             </p>
           )}
@@ -254,10 +253,10 @@ export function ChildItemCard({
                   onKeyDown={(event) => {
                     if (['e', 'E', '+', '-'].includes(event.key)) event.preventDefault()
                   }}
-                  className={cn(CONTROL, childErrors?.internalReferencePrice ? 'border-red-300' : 'border-slate-300')}
+                  className={cn(CONTROL, childErrors?.internalReferencePrice ? 'border-danger-border-strong' : 'border-border-strong')}
                 />
                 {childErrors?.internalReferencePrice?.message && (
-                  <p role="alert" className="mt-1 text-xs text-red-600">
+                  <p role="alert" className="mt-1 text-xs text-danger">
                     {childErrors.internalReferencePrice.message}
                   </p>
                 )}

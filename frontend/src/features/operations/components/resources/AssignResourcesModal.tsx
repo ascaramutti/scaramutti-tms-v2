@@ -7,7 +7,6 @@ import { FleetUnitField } from '../../../../shared/catalogs/FleetUnitField'
 import { Modal } from '../../../../shared/ui/Modal'
 import { Spinner } from '../../../../shared/ui/Spinner'
 import { Textarea } from '../../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../../shared/ui/buttonStyles'
 import { stripControlChars } from '../../../../shared/utils/sanitizeText'
 import { DriverField } from '../DriverField'
 import { useAssignServiceResources } from '../../hooks/useAssignServiceResources'
@@ -23,6 +22,8 @@ import {
   type ServiceOperationError,
 } from '../../utils/serviceResourceConflict'
 import { ResourceConflictAlert } from './ResourceConflictAlert'
+import { Button } from '../../../../shared/ui/Button'
+import { Alert } from '../../../../shared/ui/Alert'
 
 interface AssignResourcesModalProps {
   isOpen: boolean
@@ -144,7 +145,7 @@ function AssignResourcesForm({ onClose, serviceId, serviceCode }: AssignResource
   return (
     <Modal isOpen onClose={onClose} title="Asignar recursos" size="lg">
       <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-fg-muted">
           Al asignar, el viaje pasa a pendiente de inicio.
         </p>
 
@@ -203,27 +204,24 @@ function AssignResourcesForm({ onClose, serviceId, serviceCode }: AssignResource
         )}
 
         {genericError && (
-          <p
-            role="alert"
-            className="rounded-lg border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700"
-          >
+          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
             {genericError}
-          </p>
+          </Alert>
         )}
 
         <div className="flex justify-end gap-3 pt-2">
-          <button type="button" onClick={onClose} className={SECONDARY_BUTTON}>
+          <Button variant="secondary" onClick={onClose}>
             Cancelar
-          </button>
-          <button type="submit" disabled={isPending} className={PRIMARY_BUTTON}>
+          </Button>
+          <Button variant="primary" type="submit" disabled={isPending}>
             {isPending ? (
               <>
-                <Spinner size={16} className="mr-2 text-white" /> Asignando…
+                <Spinner size={16} className="mr-2 text-on-solid" /> Asignando…
               </>
             ) : (
               'Asignar recursos'
             )}
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

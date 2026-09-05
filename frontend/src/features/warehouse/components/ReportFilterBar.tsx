@@ -1,6 +1,5 @@
 import { useRef } from 'react'
 import { CalendarRange } from 'lucide-react'
-import { SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { cn } from '../../../shared/utils/cn'
 import { todayIsoDate } from '../../../shared/utils/formatters'
 import {
@@ -10,14 +9,18 @@ import {
   type ReportFilters,
 } from '../schemas/report-filters.schema'
 import { REPORT_CUTS } from '../utils/reportCuts'
+import { Button } from '../../../shared/ui/Button'
+import { Card } from '../../../shared/ui/Card'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface ReportFilterBarProps {
   value: ReportFilters
   onChange: (next: ReportFilters) => void
 }
 
-const inputClasses =
-  'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+// Sin `w-full`: en esta barra el control va en una fila de ancho fijo y estirarlo
+// cambiaría el ancho de los dos campos de fecha.
+const inputClasses = fieldClasses({ density: 'compact' })
 
 /**
  * Corte y rango del reporte. Los cortes son un `tablist`: son cuatro vistas del
@@ -66,7 +69,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
   }
 
   return (
-    <div className="space-y-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md" className="space-y-4">
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Corte del reporte">
         {REPORT_CUTS.map((option, index) => {
           const selected = value.cut === option.value
@@ -85,10 +88,10 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
               onClick={() => set('cut', option.value)}
               onKeyDown={(event) => handleCutKeyDown(event, index)}
               className={cn(
-                'rounded-lg border px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500',
+                'rounded-lg border px-3.5 py-2 text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus',
                 selected
-                  ? 'border-blue-600 bg-blue-600 text-white'
-                  : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50',
+                  ? 'border-accent bg-accent text-on-solid'
+                  : 'border-border-strong bg-surface text-fg-body hover:bg-surface-subtle',
               )}
             >
               {option.label}
@@ -101,7 +104,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
         <div>
           <label
             htmlFor="report-date-from"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Desde
           </label>
@@ -118,7 +121,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
         <div>
           <label
             htmlFor="report-date-to"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Hasta
           </label>
@@ -132,23 +135,22 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
             className={inputClasses}
           />
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
           onClick={() =>
             onChange({ ...value, dateFrom: currentMonthStart(), dateTo: todayIsoDate() })
           }
-          className={SECONDARY_BUTTON}
         >
           <CalendarRange className="mr-2 h-4 w-4" aria-hidden="true" />
           Mes actual
-        </button>
+        </Button>
       </div>
 
       {rangeMessage && (
-        <p id="report-date-error" role="alert" className="text-xs text-red-600">
+        <p id="report-date-error" role="alert" className="text-xs text-danger">
           {rangeMessage}
         </p>
       )}
-    </div>
+    </Card>
   )
 }

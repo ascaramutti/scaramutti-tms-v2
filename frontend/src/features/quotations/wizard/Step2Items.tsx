@@ -6,6 +6,7 @@ import { ItemCard } from './ItemCard'
 import { itemsSubtotal } from './itemCalc'
 import { ITEM_DEFAULTS, type WizardFormInput } from './quotation-wizard.schema'
 import type { CurrencyResponse, QuotationServiceTypeResponse } from '../../../api'
+import { Button } from '../../../shared/ui/Button'
 
 interface Step2ItemsProps {
   /** Todos los tipos de servicio (se filtran acá según el tipo de cotización). */
@@ -14,9 +15,6 @@ interface Step2ItemsProps {
   igvPercentage: number
   maxRootItems: number
 }
-
-const ADD_BUTTON =
-  'inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:bg-blue-300'
 
 export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootItems }: Step2ItemsProps) {
   const {
@@ -89,23 +87,28 @@ export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootIte
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-fg-muted">
             Ítems de la cotización
           </h2>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-fg-muted">
             {`Máximo ${maxRootItems} ítems · ${fields.length}/${maxRootItems}`}
           </p>
         </div>
-        <button type="button" onClick={handleAdd} disabled={atMax} className={ADD_BUTTON}>
+        <Button
+          variant="primary"
+          onClick={handleAdd}
+          disabled={atMax}
+          className="gap-2 disabled:cursor-not-allowed disabled:bg-accent-disabled"
+        >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Agregar ítem
-        </button>
+        </Button>
       </div>
 
       {isIntegralMode && (
         <div
           role="status"
-          className="flex items-start gap-2 rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800"
+          className="flex items-start gap-2 rounded-lg border border-warning-border bg-warning-soft px-4 py-3 text-sm text-warning-fg"
         >
           <Info className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
           <span>
@@ -118,14 +121,14 @@ export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootIte
       {fields.length === 0 ? (
         <div
           role="alert"
-          className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-500"
+          className="rounded-lg border border-dashed border-border-strong bg-surface-subtle px-6 py-10 text-center text-sm text-fg-muted"
         >
           {rootError ?? 'Agrega al menos un ítem a la cotización.'}
         </div>
       ) : (
         <>
           {rootError && (
-            <p role="alert" className="text-sm text-red-600">
+            <p role="alert" className="text-sm text-danger">
               {rootError}
             </p>
           )}
@@ -144,18 +147,18 @@ export function Step2Items({ serviceTypes, currencies, igvPercentage, maxRootIte
               />
             ))}
           </div>
-          <div className="ml-auto w-full max-w-xs space-y-1 rounded-xl bg-blue-50 px-5 py-4">
-            <div className="flex justify-between text-sm text-slate-600">
+          <div className="ml-auto w-full max-w-xs space-y-1 rounded-xl bg-accent-soft px-5 py-4">
+            <div className="flex justify-between text-sm text-fg-body">
               <span>Subtotal</span>
-              <span className="font-medium text-slate-900">{formatCurrency(subtotal, currencyCode)}</span>
+              <span className="font-medium text-fg">{formatCurrency(subtotal, currencyCode)}</span>
             </div>
-            <div className="flex justify-between text-sm text-slate-600">
+            <div className="flex justify-between text-sm text-fg-body">
               <span>{`IGV (${igvPercentage}%)`}</span>
-              <span className="font-medium text-slate-900">{formatCurrency(igvAmount, currencyCode)}</span>
+              <span className="font-medium text-fg">{formatCurrency(igvAmount, currencyCode)}</span>
             </div>
-            <div className="mt-1 flex justify-between border-t border-blue-200 pt-2">
-              <span className="text-sm font-semibold text-slate-700">Total</span>
-              <span className="text-lg font-semibold text-blue-700">{formatCurrency(grandTotal, currencyCode)}</span>
+            <div className="mt-1 flex justify-between border-t border-accent-border pt-2">
+              <span className="text-sm font-semibold text-fg-body">Total</span>
+              <span className="text-lg font-semibold text-accent-hover">{formatCurrency(grandTotal, currencyCode)}</span>
             </div>
           </div>
         </>

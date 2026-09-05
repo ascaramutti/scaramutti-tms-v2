@@ -4,11 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { isAxiosError } from 'axios'
 import type { CurrencyResponse, Problem, ServiceDetailResponse } from '../../../api'
 import { DateField } from '../../../shared/ui/DateField'
+import { FIELD_FOCUS_INVALID, fieldClasses } from '../../../shared/ui/fieldClasses'
 import { SelectField, type SelectOption } from '../../../shared/ui/SelectField'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
 import { Textarea } from '../../../shared/ui/Textarea'
-import { PRIMARY_BUTTON, SECONDARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { getApiErrorMessage, isPreconditionFailedError } from '../../../shared/utils/getApiErrorMessage'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
 import { stripControlChars } from '../../../shared/utils/sanitizeText'
@@ -32,6 +32,9 @@ import {
   SERVICE_OBSERVATIONS_MAX_LENGTH,
 } from '../schemas/service-fields.schema'
 import type { ServiceWithEtag } from '../hooks/useService'
+import { Button } from '../../../shared/ui/Button'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 /** Campos que aceptan un error de campo del backend, cuando están en pantalla. */
 const FORM_FIELDS = [
@@ -52,10 +55,10 @@ const FORM_FIELDS = [
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h2>
+    <Card as="section">
+      <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-fg-muted">{title}</h2>
       <div className="space-y-4">{children}</div>
-    </section>
+    </Card>
   )
 }
 
@@ -95,7 +98,7 @@ function RealDateTimeField({
 }) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-700">
+      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-fg-body">
         {label}
       </label>
       <input
@@ -111,15 +114,10 @@ function RealDateTimeField({
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? `${id}-error` : undefined}
         {...register}
-        className={cn(
-          'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:outline-none focus:ring-2',
-          error
-            ? 'border-red-300 focus:border-red-500 focus:ring-red-500'
-            : 'border-slate-300 focus:border-blue-500 focus:ring-blue-500',
-        )}
+        className={cn('w-full', fieldClasses({ invalid: !!error }), error && FIELD_FOCUS_INVALID)}
       />
       {error && (
-        <p id={`${id}-error`} role="alert" className="mt-1.5 text-sm text-red-600">
+        <p id={`${id}-error`} role="alert" className="mt-1.5 text-sm text-danger">
           {error}
         </p>
       )}
@@ -175,7 +173,7 @@ export function ServiceEditForm({ service, onReload, onSaved, onCancel }: Servic
   if (currenciesQuery.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando monedas" className="text-blue-600" />
+        <Spinner size={28} label="Cargando monedas" className="text-accent" />
       </div>
     )
   }
@@ -238,10 +236,10 @@ interface EditFieldsProps extends ServiceEditFormProps {
 function CatalogAlert({ message, onRetry }: { message: string; onRetry: () => void }) {
   return (
     <div role="alert" className="flex flex-col items-center px-6 py-16 text-center">
-      <p className="text-sm font-medium text-slate-700">{message}</p>
-      <button type="button" onClick={onRetry} className={`mt-4 ${SECONDARY_BUTTON}`}>
+      <p className="text-sm font-medium text-fg-body">{message}</p>
+      <Button variant="secondary" onClick={onRetry} className="mt-4">
         Reintentar
-      </button>
+      </Button>
     </div>
   )
 }
@@ -370,19 +368,13 @@ function EditFields({
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-5">
       {missingEtag && (
-        <p
-          role="alert"
-          className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
-        >
+        <Alert as="p" role="alert" className="rounded-xl px-4 py-3 text-sm text-danger-fg">
           No se puede guardar: falta la versión del viaje. Recarga la página e intenta de nuevo.
-        </p>
+        </Alert>
       )}
 
       {errors.root?.message && (
-        <div
-          role="alert"
-          className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="rounded-xl px-4 py-3 text-sm text-warning-fg">
           <p>{errors.root.message}</p>
           {stale && (
             /*
@@ -392,11 +384,11 @@ function EditFields({
              * que la otra persona acaba de cambiar, y lo pisaría en silencio. Eso
              * convertiría el bloqueo optimista en un "gana el último que aprieta".
              */
-            <button type="button" onClick={onReload} className={`mt-2 ${SECONDARY_BUTTON}`}>
+            <Button variant="secondary" onClick={onReload} className="mt-2">
               Descartar y recargar
-            </button>
+            </Button>
           )}
-        </div>
+        </Alert>
       )}
 
       <Section title="Viaje">
@@ -505,7 +497,7 @@ function EditFields({
         <Section title="Fechas reales">
           {/* Solo las que el viaje YA tiene: acá se corrigen, no se fijan. Un viaje que
               todavía no arrancó no muestra ningún campo, y el bloque entero desaparece. */}
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-fg-muted">
             Se corrigen en hora de Perú. Las fija el viaje al iniciarse y al cerrarse; acá solo se
             enmiendan.
           </p>
@@ -564,15 +556,10 @@ function EditFields({
       </Section>
 
       <div className="flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onCancel}
-          className={SECONDARY_BUTTON}
-          disabled={isSubmitting}
-        >
+        <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
           Cancelar
-        </button>
-        <button type="submit" disabled={isSubmitting || missingEtag} className={PRIMARY_BUTTON}>
+        </Button>
+        <Button type="submit" variant="primary" disabled={isSubmitting || missingEtag}>
           {isSubmitting ? (
             <>
               <Spinner size={16} label="Guardando" />
@@ -581,7 +568,7 @@ function EditFields({
           ) : (
             'Guardar cambios'
           )}
-        </button>
+        </Button>
       </div>
     </form>
   )

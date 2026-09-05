@@ -2,6 +2,7 @@ import { AlertTriangle } from 'lucide-react'
 import { SERVICE_STATUS_PRESENTATION } from '../../status/serviceStatusPresentation'
 import { SERVICE_RESOURCE_LABELS } from '../../status/resourcePresentation'
 import type { ServiceOperationError } from '../../utils/serviceResourceConflict'
+import { Alert } from '../../../../shared/ui/Alert'
 
 interface ResourceConflictAlertProps {
   error: ServiceOperationError
@@ -72,8 +73,8 @@ export function ResourceConflictAlert({
   isPending,
 }: ResourceConflictAlertProps) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden="true" />
+    <Alert variant="warning" role={undefined} className="flex items-start gap-3 rounded-lg px-4 py-3">
+      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden="true" />
       <div className="flex-1">
         {/* El `alert` va en el PÁRRAFO y no en el recuadro entero: una región viva se
             anuncia de corrido y sin estructura, así que con la tabla adentro el
@@ -82,7 +83,7 @@ export function ResourceConflictAlert({
             los comandos de tabla, y el botón fuera de la región viva. */}
         <p
           role="alert"
-          className={`text-sm text-amber-900${forceConsequence ? ' font-medium' : ''}`}
+          className={`text-sm text-warning-fg${forceConsequence ? ' font-medium' : ''}`}
         >
           {error.conflicts.length > 0 ? CONFLICT_HEADING : error.detail}
         </p>
@@ -92,7 +93,7 @@ export function ResourceConflictAlert({
             <table className="w-full text-left text-xs">
               <caption className="sr-only">Recursos en conflicto</caption>
               <thead>
-                <tr className="text-amber-800">
+                <tr className="text-warning-fg">
                   <th scope="col" className="pb-1 pr-4 font-medium">
                     Recurso
                   </th>
@@ -107,7 +108,7 @@ export function ResourceConflictAlert({
                   </th>
                 </tr>
               </thead>
-              <tbody className="text-amber-900">
+              <tbody className="text-warning-fg">
                 {error.conflicts.map((conflict) => (
                   <tr key={`${conflict.resource}-${conflict.serviceCode}`}>
                     <td className="py-0.5 pr-4">{SERVICE_RESOURCE_LABELS[conflict.resource]}</td>
@@ -126,7 +127,7 @@ export function ResourceConflictAlert({
         {error.forcible && (
           <>
             {forceConsequence && (
-              <p id={FORCE_CONSEQUENCE_ID} className="mt-3 text-sm text-amber-900">
+              <p id={FORCE_CONSEQUENCE_ID} className="mt-3 text-sm text-warning-fg">
                 {forceConsequence}
               </p>
             )}
@@ -135,13 +136,13 @@ export function ResourceConflictAlert({
               onClick={onForce}
               disabled={isPending}
               aria-describedby={forceConsequence ? FORCE_CONSEQUENCE_ID : undefined}
-              className="mt-3 rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900 hover:bg-amber-100 disabled:opacity-50"
+              className="mt-3 rounded-lg border border-warning-border-strong bg-surface px-3 py-1.5 text-xs font-medium text-warning-fg hover:bg-warning-soft-strong disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
             >
               {forceLabel}
             </button>
           </>
         )}
       </div>
-    </div>
+    </Alert>
   )
 }

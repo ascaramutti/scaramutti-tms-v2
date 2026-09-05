@@ -17,7 +17,7 @@ import { useService } from '../hooks/useService'
 import { canOperateService, canSeeServicePrices } from '../status/operationsPermissions'
 
 const SECONDARY_LINK =
-  'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
+  'inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus'
 
 /**
  * Detalle de un viaje: lo que se sabe de él, y las acciones que lo mueven.
@@ -61,7 +61,7 @@ export function ServiceDetailPage() {
   if (service.isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando servicio" className="text-blue-600" />
+        <Spinner size={28} label="Cargando servicio" className="text-accent" />
       </div>
     )
   }
@@ -71,7 +71,7 @@ export function ServiceDetailPage() {
       <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
         <BackLink to={OPERACIONES_LANDING}>Volver a servicios</BackLink>
         <div role="alert" className="flex flex-col items-center justify-center py-16 text-center">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(service.error, 'No se pudo cargar el servicio.')}
           </p>
           <button
@@ -98,7 +98,7 @@ export function ServiceDetailPage() {
           de la ventana. Acá abajo la fila es siempre la misma: el estado a la izquierda,
           las acciones a la derecha, y en anchos chicos los botones bajan sin pisar al
           badge. */}
-      <div className="space-y-4 border-b border-slate-200 pb-5">
+      <div className="space-y-4 border-b border-border pb-5">
         <PageHeader
           title={data.code}
           description={`${data.client.name} · RUC ${data.client.ruc} · registrado el ${formatDate(data.createdAt)} por ${data.createdBy.fullName}`}
@@ -119,7 +119,7 @@ export function ServiceDetailPage() {
             vive. Quién registró el viaje va en el encabezado, junto a la fecha del
             alta: son la misma frase partida, y separarlas obligaba a leer dos
             lugares para saber quién cargó el viaje y cuándo. */}
-        <p className="mt-1 text-xs text-slate-500">
+        <p className="mt-1 text-xs text-fg-muted">
           Última actualización: {formatDateTime(data.updatedAt)}
         </p>
         <div className="mt-3">

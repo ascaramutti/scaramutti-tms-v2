@@ -2,18 +2,18 @@ import { Link } from 'react-router-dom'
 import type { WarehouseWithdrawalResponse } from '../../../api'
 import { formatDate, formatQuantity } from '../../../shared/utils/formatters'
 import { fleetUnitLabel } from '../../../shared/catalogs/fleetUnit'
+import { Card } from '../../../shared/ui/Card'
 
 interface WithdrawalInfoCardsProps {
   withdrawal: WarehouseWithdrawalResponse
 }
 
-const cardClasses = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</dt>
+      <dd className="mt-0.5 text-sm text-fg">{value}</dd>
     </div>
   )
 }
@@ -26,22 +26,22 @@ function Field({ label, value }: { label: string; value: string }) {
 export function WithdrawalInfoCards({ withdrawal }: WithdrawalInfoCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <section className={cardClasses} aria-labelledby="withdrawal-info-heading">
-        <h2 id="withdrawal-info-heading" className="text-sm font-semibold text-slate-900">
+      <Card as="section" padding="md" aria-labelledby="withdrawal-info-heading">
+        <h2 id="withdrawal-info-heading" className="text-sm font-semibold text-fg">
           Retiro
         </h2>
         <dl className="mt-3 grid grid-cols-2 gap-3">
           <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Producto</dt>
+            <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">Producto</dt>
             <dd className="mt-0.5 text-sm">
               <Link
                 to={`/cotizaciones/almacen/productos/${withdrawal.product.id}`}
-                className="rounded font-medium text-blue-600 hover:text-blue-700 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                className="rounded font-medium text-accent hover:text-accent-hover hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {withdrawal.product.name}
               </Link>
               {withdrawal.product.code && (
-                <span className="block text-xs text-slate-500">
+                <span className="block text-xs text-fg-muted">
                   {withdrawal.product.code} · {withdrawal.product.unitCode}
                 </span>
               )}
@@ -68,11 +68,11 @@ export function WithdrawalInfoCards({ withdrawal }: WithdrawalInfoCardsProps) {
             value={`${withdrawal.registeredBy.fullName} · ${formatDate(withdrawal.withdrawnAt)}`}
           />
         </dl>
-      </section>
+      </Card>
 
       {withdrawal.lastEdit && (
-        <section className={cardClasses} aria-labelledby="withdrawal-lastedit-heading">
-          <h2 id="withdrawal-lastedit-heading" className="text-sm font-semibold text-slate-900">
+        <Card as="section" padding="md" aria-labelledby="withdrawal-lastedit-heading">
+          <h2 id="withdrawal-lastedit-heading" className="text-sm font-semibold text-fg">
             Última edición
           </h2>
           <dl className="mt-3 space-y-3">
@@ -82,7 +82,7 @@ export function WithdrawalInfoCards({ withdrawal }: WithdrawalInfoCardsProps) {
             />
             <Field label="Motivo" value={withdrawal.lastEdit.reason} />
           </dl>
-        </section>
+        </Card>
       )}
     </div>
   )

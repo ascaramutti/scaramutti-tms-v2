@@ -3,6 +3,8 @@ import type { WarehouseProductCategoryResponse } from '../../../api'
 import { cn } from '../../../shared/utils/cn'
 import { SEARCH_MIN_LENGTH } from '../hooks/useWarehouseProductsList'
 import { SEARCH_MAX_LENGTH, type StockFilters } from '../schemas/stock-filters.schema'
+import { Card } from '../../../shared/ui/Card'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface StockFilterBarProps {
   value: StockFilters
@@ -13,8 +15,7 @@ interface StockFilterBarProps {
   categoriesError: boolean
 }
 
-const inputClasses =
-  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }))
 
 /**
  * Barra de filtros de Existencias: búsqueda libre + categoría. El debounce de
@@ -40,19 +41,19 @@ export function StockFilterBar({
   const showSearchHint = qLength > 0 && qLength < SEARCH_MIN_LENGTH
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+    <Card padding="md">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {/* Búsqueda libre */}
         <div className="sm:col-span-2">
           <label
             htmlFor="warehouse-q"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Buscar
           </label>
           <div className="relative">
             <Search
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-fg-subtle"
               aria-hidden="true"
             />
             <input
@@ -63,11 +64,11 @@ export function StockFilterBar({
               onChange={(event) => set('q', event.target.value)}
               placeholder="Código, producto, marca, número de parte…"
               aria-describedby={showSearchHint ? 'warehouse-q-hint' : undefined}
-              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-slate-400')}
+              className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-fg-subtle')}
             />
           </div>
           {showSearchHint && (
-            <p id="warehouse-q-hint" className="mt-1 text-xs text-slate-500">
+            <p id="warehouse-q-hint" className="mt-1 text-xs text-fg-muted">
               Ingresa al menos {SEARCH_MIN_LENGTH} caracteres para buscar.
             </p>
           )}
@@ -77,7 +78,7 @@ export function StockFilterBar({
         <div>
           <label
             htmlFor="warehouse-category"
-            className="mb-1.5 block text-sm font-medium text-slate-700"
+            className="mb-1.5 block text-sm font-medium text-fg-body"
           >
             Categoría
           </label>
@@ -99,7 +100,7 @@ export function StockFilterBar({
             ))}
           </select>
           {categoriesError && (
-            <p id="warehouse-category-error" role="alert" className="mt-1 text-xs text-amber-700">
+            <p id="warehouse-category-error" role="alert" className="mt-1 text-xs text-warning">
               No se pudieron cargar las categorías.
             </p>
           )}
@@ -108,20 +109,25 @@ export function StockFilterBar({
 
       {value.lowOnly && (
         <div className="mt-4 flex items-center gap-2">
-          <span className="text-xs font-medium uppercase tracking-wide text-slate-500">
+          <span className="text-xs font-medium uppercase tracking-wide text-fg-muted">
             Filtros aplicados
           </span>
+          {/* El anillo de foco de este chip está en token y el del tile de indicadores de
+              al lado no, y es a propósito: el chip entero se convirtió en este PR, así que
+              dejarle una clase suelta adentro lo partiría al medio. El tile todavía tiene
+              colores sin token (el ámbar de su borde no tiene ninguno), así que convertirle
+              solo el anillo sería la mitad de una mudanza. Los dos valen el mismo color. */}
           <button
             type="button"
             onClick={() => set('lowOnly', false)}
             aria-label="Quitar filtro: solo stock bajo"
-            className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+            className="inline-flex items-center gap-1.5 rounded-full bg-warning-soft-strong px-2.5 py-0.5 text-xs font-medium text-warning hover:bg-warning-soft-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Solo stock bajo
             <X className="h-3.5 w-3.5" aria-hidden="true" />
           </button>
         </div>
       )}
-    </div>
+    </Card>
   )
 }

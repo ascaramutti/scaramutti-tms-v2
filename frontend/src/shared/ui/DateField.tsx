@@ -1,5 +1,6 @@
 import { Controller, type Control, type FieldValues, type Path } from 'react-hook-form'
 import { cn } from '../utils/cn'
+import { FIELD_ERROR, FIELD_LABEL, fieldClasses } from './fieldClasses'
 
 interface DateFieldProps<T extends FieldValues> {
   id: string
@@ -33,7 +34,7 @@ export function DateField<T extends FieldValues>({
 }: DateFieldProps<T>) {
   return (
     <div>
-      <label htmlFor={id} className={cn('mb-1.5 block text-sm font-medium text-slate-700', labelClassName)}>
+      <label htmlFor={id} className={cn(FIELD_LABEL, labelClassName)}>
         {label}
       </label>
       <Controller
@@ -51,15 +52,12 @@ export function DateField<T extends FieldValues>({
             onBlur={field.onBlur}
             aria-invalid={!!error}
             aria-describedby={error ? `${id}-error` : undefined}
-            className={cn(
-              'w-full rounded-lg border bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500',
-              error ? 'border-red-300' : 'border-slate-300',
-            )}
+            className={cn('w-full', fieldClasses({ invalid: !!error }))}
           />
         )}
       />
       {error && (
-        <p id={`${id}-error`} role="alert" className="mt-1.5 text-sm text-red-600">
+        <p id={`${id}-error`} role="alert" className={FIELD_ERROR}>
           {error}
         </p>
       )}

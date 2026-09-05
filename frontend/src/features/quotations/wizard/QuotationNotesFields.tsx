@@ -2,6 +2,9 @@ import { useFormContext } from 'react-hook-form'
 import { Textarea } from '../../../shared/ui/Textarea'
 import { stripControlChars } from '../../../shared/utils/sanitizeText'
 import type { WizardFormInput } from './quotation-wizard.schema'
+import { Badge } from '../../../shared/ui/Badge'
+import { Card } from '../../../shared/ui/Card'
+import { Alert } from '../../../shared/ui/Alert'
 
 const NOTE_MAX_LENGTH = 500
 
@@ -27,9 +30,9 @@ export function QuotationNotesFields() {
 
   return (
     <fieldset className="border-0 p-0">
-      <legend className="p-0 text-base font-semibold text-slate-900">Observaciones</legend>
-      <div className="mt-3 grid grid-cols-1 gap-4 rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2">
-        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4">
+      <legend className="p-0 text-base font-semibold text-fg">Observaciones</legend>
+      <Card className="gap-4 grid grid-cols-1 md:grid-cols-2 mt-3">
+        <div className="rounded-lg border border-accent-border bg-accent-soft/60 p-4">
           <Textarea
             id="quotation-client-note"
             label="Observaciones para el cliente"
@@ -45,15 +48,15 @@ export function QuotationNotesFields() {
           />
         </div>
 
-        <div className="rounded-lg border border-blue-300 bg-blue-50 p-4">
+        <Alert variant="info" role={undefined} className="rounded-lg p-4">
           <Textarea
             id="quotation-internal-note"
             label="Observaciones internas"
             labelSlot={
-              <span className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+              <Badge variant="info" bordered>
                 <span aria-hidden="true">🔒</span>
                 interno — no se muestra al cliente
-              </span>
+              </Badge>
             }
             rows={3}
             maxLength={NOTE_MAX_LENGTH}
@@ -65,8 +68,8 @@ export function QuotationNotesFields() {
             register={register('internalNote')}
             sanitize={stripControlChars}
           />
-        </div>
-      </div>
+        </Alert>
+      </Card>
     </fieldset>
   )
 }

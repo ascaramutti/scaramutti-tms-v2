@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Building2, FileText, MapPin, type LucideIcon } from 'lucide-react'
 import { formatDateOnly } from '../../../shared/utils/formatters'
+import { Card } from '../../../shared/ui/Card'
 
 interface QuotationSummaryCardProps {
   /** Nombre del cliente; ausente → "Sin cliente seleccionado" (resumen antes de elegir). */
@@ -19,21 +20,21 @@ interface QuotationSummaryCardProps {
 
 function InfoCard({ icon: Icon, title, children }: { icon: LucideIcon; title: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+    <Card as="section">
+      <h2 className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-fg-muted">
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         {title}
       </h2>
       <div className="mt-3">{children}</div>
-    </section>
+    </Card>
   )
 }
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex justify-between gap-3 py-0.5 text-sm">
-      <span className="text-slate-500">{label}</span>
-      <span className="text-right font-medium text-slate-900">{value}</span>
+      <span className="text-fg-muted">{label}</span>
+      <span className="text-right font-medium text-fg">{value}</span>
     </div>
   )
 }
@@ -65,31 +66,31 @@ export function QuotationSummaryCard({
       <InfoCard icon={Building2} title="Cliente">
         {clientName ? (
           <>
-            <p className="text-sm font-semibold text-slate-900">{clientName}</p>
-            {clientRuc && <p className="text-xs text-slate-500">RUC {clientRuc}</p>}
+            <p className="text-sm font-semibold text-fg">{clientName}</p>
+            {clientRuc && <p className="text-xs text-fg-muted">RUC {clientRuc}</p>}
             {(contactName || contactPhone) && (
               <div className="mt-2">
-                {contactName && <p className="text-sm text-slate-700">{contactName}</p>}
-                {contactPhone && <p className="text-xs text-slate-500">{contactPhone}</p>}
+                {contactName && <p className="text-sm text-fg-body">{contactName}</p>}
+                {contactPhone && <p className="text-xs text-fg-muted">{contactPhone}</p>}
               </div>
             )}
           </>
         ) : (
-          <p className="text-sm text-slate-500">Sin cliente seleccionado</p>
+          <p className="text-sm text-fg-muted">Sin cliente seleccionado</p>
         )}
       </InfoCard>
 
       <InfoCard icon={MapPin} title="Ruta">
         {hasRoute ? (
-          <div className="text-sm text-slate-800">
+          <div className="text-sm text-fg">
             <p className="font-medium">{origin}</p>
-            <p className="my-0.5 text-blue-600" aria-hidden="true">
+            <p className="my-0.5 text-accent" aria-hidden="true">
               ↓
             </p>
             <p className="font-medium">{destination}</p>
           </div>
         ) : (
-          <p className="text-sm text-slate-500">—</p>
+          <p className="text-sm text-fg-muted">—</p>
         )}
       </InfoCard>
 

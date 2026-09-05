@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import { routes } from './router'
 import { AuthProvider } from './shared/auth/AuthContext'
+import { ThemeProvider } from './shared/ui/theme/ThemeContext'
 import { tokenStorage } from './shared/auth/tokenStorage'
 import { server } from './test/mocks/server'
 import type { UserResponse, UserRole } from './api'
@@ -27,9 +28,11 @@ function renderRouteAs(role: UserRole | null, path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   return render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   )
 }
@@ -45,9 +48,11 @@ function goTo(role: UserRole | null, path: string) {
   const router = createMemoryRouter(routes, { initialEntries: [path] })
   render(
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <AuthProvider>
-        <RouterProvider router={router} />
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <RouterProvider router={router} />
+        </AuthProvider>
+      </ThemeProvider>
     </QueryClientProvider>,
   )
   return router

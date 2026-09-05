@@ -16,13 +16,13 @@ describe('SERVICE_STATUS_PRESENTATION, los colores', () => {
   it('reserva el verde para el final feliz', () => {
     // El acuerdo detrás del cambio: verde es "terminó bien", y nada más.
     expect(SERVICE_STATUS_PRESENTATION.COMPLETED.badgeVariant).toBe('success')
-    expect(SERVICE_STATUS_PRESENTATION.IN_PROGRESS.badgeVariant).toBe('violet')
+    expect(SERVICE_STATUS_PRESENTATION.IN_PROGRESS.badgeVariant).toBe('progress')
   })
 
   it('sigue la progresión del viaje sin repetir familia de color', () => {
     // Gris sin recursos, azul listo para salir, violeta en movimiento, verde terminado,
     // y las dos salidas malas aparte.
-    expect(SERVICE_STATUS_PRESENTATION.PENDING_ASSIGNMENT.badgeVariant).toBe('slate')
+    expect(SERVICE_STATUS_PRESENTATION.PENDING_ASSIGNMENT.badgeVariant).toBe('default')
     expect(SERVICE_STATUS_PRESENTATION.PENDING_START.badgeVariant).toBe('info')
     expect(SERVICE_STATUS_PRESENTATION.CANCELLED.badgeVariant).toBe('danger')
     expect(SERVICE_STATUS_PRESENTATION.DELETED.badgeVariant).toBe('warning')

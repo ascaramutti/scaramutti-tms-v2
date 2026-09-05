@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
-import { PRIMARY_BUTTON } from '../../../shared/ui/buttonStyles'
 import { cn } from '../../../shared/utils/cn'
 import { useLastGoodPage } from '../../../shared/hooks/useLastGoodPage'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
@@ -13,6 +12,7 @@ import {
   EMPTY_WITHDRAWAL_FILTERS,
   type WithdrawalFilters,
 } from '../schemas/withdrawal-filters.schema'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 
 const PAGE_SIZE = 10
 
@@ -62,7 +62,7 @@ export function WithdrawalsListPage() {
         description="Salidas de stock · cada retiro descuenta existencias."
         divider
         action={
-          <Link to="/cotizaciones/almacen/retiros/nuevo" className={cn(PRIMARY_BUTTON, 'gap-1.5')}>
+          <Link to="/cotizaciones/almacen/retiros/nuevo" className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Registrar retiro
           </Link>

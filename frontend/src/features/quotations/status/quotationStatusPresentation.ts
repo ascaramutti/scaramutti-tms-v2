@@ -53,7 +53,7 @@ interface QuotationStatusPresentation {
 export const QUOTATION_STATUS_PRESENTATION: Record<QuotationStatus, QuotationStatusPresentation> = {
   DRAFT: {
     label: 'Borrador',
-    badgeVariant: 'slate',
+    badgeVariant: 'default',
     editable: true,
     actions: [{ target: 'SENT', label: 'Enviada', variant: 'primary', requiresReason: false }],
   },
@@ -68,7 +68,7 @@ export const QUOTATION_STATUS_PRESENTATION: Record<QuotationStatus, QuotationSta
   },
   ACCEPTED: {
     label: 'Aceptada',
-    badgeVariant: 'teal',
+    badgeVariant: 'transition',
     editable: false,
     actions: [],
   },

@@ -10,6 +10,7 @@ import {
   type PurchaseInvoiceFormInput,
 } from '../schemas/purchase-invoice.schema'
 import { EntryProductField } from './EntryProductField'
+import { fieldClasses } from '../../../shared/ui/fieldClasses'
 
 interface EntryItemsTableProps {
   /** Código de moneda elegido en la cabecera, para formatear los importes. */
@@ -21,8 +22,7 @@ interface EntryItemsTableProps {
   initialSelectedProducts?: Array<WarehouseProductSummary | null>
 }
 
-const inputClasses =
-  'w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500'
+const inputClasses = cn('w-full', fieldClasses({ density: 'compact' }), 'placeholder:text-fg-subtle py-2.5')
 
 function lineTotal(quantity: number | undefined, unitPrice: number | undefined): number | null {
   if (typeof quantity !== 'number' || !Number.isFinite(quantity)) return null
@@ -82,10 +82,10 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
 
   return (
     <section className="space-y-3">
-      <h2 className="text-sm font-semibold text-slate-900">Ítems</h2>
+      <h2 className="text-sm font-semibold text-fg">Ítems</h2>
 
       {/* Encabezados: visuales, ocultos en móvil donde las filas se apilan. */}
-      <div className="hidden gap-3 text-xs font-semibold uppercase tracking-wide text-slate-500 sm:grid sm:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_2.5rem]">
+      <div className="hidden gap-3 text-xs font-semibold uppercase tracking-wide text-fg-muted sm:grid sm:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_2.5rem]">
         <span>Producto</span>
         <span>Cantidad</span>
         <span>Precio unit.</span>
@@ -101,7 +101,7 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
           return (
             <li
               key={field.id}
-              className="grid gap-3 rounded-lg border border-slate-200 p-3 sm:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_2.5rem] sm:items-start sm:rounded-none sm:border-0 sm:p-0"
+              className="grid gap-3 rounded-lg border border-border p-3 sm:grid-cols-[minmax(0,1fr)_9rem_8rem_8rem_2.5rem] sm:items-start sm:rounded-none sm:border-0 sm:p-0"
             >
               <div>
                 <EntryProductField
@@ -113,7 +113,7 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
                   error={itemErrors?.productId?.message}
                 />
                 {isRepeated(index) && (
-                  <p role="status" className="mt-1 text-xs text-amber-700">
+                  <p role="status" className="mt-1 text-xs text-warning">
                     Ya cargaste este producto en otra fila. Las cantidades se sumarán.
                   </p>
                 )}
@@ -139,18 +139,18 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
                       // Ancho fijo (no `flex-1`): así la unidad queda pegada al número
                       // y no estirada hasta el borde de la columna, separada de Precio.
                       'w-20 tabular-nums',
-                      itemErrors?.quantity ? 'border-red-300' : 'border-slate-300',
+                      itemErrors?.quantity ? 'border-danger-border-strong' : 'border-border-strong',
                     )}
                   />
                   {/* La unidad va al costado del número: "1000 GAL" se lee de un vistazo. */}
                   {selected && (
-                    <span className="whitespace-nowrap text-xs text-slate-500">
+                    <span className="whitespace-nowrap text-xs text-fg-muted">
                       {selected.unitCode}
                     </span>
                   )}
                 </div>
                 {itemErrors?.quantity && (
-                  <p role="alert" className="mt-1 text-xs text-red-600">
+                  <p role="alert" className="mt-1 text-xs text-danger">
                     {itemErrors.quantity.message}
                   </p>
                 )}
@@ -167,17 +167,17 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
                   className={cn(
                     inputClasses,
                     'tabular-nums',
-                    itemErrors?.unitPrice ? 'border-red-300' : 'border-slate-300',
+                    itemErrors?.unitPrice ? 'border-danger-border-strong' : 'border-border-strong',
                   )}
                 />
                 {itemErrors?.unitPrice && (
-                  <p role="alert" className="mt-1 text-xs text-red-600">
+                  <p role="alert" className="mt-1 text-xs text-danger">
                     {itemErrors.unitPrice.message}
                   </p>
                 )}
               </div>
 
-              <p className="py-2 text-sm tabular-nums text-slate-700">
+              <p className="py-2 text-sm tabular-nums text-fg-body">
                 {subtotal === null ? '—' : formatCurrency(subtotal, currencyCode ?? 'PEN')}
               </p>
 
@@ -187,7 +187,7 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
                   type="button"
                   onClick={() => handleRemove(index, field.id)}
                   aria-label={`Quitar el ítem ${index + 1}`}
-                  className="justify-self-end rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                  className="justify-self-end rounded-lg p-2 text-fg-subtle hover:bg-surface-muted hover:text-fg-body focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                 >
                   <Trash2 className="h-4 w-4" aria-hidden="true" />
                 </button>
@@ -200,24 +200,24 @@ export function EntryItemsTable({ currencyCode, initialSelectedProducts }: Entry
       {/* Error del array completo (por ejemplo, el máximo de ítems del contrato).
           Zod lo deja en `root` o en el nodo mismo según la regla que falle. */}
       {(errors.items?.root?.message ?? errors.items?.message) && (
-        <p role="alert" className="text-sm text-red-600">
+        <p role="alert" className="text-sm text-danger">
           {errors.items?.root?.message ?? errors.items?.message}
         </p>
       )}
 
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
         <button
           type="button"
           onClick={() => append(EMPTY_INVOICE_ITEM)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
         >
           <Plus className="h-4 w-4" aria-hidden="true" />
           Agregar ítem
         </button>
         {/* El total cambia al tipear cantidades: se anuncia para quien no lo ve. */}
-        <p aria-live="polite" className="text-sm text-slate-600">
+        <p aria-live="polite" className="text-sm text-fg-body">
           Total de la factura:{' '}
-          <span className="font-semibold tabular-nums text-slate-900">
+          <span className="font-semibold tabular-nums text-fg">
             {formatCurrency(total, currencyCode ?? 'PEN')}
           </span>
         </p>

@@ -19,9 +19,9 @@ interface ServiceEventPresentation {
  * si el contrato suma un tipo, rompe la compilación acá y en ningún otro lado.
  */
 export const SERVICE_EVENT_PRESENTATION: Record<ServiceEventType, ServiceEventPresentation> = {
-  CREATED: { label: 'Registro', badgeVariant: 'slate' },
+  CREATED: { label: 'Registro', badgeVariant: 'default' },
   ASSIGNMENT: { label: 'Recursos', badgeVariant: 'info' },
-  STATUS_CHANGE: { label: 'Estado', badgeVariant: 'teal' },
+  STATUS_CHANGE: { label: 'Estado', badgeVariant: 'transition' },
   FIELD_EDIT: { label: 'Edición', badgeVariant: 'warning' },
   // Es el tipo con el que llega TODO lo heredado del sistema anterior, así que
   // hoy es el más frecuente de lejos y lo seguirá siendo hasta que los viajes

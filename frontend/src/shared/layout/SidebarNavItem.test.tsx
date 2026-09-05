@@ -27,6 +27,10 @@ describe('SidebarNavItem', () => {
     expect(span).toHaveAttribute('title', 'Próximamente')
     // Texto para lectores de pantalla
     expect(screen.getByText('(próximamente)', { exact: false })).toBeInTheDocument()
+    // Y que se VEA apagado, que es lo que el lector de pantalla no cubre. La opacidad no está
+    // de adorno: el tono apagado y el navegable se separan poco, y esa distancia depende de dos
+    // tokens que se mueven por otro motivo. Sin esta línea, sacarla no rompe nada.
+    expect(span?.className.split(/\s+/)).toContain('opacity-60')
   })
 
   it('marca el link activo cuando la ruta coincide', () => {
@@ -34,7 +38,7 @@ describe('SidebarNavItem', () => {
     const link = screen.getByRole('link', { name: /inicio/i })
     // react-router le pone aria-current="page" al activo
     expect(link).toHaveAttribute('aria-current', 'page')
-    expect(link.className).toContain('bg-blue-50')
+    expect(link.className).toContain('bg-accent-soft')
   })
 
   it('NO marca activo cuando la ruta no coincide', () => {
@@ -70,6 +74,6 @@ describe('SidebarNavItem', () => {
     )
     const link = screen.getByRole('link', { name: /cotizaciones/i })
     expect(link).not.toHaveAttribute('aria-current')
-    expect(link.className).not.toContain('bg-blue-50')
+    expect(link.className).not.toContain('bg-accent-soft')
   })
 })

@@ -21,6 +21,8 @@ import {
   warehouseInvoicesPagedByParam,
   warehouseInvoicesSlow,
 } from '../../../test/mocks/handlers/warehouse'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
+import { cn } from '../../../shared/utils/cn'
 
 function renderEntradas() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
@@ -298,10 +300,16 @@ describe('EntriesListPage', () => {
   })
 
   // ----- Navegación -----
-  it('el botón de registrar lleva al formulario de nueva entrada', async () => {
+  it('el enlace de registrar es la acción principal y lleva al formulario de nueva entrada', async () => {
     const user = userEvent.setup()
     renderEntradas()
     await screen.findByText('F001-00123')
+    // Es un enlace con pinta de botón: tiene que NAVEGAR (por eso el click de abajo) y
+    // tiene que verse como la acción principal del listado. Sin esta línea, pintarlo de
+    // secundario dejaba todos los casos del archivo en verde: medido.
+    expect(screen.getByRole('link', { name: /registrar entrada/i }).className).toBe(
+      cn(buttonClasses({ variant: 'primary' }), 'gap-1.5'),
+    )
     await user.click(screen.getByRole('link', { name: /registrar entrada/i }))
     expect(await screen.findByText('NUEVA ENTRADA STUB')).toBeInTheDocument()
   })

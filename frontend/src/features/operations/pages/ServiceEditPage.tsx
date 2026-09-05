@@ -13,7 +13,7 @@ import { isServiceEditable } from '../status/serviceStatusTransitions'
 import { SERVICE_STATUS_PRESENTATION } from '../status/serviceStatusPresentation'
 
 const SECONDARY_LINK =
-  'inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500'
+  'inline-flex items-center rounded-lg border border-border-strong bg-surface px-4 py-2 text-sm font-medium text-fg-body hover:bg-surface-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-focus'
 
 /**
  * Edición de un viaje, con justificación obligatoria.
@@ -57,7 +57,7 @@ export function ServiceEditPage() {
   if (service.isLoading) {
     return (
       <div className="flex justify-center py-24">
-        <Spinner size={28} label="Cargando servicio" className="text-blue-600" />
+        <Spinner size={28} label="Cargando servicio" className="text-accent" />
       </div>
     )
   }
@@ -66,7 +66,7 @@ export function ServiceEditPage() {
     return (
       <Shell>
         <div className="text-center" role="alert">
-          <p className="text-sm font-medium text-slate-700">
+          <p className="text-sm font-medium text-fg-body">
             {getApiErrorMessage(service.error, 'No se pudo cargar el servicio.')}
           </p>
           <button type="button" onClick={() => void service.refetch()} className={`mt-4 ${SECONDARY_LINK}`}>

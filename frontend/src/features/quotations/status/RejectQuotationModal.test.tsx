@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { RejectQuotationModal } from './RejectQuotationModal'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 import { server } from '../../../test/mocks/server'
 import {
   changeQuotationStatusError,
@@ -38,6 +39,27 @@ const REASON_LABEL = /motivo del rechazo/i
 
 describe('RejectQuotationModal', () => {
   // ----- Validación -----
+  it('el botón que registra el rechazo se pinta como destructivo', () => {
+    // El sistema tiene SEIS confirmar destructivos: los cuatro que este PR muda al
+    // componente (quitar refuerzo, cancelar viaje, eliminar viaje y este) y los dos de
+    // anulación de almacén, que quedan crudos porque son la forma alta con `focus-visible:`
+    // (ver la tabla de `DECISIONES.md`). De los cuatro que se mudan, solo cancelar viaje
+    // tenía esta red antes; los otros tres la reciben acá. La mutación a `primary` dejaba
+    // los trece casos de este archivo en verde. Va por inclusión porque el botón suma sus
+    // clases de `disabled:` sobre las de la variante.
+    renderModal()
+    const clases = new Set(
+      screen.getByRole('button', { name: 'Registrar rechazo' }).className.split(/\s+/),
+    )
+    for (const c of buttonClasses({ variant: 'danger' }).split(/\s+/)) {
+      expect(clases.has(c)).toBe(true)
+    }
+    expect(clases.has('bg-accent')).toBe(false)
+    // Y trae la clase que lo apaga: la señal visual de deshabilitado también pasó de vivir
+    // dentro de la constante a ser una prop suelta.
+    expect(clases.has('disabled:opacity-60')).toBe(true)
+  })
+
   it('motivo vacío → error inline y NO dispara el PATCH', async () => {
     const sink: { body?: ChangeStatusBody } = {}
     server.use(changeQuotationStatusSuccess(sink))

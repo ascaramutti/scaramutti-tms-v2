@@ -47,7 +47,7 @@ export function StockTable({
       key: 'code',
       header: 'Código',
       render: (product) => (
-        <span className="font-medium tabular-nums text-slate-900">{product.code}</span>
+        <span className="font-medium tabular-nums text-fg">{product.code}</span>
       ),
     },
     {
@@ -55,8 +55,8 @@ export function StockTable({
       header: 'Producto',
       render: (product) => (
         <div>
-          <p className="font-medium text-slate-900">{product.name}</p>
-          <p className="text-xs text-slate-500">{formatIdentificationLabel(product)}</p>
+          <p className="font-medium text-fg">{product.name}</p>
+          <p className="text-xs text-fg-muted">{formatIdentificationLabel(product)}</p>
         </div>
       ),
     },
@@ -82,7 +82,7 @@ export function StockTable({
       header: 'Mínimo',
       align: 'right',
       render: (product) => (
-        <span className="tabular-nums text-slate-500">
+        <span className="tabular-nums text-fg-muted">
           {formatQuantity(product.minStock)} {product.unitOfMeasure.code}
         </span>
       ),

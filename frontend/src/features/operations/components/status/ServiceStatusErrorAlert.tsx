@@ -1,4 +1,5 @@
 import { getApiErrorMessage, isPreconditionFailedError } from '../../../../shared/utils/getApiErrorMessage'
+import { Alert } from '../../../../shared/ui/Alert'
 
 interface ServiceStatusErrorAlertProps {
   error: unknown
@@ -28,19 +29,19 @@ export function ServiceStatusErrorAlert({
   onRefresh,
 }: ServiceStatusErrorAlertProps) {
   return (
-    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-3">
-      <p className="text-sm text-red-700">
+    <Alert role="alert" className="rounded-lg px-3.5 py-3">
+      <p className="text-sm text-danger-fg">
         {getApiErrorMessage(error, fallback)}
       </p>
       {isPreconditionFailedError(error) && (
         <button
           type="button"
           onClick={onRefresh}
-          className="mt-2 inline-flex items-center rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-red-500"
+          className="mt-2 inline-flex items-center rounded-lg border border-danger-border-strong bg-surface px-3 py-1.5 text-sm font-medium text-danger-fg hover:bg-danger-soft-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-danger"
         >
           Descartar y recargar
         </button>
       )}
-    </div>
+    </Alert>
   )
 }

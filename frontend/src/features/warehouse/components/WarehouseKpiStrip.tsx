@@ -1,7 +1,8 @@
-import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Package, type LucideIcon } from 'lucide-react'
+import { AlertTriangle, ArrowDownToLine, ArrowUpFromLine, Package } from 'lucide-react'
 import type { WarehouseStatsResponse } from '../../../api'
-import { Spinner } from '../../../shared/ui/Spinner'
 import { cn } from '../../../shared/utils/cn'
+import { KpiTile } from '../../../shared/ui/KpiTile'
+import { Alert } from '../../../shared/ui/Alert'
 
 interface WarehouseKpiStripProps {
   data?: WarehouseStatsResponse
@@ -12,40 +13,6 @@ interface WarehouseKpiStripProps {
   /** El corte "solo stock bajo" está aplicado en la tabla. */
   lowOnly: boolean
   onToggleLowOnly: () => void
-}
-
-interface TileProps {
-  icon: LucideIcon
-  label: string
-  value: number | undefined
-  isLoading: boolean
-  highlight?: boolean
-}
-
-const TILE_CLASSES = 'rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm'
-
-function TileBody({ icon: Icon, label, value, isLoading, highlight }: TileProps) {
-  return (
-    <>
-      <span className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-slate-500">
-        <Icon className="h-4 w-4" aria-hidden="true" />
-        {label}
-      </span>
-      {isLoading ? (
-        <Spinner size={18} label="Cargando indicadores" className="mt-2 text-blue-600" />
-      ) : (
-        <span
-          className={cn(
-            'mt-2 block text-2xl font-semibold tabular-nums',
-            highlight ? 'text-amber-700' : 'text-slate-900',
-          )}
-        >
-          {/* `0` es un dato, no un vacío: solo el undefined (stats en error) cae al guion. */}
-          {value ?? '—'}
-        </span>
-      )}
-    </>
-  )
 }
 
 /**
@@ -69,10 +36,7 @@ export function WarehouseKpiStrip({
     <div className="space-y-3">
       {/* Los KPIs son informativos: si fallan, se degrada el strip y la tabla sigue trabajando. */}
       {isError && (
-        <div
-          role="alert"
-          className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800"
-        >
+        <Alert variant="warning" role="alert" className="flex items-center justify-between gap-3 rounded-lg px-4 py-2.5 text-sm text-warning-fg">
           <span>{errorMessage ?? 'No se pudieron cargar los indicadores del almacén.'}</span>
           <button
             type="button"
@@ -80,24 +44,23 @@ export function WarehouseKpiStrip({
             // Nombre propio: si el listado también falla, su botón "Reintentar"
             // queda en la misma pantalla y serían dos nombres idénticos.
             aria-label="Reintentar cargar los indicadores"
-            className="shrink-0 font-medium text-amber-900 underline underline-offset-2 hover:no-underline"
+            className="shrink-0 font-medium text-warning-fg underline underline-offset-2 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
           >
             Reintentar
           </button>
-        </div>
+        </Alert>
       )}
 
       <div role="group" aria-label="Resumen del almacén" className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className={TILE_CLASSES}>
-          <TileBody
-            icon={Package}
-            label="Productos activos"
-            value={data?.activeProducts}
-            isLoading={isLoading}
-          />
-        </div>
+        <KpiTile
+          icon={Package}
+          label="Productos activos"
+          value={data?.activeProducts}
+          isLoading={isLoading}
+        />
 
-        <button
+        <KpiTile
+          as="button"
           type="button"
           onClick={onToggleLowOnly}
           aria-pressed={lowOnly}
@@ -106,37 +69,29 @@ export function WarehouseKpiStrip({
           // accionable sería además el único que un lector de pantalla no puede leer.
           aria-label={`Con stock bajo: ${data?.lowStockCount ?? 'sin dato'}. Filtrar: solo stock bajo`}
           className={cn(
-            TILE_CLASSES,
-            'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2',
-            lowOnly ? 'border-amber-400 bg-amber-50' : 'hover:bg-slate-50',
+            'transition focus:outline-none focus-visible:ring-2 focus-visible:ring-focus focus-visible:ring-offset-2 focus-visible:ring-offset-canvas',
+            lowOnly ? 'border-warning bg-warning-soft' : 'hover:bg-surface-subtle',
           )}
-        >
-          <TileBody
-            icon={AlertTriangle}
-            label="Con stock bajo"
-            value={data?.lowStockCount}
-            isLoading={isLoading}
-            highlight={!!data && data.lowStockCount > 0}
-          />
-        </button>
+          icon={AlertTriangle}
+          label="Con stock bajo"
+          value={data?.lowStockCount}
+          isLoading={isLoading}
+          highlight={!!data && data.lowStockCount > 0}
+        />
 
-        <div className={TILE_CLASSES}>
-          <TileBody
-            icon={ArrowDownToLine}
-            label="Entradas del mes"
-            value={data?.entriesThisMonth}
-            isLoading={isLoading}
-          />
-        </div>
+        <KpiTile
+          icon={ArrowDownToLine}
+          label="Entradas del mes"
+          value={data?.entriesThisMonth}
+          isLoading={isLoading}
+        />
 
-        <div className={TILE_CLASSES}>
-          <TileBody
-            icon={ArrowUpFromLine}
-            label="Retiros del mes"
-            value={data?.withdrawalsThisMonth}
-            isLoading={isLoading}
-          />
-        </div>
+        <KpiTile
+          icon={ArrowUpFromLine}
+          label="Retiros del mes"
+          value={data?.withdrawalsThisMonth}
+          isLoading={isLoading}
+        />
       </div>
     </div>
   )

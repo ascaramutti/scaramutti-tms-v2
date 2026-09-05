@@ -1,17 +1,17 @@
 import type { WarehousePurchaseInvoiceResponse } from '../../../api'
 import { formatDate, formatDateOnly } from '../../../shared/utils/formatters'
+import { Card } from '../../../shared/ui/Card'
 
 interface EntryInfoCardsProps {
   invoice: WarehousePurchaseInvoiceResponse
 }
 
-const cardClasses = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm'
 
 function Field({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">{label}</dt>
-      <dd className="mt-0.5 text-sm text-slate-900">{value}</dd>
+      <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">{label}</dt>
+      <dd className="mt-0.5 text-sm text-fg">{value}</dd>
     </div>
   )
 }
@@ -25,8 +25,8 @@ function Field({ label, value }: { label: string; value: string }) {
 export function EntryInfoCards({ invoice }: EntryInfoCardsProps) {
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-      <section className={cardClasses} aria-labelledby="entry-info-heading">
-        <h2 id="entry-info-heading" className="text-sm font-semibold text-slate-900">
+      <Card as="section" padding="md" aria-labelledby="entry-info-heading">
+        <h2 id="entry-info-heading" className="text-sm font-semibold text-fg">
           Factura
         </h2>
         <dl className="mt-3 grid grid-cols-2 gap-3">
@@ -43,11 +43,11 @@ export function EntryInfoCards({ invoice }: EntryInfoCardsProps) {
             value={`${invoice.registeredBy.fullName} · ${formatDate(invoice.createdAt)}`}
           />
         </dl>
-      </section>
+      </Card>
 
       {invoice.lastEdit && (
-        <section className={cardClasses} aria-labelledby="entry-lastedit-heading">
-          <h2 id="entry-lastedit-heading" className="text-sm font-semibold text-slate-900">
+        <Card as="section" padding="md" aria-labelledby="entry-lastedit-heading">
+          <h2 id="entry-lastedit-heading" className="text-sm font-semibold text-fg">
             Última edición
           </h2>
           <dl className="mt-3 space-y-3">
@@ -57,7 +57,7 @@ export function EntryInfoCards({ invoice }: EntryInfoCardsProps) {
             />
             <Field label="Motivo" value={invoice.lastEdit.reason} />
           </dl>
-        </section>
+        </Card>
       )}
     </div>
   )
