@@ -11,6 +11,12 @@ cada tag anotado.
 
 ## [Sin publicar]
 
+### Fixed
+
+- El frontend manda `Cache-Control` en sus respuestas: `no-cache` en el documento, para que cada
+  despliegue llegue sin recarga forzada, y un año con `immutable` en los assets, que llevan un hash
+  del contenido en el nombre. Hasta la 2.5.0 no mandaba ninguna (#181).
+
 ### Security
 
 - `axios` y `react-router-dom` actualizados por encima de sus avisos de seguridad publicados: axios
