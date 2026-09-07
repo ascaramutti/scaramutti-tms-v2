@@ -9,7 +9,15 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
-## [2.5.0] - sin publicar
+## [Sin publicar]
+
+### Security
+
+- `axios` y `react-router-dom` actualizados por encima de sus avisos de seguridad publicados: axios
+  de 1.16.0 a 1.20.0 y react-router-dom de 7.15.0 a 7.18.3, que arrastra `form-data` a 4.0.6. La
+  auditoría de dependencias de ejecución queda sin avisos (#180).
+
+## [2.5.0] - 2026-09-05
 
 Serie del tema del frontend: PRs #168 a #177. Solo frontend; sin migraciones, sin cambios de
 backend ni de contrato.
