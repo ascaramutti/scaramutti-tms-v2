@@ -1,5 +1,13 @@
 # Gateway
 
+> **Retirado de producción el 2026-08-30**: en Azure quedan
+> `backend` y `frontend`, y es el nginx del frontend el que sirve la SPA y proxea
+> `/api/v1` al backend. Lo que sigue describe la topología anterior, que continúa
+> en el servidor de respaldo. Desde la mudanza de la SPA a la raíz del dominio
+> (2026-09), la tabla de prefijos de abajo **ya no corresponde** al frontend
+> actual: queda como registro de cómo se ruteaba cuando el gateway estaba al
+> frente.
+
 Nginx que expone **un solo origin** y rutea por prefijo de path. Es la **única
 aplicación pública** del sistema: tiene colgados el dominio, el certificado
 gestionado y la allowlist de IPs. Si el gateway no arranca, no entra nadie.

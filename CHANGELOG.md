@@ -9,7 +9,35 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
-## [2.5.0] - sin publicar
+## [2.6.0] - 2026-09-08
+
+La SPA se muda a la raíz del dominio, con las dependencias de ejecución por encima de sus avisos de
+seguridad y con cabeceras de caché en las respuestas del frontend: PRs #180 a #184. Solo frontend y
+su nginx; sin migraciones, sin cambios de backend ni de contrato.
+
+### Changed
+
+- La SPA se sirve desde la raíz del dominio. El módulo de cotizaciones conserva sus URL; login,
+  cuenta, almacén y operaciones pasan a `/login`, `/cuenta/cambiar-contrasena`, `/almacen` y
+  `/operaciones`. Las URL viejas no se redirigen: terminan en la pantalla principal de cada rol,
+  igual que cualquier URL inexistente (#183).
+
+### Fixed
+
+- Al entrar por un enlace directo, después del login se respeta ese destino en vez de mandar
+  siempre a la pantalla principal; si el rol no puede abrirlo, cae en la suya. Un despachador que
+  abría un enlace a una cotización veía "Sin acceso" (#183).
+- El frontend manda `Cache-Control` en sus respuestas: `no-cache` en el documento, para que cada
+  despliegue llegue sin recarga forzada, y un año con `immutable` en los assets, que llevan un hash
+  del contenido en el nombre. Hasta la 2.5.0 no mandaba ninguna (#181).
+
+### Security
+
+- `axios` y `react-router-dom` actualizados por encima de sus avisos de seguridad publicados: axios
+  de 1.16.0 a 1.20.0 y react-router-dom de 7.15.0 a 7.18.3, que arrastra `form-data` a 4.0.6. La
+  auditoría de dependencias de ejecución queda sin avisos (#180).
+
+## [2.5.0] - 2026-09-05
 
 Serie del tema del frontend: PRs #168 a #177. Solo frontend; sin migraciones, sin cambios de
 backend ni de contrato.

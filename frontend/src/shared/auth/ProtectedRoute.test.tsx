@@ -1,3 +1,4 @@
+import { LOGIN_PATH, OPERATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -25,8 +26,8 @@ function renderProtected(
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
-            <Route path="/cotizaciones/login" element={<div>LOGIN PAGE</div>} />
-            <Route path="/cotizaciones/almacen" element={<div>ALMACEN</div>} />
+            <Route path={LOGIN_PATH} element={<div>LOGIN PAGE</div>} />
+            <Route path={WAREHOUSE_BASE} element={<div>ALMACEN</div>} />
             <Route
               path="/protegida"
               element={
@@ -51,7 +52,7 @@ describe('ProtectedRoute', () => {
     tokenStorage.clear()
   })
 
-  it('redirige a /cotizaciones/login si no hay sesion', async () => {
+  it('redirige al login si no hay sesion', async () => {
     renderProtected('/protegida')
     expect(await screen.findByText('LOGIN PAGE')).toBeInTheDocument()
     expect(screen.queryByText('CONTENIDO PROTEGIDO')).not.toBeInTheDocument()
@@ -73,7 +74,7 @@ describe('ProtectedRoute', () => {
     expect(await screen.findByText('CONTENIDO PROTEGIDO')).toBeInTheDocument()
   })
 
-  it('redirige a /cotizaciones/login si el token es invalido (getCurrentUser devuelve 401)', async () => {
+  it('redirige al login si el token es invalido (getCurrentUser devuelve 401)', async () => {
     tokenStorage.setTokens('expired-token', 'expired-refresh')
     server.use(
       getCurrentUserErrorResponse(401, {
@@ -115,7 +116,7 @@ describe('ProtectedRoute', () => {
     renderProtected('/protegida', { allowedRoles: ['sales'], moduleName: 'Cotizaciones' })
     expect(await screen.findByRole('link', { name: /ir a almacén/i })).toHaveAttribute(
       'href',
-      '/cotizaciones/almacen',
+      WAREHOUSE_BASE,
     )
   })
 
@@ -143,7 +144,7 @@ describe('ProtectedRoute', () => {
     renderProtected('/protegida', { allowedRoles: ['sales'], moduleName: 'Cotizaciones' })
     expect(await screen.findByRole('link', { name: /ir a operaciones/i })).toHaveAttribute(
       'href',
-      '/cotizaciones/operaciones',
+      OPERATIONS_BASE,
     )
   })
 

@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE, quotationDetailPath } from '../../../shared/paths'
 import { useEffect, useRef, useState } from 'react'
 import { FileQuestion } from 'lucide-react'
 import { Navigate, useNavigate, useParams } from 'react-router-dom'
@@ -18,7 +19,8 @@ import type { ClientResponse } from '../../../api'
 import { Button } from '../../../shared/ui/Button'
 
 /**
- * Página de EDICIÓN de cotización (`/cotizaciones/:id/editar`). Carga la cotización (GET) y los
+ * Página de EDICIÓN de cotización, la ruta de edición por id bajo la base del módulo
+ * comercial. Carga la cotización (GET) y los
  * catálogos, y monta el `WizardForm` compartido en modo edición: precargado con
  * `quotationResponseToForm`, con tipo + cliente inmutables, y guardando vía PUT con `If-Match`
  * (optimistic locking). Reusa los gates de carga/404 del detalle.
@@ -27,7 +29,6 @@ export function CotizacionEditPage() {
   const navigate = useNavigate()
   const params = useParams<{ id: string }>()
   const id = Number(params.id)
-  const idInvalid = !Number.isInteger(id) || id <= 0
 
   const quotation = useQuotation(id)
   const catalogs = useWizardCatalogs()
@@ -53,11 +54,11 @@ export function CotizacionEditPage() {
   }, [isTerminal, loadedStatus])
 
   function goToList() {
-    navigate('/cotizaciones')
+    navigate(QUOTATIONS_BASE)
   }
 
-  // Id no numérico o 404 → "no encontrada" (estado dedicado, no error genérico).
-  if (idInvalid || (quotation.isError && isNotFoundError(quotation.error))) {
+  // 404 del servidor → "no encontrada" (estado dedicado, no un error genérico).
+  if (quotation.isError && isNotFoundError(quotation.error)) {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <EmptyState
@@ -77,7 +78,7 @@ export function CotizacionEditPage() {
   // Terminal (ACCEPTED/REJECTED/EXPIRED) → rebote al detalle. Va antes del spinner de carga:
   // una terminal no se edita, no tiene sentido esperar a los catálogos del wizard.
   if (isTerminal) {
-    return <Navigate to={`/cotizaciones/${id}`} replace />
+    return <Navigate to={quotationDetailPath(id)} replace />
   }
 
   // Carga de la cotización o de los catálogos.
@@ -148,7 +149,7 @@ export function CotizacionEditPage() {
   function handleUpdate(values: WizardFormInput) {
     updateQuotation.mutate(
       { id, ifMatch, body: quotationFormToRequest(values) },
-      { onSuccess: () => navigate(`/cotizaciones/${id}`) },
+      { onSuccess: () => navigate(quotationDetailPath(id)) },
     )
   }
 
@@ -176,7 +177,7 @@ export function CotizacionEditPage() {
       isSubmitting={updateQuotation.isPending}
       apiError={updateQuotation.isError ? updateQuotation.error : null}
       onStepChange={updateQuotation.reset}
-      backTo={`/cotizaciones/${id}`}
+      backTo={quotationDetailPath(id)}
       backLabel="Cotización"
       onRecover={handleRecover}
     />

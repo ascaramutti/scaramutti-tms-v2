@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -32,15 +33,15 @@ function renderEntradas() {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter initialEntries={['/cotizaciones/almacen/entradas']}>
+        <MemoryRouter initialEntries={[`${WAREHOUSE_BASE}/entradas`]}>
           <Routes>
-            <Route path="/cotizaciones/almacen/entradas" element={<EntriesListPage />} />
+            <Route path={`${WAREHOUSE_BASE}/entradas`} element={<EntriesListPage />} />
             <Route
-              path="/cotizaciones/almacen/entradas/nueva"
+              path={`${WAREHOUSE_BASE}/entradas/nueva`}
               element={<div>NUEVA ENTRADA STUB</div>}
             />
             <Route
-              path="/cotizaciones/almacen/entradas/:id"
+              path={`${WAREHOUSE_BASE}/entradas/:id`}
               element={<div>DETALLE ENTRADA STUB</div>}
             />
           </Routes>

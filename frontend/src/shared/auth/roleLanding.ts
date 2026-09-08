@@ -1,3 +1,4 @@
+import { OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import type { UserRole } from '../../api'
 
 /**
@@ -13,16 +14,17 @@ import type { UserRole } from '../../api'
  * navegación (está en el historial); no alcanza con apuntar el landing afuera,
  * porque el router no puede navegar a otra app.
  */
-export const COTIZACIONES_LANDING = '/cotizaciones'
+export const COTIZACIONES_LANDING = QUOTATIONS_BASE
 
 /**
- * Módulo Almacén. Vive DENTRO de esta SPA: el prefijo `/cotizaciones` es el
- * `base` de Vite (la app entera se sirve ahí), no el módulo de cotizaciones.
+ * Módulo Almacén. Vive DENTRO de esta SPA, con su propia raíz: hasta la mudanza
+ * de 2026-09 colgaba del prefijo que se llamaba como el módulo de cotizaciones,
+ * y eso confundía a quien leía la URL.
  */
-export const ALMACEN_LANDING = '/cotizaciones/almacen'
+export const ALMACEN_LANDING = WAREHOUSE_BASE
 
-/** Módulo Operaciones. Cuelga del mismo prefijo, por la misma razón. */
-export const OPERACIONES_LANDING = '/cotizaciones/operaciones'
+/** Módulo Operaciones, con su propia raíz, por la misma historia. */
+export const OPERACIONES_LANDING = OPERATIONS_BASE
 
 /**
  * Los tres destinos posibles. Tenerlos como unión (y no como `string` suelto)

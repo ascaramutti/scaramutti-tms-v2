@@ -1,3 +1,4 @@
+import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -23,7 +24,7 @@ function buildUser(role: UserRole): UserResponse {
   }
 }
 
-function renderSidebarAs(role: UserRole, initialPath = '/cotizaciones') {
+function renderSidebarAs(role: UserRole, initialPath = QUOTATIONS_BASE) {
   server.use(
     http.get(`${API}/auth/me`, () => HttpResponse.json(buildUser(role))),
   )
@@ -57,18 +58,18 @@ describe('Sidebar - filtrado por rol', () => {
     // Cotizaciones ya está activa: es un link navegable (no el placeholder disabled).
     expect(screen.getByRole('link', { name: /cotizaciones/i })).toHaveAttribute(
       'href',
-      '/cotizaciones',
+      QUOTATIONS_BASE,
     )
     expect(screen.getByText('Clientes')).toBeInTheDocument()
     expect(screen.getByText(/comercial/i)).toBeInTheDocument()
     // Operaciones: Servicios es navegable dentro de la SPA
     expect(screen.getByRole('link', { name: /^servicios$/i })).toHaveAttribute(
       'href',
-      '/cotizaciones/operaciones',
+      OPERATIONS_BASE,
     )
     expect(screen.getByRole('link', { name: /cambiar contraseña/i })).toHaveAttribute(
       'href',
-      '/cotizaciones/cuenta/cambiar-contrasena',
+      CHANGE_PASSWORD_PATH,
     )
     expect(screen.getByText(/administrar cuenta/i)).toBeInTheDocument()
   })
@@ -135,7 +136,7 @@ describe('Sidebar - módulo Almacén', () => {
       expect(screen.getByText(/^almacén$/i)).toBeInTheDocument()
       expect(screen.getByRole('link', { name: /existencias/i })).toHaveAttribute(
         'href',
-        '/cotizaciones/almacen',
+        WAREHOUSE_BASE,
       )
     },
   )
@@ -165,32 +166,33 @@ describe('Sidebar - módulo Almacén', () => {
   it('reportes navega a su pantalla', async () => {
     renderSidebarAs('warehouse_keeper')
     const reportes = await screen.findByRole('link', { name: /reportes/i })
-    expect(reportes).toHaveAttribute('href', '/cotizaciones/almacen/reportes')
+    expect(reportes).toHaveAttribute('href', `${WAREHOUSE_BASE}/reportes`)
   })
 
   it('entradas navega a su listado', async () => {
     renderSidebarAs('warehouse_keeper')
     const entradas = await screen.findByRole('link', { name: /entradas/i })
-    expect(entradas).toHaveAttribute('href', '/cotizaciones/almacen/entradas')
+    expect(entradas).toHaveAttribute('href', `${WAREHOUSE_BASE}/entradas`)
   })
 
   it('retiros navega a su listado', async () => {
     renderSidebarAs('warehouse_keeper')
     const retiros = await screen.findByRole('link', { name: /retiros/i })
-    expect(retiros).toHaveAttribute('href', '/cotizaciones/almacen/retiros')
+    expect(retiros).toHaveAttribute('href', `${WAREHOUSE_BASE}/retiros`)
   })
 
   it('en entradas se resalta Entradas y NO Existencias', async () => {
-    renderSidebarAs('admin', '/cotizaciones/almacen/entradas')
+    renderSidebarAs('admin', `${WAREHOUSE_BASE}/entradas`)
     const entradas = await screen.findByRole('link', { name: /entradas/i })
     expect(entradas).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: /existencias/i })).not.toHaveAttribute('aria-current')
   })
 
   it('en almacén se resalta Existencias y NO Cotizaciones', async () => {
-    // Ambos módulos cuelgan de /cotizaciones (el base de la SPA): sin matcher
-    // por módulo, el prefijo marcaría Cotizaciones estando en Almacén.
-    renderSidebarAs('admin', '/cotizaciones/almacen')
+    // Cada módulo tiene su propia raíz, así que el prefijo de cotizaciones no
+    // alcanza a almacén. Hasta la mudanza de 2026-09 sí lo hacía, y por eso el
+    // ítem llevaba un matcher propio con una lista de exclusiones.
+    renderSidebarAs('admin', WAREHOUSE_BASE)
     const existencias = await screen.findByRole('link', { name: /existencias/i })
     expect(existencias).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: /^cotizaciones$/i })).not.toHaveAttribute(
@@ -199,7 +201,7 @@ describe('Sidebar - módulo Almacén', () => {
   })
 
   it('el detalle de un producto sigue resaltando Existencias', async () => {
-    renderSidebarAs('admin', '/cotizaciones/almacen/productos/42')
+    renderSidebarAs('admin', `${WAREHOUSE_BASE}/productos/42`)
     const existencias = await screen.findByRole('link', { name: /existencias/i })
     expect(existencias).toHaveAttribute('aria-current', 'page')
   })
@@ -234,14 +236,14 @@ describe('Sidebar - módulo Almacén', () => {
     })
     expect(screen.getByRole('link', { name: /^servicios$/i })).toHaveAttribute(
       'href',
-      '/cotizaciones/operaciones',
+      OPERATIONS_BASE,
     )
     expect(screen.getByText(/^operaciones$/i)).toBeInTheDocument()
   })
 
   it('los matchers respetan el borde de segmento en ambos módulos', async () => {
     // Una ruta que solo comparte texto con el prefijo no es el módulo.
-    renderSidebarAs('admin', '/cotizaciones/almacen/productosX')
+    renderSidebarAs('admin', `${WAREHOUSE_BASE}/productosX`)
     await screen.findByRole('link', { name: /existencias/i })
     expect(screen.getByRole('link', { name: /existencias/i })).not.toHaveAttribute('aria-current')
     expect(screen.getByRole('link', { name: /^cotizaciones$/i })).not.toHaveAttribute(
@@ -252,10 +254,10 @@ describe('Sidebar - módulo Almacén', () => {
 
 describe('Sidebar - módulo Operaciones', () => {
   it('en operaciones se resalta Servicios y NO Cotizaciones', async () => {
-    // Los tres módulos cuelgan de /cotizaciones (el base de la SPA): sin el
-    // subárbol en NON_QUOTATION_SUBTREES, el prefijo marcaría Cotizaciones
-    // estando en Operaciones.
-    renderSidebarAs('admin', '/cotizaciones/operaciones')
+    // Cada módulo tiene su propia raíz, así que el prefijo de cotizaciones no
+    // alcanza a operaciones. Hasta la mudanza de 2026-09 sí lo hacía, y por eso
+    // el matcher llevaba una lista de exclusiones.
+    renderSidebarAs('admin', OPERATIONS_BASE)
     const servicios = await screen.findByRole('link', { name: /^servicios$/i })
     expect(servicios).toHaveAttribute('aria-current', 'page')
     expect(screen.getByRole('link', { name: /^cotizaciones$/i })).not.toHaveAttribute(
@@ -263,8 +265,17 @@ describe('Sidebar - módulo Operaciones', () => {
     )
   })
 
+  it.each([QUOTATIONS_BASE, `${QUOTATIONS_BASE}/12`])(
+    'estando en %s, el item Cotizaciones queda marcado como la página actual',
+    async (path) => {
+      renderSidebarAs('admin', path)
+      const cotizaciones = await screen.findByRole('link', { name: /^cotizaciones$/i })
+      expect(cotizaciones).toHaveAttribute('aria-current', 'page')
+    },
+  )
+
   it('el detalle de un servicio sigue resaltando Servicios', async () => {
-    renderSidebarAs('admin', '/cotizaciones/operaciones/servicios/42')
+    renderSidebarAs('admin', `${OPERATIONS_BASE}/servicios/42`)
     const servicios = await screen.findByRole('link', { name: /^servicios$/i })
     expect(servicios).toHaveAttribute('aria-current', 'page')
   })
@@ -272,7 +283,7 @@ describe('Sidebar - módulo Operaciones', () => {
   it('una hermana de servicios no resalta Servicios', async () => {
     // El día que Reportes tenga pantalla, el prefijo pelado marcaría Servicios
     // estando en ella. Este caso fija que el matcher no lo hace.
-    renderSidebarAs('admin', '/cotizaciones/operaciones/reportes')
+    renderSidebarAs('admin', `${OPERATIONS_BASE}/reportes`)
     const servicios = await screen.findByRole('link', { name: /^servicios$/i })
     expect(servicios).not.toHaveAttribute('aria-current')
   })
@@ -280,7 +291,7 @@ describe('Sidebar - módulo Operaciones', () => {
   it('Reportes de operaciones está deshabilitado y el despachador no lo ve', async () => {
     // Sin pantalla todavía: se anuncia como deshabilitado, no como link. Y el
     // contrato deja al despachador afuera del reporte semanal (ve precios).
-    renderSidebarAs('admin', '/cotizaciones/operaciones')
+    renderSidebarAs('admin', OPERATIONS_BASE)
     const reportes = await screen.findByText('Reportes de operaciones')
     expect(reportes).toHaveAttribute('aria-disabled', 'true')
     // Lo que de verdad llega a un lector de pantalla es este texto: sobre un
@@ -293,7 +304,7 @@ describe('Sidebar - módulo Operaciones', () => {
   })
 
   it('el despachador ve Servicios pero no el reporte', async () => {
-    renderSidebarAs('dispatcher', '/cotizaciones/operaciones')
+    renderSidebarAs('dispatcher', OPERATIONS_BASE)
     expect(await screen.findByRole('link', { name: /^servicios$/i })).toBeInTheDocument()
     expect(screen.queryByText('Reportes de operaciones')).not.toBeInTheDocument()
   })

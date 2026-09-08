@@ -1,3 +1,4 @@
+import { OPERATIONS_BASE } from '../../../shared/paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -41,7 +42,7 @@ afterEach(() => {
 })
 
 const SERVICE_ID = 77
-const EDIT_PATH = `/cotizaciones/operaciones/servicios/${SERVICE_ID}/editar`
+const EDIT_PATH = `${OPERATIONS_BASE}/servicios/${SERVICE_ID}/editar`
 const JUSTIFICATION = 'Corrijo el destino que vino mal del cliente'
 
 const CURRENCIES = [
@@ -70,11 +71,11 @@ function renderEditPage({ role = 'admin' as UserRole } = {}) {
         <MemoryRouter initialEntries={[EDIT_PATH]}>
           <Routes>
             <Route
-              path="/cotizaciones/operaciones/servicios/:id/editar"
+              path={`${OPERATIONS_BASE}/servicios/:id/editar`}
               element={<ServiceEditPage />}
             />
-            <Route path="/cotizaciones/operaciones/servicios/:id" element={<DetalleStub />} />
-            <Route path="/cotizaciones/operaciones" element={<div>Listado de servicios</div>} />
+            <Route path={`${OPERATIONS_BASE}/servicios/:id`} element={<DetalleStub />} />
+            <Route path={OPERATIONS_BASE} element={<div>Listado de servicios</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>

@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE } from '../../../shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -26,7 +27,7 @@ function DetalleStub() {
   return <div>DETALLE {id}</div>
 }
 
-function renderCotizaciones(initialPath = '/cotizaciones') {
+function renderCotizaciones(initialPath = QUOTATIONS_BASE) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   })
@@ -38,9 +39,9 @@ function renderCotizaciones(initialPath = '/cotizaciones') {
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
-            <Route path="/cotizaciones" element={<CotizacionesListPage />} />
-            <Route path="/cotizaciones/nueva" element={<div>NUEVA COTIZACION</div>} />
-            <Route path="/cotizaciones/:id" element={<DetalleStub />} />
+            <Route path={QUOTATIONS_BASE} element={<CotizacionesListPage />} />
+            <Route path={`${QUOTATIONS_BASE}/nueva`} element={<div>NUEVA COTIZACION</div>} />
+            <Route path={`${QUOTATIONS_BASE}/:id`} element={<DetalleStub />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>

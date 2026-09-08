@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { Link } from 'react-router-dom'
 import type {
   WarehouseKardexMovementResponse,
@@ -45,8 +46,8 @@ const MOVEMENT_VARIANTS: Record<WarehouseKardexMovementType, BadgeVariant> = {
  * afuera a propósito: el corte inicial no tiene documento que abrir.
  */
 const MOVEMENT_SOURCE_PATHS: Record<Exclude<WarehouseKardexMovementType, 'APERTURA'>, string> = {
-  ENTRADA: '/cotizaciones/almacen/entradas',
-  SALIDA: '/cotizaciones/almacen/retiros',
+  ENTRADA: `${WAREHOUSE_BASE}/entradas`,
+  SALIDA: `${WAREHOUSE_BASE}/retiros`,
 }
 
 /** Las salidas restan; apertura y entradas suman. El backend manda la cantidad siempre positiva. */

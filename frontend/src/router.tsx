@@ -1,6 +1,8 @@
+import { CHANGE_PASSWORD_PATH, LOGIN_PATH, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
 import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
+import { RequireNumericId } from './shared/auth/RequireNumericId'
 import {
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
@@ -32,10 +34,11 @@ import { ServiceDetailPage } from './features/operations/pages/ServiceDetailPage
 import { ServiceEditPage } from './features/operations/pages/ServiceEditPage'
 import { ServiceCreatePage } from './features/operations/pages/ServiceCreatePage'
 
-// Toda la app vive bajo /cotizaciones (coincide con el `base` de Vite): v2 convive
-// con v1 detrás de un gateway que rutea por prefijo. No usamos `basename` porque
-// las rutas del módulo ya traían el prefijo /cotizaciones — solo login y cuenta
-// se movieron adentro. La raíz `/` del dominio pertenece a v1.
+// La aplicación se sirve desde la raíz del dominio. Hasta la mudanza de 2026-09
+// vivía bajo un prefijo heredado de cuando convivía con la v1 detrás de un
+// gateway que ruteaba por prefijo; retirada la v1, el prefijo dejó de tener
+// sentido. No se usa `basename`: con la base en la raíz no hace falta. Los
+// valores viven en shared/paths.
 /**
  * La tabla de rutas se exporta aparte del router para poder montarla en un
  * router de memoria desde los tests: sin eso, cada test que necesita una ruta
@@ -43,7 +46,7 @@ import { ServiceCreatePage } from './features/operations/pages/ServiceCreatePage
  * typo en el path pasan a producción con la suite en verde).
  */
 export const routes: RouteObject[] = [
-  { path: '/cotizaciones/login', element: <LoginPage /> },
+  { path: LOGIN_PATH, element: <LoginPage /> },
   {
     // Layout route: las rutas autenticadas comparten AppLayout (con sidebar).
     element: (
@@ -53,44 +56,50 @@ export const routes: RouteObject[] = [
     ),
     children: [
       {
-        path: '/cotizaciones',
+        path: QUOTATIONS_BASE,
         element: (
           <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
             <CotizacionesListPage />
           </ProtectedRoute>
         ),
       },
-      // Declarado ANTES de /cotizaciones/:id para que "nueva" no matchee como id.
+      // Declarado ANTES del detalle por id para que "nueva" no matchee como id.
       {
-        path: '/cotizaciones/nueva',
+        path: `${QUOTATIONS_BASE}/nueva`,
         element: (
           <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
             <CotizacionWizardPage />
           </ProtectedRoute>
         ),
       },
-      // Declarado ANTES de /cotizaciones/:id para que "editar" no matchee como id.
+      // Declarado ANTES del detalle por id para que "editar" no matchee como id.
       {
-        path: '/cotizaciones/:id/editar',
+        path: `${QUOTATIONS_BASE}/:id/editar`,
         element: (
-          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
-            <CotizacionEditPage />
-          </ProtectedRoute>
+          // La validación del id va ANTES de la guarda de rol: ver RequireNumericId.
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
+              <CotizacionEditPage />
+            </ProtectedRoute>
+          </RequireNumericId>
         ),
       },
       {
-        path: '/cotizaciones/:id',
+        path: `${QUOTATIONS_BASE}/:id`,
         element: (
-          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
-            <CotizacionDetailPage />
-          </ProtectedRoute>
+          // La validación del id va ANTES de la guarda de rol: ver RequireNumericId.
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
+              <CotizacionDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
         ),
       },
-      // Módulo Almacén. Cuelga del mismo prefijo porque /cotizaciones es el
-      // `base` de Vite (la SPA entera se sirve ahí), no el módulo comercial:
-      // así el gateway sigue ruteando v2 por un único prefijo.
+      // Módulo Almacén, con su propia raíz. Hasta la mudanza de 2026-09 colgaba
+      // del prefijo que se llamaba como el módulo comercial, y por eso la URL
+      // decía "cotizaciones" delante de almacén.
       {
-        path: '/cotizaciones/almacen',
+        path: WAREHOUSE_BASE,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <StockListPage />
@@ -99,7 +108,7 @@ export const routes: RouteObject[] = [
       },
       // Declarado ANTES de /entradas/:id para que "nueva" no matchee como id.
       {
-        path: '/cotizaciones/almacen/entradas/nueva',
+        path: `${WAREHOUSE_BASE}/entradas/nueva`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <EntryCreatePage />
@@ -107,7 +116,7 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-        path: '/cotizaciones/almacen/entradas',
+        path: `${WAREHOUSE_BASE}/entradas`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <EntriesListPage />
@@ -116,7 +125,7 @@ export const routes: RouteObject[] = [
       },
       // Declarado ANTES de /entradas/:id para que "editar" no matchee como id.
       {
-        path: '/cotizaciones/almacen/entradas/:id/editar',
+        path: `${WAREHOUSE_BASE}/entradas/:id/editar`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <EntryEditPage />
@@ -124,7 +133,7 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-        path: '/cotizaciones/almacen/entradas/:id',
+        path: `${WAREHOUSE_BASE}/entradas/:id`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <EntryDetailPage />
@@ -133,7 +142,7 @@ export const routes: RouteObject[] = [
       },
       // Declarado ANTES de /retiros/:id para que "nuevo" no matchee como id.
       {
-        path: '/cotizaciones/almacen/retiros/nuevo',
+        path: `${WAREHOUSE_BASE}/retiros/nuevo`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <WithdrawalCreatePage />
@@ -141,7 +150,7 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-        path: '/cotizaciones/almacen/retiros',
+        path: `${WAREHOUSE_BASE}/retiros`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <WithdrawalsListPage />
@@ -150,7 +159,7 @@ export const routes: RouteObject[] = [
       },
       // Declarado ANTES de /retiros/:id para que "editar" no matchee como id.
       {
-        path: '/cotizaciones/almacen/retiros/:id/editar',
+        path: `${WAREHOUSE_BASE}/retiros/:id/editar`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <WithdrawalEditPage />
@@ -158,7 +167,7 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-        path: '/cotizaciones/almacen/retiros/:id',
+        path: `${WAREHOUSE_BASE}/retiros/:id`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <WithdrawalDetailPage />
@@ -166,7 +175,7 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-        path: '/cotizaciones/almacen/reportes',
+        path: `${WAREHOUSE_BASE}/reportes`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <WarehouseReportsPage />
@@ -174,7 +183,7 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-        path: '/cotizaciones/almacen/corte-inicial',
+        path: `${WAREHOUSE_BASE}/corte-inicial`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <OpeningBalancesPage />
@@ -182,16 +191,15 @@ export const routes: RouteObject[] = [
         ),
       },
       {
-        path: '/cotizaciones/almacen/productos/:id',
+        path: `${WAREHOUSE_BASE}/productos/:id`,
         element: (
           <ProtectedRoute allowedRoles={WAREHOUSE_ROLES} moduleName="Almacén">
             <ProductDetailPage />
           </ProtectedRoute>
         ),
       },
-      // Módulo Operaciones (control de viajes). Cuelga del mismo prefijo que
-      // almacén y por la misma razón: /cotizaciones es el `base` de Vite, no el
-      // módulo comercial.
+      // Módulo Operaciones (control de viajes), con su propia raíz, por la misma
+      // historia que almacén.
       {
         path: OPERACIONES_LANDING,
         element: (
@@ -236,9 +244,13 @@ export const routes: RouteObject[] = [
           </ProtectedRoute>
         ),
       },
-      { path: '/cotizaciones/cuenta/cambiar-contrasena', element: <ChangePasswordPage /> },
+      { path: CHANGE_PASSWORD_PATH, element: <ChangePasswordPage /> },
     ],
   },
+  // La raíz del dominio. Antes la resolvía nginx con un 302 al prefijo; desde que
+  // la SPA es la raíz, entra acá y aterriza según el rol, o manda al login si no
+  // hay sesión: lo mismo que decide el comodín de abajo.
+  { path: '/', element: <LandingRedirect /> },
   // Cualquier ruta que no existe: decide según la sesión (ver LandingRedirect).
   { path: '*', element: <LandingRedirect /> },
 ]

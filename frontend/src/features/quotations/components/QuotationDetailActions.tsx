@@ -1,3 +1,4 @@
+import { quotationDetailPath } from '../../../shared/paths'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -122,7 +123,7 @@ export function QuotationDetailActions({
         />
         {editable ? (
           <Link
-            to={`/cotizaciones/${quotationId}/editar`}
+            to={`${quotationDetailPath(quotationId)}/editar`}
             className={buttonClasses({ variant: 'secondary' })}
           >
             <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />

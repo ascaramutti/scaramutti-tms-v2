@@ -11,7 +11,7 @@ interface SidebarNavItemProps {
   /**
    * Matcher custom de "activo". El default es prefix-matching, que marca falsos
    * positivos cuando rutas de otra sección anidan bajo el mismo prefijo (ej.
-   * /cotizaciones/cuenta/* y /cotizaciones/almacen/* no son Cotizaciones).
+   * /almacen/entradas cuelga de /almacen pero no es Existencias).
    */
   activeWhen?: (pathname: string) => boolean
 }

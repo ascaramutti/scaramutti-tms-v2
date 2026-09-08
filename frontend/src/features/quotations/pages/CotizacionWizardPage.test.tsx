@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE } from '../../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -32,11 +33,11 @@ function renderWizard() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={['/cotizaciones/nueva']}>
+      <MemoryRouter initialEntries={[`${QUOTATIONS_BASE}/nueva`]}>
         <Routes>
-          <Route path="/cotizaciones" element={<div>LISTADO COTIZACIONES</div>} />
-          <Route path="/cotizaciones/nueva" element={<CotizacionWizardPage />} />
-          <Route path="/cotizaciones/:id" element={<QuotationDetailStub />} />
+          <Route path={QUOTATIONS_BASE} element={<div>LISTADO COTIZACIONES</div>} />
+          <Route path={`${QUOTATIONS_BASE}/nueva`} element={<CotizacionWizardPage />} />
+          <Route path={`${QUOTATIONS_BASE}/:id`} element={<QuotationDetailStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

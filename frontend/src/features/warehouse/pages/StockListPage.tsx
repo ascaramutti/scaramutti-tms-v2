@@ -1,3 +1,4 @@
+import { warehouseProductPath } from '../../../shared/paths'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '../../../shared/ui/PageHeader'
@@ -103,7 +104,7 @@ export function StockListPage() {
         errorMessage={getApiErrorMessage(error, 'No se pudieron cargar las existencias.')}
         onRetry={() => refetch()}
         onPageChange={setPage}
-        onRowClick={(product) => navigate(`/cotizaciones/almacen/productos/${product.id}`)}
+        onRowClick={(product) => navigate(warehouseProductPath(product.id))}
         hasActiveFilters={hasActiveFilters}
       />
     </div>

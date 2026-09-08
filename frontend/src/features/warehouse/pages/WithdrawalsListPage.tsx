@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
@@ -62,7 +63,7 @@ export function WithdrawalsListPage() {
         description="Salidas de stock · cada retiro descuenta existencias."
         divider
         action={
-          <Link to="/cotizaciones/almacen/retiros/nuevo" className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
+          <Link to={`${WAREHOUSE_BASE}/retiros/nuevo`} className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Registrar retiro
           </Link>
@@ -85,7 +86,7 @@ export function WithdrawalsListPage() {
         onPageChange={setPage}
         hasActiveFilters={hasActiveFilters}
         onRowClick={(withdrawal) =>
-          navigate(`/cotizaciones/almacen/retiros/${withdrawal.id}`)
+          navigate(`${WAREHOUSE_BASE}/retiros/${withdrawal.id}`)
         }
       />
     </div>

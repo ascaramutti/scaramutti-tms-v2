@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE } from '../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { matchesPathPrefix } from './pathMatching'
 
@@ -10,11 +11,11 @@ describe('matchesPathPrefix', () => {
 
   it('respeta el borde de segmento', () => {
     expect(matchesPathPrefix('/clientesX', '/clientes')).toBe(false)
-    expect(matchesPathPrefix('/cotizacionesX', '/cotizaciones')).toBe(false)
+    expect(matchesPathPrefix(`${QUOTATIONS_BASE}X`, QUOTATIONS_BASE)).toBe(false)
   })
 
   it('la raíz matchea solo exacta (si no, marcaría toda la app)', () => {
     expect(matchesPathPrefix('/', '/')).toBe(true)
-    expect(matchesPathPrefix('/cotizaciones', '/')).toBe(false)
+    expect(matchesPathPrefix(QUOTATIONS_BASE, '/')).toBe(false)
   })
 })

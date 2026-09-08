@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE, quotationDetailPath } from '../../../shared/paths'
 import { useNavigate } from 'react-router-dom'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
@@ -45,7 +46,7 @@ export function CotizacionWizardPage() {
 
   function handleCreate(values: WizardFormInput) {
     createQuotation.mutate(quotationFormToRequest(values), {
-      onSuccess: (created) => navigate(`/cotizaciones/${created.id}`),
+      onSuccess: (created) => navigate(quotationDetailPath(created.id)),
     })
   }
 
@@ -59,7 +60,7 @@ export function CotizacionWizardPage() {
       isSubmitting={createQuotation.isPending}
       apiError={createQuotation.isError ? createQuotation.error : null}
       onStepChange={createQuotation.reset}
-      backTo="/cotizaciones"
+      backTo={QUOTATIONS_BASE}
       backLabel="Cotizaciones"
     />
   )
