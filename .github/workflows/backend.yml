@@ -89,7 +89,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Configurar JDK 21 (Temurin)
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           # El pom compila con `maven.compiler.release` en 17 y el runtime es JDK 21:
