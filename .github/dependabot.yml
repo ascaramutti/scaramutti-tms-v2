@@ -14,6 +14,23 @@ updates:
     groups:
       backend-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Quarkus no entra al grupo de menores: la plataforma versiona todo el stack a
+      # la vez, así que lo que el bot ve como "minor" es un salto de LTS. El primer
+      # escaneo propuso 3.15 a 3.39 con esa etiqueta y rompía un test. Los parches sí
+      # entran; el salto de plataforma es un PR propio, con las notas de versión
+      # leídas y la suite entera corrida, y lo decide el dueño.
+      - dependency-name: "io.quarkus.platform:*"
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+      - dependency-name: "io.quarkus:*"
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+      # Hibernate no se propone suelto en ninguna versión: su número lo fija el BOM
+      # de la plataforma, y subirlo por afuera desalinea el stack sin avisar.
+      - dependency-name: "org.hibernate.orm:*"
 
   - package-ecosystem: npm
     directory: /frontend
@@ -26,6 +43,18 @@ updates:
     groups:
       frontend-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Los tipos de Node siguen al runtime, no al calendario: el proyecto corre
+      # Node 22 y el bot propuso los tipos de la 26. La mayor entra el día que suba
+      # el runtime, en el mismo cambio.
+      - dependency-name: "@types/node"
+        update-types:
+          - version-update:semver-major
+      # TypeScript mayor queda fuera por decisión del dueño: la 7 rompe la
+      # instalación. Se sube cuando se decida, con la suite corrida.
+      - dependency-name: "typescript"
+        update-types:
+          - version-update:semver-major
 
   - package-ecosystem: github-actions
     directory: /
