@@ -53,10 +53,38 @@ describe('canRoleOpenPath', () => {
     },
   )
 
-  it.each(['//evil.com', '/\\evil.com', 'https://evil.com', 'javascript:alert(1)', 'sin-barra', '  /almacen'])(
-    'no acepta %s como destino: no es una ruta de esta aplicación',
+  it.each([
+    '//evil.com',
+    '/\\evil.com',
+    'https://evil.com',
+    'javascript:alert(1)',
+    'sin-barra',
+    '  /almacen',
+    // Un carácter de control entre las dos barras: el parser de URL lo tira y lo
+    // que queda sale del dominio.
+    '/\r/evil.com',
+    '/\n/evil.com',
+    '/\t/evil.com',
+    '/\u0000/evil.com',
+  ])(
+    'no acepta %j como destino: no es una ruta de esta aplicación',
     (destino) => {
       expect(canRoleOpenPath(destino, 'admin')).toBe(false)
+    },
+  )
+
+  it.each([
+    QUOTATIONS_BASE,
+    `${QUOTATIONS_BASE}/12`,
+    `${WAREHOUSE_BASE}/entradas?pagina=2`,
+    `${QUOTATIONS_BASE}/12#items`,
+    // Un no-ASCII válido tiene que pasar: si alguien estira el rango de control
+    // hasta 0xFF, los acentos empiezan a rechazarse y nadie se entera.
+    `${WAREHOUSE_BASE}/entradas?q=señal`,
+  ])(
+    'sigue aceptando %s, que es una ruta legítima',
+    (destino) => {
+      expect(canRoleOpenPath(destino, 'admin')).toBe(true)
     },
   )
 
