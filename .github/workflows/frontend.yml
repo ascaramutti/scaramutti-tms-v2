@@ -25,7 +25,7 @@ jobs:
       frontend: ${{ steps.filter.outputs.frontend }}
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -66,7 +66,7 @@ jobs:
 
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       # La misma major de Node que usa el build de producción (Dockerfile).
       - name: Configurar Node.js
@@ -106,7 +106,7 @@ jobs:
         working-directory: frontend
     steps:
       - name: Checkout del código
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
       - name: Configurar Node.js
         uses: actions/setup-node@v5
         with:
