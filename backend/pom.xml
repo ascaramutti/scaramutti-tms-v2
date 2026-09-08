@@ -18,7 +18,7 @@
         <quarkus.platform.version>3.15.1</quarkus.platform.version>
         <surefire-plugin.version>3.2.5</surefire-plugin.version>
         <mapstruct.version>1.5.5.Final</mapstruct.version>
-        <hibernate-jpamodelgen.version>6.6.4.Final</hibernate-jpamodelgen.version>
+        <hibernate-jpamodelgen.version>7.4.7.Final</hibernate-jpamodelgen.version>
         <jacoco.version>0.8.12</jacoco.version>
     </properties>
 
