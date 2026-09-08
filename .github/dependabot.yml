@@ -1,0 +1,40 @@
+# Actualización de dependencias: un PR agrupado por ecosistema y por semana, con las
+# menores y parches juntos (las mayores van solas: se revisan aparte). Las alertas de
+# seguridad se activan en Settings → Code security, fuera de este archivo.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      frontend-minor-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions-minor-patch:
+        update-types: [minor, patch]

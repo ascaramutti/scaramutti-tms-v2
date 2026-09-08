@@ -1,0 +1,55 @@
+# Reglas de gitleaks del proyecto. Extiende las reglas por defecto (tokens, claves
+# privadas, credenciales conocidas) con lo que en un repositorio público nadie más
+# detecta: direcciones de la red privada y hostnames internos.
+#
+# ⚠️ Este archivo es público. NO poner acá hostnames ni IPs reales como "ejemplo":
+# los patrones tienen que ser genéricos (rangos, sufijos de dominio), nunca valores.
+
+title = "gitleaks del proyecto"
+
+[extend]
+useDefault = true
+
+# Rango CGNAT 100.64.0.0/10, el que usa Tailscale para toda la tailnet.
+[[rules]]
+id = "tailnet-ip"
+description = "IP de la red privada (100.64.0.0/10)"
+regex = '''\b100\.(6[4-9]|[7-9][0-9]|1[01][0-9]|12[0-7])\.[0-9]{1,3}\.[0-9]{1,3}\b'''
+keywords = ["100."]
+
+# Nombres de máquina de la red privada: dominios MagicDNS de Tailscale y .local.
+[[rules]]
+id = "hostname-red-privada"
+description = "Hostname de la red privada (*.ts.net, *.tailscale.net, *.local)"
+regex = '''\b[a-z0-9-]+\.(ts\.net|tailscale\.net|local)\b'''
+keywords = ["ts.net", "tailscale.net", ".local"]
+
+# Cadenas de conexión con credenciales embebidas.
+[[rules]]
+id = "url-con-credenciales"
+description = "URL con usuario:password embebidos"
+regex = '''[a-z][a-z0-9+.-]*://[^/\s:@]+:[^/\s:@]+@'''
+keywords = ["://"]
+
+[allowlist]
+description = "Lo que legítimamente puede parecer un hallazgo"
+# Sin esto, las expresiones de abajo se comparan contra el grupo capturado por la
+# regla (para la de hostnames, apenas "local") y no contra el texto encontrado, así
+# que ninguna que mencione lo que está alrededor llega a suprimir nada.
+regexTarget = "match"
+paths = [
+  '''\.gitleaks\.toml$''',            # este archivo describe los patrones
+  '''package-lock\.json$''',          # hashes de integridad, no secretos
+]
+regexes = [
+  '''dev_local_only''',               # credencial de desarrollo local, documentada como tal
+  '''env\.local''',                   # archivo de entorno de Vite, no un hostname
+  '''settings\.local''',              # archivo de configuración local del editor, ídem
+  '''Inactivo1234''',                  # contraseña del usuario inactivo que siembra el
+                                      # perfil de desarrollo, para el caso de login rechazado
+  # Las tres de abajo vienen de la plantilla: hoy ninguna regla propia las dispara,
+  # y quedan por si alguna futura mira direcciones o dominios de ejemplo.
+  '''localhost''',
+  '''127\.0\.0\.1''',
+  '''example\.com''',
+]
