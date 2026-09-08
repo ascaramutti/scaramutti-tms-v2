@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -33,7 +34,7 @@ function renderReportes() {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter initialEntries={['/cotizaciones/almacen/reportes']}>
+        <MemoryRouter initialEntries={[`${WAREHOUSE_BASE}/reportes`]}>
           <WarehouseReportsPage />
         </MemoryRouter>
       </AuthProvider>

@@ -1,3 +1,4 @@
+import { OPERATIONS_BASE } from '../../../shared/paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -59,15 +60,15 @@ function renderCreatePage({
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter initialEntries={['/cotizaciones/operaciones/servicios/nuevo']}>
+        <MemoryRouter initialEntries={[`${OPERATIONS_BASE}/servicios/nuevo`]}>
           <Routes>
-            <Route path="/cotizaciones/operaciones/servicios/nuevo" element={<ServiceCreatePage />} />
+            <Route path={`${OPERATIONS_BASE}/servicios/nuevo`} element={<ServiceCreatePage />} />
             {/* Destino del alta y del cancelar: se afirma que se llega, no que se navega. */}
-            <Route path="/cotizaciones/operaciones" element={<div>Listado de servicios</div>} />
+            <Route path={OPERATIONS_BASE} element={<div>Listado de servicios</div>} />
             {/* Sustituta del detalle, que nombra el id recibido: sin eso, el test
                 no distingue "abrió el detalle del viaje recién creado" de "abrió
                 alguno". */}
-            <Route path="/cotizaciones/operaciones/servicios/:id" element={<DetalleStub />} />
+            <Route path={`${OPERATIONS_BASE}/servicios/:id`} element={<DetalleStub />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>

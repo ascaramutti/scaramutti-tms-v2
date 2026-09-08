@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -14,9 +15,9 @@ function renderItem(node: React.ReactNode, initialPath = '/') {
 
 describe('SidebarNavItem', () => {
   it('renderiza NavLink (<a>) cuando se pasa `to`', () => {
-    renderItem(<SidebarNavItem icon={FileText} label="Cotizaciones" to="/cotizaciones" />)
+    renderItem(<SidebarNavItem icon={FileText} label="Cotizaciones" to={QUOTATIONS_BASE} />)
     const link = screen.getByRole('link', { name: /cotizaciones/i })
-    expect(link).toHaveAttribute('href', '/cotizaciones')
+    expect(link).toHaveAttribute('href', QUOTATIONS_BASE)
   })
 
   it('renderiza <span aria-disabled> cuando NO se pasa `to`', () => {
@@ -67,10 +68,10 @@ describe('SidebarNavItem', () => {
       <SidebarNavItem
         icon={FileText}
         label="Cotizaciones"
-        to="/cotizaciones"
-        activeWhen={(pathname) => !pathname.startsWith('/cotizaciones/almacen')}
+        to={QUOTATIONS_BASE}
+        activeWhen={(pathname) => !pathname.startsWith(WAREHOUSE_BASE)}
       />,
-      '/cotizaciones/almacen',
+      WAREHOUSE_BASE,
     )
     const link = screen.getByRole('link', { name: /cotizaciones/i })
     expect(link).not.toHaveAttribute('aria-current')

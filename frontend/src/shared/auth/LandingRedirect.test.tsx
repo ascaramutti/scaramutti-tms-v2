@@ -1,3 +1,4 @@
+import { LOGIN_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -35,10 +36,10 @@ function renderRedirect() {
         <MemoryRouter initialEntries={['/ruta-que-no-existe']}>
           <Routes>
             <Route path="/ruta-que-no-existe" element={<LandingRedirect />} />
-            <Route path="/cotizaciones/login" element={<div>LOGIN</div>} />
-            <Route path="/cotizaciones" element={<div>COTIZACIONES</div>} />
-            <Route path="/cotizaciones/operaciones" element={<div>OPERACIONES</div>} />
-            <Route path="/cotizaciones/almacen" element={<div>ALMACEN</div>} />
+            <Route path={LOGIN_PATH} element={<div>LOGIN</div>} />
+            <Route path={QUOTATIONS_BASE} element={<div>COTIZACIONES</div>} />
+            <Route path={OPERATIONS_BASE} element={<div>OPERACIONES</div>} />
+            <Route path={WAREHOUSE_BASE} element={<div>ALMACEN</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>

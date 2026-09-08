@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE } from '../../../shared/paths'
 import { Badge } from '../../../shared/ui/Badge'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { formatDate } from '../../../shared/utils/formatters'
@@ -26,7 +27,7 @@ export function QuotationDetailHeader({
 }: QuotationDetailHeaderProps) {
   return (
     <header className="border-b border-border pb-5">
-      <BackLink to="/cotizaciones">Cotizaciones</BackLink>
+      <BackLink to={QUOTATIONS_BASE}>Cotizaciones</BackLink>
 
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold text-fg">{code}</h1>

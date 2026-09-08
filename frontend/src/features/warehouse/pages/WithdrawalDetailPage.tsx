@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Ban, Pencil } from 'lucide-react'
@@ -14,7 +15,7 @@ import { useWarehouseWithdrawal } from '../hooks/useWarehouseWithdrawal'
 import { Card } from '../../../shared/ui/Card'
 import { Alert } from '../../../shared/ui/Alert'
 
-const WITHDRAWALS_PATH = '/cotizaciones/almacen/retiros'
+const WITHDRAWALS_PATH = `${WAREHOUSE_BASE}/retiros`
 
 /**
  * Detalle de un retiro: su ficha y la anulación. El alta vive en su propia

@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
@@ -60,7 +61,7 @@ export function EntriesListPage() {
         description="Compras por factura · cada ítem registrado suma stock."
         divider
         action={
-          <Link to="/cotizaciones/almacen/entradas/nueva" className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
+          <Link to={`${WAREHOUSE_BASE}/entradas/nueva`} className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
             <Plus className="h-4 w-4" aria-hidden="true" />
             Registrar entrada
           </Link>
@@ -86,7 +87,7 @@ export function EntriesListPage() {
         onPageChange={setPage}
         hasActiveFilters={hasActiveFilters}
         onRowClick={(invoice) =>
-          navigate(`/cotizaciones/almacen/entradas/${invoice.id}`)
+          navigate(`${WAREHOUSE_BASE}/entradas/${invoice.id}`)
         }
       />
     </div>

@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -9,7 +10,7 @@ import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getAp
 import { EntryForm } from '../components/EntryForm'
 import { useWarehousePurchaseInvoice } from '../hooks/useWarehousePurchaseInvoice'
 
-const ENTRIES_PATH = '/cotizaciones/almacen/entradas'
+const ENTRIES_PATH = `${WAREHOUSE_BASE}/entradas`
 
 /**
  * Edición de una entrada. Carga el detalle (GET, con su ETag), monta el

@@ -1,3 +1,4 @@
+import { LOGIN_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../../shared/paths'
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -10,7 +11,7 @@ import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
 import { loginAsRoleResponse, loginErrorResponse } from '../../../test/mocks/handlers/auth'
 
-function renderLogin(initialPath = '/cotizaciones/login') {
+function renderLogin(initialPath = LOGIN_PATH) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -19,10 +20,10 @@ function renderLogin(initialPath = '/cotizaciones/login') {
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
-            <Route path="/cotizaciones/login" element={<LoginPage />} />
-            <Route path="/cotizaciones" element={<div>HOME</div>} />
-            <Route path="/cotizaciones/almacen" element={<div>ALMACEN</div>} />
-            <Route path="/cotizaciones/operaciones" element={<div>OPERACIONES</div>} />
+            <Route path={LOGIN_PATH} element={<LoginPage />} />
+            <Route path={QUOTATIONS_BASE} element={<div>HOME</div>} />
+            <Route path={WAREHOUSE_BASE} element={<div>ALMACEN</div>} />
+            <Route path={OPERATIONS_BASE} element={<div>OPERACIONES</div>} />
             <Route path="/clients" element={<div>CLIENTS</div>} />
           </Routes>
         </MemoryRouter>
@@ -194,11 +195,11 @@ describe('LoginPage', () => {
       >
         <AuthProvider>
           <MemoryRouter
-            initialEntries={[{ pathname: '/cotizaciones/login', state: { from: '/clients' } }]}
+            initialEntries={[{ pathname: LOGIN_PATH, state: { from: '/clients' } }]}
           >
             <Routes>
-              <Route path="/cotizaciones/login" element={<LoginPage />} />
-              <Route path="/cotizaciones" element={<div>HOME</div>} />
+              <Route path={LOGIN_PATH} element={<LoginPage />} />
+              <Route path={QUOTATIONS_BASE} element={<div>HOME</div>} />
               <Route path="/clients" element={<div>CLIENTS</div>} />
             </Routes>
           </MemoryRouter>

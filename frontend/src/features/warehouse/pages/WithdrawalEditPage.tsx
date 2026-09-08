@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
@@ -10,7 +11,7 @@ import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getAp
 import { WithdrawalForm } from '../components/WithdrawalForm'
 import { useWarehouseWithdrawal } from '../hooks/useWarehouseWithdrawal'
 
-const WITHDRAWALS_PATH = '/cotizaciones/almacen/retiros'
+const WITHDRAWALS_PATH = `${WAREHOUSE_BASE}/retiros`
 
 /**
  * Edición de un retiro. Carga el detalle (GET, con su ETag), monta el

@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { Pencil } from 'lucide-react'
@@ -15,7 +16,7 @@ import { useWarehouseProductKardex } from '../hooks/useWarehouseProductKardex'
 import { Card } from '../../../shared/ui/Card'
 
 const KARDEX_PAGE_SIZE = 10
-const STOCK_LIST_PATH = '/cotizaciones/almacen'
+const STOCK_LIST_PATH = WAREHOUSE_BASE
 
 /**
  * Detalle de un producto: su ficha de catálogo, las existencias y el kardex.

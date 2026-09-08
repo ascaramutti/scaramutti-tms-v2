@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -39,7 +40,7 @@ vi.mock('sonner', () => ({
   toast: { success: vi.fn(), error: vi.fn() },
 }))
 
-const CORTE_INICIAL_PATH = '/cotizaciones/almacen/corte-inicial'
+const CORTE_INICIAL_PATH = `${WAREHOUSE_BASE}/corte-inicial`
 
 /** Por defecto admin: es el único rol que registra, y el form es casi toda la pantalla. */
 function renderCorteInicial(role: UserResponse['role'] = 'admin') {
@@ -53,7 +54,7 @@ function renderCorteInicial(role: UserResponse['role'] = 'admin') {
           <Routes>
             <Route path={CORTE_INICIAL_PATH} element={<OpeningBalancesPage />} />
             <Route
-              path="/cotizaciones/almacen/productos/:id"
+              path={`${WAREHOUSE_BASE}/productos/:id`}
               element={<div>KARDEX STUB</div>}
             />
           </Routes>
@@ -481,7 +482,7 @@ describe('OpeningBalancesPage', () => {
 
     expect(await screen.findByText(detail)).toBeInTheDocument()
     const kardexLink = screen.getByRole('link', { name: /ver el kardex de/i })
-    expect(kardexLink).toHaveAttribute('href', '/cotizaciones/almacen/productos/1')
+    expect(kardexLink).toHaveAttribute('href', `${WAREHOUSE_BASE}/productos/1`)
   })
 
   it('WH-004: muestra el detalle del backend cuando el producto no existe o está inactivo', async () => {

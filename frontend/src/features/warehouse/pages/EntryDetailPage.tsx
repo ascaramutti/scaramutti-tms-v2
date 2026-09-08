@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE, warehouseProductPath } from '../../../shared/paths'
 import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Ban, Pencil } from 'lucide-react'
@@ -15,7 +16,7 @@ import { useWarehousePurchaseInvoice } from '../hooks/useWarehousePurchaseInvoic
 import { Card } from '../../../shared/ui/Card'
 import { Alert } from '../../../shared/ui/Alert'
 
-const ENTRIES_PATH = '/cotizaciones/almacen/entradas'
+const ENTRIES_PATH = `${WAREHOUSE_BASE}/entradas`
 
 /**
  * Detalle de una entrada (factura de compra): su ficha, los ítems con el total y
@@ -166,7 +167,7 @@ export function EntryDetailPage() {
         total={data.total}
         currencyCode={data.currency.code}
         onProductClick={(item) =>
-          navigate(`/cotizaciones/almacen/productos/${item.product.id}`)
+          navigate(warehouseProductPath(item.product.id))
         }
       />
 

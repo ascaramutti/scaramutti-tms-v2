@@ -1,3 +1,4 @@
+import { OPERATIONS_BASE } from '../../../../shared/paths'
 import type { ReactNode } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
@@ -80,7 +81,7 @@ describe('ServiceStatusActions, qué ofrece', () => {
     // devuelve al usuario a donde ya estaba y la pantalla queda inalcanzable.
     expect(screen.getByRole('link', { name: 'Editar' })).toHaveAttribute(
       'href',
-      '/cotizaciones/operaciones/servicios/77/editar',
+      `${OPERATIONS_BASE}/servicios/77/editar`,
     )
     // Y con la variante que le toca. El `it.each` de arriba cubre el mapa de
     // transiciones, pero este enlace vive al lado y no sale del mapa: pintarlo de primario

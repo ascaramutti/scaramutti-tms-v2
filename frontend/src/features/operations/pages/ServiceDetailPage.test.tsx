@@ -1,3 +1,4 @@
+import { OPERATIONS_BASE } from '../../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
 import { render, screen, within } from '@testing-library/react'
@@ -21,7 +22,7 @@ import {
   serviceDetailSlow,
 } from '../../../test/mocks/handlers/operations'
 
-function renderDetail({ role = 'admin' as UserRole, path = '/cotizaciones/operaciones/servicios/77' } = {}) {
+function renderDetail({ role = 'admin' as UserRole, path = `${OPERATIONS_BASE}/servicios/77` } = {}) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   tokenStorage.setTokens('fake-access', 'fake-refresh')
   queryClient.setQueryData(currentUserQueryKey, { ...fakeUser, role })
@@ -31,10 +32,10 @@ function renderDetail({ role = 'admin' as UserRole, path = '/cotizaciones/operac
         <MemoryRouter initialEntries={[path]}>
           <Routes>
             <Route
-              path="/cotizaciones/operaciones/servicios/:id"
+              path={`${OPERATIONS_BASE}/servicios/:id`}
               element={<ServiceDetailPage />}
             />
-            <Route path="/cotizaciones/operaciones" element={<div>Listado de servicios</div>} />
+            <Route path={OPERATIONS_BASE} element={<div>Listado de servicios</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -593,8 +594,8 @@ describe('ServiceDetailPage', () => {
     // termina en la rama de error genérica, ofreciendo reintentar algo que nunca se
     // va a pedir, en vez de decir que ese id no existe.
     for (const path of [
-      '/cotizaciones/operaciones/servicios/0',
-      '/cotizaciones/operaciones/servicios/-5',
+      `${OPERATIONS_BASE}/servicios/0`,
+      `${OPERATIONS_BASE}/servicios/-5`,
     ]) {
       const { unmount } = renderDetail({ path })
       expect(await screen.findByText('No se encontró el servicio')).toBeInTheDocument()
@@ -612,7 +613,7 @@ describe('ServiceDetailPage', () => {
         return HttpResponse.json(fakeServiceDetail())
       }),
     )
-    renderDetail({ path: '/cotizaciones/operaciones/servicios/abc' })
+    renderDetail({ path: `${OPERATIONS_BASE}/servicios/abc` })
 
     expect(await screen.findByText('No se encontró el servicio')).toBeInTheDocument()
     expect(calls).toBe(0)

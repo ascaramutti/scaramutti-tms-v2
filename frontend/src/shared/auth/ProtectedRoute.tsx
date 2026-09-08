@@ -1,3 +1,4 @@
+import { LOGIN_PATH } from '../../shared/paths'
 import { Link, Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { SessionLoading } from './SessionLoading'
@@ -85,7 +86,7 @@ export function ProtectedRoute({
   }
 
   if (!isAuthenticated || !user) {
-    return <Navigate to="/cotizaciones/login" replace state={{ from: location.pathname }} />
+    return <Navigate to={LOGIN_PATH} replace state={{ from: location.pathname }} />
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {

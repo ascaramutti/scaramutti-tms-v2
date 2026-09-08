@@ -1,3 +1,4 @@
+import { LOGIN_PATH } from '../../shared/paths'
 import { Navigate } from 'react-router-dom'
 import { SessionLoading } from './SessionLoading'
 import { useAuth } from './AuthContext'
@@ -6,7 +7,7 @@ import { landingPathFor } from './roleLanding'
 /**
  * Destino de cualquier ruta que no existe (el catch-all del router).
  *
- * Antes mandaba a todos a `/cotizaciones` fijo, que solo sirve para los roles
+ * Antes mandaba a todos al módulo comercial fijo, que solo sirve para los roles
  * del módulo comercial: al despachador y a los dos de almacén, un simple typo
  * en la URL les mostraba "Sin acceso a Cotizaciones", un error de permisos que
  * no tiene nada que ver con lo que pasó.
@@ -16,7 +17,8 @@ import { landingPathFor } from './roleLanding'
  * iniciar sesión.
  *
  * ⚠️ Alcance: acá llegan solo las rutas de DOS O MÁS segmentos que no matchean
- * nada. `/cotizaciones/loquesea` no llega: lo captura `/cotizaciones/:id` y lo
+ * nada. Un solo segmento después de la base del módulo comercial no llega: lo captura
+ * el detalle por id y lo
  * trata como id de cotización, con la guarda del módulo comercial. O sea que el
  * typo de un solo segmento sigue mostrando "Sin acceso" a quien no trabaja ahí,
  * y en ese camino el destino de retorno sí se guarda.
@@ -34,7 +36,7 @@ export function LandingRedirect() {
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/cotizaciones/login" replace />
+    return <Navigate to={LOGIN_PATH} replace />
   }
 
   return <Navigate to={landingPathFor(user?.role)} replace />

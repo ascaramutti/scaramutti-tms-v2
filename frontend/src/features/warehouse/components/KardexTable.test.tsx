@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { describe, expect, it, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -143,7 +144,7 @@ describe('KardexTable', () => {
       fakeKardexMovement({ movementType: 'ENTRADA', sourceId: 42, reference: 'Factura F001-123' }),
     ])
     const link = screen.getByRole('link', { name: 'Factura F001-123' })
-    expect(link).toHaveAttribute('href', '/cotizaciones/almacen/entradas/42')
+    expect(link).toHaveAttribute('href', `${WAREHOUSE_BASE}/entradas/42`)
   })
 
   it('no linkea el corte inicial (APERTURA sin origen)', () => {
@@ -159,7 +160,7 @@ describe('KardexTable', () => {
       fakeKardexMovement({ movementType: 'SALIDA', sourceId: 9, reference: 'Retiro RET-0009' }),
     ])
     const link = screen.getByRole('link', { name: 'Retiro RET-0009' })
-    expect(link).toHaveAttribute('href', '/cotizaciones/almacen/retiros/9')
+    expect(link).toHaveAttribute('href', `${WAREHOUSE_BASE}/retiros/9`)
   })
 
   it('no linkea un movimiento sin origen aunque no sea una apertura', () => {

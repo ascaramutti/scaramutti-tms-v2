@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE } from '../../../shared/paths'
 import { FileQuestion } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { EmptyState } from '../../../shared/ui/EmptyState'
@@ -26,7 +27,7 @@ export function CotizacionDetailPage() {
   const { data, isLoading, isError, error, refetch } = useQuotation(id)
 
   function goToList() {
-    navigate('/cotizaciones')
+    navigate(QUOTATIONS_BASE)
   }
 
   // Id no numérico o 404 → "no encontrada" (estado dedicado, no un error genérico).
