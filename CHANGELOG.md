@@ -9,7 +9,11 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
-## [Sin publicar]
+## [2.6.0] - 2026-09-08
+
+La SPA se muda a la raíz del dominio, con las dependencias de ejecución por encima de sus avisos de
+seguridad y con cabeceras de caché en las respuestas del frontend: PRs #180 a #184. Solo frontend y
+su nginx; sin migraciones, sin cambios de backend ni de contrato.
 
 ### Changed
 
