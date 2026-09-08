@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# Hook commit-msg: hace ejecutables las convenciones de commit que más se rompían.
+# Se activa con:  git config core.hooksPath .githooks
+# Salida de emergencia (queda registrada en la conversación, no en el historial):
+#   SKIP_COMMIT_CHECK=1 git commit ...
+#
+# Reglas:
+#   - título: inglés, prefijo convencional, <= 72 caracteres, una sola intención (sin " and ")
+#   - cuerpo: tope 150 palabras y 3 párrafos
+#   - sin footers de herramientas, sin rayas largas (—)
+set -u
+[ "${SKIP_COMMIT_CHECK:-0}" = "1" ] && exit 0
+
+MSG_FILE="$1"
+# Sin comentarios ni líneas vacías al principio.
+MSG=$(grep -v '^#' "$MSG_FILE" | sed '/./,$!d')
+TITLE=$(printf '%s\n' "$MSG" | head -n1)
+BODY=$(printf '%s\n' "$MSG" | sed '1d' | sed '/./,$!d')
+
+# Los merges y reverts los escribe git: no se revisan.
+case "$TITLE" in "Merge "*|"Revert "*) exit 0 ;; esac
+
+errores=()
+
+[ -z "$TITLE" ] && errores+=("el título está vacío")
+[ ${#TITLE} -gt 72 ] && errores+=("el título tiene ${#TITLE} caracteres (máximo 72)")
+printf '%s' "$TITLE" | grep -qE '^(feat|fix|chore|ci|docs|refactor|test|perf|build)(\([a-z0-9-]+\))?: ' \
+  || errores+=("el título no sigue 'tipo(scope): descripción' (feat, fix, chore, ci, docs, refactor, test, perf, build)")
+printf '%s' "$TITLE" | grep -qiE ' and ' \
+  && errores+=("el título tiene ' and ': dos intenciones son dos commits, o está contando la mecánica")
+printf '%s' "$MSG" | grep -q '—' \
+  && errores+=("hay rayas largas (—): usar paréntesis, comas o dos puntos")
+printf '%s' "$MSG" | grep -qiE '^(Co-Authored-By|Signed-off-by|Generated with|Claude-Session)' \
+  && errores+=("hay footers o atribuciones de herramientas: no van")
+
+if [ -n "$BODY" ]; then
+  PALABRAS=$(printf '%s\n' "$BODY" | wc -w | tr -d ' ')
+  PARRAFOS=$(printf '%s\n\n' "$BODY" | awk 'BEGIN{n=0;e=1} /^[[:space:]]*$/{e=1;next} {if(e){n++;e=0}} END{print n}')
+  [ "$PALABRAS" -gt 150 ] && errores+=("el cuerpo tiene $PALABRAS palabras (tope 150): las enumeraciones van al PR, los porqués al javadoc")
+  [ "$PARRAFOS" -gt 3 ] && errores+=("el cuerpo tiene $PARRAFOS párrafos (tope 3)")
+fi
+
+if [ ${#errores[@]} -gt 0 ]; then
+  echo "⛔ commit rechazado por las convenciones:"
+  for e in "${errores[@]}"; do echo "   - $e"; done
+  echo "   (el mensaje quedó en $MSG_FILE; corregilo y volvé a commitear)"
+  exit 1
+fi
