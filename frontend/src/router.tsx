@@ -2,6 +2,7 @@ import { CHANGE_PASSWORD_PATH, LOGIN_PATH, QUOTATIONS_BASE, WAREHOUSE_BASE } fro
 import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
+import { RequireNumericId } from './shared/auth/RequireNumericId'
 import {
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
@@ -33,10 +34,11 @@ import { ServiceDetailPage } from './features/operations/pages/ServiceDetailPage
 import { ServiceEditPage } from './features/operations/pages/ServiceEditPage'
 import { ServiceCreatePage } from './features/operations/pages/ServiceCreatePage'
 
-// Toda la app vive bajo `SPA_BASE`, que coincide con el `base` de Vite: viene de
-// cuando v2 convivía con v1 detrás de un gateway que ruteaba por prefijo. No se
-// usa `basename` del router porque las rutas del módulo ya traían el prefijo y
-// solo login y cuenta se movieron adentro. Los valores viven en shared/paths.
+// La aplicación se sirve desde la raíz del dominio. Hasta la mudanza de 2026-09
+// vivía bajo un prefijo heredado de cuando convivía con la v1 detrás de un
+// gateway que ruteaba por prefijo; retirada la v1, el prefijo dejó de tener
+// sentido. No se usa `basename`: con la base en la raíz no hace falta. Los
+// valores viven en shared/paths.
 /**
  * La tabla de rutas se exporta aparte del router para poder montarla en un
  * router de memoria desde los tests: sin eso, cada test que necesita una ruta
@@ -74,22 +76,28 @@ export const routes: RouteObject[] = [
       {
         path: `${QUOTATIONS_BASE}/:id/editar`,
         element: (
-          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
-            <CotizacionEditPage />
-          </ProtectedRoute>
+          // La validación del id va ANTES de la guarda de rol: ver RequireNumericId.
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
+              <CotizacionEditPage />
+            </ProtectedRoute>
+          </RequireNumericId>
         ),
       },
       {
         path: `${QUOTATIONS_BASE}/:id`,
         element: (
-          <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
-            <CotizacionDetailPage />
-          </ProtectedRoute>
+          // La validación del id va ANTES de la guarda de rol: ver RequireNumericId.
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
+              <CotizacionDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
         ),
       },
-      // Módulo Almacén. Cuelga de la misma base porque esa base es el `base` de
-      // Vite (la SPA entera se sirve ahí), no el módulo comercial: así el
-      // gateway ruteaba v2 por un único prefijo.
+      // Módulo Almacén, con su propia raíz. Hasta la mudanza de 2026-09 colgaba
+      // del prefijo que se llamaba como el módulo comercial, y por eso la URL
+      // decía "cotizaciones" delante de almacén.
       {
         path: WAREHOUSE_BASE,
         element: (
@@ -190,9 +198,8 @@ export const routes: RouteObject[] = [
           </ProtectedRoute>
         ),
       },
-      // Módulo Operaciones (control de viajes). Cuelga de la misma base que
-      // almacén y por la misma razón: esa base es el `base` de Vite, no el
-      // módulo comercial.
+      // Módulo Operaciones (control de viajes), con su propia raíz, por la misma
+      // historia que almacén.
       {
         path: OPERACIONES_LANDING,
         element: (
@@ -240,6 +247,10 @@ export const routes: RouteObject[] = [
       { path: CHANGE_PASSWORD_PATH, element: <ChangePasswordPage /> },
     ],
   },
+  // La raíz del dominio. Antes la resolvía nginx con un 302 al prefijo; desde que
+  // la SPA es la raíz, entra acá y aterriza según el rol, o manda al login si no
+  // hay sesión: lo mismo que decide el comodín de abajo.
+  { path: '/', element: <LandingRedirect /> },
   // Cualquier ruta que no existe: decide según la sesión (ver LandingRedirect).
   { path: '*', element: <LandingRedirect /> },
 ]

@@ -74,7 +74,7 @@ jobs:
             wget --quiet --tries=1 -O- http://127.0.0.1:8080/api/v1/q/health
           # SPA servida por el frontend
           docker exec scaramutti-tms-v2-frontend-staging \
-            wget --quiet --tries=1 --spider http://127.0.0.1/cotizaciones/
+            wget --quiet --tries=1 --spider http://127.0.0.1/
 
       - name: Limpiar imágenes colgantes
         if: always()

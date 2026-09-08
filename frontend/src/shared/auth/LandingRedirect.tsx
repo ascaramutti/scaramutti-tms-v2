@@ -12,16 +12,17 @@ import { landingPathFor } from './roleLanding'
  * en la URL les mostraba "Sin acceso a Cotizaciones", un error de permisos que
  * no tiene nada que ver con lo que pasó.
  *
- * Ahora la sesión decide. Y sin sesión no se guarda la ruta rota como destino
- * de retorno: volver a una URL que no existe solo repite el rebote después de
- * iniciar sesión.
+ * Ahora la sesión decide. Cuando entra por el comodín y no hay sesión, la ruta
+ * rota no se guarda como destino de retorno: volver a una URL que no existe solo
+ * repite el rebote después de iniciar sesión. Por el otro camino, el de un id que
+ * no es válido, quien corta antes es la guarda del layout, y esa sí guarda el
+ * destino: después del login el desvío vuelve a correr y termina igual en la
+ * principal del rol.
  *
- * ⚠️ Alcance: acá llegan solo las rutas de DOS O MÁS segmentos que no matchean
- * nada. Un solo segmento después de la base del módulo comercial no llega: lo captura
- * el detalle por id y lo
- * trata como id de cotización, con la guarda del módulo comercial. O sea que el
- * typo de un solo segmento sigue mostrando "Sin acceso" a quien no trabaja ahí,
- * y en ese camino el destino de retorno sí se guarda.
+ * Alcance: llegan las rutas que no matchean nada, y también las que caen en el
+ * detalle de cotización con un id que no es un entero positivo, porque
+ * `RequireNumericId` las desvía acá antes de la guarda de rol. Así una URL vieja
+ * de un solo segmento termina en la principal del rol y no en "Sin acceso".
  *
  * Es un redirect silencioso a propósito: la aplicación es chica y el caso
  * típico es un error de tipeo, no un enlace roto que haya que investigar.

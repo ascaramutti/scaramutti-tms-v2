@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Navigate, useLocation, useNavigate } from 'react-router-dom'
+import { Navigate, useLocation } from 'react-router-dom'
 import { LogIn } from 'lucide-react'
 import { loginSchema, type LoginFormInput } from '../schemas/login.schema'
 import { useLoginMutation } from '../hooks/useLoginMutation'
 import { useAuth } from '../../../shared/auth/AuthContext'
+import { canRoleOpenPath } from '../../../shared/auth/canRoleOpenPath'
 import { landingPathFor } from '../../../shared/auth/roleLanding'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { TextField } from '../../../shared/ui/TextField'
@@ -27,13 +28,18 @@ interface LocationState {
  * Redirect post-autenticación según el rol del usuario. Todos los landings
  * viven en esta SPA, así que siempre navega el router.
  */
-function AuthenticatedLanding() {
+function AuthenticatedLanding({ from }: { from?: string }) {
   const { user } = useAuth()
-  return <Navigate to={landingPathFor(user?.role)} replace />
+  // El enlace directo gana, salvo que el rol no pueda abrirlo: ahí cae en su
+  // principal, la misma decisión que toma el comodín del router. Sin esto, un
+  // despachador que llega por un enlace a cotizaciones ve "Sin acceso".
+  // `canRoleOpenPath` decide las dos cosas: si es una ruta de esta aplicación y
+  // si ese rol la abre.
+  const destino = from && canRoleOpenPath(from, user?.role) ? from : landingPathFor(user?.role)
+  return <Navigate to={destino} replace />
 }
 
 export function LoginPage() {
-  const navigate = useNavigate()
   const location = useLocation()
   const { isAuthenticated, setSession } = useAuth()
   const loginMutation = useLoginMutation()
@@ -53,17 +59,16 @@ export function LoginPage() {
     setFocus('username')
   }, [setFocus])
 
+  const from = (location.state as LocationState | null)?.from
+
   if (isAuthenticated) {
-    return <AuthenticatedLanding />
+    return <AuthenticatedLanding from={from} />
   }
 
   const onSubmit = handleSubmit(async (values) => {
     try {
       const response = await withMinDuration(loginMutation.mutateAsync(values), MIN_LOADER_MS)
       setSession(response.token, response.refreshToken ?? null, response.user)
-      const landing = landingPathFor(response.user.role)
-      const from = (location.state as LocationState | null)?.from ?? landing
-      navigate(from, { replace: true })
     } catch (error) {
       handleApiFormError(error, {
         setError,

@@ -12,7 +12,7 @@ push a develop ──► runner self-hosted ──► build imágenes ──► 
 db-staging ◄── restore-staging-db.sh ◄── dump diario 02:00 UTC (OneDrive)
 ```
 
-- Frontend: `http://<ip-tailscale>:8088/cotizaciones/`
+- Frontend: `http://<ip-tailscale>:8088/`
 - La DB **no** se refresca en cada deploy: se refresca a demanda con
   `restore-staging-db.sh` (típicamente antes de probar una migración nueva).
 
@@ -98,7 +98,7 @@ docker compose --env-file /opt/tms-staging/staging.env \
 ### 4. Verificación end-to-end
 
 Push (o merge) a `develop` → pestaña Actions → *Deploy staging* debe quedar
-verde → abrir `http://<ip-tailscale>:8088/cotizaciones/` y loguearse (las
+verde → abrir `http://<ip-tailscale>:8088/` y loguearse (las
 credenciales son las de prod: la DB es una copia).
 
 ## Operación

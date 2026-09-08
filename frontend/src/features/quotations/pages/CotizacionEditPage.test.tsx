@@ -165,11 +165,6 @@ describe('CotizacionEditPage', () => {
     expect(screen.queryByText('Tipo de cotización')).not.toBeInTheDocument()
   })
 
-  it('muestra "no encontrada" si el id no es numérico', async () => {
-    renderEdit('abc')
-    expect(await screen.findByText(/no encontrada/i)).toBeInTheDocument()
-  })
-
   // ----- Terminal (inmutable): rebota al detalle -----
 
   it('rebota al detalle con aviso si la cotización es terminal (ACCEPTED)', async () => {

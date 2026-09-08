@@ -2,11 +2,11 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import {
+  ACCOUNT_BASE,
   CHANGE_PASSWORD_PATH,
   LOGIN_PATH,
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
-  SPA_BASE,
   WAREHOUSE_BASE,
 } from './paths'
 
@@ -36,15 +36,15 @@ const PERMITIDOS = [
 ]
 
 /**
- * La raíz queda afuera, valga la que valga la constante: `'/'` entre comillas
+ * La raíz queda afuera venga de la constante que venga: `'/'` entre comillas
  * aparece en cualquier archivo que parta una cadena o declare la ruta raíz, y
- * buscarla daría ruido en vez de hallazgos. El día que la base sea `/`, quedan
- * afuera ella y cualquier otra que haya colapsado a lo mismo; las que nombran
- * cada módulo siguen adentro, que son las que importan.
+ * buscarla daría ruido en vez de hallazgos. Hoy ninguna vale eso, pero el filtro
+ * se queda de guardia: es lo que evitó que la mudanza a la raíz dejara la guarda
+ * señalando medio árbol.
  */
 const VALORES = [
-  SPA_BASE,
   LOGIN_PATH,
+  ACCOUNT_BASE,
   CHANGE_PASSWORD_PATH,
   QUOTATIONS_BASE,
   WAREHOUSE_BASE,

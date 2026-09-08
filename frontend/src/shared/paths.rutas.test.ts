@@ -10,33 +10,36 @@ import { routes } from '../router'
  * que el router pasa igual aunque la constante cambie de valor. Esta lista es lo
  * único que fija los valores, y por eso está escrita entera y no derivada.
  *
- * En la centralización prueba que ninguna URL se movió. En la mudanza que sigue
- * se actualiza A PROPÓSITO, y ese diff es el que hay que leer con atención: es
- * la lista completa de lo que cambia para el usuario.
+ * En la centralización probó que ninguna URL se había movido. En la mudanza de
+ * 2026-09 se actualizó A PROPÓSITO, y ese diff es la lista completa de lo que
+ * cambió para el usuario: login, cuenta, almacén y operaciones salieron del
+ * prefijo viejo, cotizaciones conservó sus URL y la raíz pasó a ser una ruta de
+ * la aplicación en vez de una redirección de nginx.
  */
 const RUTAS = [
-  '/cotizaciones/login',
+  '/login',
   '/cotizaciones',
   '/cotizaciones/nueva',
   '/cotizaciones/:id/editar',
   '/cotizaciones/:id',
-  '/cotizaciones/almacen',
-  '/cotizaciones/almacen/entradas/nueva',
-  '/cotizaciones/almacen/entradas',
-  '/cotizaciones/almacen/entradas/:id/editar',
-  '/cotizaciones/almacen/entradas/:id',
-  '/cotizaciones/almacen/retiros/nuevo',
-  '/cotizaciones/almacen/retiros',
-  '/cotizaciones/almacen/retiros/:id/editar',
-  '/cotizaciones/almacen/retiros/:id',
-  '/cotizaciones/almacen/reportes',
-  '/cotizaciones/almacen/corte-inicial',
-  '/cotizaciones/almacen/productos/:id',
-  '/cotizaciones/operaciones',
-  '/cotizaciones/operaciones/servicios/nuevo',
-  '/cotizaciones/operaciones/servicios/:id/editar',
-  '/cotizaciones/operaciones/servicios/:id',
-  '/cotizaciones/cuenta/cambiar-contrasena',
+  '/almacen',
+  '/almacen/entradas/nueva',
+  '/almacen/entradas',
+  '/almacen/entradas/:id/editar',
+  '/almacen/entradas/:id',
+  '/almacen/retiros/nuevo',
+  '/almacen/retiros',
+  '/almacen/retiros/:id/editar',
+  '/almacen/retiros/:id',
+  '/almacen/reportes',
+  '/almacen/corte-inicial',
+  '/almacen/productos/:id',
+  '/operaciones',
+  '/operaciones/servicios/nuevo',
+  '/operaciones/servicios/:id/editar',
+  '/operaciones/servicios/:id',
+  '/cuenta/cambiar-contrasena',
+  '/',
   '*',
 ]
 

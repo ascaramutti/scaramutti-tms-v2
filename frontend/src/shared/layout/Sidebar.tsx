@@ -1,4 +1,4 @@
-import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, SPA_BASE, WAREHOUSE_BASE } from '../../shared/paths'
+import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -42,17 +42,6 @@ interface MenuGroup {
   label: string
   items: MenuItem[]
 }
-
-/**
- * Subárboles que cuelgan de la base de la SPA (el `base` de Vite, o sea la
- * aplicación entera) pero NO son el módulo comercial. Sin esta lista el prefijo marcaría
- * activo el item de Cotizaciones mientras el usuario está en otro módulo.
- */
-const NON_QUOTATION_SUBTREES = [
-  `${SPA_BASE}/cuenta`,
-  WAREHOUSE_BASE,
-  OPERATIONS_BASE,
-]
 
 // Matriz de permisos del menú alineada con `x-required-roles` del contrato OpenAPI.
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
@@ -139,9 +128,6 @@ const MENU: MenuGroup[] = [
         label: 'Cotizaciones',
         to: QUOTATIONS_BASE,
         allowedRoles: QUOTATION_ROLES,
-        activeWhen: (pathname) =>
-          matchesPathPrefix(pathname, QUOTATIONS_BASE) &&
-          !NON_QUOTATION_SUBTREES.some((subtree) => matchesPathPrefix(pathname, subtree)),
       },
       {
         icon: Users,

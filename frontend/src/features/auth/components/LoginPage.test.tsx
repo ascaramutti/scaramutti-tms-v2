@@ -11,7 +11,7 @@ import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
 import { loginAsRoleResponse, loginErrorResponse } from '../../../test/mocks/handlers/auth'
 
-function renderLogin(initialPath = LOGIN_PATH) {
+function renderLogin(initialPath: string | { pathname: string; state: { from: string } } = LOGIN_PATH) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
@@ -160,29 +160,26 @@ describe('LoginPage', () => {
     expect(await screen.findByText('HOME')).toBeInTheDocument()
   })
 
-  // ⚠️ APAGADO por un defecto de la pantalla, no del test. Al crear la sesión,
-  // `LoginPage` se vuelve a renderizar y devuelve <Navigate> al landing del rol,
-  // que compite contra el navigate(`from`) del submit: gana el que agende su
-  // efecto último. O sea que el destino después de iniciar sesión con un
-  // deep-link guardado es NO DETERMINISTA. Corriéndolo en repetición falla de
-  // forma intermitente (medido entre 1 y 2 de cada 6 corridas, según la carga
-  // de la máquina), y cuando falla es porque ganó el landing.
-  //
-  // Alcance: para `admin` la carrera ya existía en develop. Para `dispatcher`
-  // NO: salía antes por la rama de navegación externa, que era determinista.
-  // Al retirarla, este cambio lo metió en la carrera.
-  //
-  // Y hay una segunda cosa, distinta de la carrera: la rama que se retiró
-  // también DESCARTABA a propósito el destino guardado cuando el rol no tenía
-  // acceso a él ("un deep-link a v2 no le sirve a un rol sin acceso al
-  // módulo"). Esa regla se fue con ella y nada la repuso, así que hoy un
-  // despachador que llega por un enlace a cotizaciones puede aterrizar en "Sin
-  // acceso" en vez de en su módulo. Sobrevive a cualquier arreglo del timing.
-  //
-  // Para encenderlo hay que decidir antes quién manda (lo natural es que el
-  // deep-link gane, con el landing de respaldo cuando el rol no puede verlo) y
-  // dejar UNA sola navegación en el componente.
-  it.skip('login exitoso navega a `from` si vino redireccionado', async () => {
+  // Los dos casos que siguen fijan la regla del destino guardado: el enlace
+  // directo gana si el rol puede abrirlo, y si no, cae en su principal.
+  // Estuvieron apagados mientras el componente hacía dos navegaciones, la del
+  // envío y la del render, que corrían juntas y volvían el destino no
+  // determinista; con una sola, la del render, dejaron de ser intermitentes.
+  it('con un destino guardado que su rol NO puede abrir, aterriza en su principal', async () => {
+    // El despachador que llega por un enlace a una cotización: antes veía "Sin
+    // acceso", que es un error de permisos donde correspondía su pantalla de
+    // trabajo. El enlace directo gana, pero solo si el rol puede abrirlo.
+    server.use(loginAsRoleResponse('dispatcher'))
+    const user = userEvent.setup()
+    renderLogin({ pathname: LOGIN_PATH, state: { from: `${QUOTATIONS_BASE}/12` } })
+    await user.type(screen.getByLabelText(/usuario/i), 'jdiaz')
+    await user.type(screen.getByLabelText(/contraseña/i), 'Dispatch1234')
+    await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+
+    expect(await screen.findByText('OPERACIONES')).toBeInTheDocument()
+  })
+
+  it('login exitoso navega a `from` si vino redireccionado', async () => {
     server.use(loginAsRoleResponse('admin'))
     const user = userEvent.setup()
     render(

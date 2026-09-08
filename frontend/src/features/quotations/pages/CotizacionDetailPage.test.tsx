@@ -115,11 +115,6 @@ describe('CotizacionDetailPage', () => {
     expect(screen.getByText('El servidor falló al obtener la cotización.')).toBeInTheDocument()
   })
 
-  it('muestra "no encontrada" si el id de la URL no es numérico', async () => {
-    renderDetalle(`${QUOTATIONS_BASE}/abc`)
-    expect(await screen.findByText(/no encontrada/i)).toBeInTheDocument()
-  })
-
   // ----- Mapping de cabecera y tarjetas -----
   it('mapea código, cliente y RUC', async () => {
     server.use(
