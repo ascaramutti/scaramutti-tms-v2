@@ -213,3 +213,87 @@ describe('router — ruta que no existe', () => {
     expect(router.state.historyAction).toBe('REPLACE')
   })
 })
+
+describe('router - URL viejas y la raíz del dominio', () => {
+  // Desde que la SPA se sirve en la raíz, las URL del prefijo viejo no tienen
+  // redirección: una de un solo segmento cae en el detalle de cotización con ese
+  // texto de id. Lo que sigue verifica que ese desvío corre ANTES de la guarda de
+  // rol, que es lo que hace que un almacenero no vea "Sin acceso a Cotizaciones".
+  // Las dos rutas con id, siempre juntas: el envoltorio y la guarda están puestos
+  // dos veces, y una sola de las dos mal ordenada no la vería nadie.
+  it.each([
+    ['warehouse_keeper', `${QUOTATIONS_BASE}/almacen`, WAREHOUSE_BASE],
+    ['warehouse_keeper', `${QUOTATIONS_BASE}/almacen/editar`, WAREHOUSE_BASE],
+    ['dispatcher', `${QUOTATIONS_BASE}/operaciones`, OPERATIONS_BASE],
+    ['dispatcher', `${QUOTATIONS_BASE}/operaciones/editar`, OPERATIONS_BASE],
+    ['admin', `${QUOTATIONS_BASE}/almacen`, QUOTATIONS_BASE],
+    ['admin', `${QUOTATIONS_BASE}/almacen/editar`, QUOTATIONS_BASE],
+  ] as const)(
+    '%s parado en la URL vieja %s termina en %s',
+    async (role, vieja, destino) => {
+      const router = goTo(role, vieja)
+      await waitFor(() => expect(router.state.location.pathname).toBe(destino))
+      expect(screen.queryByText(/sin acceso/i)).not.toBeInTheDocument()
+    },
+  )
+
+  it('sin sesión, una URL vieja lleva al login y guarda el destino', async () => {
+    const vieja = `${QUOTATIONS_BASE}/almacen`
+    const router = goTo(null, vieja)
+    await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    // Acá corta la guarda del layout, no el desvío por id: por eso el destino sí
+    // queda guardado, y después del login el desvío vuelve a correr.
+    expect((router.state.location.state as { from?: string } | null)?.from).toBe(vieja)
+  })
+
+  it.each([
+    ['almacen', ''],
+    ['abc', ''],
+    ['0', ''],
+    ['-3', ''],
+    ['1e2', ''],
+    ['almacen', '/editar'],
+    ['abc', '/editar'],
+    ['0', '/editar'],
+    ['-3', '/editar'],
+    ['1e2', '/editar'],
+  ])('el id %s%s no es un entero positivo y desvía al aterrizaje por rol', async (id, cola) => {
+    // '1e2' entra a propósito: `Number()` lo acepta como 100, así que validar con
+    // Number dejaría pasar un id que la aplicación nunca escribió.
+    const router = goTo('admin', `${QUOTATIONS_BASE}/${id}${cola}`)
+    await waitFor(() => expect(router.state.location.pathname).toBe(QUOTATIONS_BASE))
+  })
+
+  it.each(['', '/editar'])(
+    'un id que sí es un entero positivo llega a la página (%s)',
+    async (cola) => {
+      const router = goTo('admin', `${QUOTATIONS_BASE}/12${cola}`)
+      await waitFor(() =>
+        expect(router.state.location.pathname).toBe(`${QUOTATIONS_BASE}/12${cola}`),
+      )
+    },
+  )
+
+  // La guarda de rol tiene que seguir adentro del envoltorio: con un id válido,
+  // quien no abre cotizaciones ve "Sin acceso", no la pantalla.
+  it.each(['', '/editar'])(
+    'con un id válido, warehouse_keeper ve "Sin acceso" en %s',
+    async (cola) => {
+      goTo('warehouse_keeper', `${QUOTATIONS_BASE}/12${cola}`)
+      expect(
+        await screen.findByRole('heading', { name: /sin acceso a cotizaciones/i }),
+      ).toBeInTheDocument()
+    },
+  )
+
+  // La raíz es una ruta de la aplicación desde la mudanza, no un 302 de nginx.
+  it('la raíz sin sesión lleva al login', async () => {
+    const router = goTo(null, '/')
+    await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+  })
+
+  it('la raíz con sesión aterriza según el rol', async () => {
+    const router = goTo('warehouse_keeper', '/')
+    await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
+  })
+})

@@ -29,7 +29,6 @@ export function CotizacionEditPage() {
   const navigate = useNavigate()
   const params = useParams<{ id: string }>()
   const id = Number(params.id)
-  const idInvalid = !Number.isInteger(id) || id <= 0
 
   const quotation = useQuotation(id)
   const catalogs = useWizardCatalogs()
@@ -58,8 +57,8 @@ export function CotizacionEditPage() {
     navigate(QUOTATIONS_BASE)
   }
 
-  // Id no numérico o 404 → "no encontrada" (estado dedicado, no error genérico).
-  if (idInvalid || (quotation.isError && isNotFoundError(quotation.error))) {
+  // 404 del servidor → "no encontrada" (estado dedicado, no un error genérico).
+  if (quotation.isError && isNotFoundError(quotation.error)) {
     return (
       <div className="mx-auto max-w-[1024px] px-6 py-8">
         <EmptyState

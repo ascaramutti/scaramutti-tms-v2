@@ -1,4 +1,3 @@
-import { SPA_BASE } from '../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import {
   ALL_ROLES,
@@ -42,7 +41,9 @@ describe('landingPathFor', () => {
     // ruta que el router no sabe resolver.
     for (const role of ALL_ROLES) {
       const landing = landingPathFor(role)
-      expect(landing === SPA_BASE || landing.startsWith(`${SPA_BASE}/`)).toBe(true)
+      expect(landing.startsWith('/')).toBe(true)
+      expect(landing.startsWith('//')).toBe(false)
+      expect(landing).not.toMatch(/^[a-z]+:/i)
     }
   })
 })

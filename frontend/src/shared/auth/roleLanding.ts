@@ -17,13 +17,13 @@ import type { UserRole } from '../../api'
 export const COTIZACIONES_LANDING = QUOTATIONS_BASE
 
 /**
- * Módulo Almacén. Vive DENTRO de esta SPA: el prefijo del que cuelga es
- * `SPA_BASE`, el `base` de Vite (la app entera se sirve ahí), no el módulo de
- * cotizaciones.
+ * Módulo Almacén. Vive DENTRO de esta SPA, con su propia raíz: hasta la mudanza
+ * de 2026-09 colgaba del prefijo que se llamaba como el módulo de cotizaciones,
+ * y eso confundía a quien leía la URL.
  */
 export const ALMACEN_LANDING = WAREHOUSE_BASE
 
-/** Módulo Operaciones. Cuelga del mismo prefijo, por la misma razón. */
+/** Módulo Operaciones, con su propia raíz, por la misma historia. */
 export const OPERACIONES_LANDING = OPERATIONS_BASE
 
 /**

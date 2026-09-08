@@ -37,10 +37,10 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       # Build de la imagen del frontend EN el runner. La URL de la API va
-      # RELATIVA (/api/v1) porque el frontend se sirve detrás del gateway (mismo
-      # origen): el gateway rutea /api/v1 al backend. NO usar la URL absoluta
-      # del backend, que es internal (inaccesible directo desde el navegador)
-      # → rompería la app.
+      # RELATIVA (/api/v1) porque el mismo nginx que sirve la SPA proxea esa
+      # ruta al backend, así que para el navegador es el mismo origen. NO usar
+      # la URL absoluta del backend, que es internal (inaccesible directo desde
+      # el navegador) → rompería la app.
       - name: Build imagen base
         run: |
           docker build \
@@ -82,32 +82,26 @@ jobs:
                   proxy_set_header Host backend.${INTERNAL_SUFFIX};
                   proxy_set_header X-Forwarded-Proto $scheme;
               }
-              # Sin la barra final caería en `location /` y su 302 perdería el
-              # método y el cuerpo. El 308 los preserva.
+              # Sin la barra final caería en `location /`, que sirve el documento
+              # de la SPA en vez de proxear. El 308 preserva método y cuerpo.
               location = /api/v1 { return 308 /api/v1/; }
 
               # Los assets llevan un hash del contenido en el nombre: esa URL nunca
               # cambia de contenido y se puede guardar un año sin preguntar.
-              location /cotizaciones/assets/ {
+              location /assets/ {
                   try_files $uri =404;
                   add_header Cache-Control "public, max-age=31536000, immutable";
               }
 
-              # El documento sí cambia con cada despliegue, y hasta la v2.5.0 se
-              # servía sin ninguna cabecera de caché: una versión nueva podía no
-              # llegar sin recarga forzada. `no-cache` obliga a revalidar, y con el
-              # ETag que nginx ya manda eso cuesta un 304. Cubre también las rutas
-              # de la SPA, que caen acá por el try_files.
-              location /cotizaciones/ {
-                  try_files $uri $uri/ /cotizaciones/index.html;
+              # La SPA se sirve desde la raíz. Hasta la mudanza de 2026-09 vivía bajo
+              # /cotizaciones, heredado de la convivencia con la v1; las rutas viejas
+              # no tienen redirección acá, las resuelve la aplicación mandando a cada
+              # rol a su pantalla principal. `no-cache` obliga a revalidar el
+              # documento, y con el ETag eso cuesta un 304.
+              location / {
+                  try_files $uri $uri/ /index.html;
                   add_header Cache-Control "no-cache";
               }
-              location = /cotizaciones { return 302 /cotizaciones/; }
-
-              # Contrato neutral de la plataforma, heredado del gateway.
-              location = /login { return 302 /cotizaciones/login; }
-
-              location / { return 302 /cotizaciones/; }
           }
           NGINX
           cat > azure-build/Dockerfile <<DOCKER

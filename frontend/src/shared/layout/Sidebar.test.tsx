@@ -189,8 +189,9 @@ describe('Sidebar - módulo Almacén', () => {
   })
 
   it('en almacén se resalta Existencias y NO Cotizaciones', async () => {
-    // Ambos módulos cuelgan de la base de la SPA: sin matcher por módulo, el
-    // prefijo marcaría Cotizaciones estando en Almacén.
+    // Cada módulo tiene su propia raíz, así que el prefijo de cotizaciones no
+    // alcanza a almacén. Hasta la mudanza de 2026-09 sí lo hacía, y por eso el
+    // ítem llevaba un matcher propio con una lista de exclusiones.
     renderSidebarAs('admin', WAREHOUSE_BASE)
     const existencias = await screen.findByRole('link', { name: /existencias/i })
     expect(existencias).toHaveAttribute('aria-current', 'page')
@@ -253,9 +254,9 @@ describe('Sidebar - módulo Almacén', () => {
 
 describe('Sidebar - módulo Operaciones', () => {
   it('en operaciones se resalta Servicios y NO Cotizaciones', async () => {
-    // Los tres módulos cuelgan de la base de la SPA: sin el subárbol en
-    // NON_QUOTATION_SUBTREES, el prefijo marcaría Cotizaciones
-    // estando en Operaciones.
+    // Cada módulo tiene su propia raíz, así que el prefijo de cotizaciones no
+    // alcanza a operaciones. Hasta la mudanza de 2026-09 sí lo hacía, y por eso
+    // el matcher llevaba una lista de exclusiones.
     renderSidebarAs('admin', OPERATIONS_BASE)
     const servicios = await screen.findByRole('link', { name: /^servicios$/i })
     expect(servicios).toHaveAttribute('aria-current', 'page')
@@ -263,6 +264,15 @@ describe('Sidebar - módulo Operaciones', () => {
       'aria-current',
     )
   })
+
+  it.each([QUOTATIONS_BASE, `${QUOTATIONS_BASE}/12`])(
+    'estando en %s, el item Cotizaciones queda marcado como la página actual',
+    async (path) => {
+      renderSidebarAs('admin', path)
+      const cotizaciones = await screen.findByRole('link', { name: /^cotizaciones$/i })
+      expect(cotizaciones).toHaveAttribute('aria-current', 'page')
+    },
+  )
 
   it('el detalle de un servicio sigue resaltando Servicios', async () => {
     renderSidebarAs('admin', `${OPERATIONS_BASE}/servicios/42`)

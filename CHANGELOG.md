@@ -11,6 +11,13 @@ cada tag anotado.
 
 ## [Sin publicar]
 
+### Changed
+
+- La SPA se sirve desde la raíz del dominio. El módulo de cotizaciones conserva sus URL; login,
+  cuenta, almacén y operaciones pasan a `/login`, `/cuenta/cambiar-contrasena`, `/almacen` y
+  `/operaciones`. Las URL viejas no se redirigen: terminan en la pantalla principal de cada rol,
+  igual que cualquier URL inexistente (#183).
+
 ### Fixed
 
 - El frontend manda `Cache-Control` en sus respuestas: `no-cache` en el documento, para que cada
