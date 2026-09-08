@@ -15,11 +15,11 @@
         <maven.compiler.release>17</maven.compiler.release>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.15.1</quarkus.platform.version>
-        <surefire-plugin.version>3.2.5</surefire-plugin.version>
-        <mapstruct.version>1.5.5.Final</mapstruct.version>
+        <quarkus.platform.version>3.39.2</quarkus.platform.version>
+        <surefire-plugin.version>3.6.0</surefire-plugin.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
         <hibernate-jpamodelgen.version>6.6.4.Final</hibernate-jpamodelgen.version>
-        <jacoco.version>0.8.12</jacoco.version>
+        <jacoco.version>0.8.15</jacoco.version>
     </properties>
 
     <dependencyManagement>
@@ -144,13 +144,13 @@
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-core</artifactId>
-            <version>5.14.2</version>
+            <version>5.23.0</version>
             <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.mockito</groupId>
             <artifactId>mockito-junit-jupiter</artifactId>
-            <version>5.14.2</version>
+            <version>5.23.0</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
