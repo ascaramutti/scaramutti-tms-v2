@@ -70,7 +70,7 @@ jobs:
 
       # La misma major de Node que usa el build de producción (Dockerfile).
       - name: Configurar Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
@@ -108,7 +108,7 @@ jobs:
       - name: Checkout del código
         uses: actions/checkout@v7
       - name: Configurar Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
           node-version: '22'
           cache: npm
