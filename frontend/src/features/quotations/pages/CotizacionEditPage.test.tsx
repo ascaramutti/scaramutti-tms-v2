@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE, quotationDetailPath } from '../../../shared/paths'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -28,11 +29,11 @@ function renderEdit(id: string | number = 1) {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[`/cotizaciones/${id}/editar`]}>
+      <MemoryRouter initialEntries={[`${quotationDetailPath(id)}/editar`]}>
         <Routes>
-          <Route path="/cotizaciones" element={<div>LISTADO COTIZACIONES</div>} />
-          <Route path="/cotizaciones/:id/editar" element={<CotizacionEditPage />} />
-          <Route path="/cotizaciones/:id" element={<QuotationDetailStub />} />
+          <Route path={QUOTATIONS_BASE} element={<div>LISTADO COTIZACIONES</div>} />
+          <Route path={`${QUOTATIONS_BASE}/:id/editar`} element={<CotizacionEditPage />} />
+          <Route path={`${QUOTATIONS_BASE}/:id`} element={<QuotationDetailStub />} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,

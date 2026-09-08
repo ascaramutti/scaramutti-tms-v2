@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE } from '../../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -21,7 +22,7 @@ import {
 } from '../../../test/mocks/handlers/quotations'
 import type { ChangeStatusBody } from '../../../test/mocks/handlers/quotations'
 
-function renderDetalle(initialPath = '/cotizaciones/1') {
+function renderDetalle(initialPath = `${QUOTATIONS_BASE}/1`) {
   const queryClient = new QueryClient({
     // retryDelay 0: el hook reintenta errores ≠404 (1 vez); sin delay para que
     // el estado de error aparezca de inmediato en los tests.
@@ -35,8 +36,8 @@ function renderDetalle(initialPath = '/cotizaciones/1') {
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
-            <Route path="/cotizaciones" element={<div>LISTADO COTIZACIONES</div>} />
-            <Route path="/cotizaciones/:id" element={<CotizacionDetailPage />} />
+            <Route path={QUOTATIONS_BASE} element={<div>LISTADO COTIZACIONES</div>} />
+            <Route path={`${QUOTATIONS_BASE}/:id`} element={<CotizacionDetailPage />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -101,7 +102,7 @@ describe('CotizacionDetailPage', () => {
 
   it('muestra "Cotización no encontrada" en 404', async () => {
     server.use(quotationDetailError(404, { detail: 'No existe' }))
-    renderDetalle('/cotizaciones/999')
+    renderDetalle(`${QUOTATIONS_BASE}/999`)
     expect(await screen.findByText(/no encontrada/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /volver al listado/i })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { level: 1, name: '2026-00001' })).not.toBeInTheDocument()
@@ -115,7 +116,7 @@ describe('CotizacionDetailPage', () => {
   })
 
   it('muestra "no encontrada" si el id de la URL no es numérico', async () => {
-    renderDetalle('/cotizaciones/abc')
+    renderDetalle(`${QUOTATIONS_BASE}/abc`)
     expect(await screen.findByText(/no encontrada/i)).toBeInTheDocument()
   })
 
@@ -383,7 +384,7 @@ describe('CotizacionDetailPage', () => {
   it('usa el id de la URL en el fetch', async () => {
     const sink: { id?: string } = {}
     server.use(quotationDetailCapture(sink, getQuotationResponse({ id: 42, code: '2026-00042' })))
-    renderDetalle('/cotizaciones/42')
+    renderDetalle(`${QUOTATIONS_BASE}/42`)
     await findTitle('2026-00042')
     expect(sink.id).toBe('42')
   })

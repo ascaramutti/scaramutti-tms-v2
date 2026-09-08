@@ -1,3 +1,4 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -36,10 +37,10 @@ function renderExistencias() {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter initialEntries={['/cotizaciones/almacen']}>
+        <MemoryRouter initialEntries={[WAREHOUSE_BASE]}>
           <Routes>
-            <Route path="/cotizaciones/almacen" element={<StockListPage />} />
-            <Route path="/cotizaciones/almacen/productos/:id" element={<DetalleStub />} />
+            <Route path={WAREHOUSE_BASE} element={<StockListPage />} />
+            <Route path={`${WAREHOUSE_BASE}/productos/:id`} element={<DetalleStub />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>

@@ -1,3 +1,4 @@
+import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE } from '../../../shared/paths'
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -14,7 +15,7 @@ import { changePasswordErrorResponse, fakeUser } from '../../../test/mocks/handl
 
 const API = 'http://localhost:8080/api/v1'
 
-function renderPage(initialPath = '/cotizaciones/cuenta/cambiar-contrasena') {
+function renderPage(initialPath = CHANGE_PASSWORD_PATH) {
   // La página usa useAuth (landing por rol al salir): requiere AuthProvider
   // con sesión. El /auth/me default del server responde admin.
   tokenStorage.setTokens('fake-access', 'fake-refresh')
@@ -26,9 +27,9 @@ function renderPage(initialPath = '/cotizaciones/cuenta/cambiar-contrasena') {
       <AuthProvider>
         <MemoryRouter initialEntries={[initialPath]}>
           <Routes>
-            <Route path="/cotizaciones/cuenta/cambiar-contrasena" element={<ChangePasswordPage />} />
-            <Route path="/cotizaciones" element={<div>HOME</div>} />
-            <Route path="/cotizaciones/operaciones" element={<div>OPERACIONES</div>} />
+            <Route path={CHANGE_PASSWORD_PATH} element={<ChangePasswordPage />} />
+            <Route path={QUOTATIONS_BASE} element={<div>HOME</div>} />
+            <Route path={OPERATIONS_BASE} element={<div>OPERACIONES</div>} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>
@@ -149,9 +150,9 @@ describe('ChangePasswordPage', () => {
 
   // ----- Landing por rol al salir (unificación v1+v2) -----
   it('dispatcher: cambio exitoso lo devuelve a operaciones, dentro de la SPA', async () => {
-    // El dispatcher es el caso que motivó goToLanding: navegar a /cotizaciones
-    // lo dejaba en la vista "Sin acceso" (no tiene rol para el módulo). Su
-    // landing dejó de estar en v1, pero sigue sin ser /cotizaciones.
+    // El dispatcher es el caso que motivó goToLanding: navegar al módulo
+    // comercial lo dejaba en la vista "Sin acceso" (no tiene rol para él). Su
+    // landing dejó de estar en v1, pero sigue sin ser el módulo comercial.
     server.use(
       http.get(`${API}/auth/me`, () =>
         HttpResponse.json({ ...fakeUser, username: 'jdiaz', role: 'dispatcher' }),

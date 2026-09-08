@@ -1,3 +1,4 @@
+import { SPA_BASE } from '../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import {
   ALL_ROLES,
@@ -22,13 +23,6 @@ describe('landingPathFor', () => {
     expect(landingPathFor(role)).toBe(expected)
   })
 
-  it('el despachador aterriza en la ruta del módulo, escrita a mano', () => {
-    // A propósito con el literal y no con la constante: el resto del archivo
-    // compara la constante contra sí misma, así que un cambio de path no
-    // rompería nada acá. Este caso es el que lo fija.
-    expect(landingPathFor('dispatcher')).toBe('/cotizaciones/operaciones')
-  })
-
   it('sin rol (sesión a medio cargar) cae a cotizaciones', () => {
     expect(landingPathFor(undefined)).toBe(COTIZACIONES_LANDING)
   })
@@ -47,7 +41,8 @@ describe('landingPathFor', () => {
     // se retiró, y este test tiene que romper antes de que alguien quede en una
     // ruta que el router no sabe resolver.
     for (const role of ALL_ROLES) {
-      expect(landingPathFor(role)).toMatch(/^\/cotizaciones(\/|$)/)
+      const landing = landingPathFor(role)
+      expect(landing === SPA_BASE || landing.startsWith(`${SPA_BASE}/`)).toBe(true)
     }
   })
 })

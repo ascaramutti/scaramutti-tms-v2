@@ -1,10 +1,11 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { EntryForm } from '../components/EntryForm'
 
-const ENTRIES_PATH = '/cotizaciones/almacen/entradas'
+const ENTRIES_PATH = `${WAREHOUSE_BASE}/entradas`
 
 /** Registro de una entrada. Al guardar abre el detalle de la entrada recién creada. */
 export function EntryCreatePage() {

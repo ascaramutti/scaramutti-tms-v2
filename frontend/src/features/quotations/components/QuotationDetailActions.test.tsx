@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE } from '../../../shared/paths'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -82,7 +83,7 @@ describe('QuotationDetailActions', () => {
 
   it('muestra Editar como enlace secundario al wizard de edición', () => {
     renderActions()
-    expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', '/cotizaciones/1/editar')
+    expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', `${QUOTATIONS_BASE}/1/editar`)
     // Con su variante: es el secundario de la barra, al lado del azul de Descargar PDF.
     expect(screen.getByRole('link', { name: /editar/i }).className).toBe(
       buttonClasses({ variant: 'secondary' }),
@@ -91,7 +92,7 @@ describe('QuotationDetailActions', () => {
 
   it('estado editable (SENT): Editar sigue siendo un link al wizard', () => {
     renderActions({ status: 'SENT' })
-    expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', '/cotizaciones/1/editar')
+    expect(screen.getByRole('link', { name: /editar/i })).toHaveAttribute('href', `${QUOTATIONS_BASE}/1/editar`)
   })
 
   it.each([

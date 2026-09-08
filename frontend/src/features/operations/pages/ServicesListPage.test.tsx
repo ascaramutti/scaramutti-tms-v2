@@ -1,3 +1,4 @@
+import { OPERATIONS_BASE } from '../../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -44,18 +45,18 @@ function renderServicios({ role = 'admin' as UserRole } = {}) {
   return render(
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <MemoryRouter initialEntries={['/cotizaciones/operaciones']}>
+        <MemoryRouter initialEntries={[OPERATIONS_BASE]}>
           <Routes>
-            <Route path="/cotizaciones/operaciones" element={<ServicesListPage />} />
+            <Route path={OPERATIONS_BASE} element={<ServicesListPage />} />
             {/* Sustituta del alta: la pantalla real se prueba en su propio archivo. */}
             <Route
-              path="/cotizaciones/operaciones/servicios/nuevo"
+              path={`${OPERATIONS_BASE}/servicios/nuevo`}
               element={<div>Ruta del alta</div>}
             />
             {/* Sustituta del detalle, que nombra el id recibido: sin eso, un test
                 de navegación no distingue "abrió el detalle correcto" de "abrió
                 alguno". */}
-            <Route path="/cotizaciones/operaciones/servicios/:id" element={<DetalleStub />} />
+            <Route path={`${OPERATIONS_BASE}/servicios/:id`} element={<DetalleStub />} />
           </Routes>
         </MemoryRouter>
       </AuthProvider>

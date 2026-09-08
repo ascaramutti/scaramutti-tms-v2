@@ -1,10 +1,11 @@
+import { WAREHOUSE_BASE } from '../../../shared/paths'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { WithdrawalForm } from '../components/WithdrawalForm'
 
-const WITHDRAWALS_PATH = '/cotizaciones/almacen/retiros'
+const WITHDRAWALS_PATH = `${WAREHOUSE_BASE}/retiros`
 
 /** Registro de un retiro. Al guardar abre el detalle del retiro recién creado. */
 export function WithdrawalCreatePage() {

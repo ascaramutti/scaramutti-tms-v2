@@ -1,3 +1,4 @@
+import { warehouseProductPath } from '../../../shared/paths'
 import { Link } from 'react-router-dom'
 import type { WarehouseWithdrawalResponse } from '../../../api'
 import { formatDate, formatQuantity } from '../../../shared/utils/formatters'
@@ -35,7 +36,7 @@ export function WithdrawalInfoCards({ withdrawal }: WithdrawalInfoCardsProps) {
             <dt className="text-xs font-medium uppercase tracking-wide text-fg-muted">Producto</dt>
             <dd className="mt-0.5 text-sm">
               <Link
-                to={`/cotizaciones/almacen/productos/${withdrawal.product.id}`}
+                to={warehouseProductPath(withdrawal.product.id)}
                 className="rounded font-medium text-accent hover:text-accent-hover hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
               >
                 {withdrawal.product.name}

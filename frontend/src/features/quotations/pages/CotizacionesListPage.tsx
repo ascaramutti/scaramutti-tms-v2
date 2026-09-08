@@ -1,3 +1,4 @@
+import { QUOTATIONS_BASE, quotationDetailPath } from '../../../shared/paths'
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Plus } from 'lucide-react'
@@ -57,7 +58,7 @@ export function CotizacionesListPage() {
         action={
           <button
             type="button"
-            onClick={() => navigate('/cotizaciones/nueva')}
+            onClick={() => navigate(`${QUOTATIONS_BASE}/nueva`)}
             className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2.5 text-sm font-medium text-on-solid shadow-sm hover:bg-accent-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-canvas"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -83,7 +84,7 @@ export function CotizacionesListPage() {
         errorMessage={getApiErrorMessage(error, 'No se pudieron cargar las cotizaciones.')}
         onRetry={() => refetch()}
         onPageChange={setPage}
-        onRowClick={(quotation) => navigate(`/cotizaciones/${quotation.id}`)}
+        onRowClick={(quotation) => navigate(quotationDetailPath(quotation.id))}
         hasActiveFilters={hasActiveFilters}
       />
     </div>

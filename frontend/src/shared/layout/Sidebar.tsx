@@ -1,3 +1,4 @@
+import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, SPA_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -43,18 +44,15 @@ interface MenuGroup {
 }
 
 /**
- * Subárboles que cuelgan de /cotizaciones (el `base` de Vite, o sea la SPA
- * entera) pero NO son el módulo comercial. Sin esta lista el prefijo marcaría
+ * Subárboles que cuelgan de la base de la SPA (el `base` de Vite, o sea la
+ * aplicación entera) pero NO son el módulo comercial. Sin esta lista el prefijo marcaría
  * activo el item de Cotizaciones mientras el usuario está en otro módulo.
  */
 const NON_QUOTATION_SUBTREES = [
-  '/cotizaciones/cuenta',
-  '/cotizaciones/almacen',
-  '/cotizaciones/operaciones',
+  `${SPA_BASE}/cuenta`,
+  WAREHOUSE_BASE,
+  OPERATIONS_BASE,
 ]
-
-const WAREHOUSE_BASE = '/cotizaciones/almacen'
-const OPERATIONS_BASE = '/cotizaciones/operaciones'
 
 // Matriz de permisos del menú alineada con `x-required-roles` del contrato OpenAPI.
 // Cuando se agregue un módulo nuevo, sumar el item acá con sus roles permitidos.
@@ -139,10 +137,10 @@ const MENU: MenuGroup[] = [
       {
         icon: FileText,
         label: 'Cotizaciones',
-        to: '/cotizaciones',
+        to: QUOTATIONS_BASE,
         allowedRoles: QUOTATION_ROLES,
         activeWhen: (pathname) =>
-          matchesPathPrefix(pathname, '/cotizaciones') &&
+          matchesPathPrefix(pathname, QUOTATIONS_BASE) &&
           !NON_QUOTATION_SUBTREES.some((subtree) => matchesPathPrefix(pathname, subtree)),
       },
       {
@@ -157,7 +155,7 @@ const MENU: MenuGroup[] = [
     items: [
       // Sin allowedRoles → visible para todos. Cualquier usuario puede cambiar
       // su propia contraseña, independientemente del rol.
-      { icon: KeyRound, label: 'Cambiar contraseña', to: '/cotizaciones/cuenta/cambiar-contrasena' },
+      { icon: KeyRound, label: 'Cambiar contraseña', to: CHANGE_PASSWORD_PATH },
     ],
   },
 ]
