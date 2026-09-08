@@ -49,12 +49,22 @@ function encaja(pathname: string, patron: string): boolean {
  * barras: los navegadores la normalizan, y react-router aborta con "External
  * navigation is not allowed", que sin `errorElement` deja la pantalla en blanco.
  *
+ * Y descarta los caracteres de control. Tres de ellos hacen daño: el parser de
+ * URL elimina tab, salto de línea y retorno de carro de en medio de la cadena
+ * antes de resolver, así que `/\r/evil.com` queda en `//evil.com` y sale del
+ * dominio; rechazar solo las dos primeras posiciones no alcanza cuando lo que
+ * separa las barras se evapora al resolver. Los demás controles no se eliminan
+ * (quedan codificados, dentro del mismo origen), pero tampoco son una ruta que
+ * esta aplicación escriba, así que se rechaza el rango entero.
+ *
  * Hoy el destino guardado solo lo escribe la guarda de ruta desde el `pathname`
  * del navegador, así que no hay por dónde entrar algo así; queda medido de todos
  * modos, porque el día que ese destino venga de un parámetro de la URL esto es lo
  * único que separa un redirect de la aplicación de uno a cualquier lado.
  */
 function esRutaDeLaApp(pathname: string): boolean {
+  // eslint-disable-next-line no-control-regex -- la clase de control es lo que se busca
+  if (/[\u0000-\u001f]/.test(pathname)) return false
   return pathname.startsWith('/') && !/^\/[\\/]/.test(pathname)
 }
 
