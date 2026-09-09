@@ -1,0 +1,124 @@
+name: Frontend checks
+
+# CI del frontend: lint + tests + build de producción (que corre `tsc` y caza los
+# errores de tipos que ni el lint ni los tests ven). Mismo patrón que backend.yml:
+# un solo workflow, `changes` detecta si el PR toca el frontend y `checks` corre
+# solo en ese caso; saltado cuenta como éxito para los checks requeridos.
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frontend-checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # La spec que dispara el frontend es la RUNTIME del backend, que es la entrada
+      # del generador del cliente; el contrato de diseño (api/openapi.yaml) no lo toca.
+      - name: Detectar cambios en frontend/
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request)
+              git fetch --no-tags origin "$BASE_REF"
+              CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD") ;;
+            push)
+              if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then CHANGED="frontend/"
+              else CHANGED=$(git diff --name-only "$BEFORE" "$SHA"); fi ;;
+            *) CHANGED="frontend/" ;;
+          esac
+          if echo "$CHANGED" | grep -qE '^(frontend/|backend/src/main/resources/META-INF/openapi\.yaml|\.github/workflows/frontend\.yml)'; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"; echo "El PR no toca frontend/**: se salta."
+          fi
+
+  # El nombre de este job (`checks`) es el check requerido en la protección de ramas.
+  checks:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: frontend
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v7
+
+      # La misma major de Node que usa el build de producción (Dockerfile).
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # npm ci, no install: instala exactamente el lockfile y falla si package.json y
+      # package-lock.json están desincronizados.
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Tests
+        run: npm run test
+
+      # `npm run build` corre `tsc -b` antes de Vite: acá se cazan los errores de
+      # tipos, que ni el lint ni las pruebas ven por sí solos.
+      - name: Build de producción
+        run: npm run build
+
+  # Drift del cliente generado: el cliente TypeScript commiteado tiene que ser el que
+  # sale del contrato. Se regenera y, si difiere, alguien tocó el contrato sin regenerar
+  # (o al revés). No es check requerido hasta verificar que la generación es
+  # determinista en este proyecto; después se agrega a la protección de ramas.
+  api-drift:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v7
+      - name: Configurar Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependencias
+        run: npm ci
+      - name: Regenerar el cliente y comparar
+        run: |
+          npm run generate-api
+          if ! git diff --exit-code -- src/api; then
+            echo "::error::El cliente generado difiere del commiteado: regenerá con 'npm run generate-api' y commiteá el resultado."
+            exit 1
+          fi

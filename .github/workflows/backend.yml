@@ -1,0 +1,123 @@
+name: Backend tests
+
+# CI del backend: suite completa (JUnit + RestAssured) contra un Postgres efímero.
+# Corre en runner GitHub-hosted: gratis en repo público y sin acceso a infra propia,
+# así que pull_request desde forks es seguro acá (un runner self-hosted NUNCA va en
+# pull_request).
+#
+# Un solo workflow, sin gemelo "no-op": el job `changes` detecta si el PR toca el
+# backend y `test` corre solo en ese caso. Un job saltado por `if` se reporta como
+# éxito para los checks requeridos (documentado por GitHub en "Handling skipped but
+# required checks"), así que no hace falta el segundo workflow que podía pisar un
+# fallo real al re-correrse.
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Un commit nuevo en la misma rama cancela el run anterior: solo importa el último.
+concurrency:
+  group: backend-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detectar cambios en backend/
+        id: filter
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_REF: ${{ github.base_ref }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+        run: |
+          case "$EVENT" in
+            pull_request)
+              git fetch --no-tags origin "$BASE_REF"
+              CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD") ;;
+            push)
+              if [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then CHANGED="backend/"
+              else CHANGED=$(git diff --name-only "$BEFORE" "$SHA"); fi ;;
+            *) CHANGED="backend/" ;;   # workflow_dispatch: correr siempre
+          esac
+          if echo "$CHANGED" | grep -qE '^(backend/|\.github/workflows/backend\.yml)'; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"; echo "El PR no toca backend/**: se salta."
+          fi
+
+  # El nombre de este job (`test`) es el check requerido en la protección de ramas.
+  test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    # Postgres efímero, misma imagen que dev y prod. Credenciales de TEST, no secretos:
+    # son las del perfil de test de application.properties. Flyway migra el schema
+    # completo al arrancar y el seeder de dev siembra usuarios y catálogos.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: scaramutti_user
+          POSTGRES_PASSWORD: dev_local_only
+          POSTGRES_DB: scaramutti_tms_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U scaramutti_user -d scaramutti_tms_dev"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v7
+
+      - name: Configurar JDK 21 (Temurin)
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          # El pom compila con `maven.compiler.release` en 17 y el runtime es JDK 21:
+          # el JDK del runner tiene que ser el de ejecución, no el del release.
+          java-version: '21'
+          cache: maven
+
+      # La clave privada está ignorada por git: se genera un par fresco para el run.
+      # Pisar la pública commiteada en el workspace efímero es intencional (deben casar).
+      - name: Generar keypair JWT de test
+        run: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
+            -out backend/src/main/resources/keys/privatekey.pem
+          openssl rsa -in backend/src/main/resources/keys/privatekey.pem \
+            -pubout -out backend/src/main/resources/keys/publickey.pem
+
+      # Suite completa, sin exclusiones. Las reglas de arquitectura (ArchUnit) corren acá
+      # como un test más: si un módulo importa a otro, el PR no pasa.
+      - name: Ejecutar tests
+        working-directory: backend
+        run: mvn -B test
+
+      # Cobertura como información, no como gate: la red de este método son las
+      # mutaciones dirigidas. El reporte queda disponible como artefacto del run.
+      - name: Publicar reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco
+          path: backend/target/site/jacoco/
+          if-no-files-found: ignore

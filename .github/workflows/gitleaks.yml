@@ -1,0 +1,40 @@
+name: Gitleaks
+
+# Detección de secretos en cada PR y en cada push a la rama de integración.
+# Complementa a la push protection de GitHub (que detecta tokens conocidos) con las
+# reglas propias de `.gitleaks.toml`: en un repositorio público el riesgo real no son
+# solo tokens sino IPs de la red privada y hostnames, que nadie más detecta.
+# El nombre del job (`gitleaks`) es el check requerido en la protección de ramas.
+on:
+  pull_request:
+  push:
+    branches: [develop]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gitleaks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gitleaks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # escanea los commits del PR, no solo el árbol final
+
+      - name: Gitleaks
+        uses: gitleaks/gitleaks-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Config del repo (reglas propias + las por defecto). Ver .gitleaks.toml.
+          GITLEAKS_CONFIG: .gitleaks.toml
+          # Sin comentarios en el PR: comentarlos pide permiso de escritura sobre los
+          # pull requests, y el veredicto ya lo da el código de salida del job. Con el
+          # permiso mínimo y esto en `true`, la acción falla al intentar comentar.
+          GITLEAKS_ENABLE_COMMENTS: "false"
