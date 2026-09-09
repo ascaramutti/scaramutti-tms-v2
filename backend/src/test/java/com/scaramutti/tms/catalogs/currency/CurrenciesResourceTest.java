@@ -2,6 +2,7 @@ package com.scaramutti.tms.catalogs.currency;
 
 import com.scaramutti.tms.shared.entity.Currency;
 import com.scaramutti.tms.shared.repository.CurrencyRepository;
+import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -260,5 +261,15 @@ class CurrenciesResourceTest {
         .then()
             .statusCode(200)
             .body("code", hasItem("USD"));
+    }
+
+    /**
+     * La misma ruta escrita torcida (punto y coma, barra doble, caracteres codificados) tampoco
+     * entra sin token, con las dos capas puestas, que es la configuración real. El porqué, la
+     * lista y las mediciones, en {@code RoutePolicyTrickyUrls}.
+     */
+    @Test
+    void list_withTrickyUrls_withoutToken_returns401() {
+        RoutePolicyTrickyUrls.assertAllReturn401WithoutToken("/currencies");
     }
 }
