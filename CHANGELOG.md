@@ -9,6 +9,23 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [Sin publicar]
+
+El grupo de dependencias menores y de parche del frontend: 25 paquetes. Solo frontend; sin
+migraciones, sin cambios de backend ni de contrato.
+
+### Changed
+
+- Las dependencias de ejecución suben dentro de su misma versión mayor: `react` y `react-dom` de
+  19.2.6 a 19.2.8, `@tanstack/react-query` de 5.100.10 a 5.102.8, `react-hook-form` de 7.75.0 a
+  7.87.0, `@hookform/resolvers` de 5.2.2 a 5.9.1, `zod` de 4.4.3 a 4.5.4, `lucide-react` de 1.14.0
+  a 1.43.0 y `sonner` de 2.0.7 a 2.0.8. La auditoría de dependencias de ejecución sigue sin avisos
+  (#200).
+- Las herramientas de desarrollo (linter, empaquetador, motor de estilos, utilidades de prueba y
+  generador del cliente de la API) suben en el mismo grupo. El generador nuevo vuelve a emitir el
+  cliente commiteado: la salida anota los tipos de retorno que antes se inferían y no mueve ninguna
+  URL, ningún esquema de seguridad ni ningún tipo del contrato (#200).
+
 ## [2.6.0] - 2026-09-08
 
 La SPA se muda a la raíz del dominio, con las dependencias de ejecución por encima de sus avisos de
