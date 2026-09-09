@@ -9,10 +9,12 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
-## [Sin publicar]
+## [2.6.1] - 2026-09-09
 
-El grupo de dependencias menores y de parche del frontend: 25 paquetes. Solo frontend; sin
-migraciones, sin cambios de backend ni de contrato.
+Las dependencias al día y la infraestructura del ciclo: PRs #187 a #200. Quarkus en su último
+parche de la 3.15, los menores del frontend con el cliente de la API regenerado, y los workflows
+del ciclo con gitleaks, Dependabot y las acciones en Node 24. Sin migraciones, sin cambios de
+contrato.
 
 ### Changed
 
