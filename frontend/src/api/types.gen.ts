@@ -2068,11 +2068,11 @@ export type ListQuotationsData = {
          */
         serviceTypeId?: number;
         /**
-         * Filtro por `createdAt` desde (ISO date, inclusivo). Interpretado en zona horaria de Lima (UTC-5).
+         * Filtro por `createdAt` desde (ISO date, inclusivo). Día calendario en America/Lima.
          */
         dateFrom?: string;
         /**
-         * Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Interpretado en zona horaria de Lima (UTC-5).
+         * Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Día calendario en America/Lima.
          */
         dateTo?: string;
     };

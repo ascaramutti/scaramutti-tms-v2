@@ -68,7 +68,7 @@ public class QuotationResource {
      * code/client.name/client.ruc/origin/destination (minimo 3 chars).
      *
      * <p>{@code totalAmount}/{@code itemsCount} se calculan en runtime (no se
-     * persisten). Las fechas se interpretan en zona Lima (UTC-5).
+     * persisten). Las fechas son dias calendario en America/Lima.
      */
     @GET
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})

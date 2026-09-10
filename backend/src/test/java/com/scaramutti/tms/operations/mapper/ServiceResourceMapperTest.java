@@ -11,6 +11,7 @@ import com.scaramutti.tms.operations.service.cmd.CreateServiceCommand;
 import com.scaramutti.tms.operations.service.cmd.ListServicesQuery;
 import com.scaramutti.tms.operations.service.cmd.UpdateServiceCommand;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.util.DateUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -783,7 +784,7 @@ class ServiceResourceMapperTest {
     @Test
     void toCreateServiceCommand_trimsFreeTextAsBefore() {
         CreateServiceCommand command = mapper.toCreateServiceCommand(new ServiceCreateRequest(
-            1, TripScope.PROVINCIA, LocalDate.now(), "  Piura  ", "  Lima  ", 1,
+            1, TripScope.PROVINCIA, LocalDate.now(DateUtils.LIMA), "  Piura  ", "  Lima  ", 1,
             BigDecimal.TEN, null, null, null, BigDecimal.TEN, 1, "   "));
 
         assertEquals("Piura", command.origin());
@@ -806,13 +807,13 @@ class ServiceResourceMapperTest {
 
     private static ServiceUpdateRequest updateRequest(
             String origin, String destination, String observations, String justification) {
-        return new ServiceUpdateRequest(LocalDate.now(), origin, destination, BigDecimal.TEN,
+        return new ServiceUpdateRequest(LocalDate.now(DateUtils.LIMA), origin, destination, BigDecimal.TEN,
             null, null, null, BigDecimal.TEN, 1, observations, null, null, justification);
     }
 
     private static ServiceUpdateRequest updateRequestWithRealDates(
             OffsetDateTime start, OffsetDateTime end) {
-        return new ServiceUpdateRequest(LocalDate.now(), "Piura", "Lima", BigDecimal.TEN,
+        return new ServiceUpdateRequest(LocalDate.now(DateUtils.LIMA), "Piura", "Lima", BigDecimal.TEN,
             null, null, null, BigDecimal.TEN, 1, null, start, end, VALID_JUSTIFICATION);
     }
 

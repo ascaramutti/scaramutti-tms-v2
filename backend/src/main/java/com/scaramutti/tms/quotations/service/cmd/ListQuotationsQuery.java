@@ -17,7 +17,7 @@ import java.time.LocalDate;
  *  - clientId/createdById/currencyId: FK exactas; null = sin filtro.
  *  - cargoTypeId/serviceTypeId: "al menos un item (root o hijo) con ese tipo"
  *                   → EXISTS subquery en el repo. null = sin filtro.
- *  - dateFrom/dateTo: rango sobre createdAt en zona Lima (UTC-5). dateTo inclusivo
+ *  - dateFrom/dateTo: rango sobre createdAt en dias calendario de America/Lima. dateTo inclusivo
  *                   del dia completo (el repo lo convierte a < dateTo+1dia). null = sin filtro.
  *  - page:          base 0, validado @Min(0) en el Resource.
  *  - size:          1..100, validado @Min(1)/@Max(100) en el Resource.

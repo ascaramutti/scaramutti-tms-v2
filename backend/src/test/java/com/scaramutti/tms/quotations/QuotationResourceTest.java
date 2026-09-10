@@ -1,5 +1,6 @@
 package com.scaramutti.tms.quotations;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
@@ -15,7 +16,6 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.Map;
 import java.util.Set;
 
@@ -67,9 +67,6 @@ class QuotationResourceTest {
     private int CURRENCY_PEN_ID;
     private int ST_ACB;
     private int ST_SCH;
-
-    /** Zona del negocio — los filtros de fecha del listado se interpretan aca (igual que el backend). */
-    private static final ZoneId LIMA = ZoneId.of("America/Lima");
 
     @BeforeEach
     void resolveHermeticIds() {
@@ -1651,7 +1648,7 @@ class QuotationResourceTest {
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/quotations?q=ZTEST_LST_DFROM&dateFrom=" + LocalDate.now(LIMA).minusDays(1))
+            .get("/quotations?q=ZTEST_LST_DFROM&dateFrom=" + LocalDate.now(DateUtils.LIMA).minusDays(1))
         .then()
             .statusCode(200)
             .body("totalElements", greaterThanOrEqualTo(1));
@@ -1667,7 +1664,7 @@ class QuotationResourceTest {
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/quotations?q=ZTEST_LST_DFUT&dateFrom=" + LocalDate.now(LIMA).plusDays(2))
+            .get("/quotations?q=ZTEST_LST_DFUT&dateFrom=" + LocalDate.now(DateUtils.LIMA).plusDays(2))
         .then()
             .statusCode(200)
             .body("content.size()", is(0));
@@ -1684,7 +1681,7 @@ class QuotationResourceTest {
         given()
             .header("Authorization", "Bearer " + token)
         .when()
-            .get("/quotations?q=ZTEST_LST_DTO&dateTo=" + LocalDate.now(LIMA))
+            .get("/quotations?q=ZTEST_LST_DTO&dateTo=" + LocalDate.now(DateUtils.LIMA))
         .then()
             .statusCode(200)
             .body("totalElements", greaterThanOrEqualTo(1));

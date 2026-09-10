@@ -15,7 +15,6 @@ import jakarta.persistence.Tuple;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -298,7 +297,7 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
     public List<Service> findRecentByCreatedByAndClientAndRoute(
         Integer createdBy, Integer clientId, String origin, String destination, int secondsWindow
     ) {
-        OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(secondsWindow);
+        OffsetDateTime cutoff = DateUtils.nowUtcMicros().minusSeconds(secondsWindow);
         return list("createdBy = ?1 AND clientId = ?2 AND origin = ?3 AND destination = ?4 AND createdAt >= ?5",
             createdBy, clientId, origin, destination, cutoff);
     }

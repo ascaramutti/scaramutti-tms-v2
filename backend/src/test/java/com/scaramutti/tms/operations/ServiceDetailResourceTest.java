@@ -1,5 +1,6 @@
 package com.scaramutti.tms.operations;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -74,7 +75,7 @@ class ServiceDetailResourceTest {
      */
     @Test
     void getService_returnsEveryFieldWithItsOwnValue() {
-        LocalDate tentativeDate = LocalDate.now().plusDays(3);
+        LocalDate tentativeDate = LocalDate.now(DateUtils.LIMA).plusDays(3);
         long id = createService("Sullana Origen", "Chiclayo Destino");
 
         given()
@@ -430,7 +431,7 @@ class ServiceDetailResourceTest {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
         payload.put("tripScope", "PROVINCIA");
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", origin);
         payload.put("destination", destination);
         payload.put("cargoTypeId", cargoTypeId);

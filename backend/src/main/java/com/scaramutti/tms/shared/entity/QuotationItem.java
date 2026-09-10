@@ -1,5 +1,6 @@
 package com.scaramutti.tms.shared.entity;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -10,7 +11,6 @@ import jakarta.persistence.Table;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 
 /**
  * Item de cotizacion. Tabla `cotizaciones.quotation_items`.
@@ -83,7 +83,7 @@ public class QuotationItem {
     @PrePersist
     public void onCreate() {
         if (createdAt == null) {
-            createdAt = OffsetDateTime.now(ZoneOffset.UTC);
+            createdAt = DateUtils.nowUtcMicros();
         }
     }
 }

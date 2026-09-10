@@ -1,6 +1,7 @@
 package com.scaramutti.tms.operations;
 
 import com.scaramutti.tms.operations.model.ServiceStatus;
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -1558,7 +1559,7 @@ class ServiceReinforcementResourceTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("clientId", clientId);
         body.put("tripScope", "PROVINCIA");
-        body.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        body.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         body.put("origin", origin);
         body.put("destination", destination);
         body.put("cargoTypeId", cargoTypeId);
