@@ -15,10 +15,13 @@
         <maven.compiler.release>17</maven.compiler.release>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.15.7</quarkus.platform.version>
+        <quarkus.platform.version>3.33.3.2</quarkus.platform.version>
         <surefire-plugin.version>3.6.0</surefire-plugin.version>
         <mapstruct.version>1.6.3</mapstruct.version>
-        <hibernate-jpamodelgen.version>6.6.4.Final</hibernate-jpamodelgen.version>
+        <!-- Tiene que seguir a la version de Hibernate ORM que trae el BOM de la plataforma.
+             Genera el metamodelo estatico (las clases `Entidad_`) del que dependen los
+             repositorios para nombrar campos sin literales. -->
+        <hibernate-processor.version>7.2.19.Final</hibernate-processor.version>
         <jacoco.version>0.8.15</jacoco.version>
     </properties>
 
@@ -128,7 +131,7 @@
         <!-- Test -->
         <dependency>
             <groupId>io.quarkus</groupId>
-            <artifactId>quarkus-junit5</artifactId>
+            <artifactId>quarkus-junit</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -190,8 +193,8 @@
                         </path>
                         <path>
                             <groupId>org.hibernate.orm</groupId>
-                            <artifactId>hibernate-jpamodelgen</artifactId>
-                            <version>${hibernate-jpamodelgen.version}</version>
+                            <artifactId>hibernate-processor</artifactId>
+                            <version>${hibernate-processor.version}</version>
                         </path>
                     </annotationProcessorPaths>
                 </configuration>

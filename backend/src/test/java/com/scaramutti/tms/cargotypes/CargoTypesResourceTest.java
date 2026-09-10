@@ -225,21 +225,38 @@ class CargoTypesResourceTest {
             .body("empty", equalTo(true));
     }
 
+    /**
+     * `?q=` (presente pero vacio) equivale a OMITIR el parametro: la plataforma entrega el valor
+     * vacio como null, asi que no hay filtro y el listado sale entero. Hasta la plataforma 3.15
+     * llegaba como cadena vacia y chocaba con minLength, o sea 400; ese 400 era un efecto del
+     * binder y no una regla del negocio. La regla de los tres caracteres NO cambio: sigue
+     * congelada en {@code list_withQ2Chars_returns400_COM001}, el caso de al lado.
+     */
     @Test
-    void list_withQEmptyString_returns400_COM001() {
-        // Con minLength=3, q="" no es valido. Para no filtrar el cliente debe
-        // OMITIR el param, no enviarlo vacio.
+    void list_withQEmptyString_behavesAsOmittingTheParameter() {
         String token = login("admin", "Admin1234");
 
+        JsonPath sinElParametro = given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/cargo-types")
+        .then()
+            .statusCode(200)
+            .extract().jsonPath();
+        int total = sinElParametro.getInt("totalElements");
+        List<String> nombres = sinElParametro.getList("content.name");
+
+        // El total solo dice que no filtro. La lista EN ORDEN dice ademas que no hubo ranking:
+        // con `q` vacio como cadena el ORDER BY pasaria a ordenar por similarity, y con `q` nulo
+        // ordena por nombre. Sin esta segunda comprobacion, null y "" se ven iguales.
         given()
             .header("Authorization", "Bearer " + token)
         .when()
             .get("/cargo-types?q=")
         .then()
-            .statusCode(400)
-            .contentType("application/problem+json")
-            .body("code", equalTo("COM-001"))
-            .body("errors.size()", greaterThanOrEqualTo(1));
+            .statusCode(200)
+            .body("totalElements", equalTo(total))
+            .body("content.name", equalTo(nombres));
     }
 
     // ---------- minLength validation (NUEVO vs clients) ----------------------

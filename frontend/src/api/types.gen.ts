@@ -1771,7 +1771,7 @@ export type ListCargoTypesData = {
     path?: never;
     query?: {
         /**
-         * Búsqueda libre por nombre (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+         * Búsqueda libre por nombre (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
          */
         q?: string;
         isActive?: boolean;
@@ -1959,7 +1959,7 @@ export type ListClientsData = {
     path?: never;
     query?: {
         /**
-         * Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+         * Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
          */
         q?: string;
         isActive?: boolean;
@@ -2049,7 +2049,8 @@ export type ListQuotationsData = {
         /**
          * Búsqueda libre con coincidencia parcial sobre: `code`, `client.name`,
          * `client.ruc`, `origin`, `destination`. Usa pg_trgm para fuzzy matching.
-         * Mínimo 3 caracteres.
+         * Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a
+         * omitirlo y no filtra.
          *
          */
         q?: string;
@@ -2465,6 +2466,9 @@ export type ListWarehouseSuppliersData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         */
         q?: string;
         isActive?: boolean;
         page?: number;
@@ -2540,6 +2544,9 @@ export type ListWarehouseProductsData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         */
         q?: string;
         categoryId?: number;
         isActive?: boolean;
@@ -2860,6 +2867,9 @@ export type ListWarehousePurchaseInvoicesData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         */
         q?: string;
         supplierId?: number;
         status?: WarehouseRecordStatus;
@@ -3367,6 +3377,9 @@ export type ListWorkersData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         */
         q?: string;
         isActive?: boolean;
     };
@@ -3474,6 +3487,9 @@ export type ListServicesData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         */
         q?: string;
         status?: ServiceStatus;
         /**
