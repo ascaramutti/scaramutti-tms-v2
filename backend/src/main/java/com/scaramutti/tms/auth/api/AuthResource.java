@@ -8,6 +8,7 @@ import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.mapper.AuthResourceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.AuthService;
+import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -43,15 +44,25 @@ public class AuthResource {
         return authService.refresh(authResourceMapper.toRefreshCommand(refreshRequest));
     }
 
+    /**
+     * La guarda va en el metodo y no en la clase porque {@code login} y {@code refresh} tienen
+     * que seguir siendo publicos. Exige sesion tambien en el codigo y no solo en la policy por
+     * ruta de application.properties: esa policy se evalua sobre la URL tal como llega, y hay
+     * avisos publicados de rutas que la esquivan escribiendo el mismo camino con punto y coma o
+     * con barras codificadas. La comprobacion del codigo no depende de como se escriba la ruta.
+     */
     @POST
     @Path("/change-password")
+    @Authenticated
     public Response changePassword(@Valid @NotNull ChangePasswordRequest changePasswordRequest) {
         authService.changePassword(authResourceMapper.toChangePasswordCommand(currentUser.requireId(), changePasswordRequest));
         return Response.noContent().build();
     }
 
+    /** Misma segunda capa que {@code changePassword}: ver el comentario de ese metodo. */
     @GET
     @Path("/me")
+    @Authenticated
     public UserResponse me() {
         return authService.findUserById(currentUser.requireId());
     }

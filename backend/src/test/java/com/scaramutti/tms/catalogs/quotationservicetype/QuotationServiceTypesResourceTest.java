@@ -2,6 +2,7 @@ package com.scaramutti.tms.catalogs.quotationservicetype;
 
 import com.scaramutti.tms.shared.entity.QuotationServiceType;
 import com.scaramutti.tms.shared.repository.QuotationServiceTypeRepository;
+import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -256,5 +257,15 @@ class QuotationServiceTypesResourceTest {
         .then()
             .statusCode(200)
             .body("code", hasItem("SCB"));
+    }
+
+    /**
+     * La misma ruta escrita torcida (punto y coma, barra doble, caracteres codificados) tampoco
+     * entra sin token, con las dos capas puestas, que es la configuración real. El porqué, la
+     * lista y las mediciones, en {@code RoutePolicyTrickyUrls}.
+     */
+    @Test
+    void list_withTrickyUrls_withoutToken_returns401() {
+        RoutePolicyTrickyUrls.assertAllReturn401WithoutToken("/quotation-service-types");
     }
 }

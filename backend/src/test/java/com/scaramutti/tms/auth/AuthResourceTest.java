@@ -1,5 +1,6 @@
 package com.scaramutti.tms.auth;
 
+import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.smallrye.jwt.build.Jwt;
@@ -459,5 +460,22 @@ class AuthResourceTest {
         .then()
             .statusCode(200)
             .extract().jsonPath().getString("token");
+    }
+
+    /**
+     * La misma ruta escrita torcida (punto y coma, barra doble, caracteres codificados) tampoco
+     * entra sin token, con las dos capas puestas, que es la configuración real. El porqué, la
+     * lista y las mediciones, en {@code RoutePolicyTrickyUrls}.
+     */
+    @Test
+    void me_withTrickyUrls_withoutToken_returns401() {
+        RoutePolicyTrickyUrls.assertAllReturn401WithoutToken("/auth/me");
+    }
+
+    @Test
+    void changePassword_withTrickyUrls_withoutToken_returns401() {
+        RoutePolicyTrickyUrls.assertAllReturn401WithoutTokenOnPost(
+            "/auth/change-password",
+            "{\"currentPassword\":\"Admin1234\",\"newPassword\":\"Otra12345\"}");
     }
 }

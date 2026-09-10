@@ -2,15 +2,18 @@ package com.scaramutti.tms.clients;
 
 import com.scaramutti.tms.shared.entity.Client;
 import com.scaramutti.tms.shared.repository.ClientRepository;
+import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.restassured.path.json.JsonPath;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Set;
 
 import static io.restassured.RestAssured.given;
@@ -713,21 +716,38 @@ class ClientsResourceTest {
 
     // ---------- minLength validation ---------------------------------------
 
+    /**
+     * `?q=` (presente pero vacio) equivale a OMITIR el parametro: la plataforma entrega el valor
+     * vacio como null, asi que no hay filtro y el listado sale entero. Hasta la plataforma 3.15
+     * llegaba como cadena vacia y chocaba con minLength, o sea 400; ese 400 era un efecto del
+     * binder y no una regla del negocio. La regla de los tres caracteres NO cambio: sigue
+     * congelada en {@code list_withQ2Chars_returns400_COM001}, el caso de al lado.
+     */
     @Test
-    void list_withQEmptyString_returns400_COM001() {
-        // Con minLength=3, q="" no es valido. Para no filtrar el cliente debe
-        // OMITIR el param, no enviarlo vacio.
+    void list_withQEmptyString_behavesAsOmittingTheParameter() {
         String token = login("admin", "Admin1234");
 
+        JsonPath sinElParametro = given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/clients")
+        .then()
+            .statusCode(200)
+            .extract().jsonPath();
+        int total = sinElParametro.getInt("totalElements");
+        List<String> nombres = sinElParametro.getList("content.name");
+
+        // El total solo dice que no filtro. La lista EN ORDEN dice ademas que no hubo ranking:
+        // con `q` vacio como cadena el ORDER BY pasaria a ordenar por similarity, y con `q` nulo
+        // ordena por nombre. Sin esta segunda comprobacion, null y "" se ven iguales.
         given()
             .header("Authorization", "Bearer " + token)
         .when()
             .get("/clients?q=")
         .then()
-            .statusCode(400)
-            .contentType("application/problem+json")
-            .body("code", equalTo("COM-001"))
-            .body("errors.size()", greaterThanOrEqualTo(1));
+            .statusCode(200)
+            .body("totalElements", equalTo(total))
+            .body("content.name", equalTo(nombres));
     }
 
     @Test
@@ -1143,5 +1163,15 @@ class ClientsResourceTest {
         .then()
             .statusCode(400)
             .body("code", equalTo("COM-001"));
+    }
+
+    /**
+     * La misma ruta escrita torcida (punto y coma, barra doble, caracteres codificados) tampoco
+     * entra sin token, con las dos capas puestas, que es la configuración real. El porqué, la
+     * lista y las mediciones, en {@code RoutePolicyTrickyUrls}.
+     */
+    @Test
+    void list_withTrickyUrls_withoutToken_returns401() {
+        RoutePolicyTrickyUrls.assertAllReturn401WithoutToken("/clients");
     }
 }

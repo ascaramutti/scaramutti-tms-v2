@@ -9,6 +9,36 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.7.0] - 2026-09-10
+
+Quarkus en la línea 3.33 con soporte hasta marzo de 2027, que cierra de raíz el aviso de
+autorización por ruta, y las guardas de autenticación en el código de los ocho endpoints que
+dependían solo de la política por ruta: PRs #203 a #205. Sin migraciones. Un cambio de contrato en
+un rincón: el parámetro de búsqueda vacío equivale a omitirlo.
+
+### Security
+
+- Seis endpoints exigían sesión solo por la política por ruta del servidor HTTP: los catálogos de
+  monedas, términos de pago, condiciones de cotización y tipos de servicio, y los listados de tipos
+  de carga y de clientes. Otros dos, el perfil propio y el cambio de contraseña, la exigían recién
+  dentro del método. Los ocho la exigen ahora antes de entrar. Esa política se evalúa sobre la URL
+  tal como llega y hay avisos publicados de rutas que la esquivan escribiéndola torcida; la
+  comprobación del código no depende de cómo se escriba la ruta. No cambia quién puede entrar: los
+  mismos roles que antes, y el login y la renovación del token siguen siendo públicos (#203).
+- El backend pasa a la línea 3.33 de Quarkus, la de soporte largo vigente, y con ella a Hibernate
+  7. Incluye el arreglo del aviso de autorización por ruta de junio de 2026, que la línea 3.15 no
+  recibió: ese aviso describe caminos escritos con punto y coma o con barras codificadas que dejan
+  de coincidir con la política que protege `/api/v1/*`. Esa política es la primera de las dos capas
+  que exigen sesión; la segunda es la del código, de la entrada anterior (#204).
+
+### Changed
+
+- En siete de los ocho buscadores, mandar `q` vacío (`?q=`) pasa a significar lo mismo que no
+  mandarlo: devuelve el listado sin filtrar en vez de rechazar con 400. Es una consecuencia del
+  salto de plataforma, que ahora entrega un parámetro vacío como ausente. El octavo, el listado de
+  servicios, ya se comportaba así porque su recurso colapsa el texto vacío antes de usarlo. El
+  mínimo de tres caracteres no cambia en ninguno: con uno o dos sigue siendo 400 (#204).
+
 ## [2.6.1] - 2026-09-09
 
 Las dependencias al día y la infraestructura del ciclo: PRs #187 a #200. Quarkus en su último

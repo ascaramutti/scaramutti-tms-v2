@@ -274,7 +274,7 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre por nombre (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+          description: Búsqueda libre por nombre (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 200 }
         - name: isActive
           in: query
@@ -409,7 +409,7 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres. Para no filtrar, omitir el parámetro.
+          description: Búsqueda libre por nombre o RUC (substring case-insensitive; ranking por similarity). Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 200 }
         - name: isActive
           in: query
@@ -469,7 +469,8 @@ paths:
           description: |
             Búsqueda libre con coincidencia parcial sobre: `code`, `client.name`,
             `client.ruc`, `origin`, `destination`. Usa pg_trgm para fuzzy matching.
-            Mínimo 3 caracteres.
+            Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a
+            omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 255 }
         - name: status
           in: query
@@ -884,7 +885,10 @@ paths:
         vacío).
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
-        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - name: q
+          in: query
+          description: Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: isActive, in: query, schema: { type: boolean } }
         - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
         - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
@@ -937,7 +941,10 @@ paths:
         bajo umbral. Para no filtrar, OMITIR el parámetro.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
-        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - name: q
+          in: query
+          description: Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: categoryId, in: query, schema: { type: integer } }
         - { name: isActive, in: query, schema: { type: boolean } }
         - name: lowOnly
@@ -1198,7 +1205,10 @@ paths:
         e `itemsCount` se calculan de los items (los totales NO se persisten).
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
-        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - name: q
+          in: query
+          description: Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: supplierId, in: query, schema: { type: integer } }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/WarehouseRecordStatus' } }
         - { name: dateFrom, in: query, description: '`invoiceDate` desde (inclusive)', schema: { type: string, format: date } }
@@ -1699,7 +1709,10 @@ paths:
         filtrar, OMITIR el parametro.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
-        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - name: q
+          in: query
+          description: Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: isActive, in: query, schema: { type: boolean } }
       responses:
         '200':
@@ -1810,7 +1823,10 @@ paths:
         tabulación): fuera de eso la respuesta es 400.
       x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
       parameters:
-        - { name: q, in: query, schema: { type: string, minLength: 3, maxLength: 200 } }
+        - name: q
+          in: query
+          description: Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: status, in: query, schema: { $ref: '#/components/schemas/ServiceStatus' } }
         - { name: clientId, in: query, description: Filtra por cliente exacto, schema: { type: integer } }
         - { name: dateFrom, in: query, description: 'Fecha tentativa desde (inclusive). Entre 1900-01-01 y 2999-12-31: fuera de esa ventana es 400', schema: { type: string, format: date } }
