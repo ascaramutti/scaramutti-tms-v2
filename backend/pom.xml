@@ -203,6 +203,23 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${surefire-plugin.version}</version>
                 <configuration>
+                    <!--
+                        El reloj de la JVM de tests se fija aca y no se hereda de la maquina, para
+                        que la suite discrimine lo mismo la corra quien la corra. Medido el
+                        2026-09-10 sobre OperationsWeekCycle.at: cambiar la zona de negocio por la
+                        del proceso pasa la suite entera con la JVM en Lima y rompe dos casos de
+                        OperationsWeekCycleTest en UTC. Hasta ahora eso dependia de la maquina que
+                        corriera la suite, el runner de CI incluido.
+
+                        Va con `@{argLine}` y NO con el valor pelado: la propiedad `argLine` ya
+                        llega con contenido, porque el plugin de Quarkus la completa desde su
+                        extension de Maven con las opciones `add-opens` y `add-exports` que
+                        necesita el arranque. Escrita pelada la reemplaza entera y esos flags
+                        desaparecen de la JVM bifurcada, sin ningun error que lo avise. La
+                        composicion los conserva, y de paso deja lugar a un `prepare-agent` de
+                        cobertura si alguna vez se agrega.
+                    -->
+                    <argLine>@{argLine} -Duser.timezone=UTC</argLine>
                     <systemPropertyVariables>
                         <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
                     </systemPropertyVariables>
