@@ -20,6 +20,19 @@ cada tag anotado.
   tal como llega y hay avisos publicados de rutas que la esquivan escribiéndola torcida; la
   comprobación del código no depende de cómo se escriba la ruta. No cambia quién puede entrar: los
   mismos roles que antes, y el login y la renovación del token siguen siendo públicos (#203).
+- El backend pasa a la línea 3.33 de Quarkus, la de soporte largo vigente, y con ella a Hibernate
+  7. Incluye el arreglo del aviso de autorización por ruta de junio de 2026, que la línea 3.15 no
+  recibió: ese aviso describe caminos escritos con punto y coma o con barras codificadas que dejan
+  de coincidir con la política que protege `/api/v1/*`. Esa política es la primera de las dos capas
+  que exigen sesión; la segunda es la del código, de la entrada anterior (#204).
+
+### Changed
+
+- En siete de los ocho buscadores, mandar `q` vacío (`?q=`) pasa a significar lo mismo que no
+  mandarlo: devuelve el listado sin filtrar en vez de rechazar con 400. Es una consecuencia del
+  salto de plataforma, que ahora entrega un parámetro vacío como ausente. El octavo, el listado de
+  servicios, ya se comportaba así porque su recurso colapsa el texto vacío antes de usarlo. El
+  mínimo de tres caracteres no cambia en ninguno: con uno o dos sigue siendo 400 (#204).
 
 ## [2.6.1] - 2026-09-09
 
