@@ -1,0 +1,9 @@
+# Toolchain del proyecto, pineado. Lo leen asdf y mise (se aplica solo al entrar a la
+# carpeta); sin ellos, sirve como la referencia de qué instalar a mano.
+# Java: el pom compila con `maven.compiler.release` en 17, pero el build, los tests, el CI y
+# la imagen de producción corren en 21. La distribución es la misma que usan el workflow y
+# el Dockerfile del backend.
+# Maven: 3.9 es obligatorio, no "3.9+ recomendado": la 3.8 no compila el proyecto.
+java temurin-21.0.12+8
+maven 3.9.16
+nodejs 22.23.2
