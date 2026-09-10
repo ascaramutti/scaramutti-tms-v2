@@ -5,6 +5,7 @@ import com.scaramutti.tms.cargotypes.dto.CargoTypeResponse;
 import com.scaramutti.tms.cargotypes.mapper.CargoTypeResourceMapper;
 import com.scaramutti.tms.cargotypes.service.CargoTypeService;
 import com.scaramutti.tms.shared.dto.PageResponse;
+import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -22,6 +23,14 @@ import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import org.jboss.resteasy.reactive.ResponseStatus;
 
+/**
+ * Exige sesion tambien en el codigo, no solo en la policy por ruta de application.properties:
+ * esa policy se evalua sobre la URL tal como llega, y hay avisos publicados de rutas que la
+ * esquivan escribiendo el mismo camino con punto y coma o con barras codificadas. La
+ * comprobacion del codigo no depende de como se escriba la ruta. No cambia quien puede hacer
+ * que: los metodos con @RolesAllowed conservan el suyo.
+ */
+@Authenticated
 @Path("/cargo-types")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -32,8 +41,8 @@ public class CargoTypeResource {
 
     /**
      * Sin @RolesAllowed: el contrato listCargoTypes no tiene `x-required-roles`,
-     * cualquier autenticado puede listar. La policy global protected-paths
-     * cubre el caso authn (sin token → 401).
+     * cualquier autenticado puede listar. El authn lo exigen dos capas: la policy
+     * global protected-paths y el @Authenticated de la clase (sin token → 401).
      *
      * Bean Validation en query-params: violaciones disparan
      * ConstraintViolationException → ValidationExceptionMapper → 400 COM-001.

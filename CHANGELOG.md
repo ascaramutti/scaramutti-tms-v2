@@ -9,6 +9,18 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [Sin publicar]
+
+### Security
+
+- Seis endpoints exigían sesión solo por la política por ruta del servidor HTTP: los catálogos de
+  monedas, términos de pago, condiciones de cotización y tipos de servicio, y los listados de tipos
+  de carga y de clientes. Otros dos, el perfil propio y el cambio de contraseña, la exigían recién
+  dentro del método. Los ocho la exigen ahora antes de entrar. Esa política se evalúa sobre la URL
+  tal como llega y hay avisos publicados de rutas que la esquivan escribiéndola torcida; la
+  comprobación del código no depende de cómo se escriba la ruta. No cambia quién puede entrar: los
+  mismos roles que antes, y el login y la renovación del token siguen siendo públicos (#203).
+
 ## [2.6.1] - 2026-09-09
 
 Las dependencias al día y la infraestructura del ciclo: PRs #187 a #200. Quarkus en su último

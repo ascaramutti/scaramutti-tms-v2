@@ -2,6 +2,7 @@ package com.scaramutti.tms.cargotypes;
 
 import com.scaramutti.tms.shared.entity.CargoType;
 import com.scaramutti.tms.shared.repository.CargoTypeRepository;
+import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -1272,5 +1273,15 @@ class CargoTypesResourceTest {
         .then()
             .statusCode(400)
             .body("code", equalTo("COM-001"));
+    }
+
+    /**
+     * La misma ruta escrita torcida (punto y coma, barra doble, caracteres codificados) tampoco
+     * entra sin token, con las dos capas puestas, que es la configuración real. El porqué, la
+     * lista y las mediciones, en {@code RoutePolicyTrickyUrls}.
+     */
+    @Test
+    void list_withTrickyUrls_withoutToken_returns401() {
+        RoutePolicyTrickyUrls.assertAllReturn401WithoutToken("/cargo-types");
     }
 }
