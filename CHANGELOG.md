@@ -9,7 +9,12 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
-## [Sin publicar]
+## [2.7.0] - 2026-09-10
+
+Quarkus en la línea 3.33 con soporte hasta marzo de 2027, que cierra de raíz el aviso de
+autorización por ruta, y las guardas de autenticación en el código de los ocho endpoints que
+dependían solo de la política por ruta: PRs #203 a #205. Sin migraciones. Un cambio de contrato en
+un rincón: el parámetro de búsqueda vacío equivale a omitirlo.
 
 ### Security
 
