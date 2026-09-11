@@ -29,7 +29,7 @@ import {
   type ServiceCreateFormValues,
 } from '../schemas/service-create.schema'
 import { canCreateCatalogEntry } from '../status/operationsPermissions'
-import { isPastInLima, todayInLima } from '../utils/limaDate'
+import { isPastInLima, todayInLima } from '../../../shared/utils/limaDate'
 import { ServiceClientField } from './ServiceClientField'
 import { Button } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
