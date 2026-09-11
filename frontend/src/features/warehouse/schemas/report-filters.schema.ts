@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { todayIsoDate } from '../../../shared/utils/formatters'
+import { todayInLima } from '../../../shared/utils/limaDate'
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -43,9 +43,9 @@ export function isReportRangeIncomplete(filters: ReportFilters): boolean {
   return !filters.dateFrom || !filters.dateTo
 }
 
-/** Primer día del mes en curso como `YYYY-MM-DD`, derivado de la fecha local. */
+/** Primer día del mes en curso como `YYYY-MM-DD`, derivado del día de Lima. */
 export function currentMonthStart(): string {
-  return `${todayIsoDate().slice(0, 8)}01`
+  return `${todayInLima().slice(0, 8)}01`
 }
 
 /**
@@ -53,5 +53,5 @@ export function currentMonthStart(): string {
  * el mismo corte mensual que usan los indicadores de Existencias.
  */
 export function defaultReportFilters(): ReportFilters {
-  return { cut: 'BY_UNIT', dateFrom: currentMonthStart(), dateTo: todayIsoDate() }
+  return { cut: 'BY_UNIT', dateFrom: currentMonthStart(), dateTo: todayInLima() }
 }

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { QUOTATION_TYPE_VALUES } from '../schemas/quotation-filters.schema'
 import { NO_CONTROL } from '../../../shared/utils/sanitizeText'
+import { todayInLima } from '../../../shared/utils/limaDate'
 
 /**
  * Observación libre (cliente o interna) a nivel cotización: opcional, máx. 500, sin caracteres
@@ -16,15 +17,6 @@ const quotationNoteField = z
   .regex(NO_CONTROL, 'No se permiten caracteres de control.')
   .optional()
   .or(z.literal(''))
-
-/** Fecha de hoy en formato `YYYY-MM-DD` (horario local), para validar fechas no pasadas. */
-function todayISO(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
 
 /**
  * Kinds de servicio que el Step 2 permite como ítem ROOT (incluye INTEGRAL: el Servicio
@@ -60,7 +52,7 @@ const step1Fields = {
     .string()
     .optional()
     .or(z.literal(''))
-    .refine((value) => !value || value >= todayISO(), 'No se permiten fechas pasadas.'),
+    .refine((value) => !value || value >= todayInLima(), 'No se permiten fechas pasadas.'),
   validityDays: z
     .number({ message: 'Ingresa la validez en días.' })
     .int('Debe ser un número entero.')
