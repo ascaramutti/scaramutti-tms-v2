@@ -10,7 +10,6 @@ import { EntryEditPage } from './EntryEditPage'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
-import { todayIsoDate } from '../../../shared/utils/formatters'
 import { fakeUser } from '../../../test/mocks/handlers/auth'
 import { currenciesError } from '../../../test/mocks/handlers/catalogs'
 import { server } from '../../../test/mocks/server'
@@ -128,10 +127,22 @@ describe('EntryEditPage', () => {
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Editar factura F001-00123')
   })
 
-  it('acota la fecha de factura a hoy (no futura)', async () => {
-    server.use(warehouseInvoiceDetail())
-    renderEditar()
-    expect(await screen.findByLabelText('Fecha de factura')).toHaveAttribute('max', todayIsoDate())
+  /**
+   * Mismo criterio que en la pantalla de registro: reloj fijo en el borde (02:30 UTC del 25 de
+   * agosto, el 24 en Lima y el 25 en Tokio) y esperado literal, para que el caso mida la zona y
+   * no que los dos lados llamen a la misma función. Solo se finge `Date`, porque los
+   * temporizadores los usa la espera del render.
+   */
+  it('acota la fecha de factura a hoy en Lima (no futura)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-25T02:30:00Z'))
+    try {
+      server.use(warehouseInvoiceDetail())
+      renderEditar()
+      expect(await screen.findByLabelText('Fecha de factura')).toHaveAttribute('max', '2026-08-24')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   // ----- Carga / error / id inválido / anulada -----

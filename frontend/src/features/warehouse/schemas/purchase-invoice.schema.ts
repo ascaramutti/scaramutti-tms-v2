@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { todayIsoDate } from '../../../shared/utils/formatters'
+import { todayInLima } from '../../../shared/utils/limaDate'
 
 /** Espejo de `invoiceNumber` y `guideNumber` en el contrato (`maxLength: 50`). */
 export const INVOICE_NUMBER_MAX_LENGTH = 50
@@ -62,7 +62,7 @@ export const purchaseInvoiceFormSchema = z.object({
   invoiceDate: z
     .string()
     .regex(/^\d{4}-\d{2}-\d{2}$/, 'Indica la fecha de la factura')
-    .refine((value) => value <= todayIsoDate(), 'La fecha no puede ser futura'),
+    .refine((value) => value <= todayInLima(), 'La fecha no puede ser futura'),
   guideNumber: z
     .string()
     .trim()
