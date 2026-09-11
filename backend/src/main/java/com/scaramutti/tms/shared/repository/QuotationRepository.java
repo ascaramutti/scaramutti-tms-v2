@@ -13,7 +13,6 @@ import jakarta.persistence.Tuple;
 import jakarta.transaction.Transactional;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -77,7 +76,7 @@ public class QuotationRepository implements PanacheRepositoryBase<Quotation, Lon
      * Detecta duplicados recientes para proteccion anti doble-click backend-side.
      */
     public List<Quotation> findRecentByCreatedByAndClient(Integer createdBy, Integer clientId, int secondsWindow) {
-        OffsetDateTime cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(secondsWindow);
+        OffsetDateTime cutoff = DateUtils.nowUtcMicros().minusSeconds(secondsWindow);
         return list("createdBy = ?1 AND clientId = ?2 AND createdAt >= ?3", createdBy, clientId, cutoff);
     }
 

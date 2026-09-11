@@ -1,5 +1,6 @@
 package com.scaramutti.tms.operations;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -130,7 +131,7 @@ class ServicesResourceTest {
     @Test
     void create_withPastTentativeDate_returns201() {
         Map<String, Object> payload = validPayload();
-        payload.put("tentativeDate", LocalDate.now().minusMonths(2).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).minusMonths(2).toString());
 
         given()
             .header("Authorization", "Bearer " + adminToken)
@@ -564,7 +565,7 @@ class ServicesResourceTest {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
         payload.put("tripScope", "PROVINCIA");
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", "Piura");
         payload.put("destination", "Lima");
         payload.put("cargoTypeId", cargoTypeId);

@@ -1,5 +1,6 @@
 package com.scaramutti.tms.operations;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -167,7 +168,7 @@ class ServicesListResourceTest {
      */
     @Test
     void list_putsEveryColumnInItsOwnField() {
-        LocalDate tentativeDate = LocalDate.now().plusDays(5);
+        LocalDate tentativeDate = LocalDate.now(DateUtils.LIMA).plusDays(5);
         String code = createService("Sullana Origen", "Chiclayo Destino", tentativeDate);
         forceCreatedAt(code, "2026-02-02T10:00:00Z");
         // El fixture deja estos dos en null, y dos nulls son iguales entre sí: sin valores
@@ -850,7 +851,7 @@ class ServicesListResourceTest {
     }
 
     private String createService(String origin, String destination) {
-        return createService(origin, destination, LocalDate.now().plusDays(3));
+        return createService(origin, destination, LocalDate.now(DateUtils.LIMA).plusDays(3));
     }
 
     private String createService(String origin, String destination, LocalDate tentativeDate) {
@@ -862,7 +863,7 @@ class ServicesListResourceTest {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
         payload.put("tripScope", "PROVINCIA");
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", origin);
         payload.put("destination", destination);
         payload.put("cargoTypeId", cargoTypeId);
@@ -907,7 +908,7 @@ class ServicesListResourceTest {
     }
 
     private String createServiceForClient(int client, String origin, String destination) {
-        return createServiceForClient(client, origin, destination, LocalDate.now().plusDays(3));
+        return createServiceForClient(client, origin, destination, LocalDate.now(DateUtils.LIMA).plusDays(3));
     }
 
     private String createServiceForClient(int client, String origin, String destination,

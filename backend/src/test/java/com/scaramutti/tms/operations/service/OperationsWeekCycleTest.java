@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class OperationsWeekCycleTest {
 
-    /** Lima es UTC-5 sin horario de verano, así que la medianoche de Lima son las 05:00 UTC. */
+    /** Hoy Lima no aplica horario de verano, así que su medianoche son las 05:00 UTC. */
     private static final String CYCLE_OPENS_UTC = "2026-08-19T05:00:00Z";
 
     /**

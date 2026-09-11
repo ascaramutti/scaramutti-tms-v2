@@ -1,17 +1,17 @@
 package com.scaramutti.tms.quotations.service;
 
 import com.scaramutti.tms.shared.repository.QuotationRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 
 /**
  * Generador del `code` de cotizacion en formato `YYYY-NNNNN`.
  *
  * Algoritmo (lineamiento #1):
- *  1. Determinar el anio actual (UTC).
+ *  1. Determinar el anio calendario de Lima.
  *  2. Adquirir advisory lock por anio dentro de la tx
  *     (`SELECT pg_advisory_xact_lock(year)`).
  *  3. Leer MAX(numero) parseando SUBSTRING(code) del anio actual.
@@ -34,10 +34,15 @@ public class QuotationCodeGeneratorService {
     QuotationRepository quotationRepository;
 
     /**
-     * Devuelve el siguiente code disponible para el anio en curso (UTC).
+     * Devuelve el siguiente code disponible para el anio calendario de Lima.
+     *
+     * <p>El anio sale de la zona del negocio y no de UTC porque el code es un dato que el usuario
+     * lee y dicta: entre las 19:00 y la medianoche del 31 de diciembre en Lima, UTC ya esta en el
+     * anio siguiente, asi que la primera cotizacion de esa noche saldria numerada con un anio que
+     * todavia no empezo para quien la emite, y ademas se llevaria el 00001 del anio nuevo.
      */
     public String nextCode() {
-        int year = LocalDate.now(ZoneOffset.UTC).getYear();
+        int year = LocalDate.now(DateUtils.LIMA).getYear();
         return nextCodeForYear(year);
     }
 
