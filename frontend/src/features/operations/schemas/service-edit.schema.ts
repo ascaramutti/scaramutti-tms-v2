@@ -6,7 +6,7 @@ import {
   formatLimaWallClock,
   isFutureInLima,
   limaInputToIsoInstant,
-} from '../utils/limaDate'
+} from '../../../shared/utils/limaDate'
 import {
   MEASURE_MAX,
   PRICE_MAX,
