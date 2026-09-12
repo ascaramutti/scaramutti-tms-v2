@@ -18,8 +18,8 @@ export function formatCurrency(amount: number, currencyCode: string): string {
 }
 
 /**
- * Formatea una fecha ISO (UTC) a formato corto dd/mm/aaaa en zona horaria de
- * Lima. El backend interpreta las fechas en America/Lima (UTC-5); fijamos el
+ * Formatea una fecha ISO (UTC) a formato corto dd/mm/aaaa en la zona del
+ * negocio. El backend interpreta las fechas en America/Lima; se fija el
  * `timeZone` para que un `createdAt` cerca de medianoche no muestre el día
  * anterior/siguiente.
  */
@@ -35,7 +35,7 @@ export function formatDate(isoDate: string): string {
 /**
  * Formatea una fecha *sin hora* (`YYYY-MM-DD`, ej. `tentativeServiceDate`) a
  * dd/mm/aaaa. A diferencia de `formatDate`, NO usa zona horaria: `new Date(iso)`
- * interpretaría un date-only como UTC medianoche y en Lima (UTC-5) retrocedería
+ * interpretaría un date-only como UTC medianoche y en America/Lima retrocedería
  * al día anterior. Acá construimos la fecha en horario local para que el día sea
  * exactamente el del string.
  */
@@ -49,19 +49,6 @@ export function formatDateOnly(isoDate: string): string {
 }
 
 /**
- * Fecha de hoy como `YYYY-MM-DD` en la zona del navegador, para comparar contra
- * los date-only del contrato (`invoiceDate`) y para el `max` de los inputs de
- * fecha. Se arma con los componentes locales a propósito: `toISOString()` pasa
- * por UTC y en Lima (UTC-5) devolvería el día siguiente después de las 19:00.
- */
-export function todayIsoDate(): string {
-  const now = new Date()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${now.getFullYear()}-${month}-${day}`
-}
-
-/**
  * Formatea una cantidad de inventario en formato es-PE (separador de miles).
  * El contrato tipa stock y mínimos como `number`, así que admite decimales
  * (unidades como litros o galones): se muestran hasta 2, sin rellenar con
@@ -72,9 +59,15 @@ export function formatQuantity(value: number): string {
 }
 
 /**
- * Formatea una fecha ISO (UTC) a dd/mm/aaaa, hh:mm en zona horaria de Lima. Es
+ * Formatea una fecha ISO (UTC) a dd/mm/aaaa, hh:mm en la zona del negocio. Es
  * `formatDate` con hora: el kardex necesita distinguir varios movimientos del
  * mismo día, donde solo la fecha los volvería indistinguibles.
+ *
+ * Pide `hourCycle: 'h23'` y no `hour12: false` por lo mismo que `formatLimaWallClock`
+ * en `limaDate.ts`: `hour12: false` pide reloj de 24 horas y deja al locale decidir si la
+ * medianoche es `00` o `24`; `h23` lo fija. Con este motor las dos formas dan
+ * `00`, así que ningún test las distingue y la sustitución sobrevive: lo que se
+ * elige acá no es un valor, es dejar de depender del ciclo horario del locale.
  */
 export function formatDateTime(isoDate: string): string {
   return new Intl.DateTimeFormat('es-PE', {
@@ -83,7 +76,7 @@ export function formatDateTime(isoDate: string): string {
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
-    hour12: false,
+    hourCycle: 'h23',
     timeZone: 'America/Lima',
   }).format(new Date(isoDate))
 }

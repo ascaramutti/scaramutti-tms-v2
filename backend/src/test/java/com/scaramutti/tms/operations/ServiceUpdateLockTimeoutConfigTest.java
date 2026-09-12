@@ -1,5 +1,6 @@
 package com.scaramutti.tms.operations;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -73,7 +74,7 @@ class ServiceUpdateLockTimeoutConfigTest {
         long id = createService();
 
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("tentativeDate", LocalDate.now().plusDays(5).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(5).toString());
         payload.put("origin", "Piura");
         payload.put("destination", "Destino corregido");
         payload.put("weightKg", 12000);
@@ -109,7 +110,7 @@ class ServiceUpdateLockTimeoutConfigTest {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
         payload.put("tripScope", "PROVINCIA");
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", "Piura");
         payload.put("destination", "Lima");
         payload.put("cargoTypeId", cargoTypeId);

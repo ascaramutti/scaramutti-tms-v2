@@ -14,6 +14,7 @@ import com.scaramutti.tms.shared.repository.QuotationServiceTypeRepository;
 import com.scaramutti.tms.shared.repository.RoleRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
 import io.quarkus.arc.profile.UnlessBuildProfile;
 import io.quarkus.runtime.StartupEvent;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -216,7 +217,7 @@ public class DevDataSeeder {
         worker.documentNumber = documentNumber;
         worker.position = position;
         worker.isActive = true;
-        worker.createdAt = OffsetDateTime.now();
+        worker.createdAt = DateUtils.nowUtcMicros();
         workerRepository.persist(worker);
 
         User user = new User();
@@ -225,7 +226,7 @@ public class DevDataSeeder {
         user.worker = worker;
         user.role = role;
         user.isActive = isActive;
-        user.createdAt = OffsetDateTime.now();
+        user.createdAt = DateUtils.nowUtcMicros();
         userRepository.persist(user);
     }
 }

@@ -22,7 +22,7 @@ import {
   toServiceProgressRequest,
   type ServiceProgressFormValues,
 } from '../../schemas/service-status.schema'
-import { nowInLimaForInput } from '../../utils/limaDate'
+import { nowInLimaForInput } from '../../../../shared/utils/limaDate'
 import { ServiceStatusErrorAlert } from './ServiceStatusErrorAlert'
 import { Button } from '../../../../shared/ui/Button'
 

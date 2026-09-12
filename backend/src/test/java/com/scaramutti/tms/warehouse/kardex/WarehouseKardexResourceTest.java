@@ -1,5 +1,6 @@
 package com.scaramutti.tms.warehouse.kardex;
 
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
@@ -9,7 +10,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static com.scaramutti.tms.support.TestAuth.login;
@@ -24,14 +25,12 @@ import static org.hamcrest.Matchers.nullValue;
  * {@code DEFAULT CURRENT_TIMESTAMP} SIN trigger — se insertan valores
  * EXPLICITOS para controlar {@code movedAt} determinsticamente.
  *
- * <p>La zona de negocio es America/Lima (UTC-5, sin DST) — los offsets se
- * escriben directo como {@code -05:00} para no depender de la config de zona
- * del runner de tests.
+ * <p>La zona de negocio es America/Lima, resuelta por nombre: los instantes
+ * sembrados se construyen con el helper {@code lima(...)} (ver su javadoc) y no
+ * dependen de la zona del runner de tests.
  */
 @QuarkusTest
 class WarehouseKardexResourceTest {
-
-    private static final ZoneOffset LIMA_OFFSET = ZoneOffset.of("-05:00");
 
     @Inject EntityManager entityManager;
     @Inject WarehouseTestData fixtures;
@@ -136,8 +135,14 @@ class WarehouseKardexResourceTest {
         });
     }
 
+    /**
+     * El instante que corresponde a esa hora de reloj en Lima. Resuelve por NOMBRE de zona y no
+     * por un offset escrito a mano: hoy los dos dan lo mismo, pero Peru ya tuvo horario de verano
+     * y un `-05:00` literal fabricaria instantes corridos una hora si vuelve a tenerlo.
+     */
     private OffsetDateTime lima(int year, int month, int day, int hour, int minute) {
-        return OffsetDateTime.of(year, month, day, hour, minute, 0, 0, LIMA_OFFSET);
+        return ZonedDateTime.of(year, month, day, hour, minute, 0, 0, DateUtils.LIMA)
+            .toOffsetDateTime();
     }
 
     // ---------- shape / referencia por tipo --------------------------------------

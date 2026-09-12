@@ -10,7 +10,7 @@ import { EntryCreatePage } from './EntryCreatePage'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
-import { formatCurrency, todayIsoDate } from '../../../shared/utils/formatters'
+import { formatCurrency } from '../../../shared/utils/formatters'
 import { fakeUser } from '../../../test/mocks/handlers/auth'
 import { currenciesError } from '../../../test/mocks/handlers/catalogs'
 import { server } from '../../../test/mocks/server'
@@ -126,10 +126,24 @@ describe('EntryCreatePage', () => {
     await waitFor(() => expect(currency).toHaveValue('2'))
   })
 
-  it('acota la fecha de factura a hoy (no se emiten a futuro)', async () => {
-    renderRegistro()
-    await waitForForm()
-    expect(screen.getByLabelText(/fecha de factura/i)).toHaveAttribute('max', todayIsoDate())
+  /**
+   * El reloj se fija en un instante del borde (02:30 UTC del 25 de agosto: en Lima es el 24 y en
+   * Tokio, donde corre esta suite, el 25) y el esperado va literal. Con el esperado calculado por
+   * la misma función que produce el valor, el caso se cumplía solo porque los dos lados llamaban
+   * al mismo código: no distinguía la zona ni habría notado un cambio de regla.
+   *
+   * Solo se finge `Date`: los temporizadores los usa `waitFor`, y fingirlos cuelga la espera.
+   */
+  it('acota la fecha de factura a hoy en Lima (no se emiten a futuro)', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-08-25T02:30:00Z'))
+    try {
+      renderRegistro()
+      await waitForForm()
+      expect(screen.getByLabelText(/fecha de factura/i)).toHaveAttribute('max', '2026-08-24')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('muestra el error de monedas y permite reintentar antes de montar el form', async () => {

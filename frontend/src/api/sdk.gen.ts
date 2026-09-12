@@ -200,7 +200,8 @@ export const listQuotations = <ThrowOnError extends boolean = false>(options?: O
  *
  * Crea una cotización con su cabecera + ítems + stand-by costs en una
  * transacción atómica. El backend genera el `code` (formato `YYYY-NNNNN`)
- * usando advisory lock por año (reinicio anual automático del contador).
+ * usando advisory lock por año calendario de America/Lima (reinicio anual automático
+ * del contador).
  *
  */
 export const createQuotation = <ThrowOnError extends boolean = false>(options: Options<CreateQuotationData, ThrowOnError>): RequestResult<CreateQuotationResponses, CreateQuotationErrors, ThrowOnError> => (options.client ?? client).post<CreateQuotationResponses, CreateQuotationErrors, ThrowOnError>({

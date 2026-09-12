@@ -1,5 +1,4 @@
-import { describe, expect, it } from 'vitest'
-import { todayIsoDate } from '../../../shared/utils/formatters'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   EDIT_REASON_MAX_LENGTH,
   EDIT_REASON_MIN_LENGTH,
@@ -75,19 +74,32 @@ describe('purchaseInvoiceFormSchema', () => {
     )
   })
 
-  it('rechaza una fecha futura', () => {
-    const [year, month, day] = todayIsoDate().split('-').map(Number)
-    const tomorrow = new Date(year, month - 1, day + 1)
-    const isoTomorrow = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
-    expect(errorAt({ ...VALID, invoiceDate: isoTomorrow }, ['invoiceDate'])).toBe(
-      'La fecha no puede ser futura',
-    )
-  })
+  /**
+   * El reloj se fija a propósito en un instante del borde: a las 02:30 UTC del 25 de agosto,
+   * en Lima todavía es el 24 y en Tokio ya es el 25. La suite corre en Asia/Tokyo, así que
+   * este instante es el que separa "hoy en Lima" de "hoy en el navegador"; con valores
+   * literales, para que quede a la vista cuál es cuál.
+   */
+  describe('la fecha, con el reloj fijo en el borde del día', () => {
+    beforeEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(new Date('2026-08-25T02:30:00Z'))
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
 
-  it('acepta la fecha de hoy (borde de la regla)', () => {
-    expect(
-      purchaseInvoiceFormSchema.safeParse({ ...VALID, invoiceDate: todayIsoDate() }).success,
-    ).toBe(true)
+    it('rechaza el 25, que es mañana en Lima aunque el navegador ya esté en ese día', () => {
+      expect(errorAt({ ...VALID, invoiceDate: '2026-08-25' }, ['invoiceDate'])).toBe(
+        'La fecha no puede ser futura',
+      )
+    })
+
+    it('acepta el 24, que es hoy en Lima (borde de la regla)', () => {
+      expect(
+        purchaseInvoiceFormSchema.safeParse({ ...VALID, invoiceDate: '2026-08-24' }).success,
+      ).toBe(true)
+    })
   })
 
   // ----- Guía y moneda -----

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   ITEM_DEFAULTS,
   STEP_FIELDS,
@@ -95,5 +95,50 @@ describe('wizardSchema — conditionIds', () => {
   it('conditionIds NO está en STEP_FIELDS (paso opcional, no bloquea ningún paso)', () => {
     const allStepFields = Object.values(STEP_FIELDS).flat()
     expect(allStepFields).not.toContain('conditionIds')
+  })
+})
+
+/**
+ * La fecha tentativa no puede quedar en el pasado, y "pasado" se mide en Lima y no en la zona
+ * de quien carga: el viaje es peruano aunque el navegador esté en otro país. Esta regla no
+ * tenía ningún caso hasta ahora.
+ *
+ * El reloj se fija en un instante del borde: a las 02:30 UTC del 25 de agosto, en Lima todavía
+ * es el 24 y en Tokio ya es el 25. La suite corre en Asia/Tokyo justamente para que ese borde
+ * exista, y los valores van literales para que se vea cuál día es cuál.
+ */
+describe('wizardSchema — la fecha tentativa no puede ser pasada', () => {
+  function formWithDate(tentativeServiceDate: string): WizardFormInput {
+    return { ...formWithNotes(''), tentativeServiceDate }
+  }
+
+  function dateError(form: WizardFormInput): string | undefined {
+    const result = wizardSchema.safeParse(form)
+    if (result.success) return undefined
+    return result.error.issues.find((issue) => issue.path[0] === 'tentativeServiceDate')?.message
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-08-25T02:30:00Z'))
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('rechaza el 23, que ya pasó en Lima', () => {
+    expect(dateError(formWithDate('2026-08-23'))).toBe('No se permiten fechas pasadas.')
+  })
+
+  it('acepta el 24, que es hoy en Lima aunque el navegador ya esté en el 25', () => {
+    expect(dateError(formWithDate('2026-08-24'))).toBeUndefined()
+  })
+
+  it('acepta el 26, que todavía no llegó', () => {
+    expect(dateError(formWithDate('2026-08-26'))).toBeUndefined()
+  })
+
+  it('acepta la fecha vacía, que es opcional', () => {
+    expect(dateError(formWithDate(''))).toBeUndefined()
   })
 })

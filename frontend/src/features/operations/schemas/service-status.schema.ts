@@ -3,7 +3,7 @@ import type { ChangeStatusRequest } from '../../../api'
 import { NO_CONTROL, stripControlChars } from '../../../shared/utils/sanitizeText'
 import { REAL_DATE_TIME_MIN } from './service-edit.schema'
 import { SERVICE_DATE_MAX, SERVICE_DATE_MIN } from './service-fields.schema'
-import { FUTURE_DATE_MESSAGE, isFutureInLima, limaInputToIsoInstant } from '../utils/limaDate'
+import { FUTURE_DATE_MESSAGE, isFutureInLima, limaInputToIsoInstant } from '../../../shared/utils/limaDate'
 import type {
   ServiceExitTransition,
   ServiceProgressTransition,

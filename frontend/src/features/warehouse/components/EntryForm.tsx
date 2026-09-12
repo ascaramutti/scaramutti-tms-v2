@@ -12,7 +12,7 @@ import {
   isPreconditionFailedError,
 } from '../../../shared/utils/getApiErrorMessage'
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
-import { todayIsoDate } from '../../../shared/utils/formatters'
+import { todayInLima } from '../../../shared/utils/limaDate'
 import { useCurrencies } from '../../catalogs/hooks/useCurrencies'
 import {
   toPurchaseInvoiceRequest,
@@ -297,7 +297,7 @@ export function EntryForm(props: EntryFormProps) {
               control={control}
               // Una factura de compra no se emite a futuro. El backend todavía no
               // lo restringe, así que la regla vive acá y en el schema.
-              max={todayIsoDate()}
+              max={todayInLima()}
               error={errors.invoiceDate?.message}
             />
           </div>

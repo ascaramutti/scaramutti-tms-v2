@@ -117,7 +117,7 @@ class ServiceUpdateResourceTest {
     @Test
     void update_changesEveryEditableFieldAndReturnsTheDetail() {
         long id = createService();
-        LocalDate newDate = LocalDate.now().plusDays(20);
+        LocalDate newDate = LocalDate.now(DateUtils.LIMA).plusDays(20);
         String tentativeDateBefore = detailOf(id).getString("tentativeDate");
 
         Map<String, Object> payload = payloadOf(id);
@@ -1927,7 +1927,7 @@ class ServiceUpdateResourceTest {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
         payload.put("tripScope", "PROVINCIA");
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", "Piura");
         payload.put("destination", "Lima moneda propia");
         payload.put("cargoTypeId", cargoTypeId);
@@ -1950,7 +1950,7 @@ class ServiceUpdateResourceTest {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
         payload.put("tripScope", "PROVINCIA");
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", origin);
         payload.put("destination", destination);
         payload.put("cargoTypeId", cargoTypeId);
@@ -2001,7 +2001,7 @@ class ServiceUpdateResourceTest {
     /** Cuerpo válido sin leer ningún viaje: para los casos que ni siquiera llegan a buscarlo. */
     private Map<String, Object> anyValidPayload() {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", "Piura");
         payload.put("destination", "Lima");
         payload.put("weightKg", 12000);

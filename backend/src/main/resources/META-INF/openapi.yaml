@@ -497,11 +497,11 @@ paths:
           schema: { type: integer }
         - name: dateFrom
           in: query
-          description: 'Filtro por `createdAt` desde (ISO date, inclusivo). Interpretado en zona horaria de Lima (UTC-5).'
+          description: 'Filtro por `createdAt` desde (ISO date, inclusivo). Día calendario en America/Lima.'
           schema: { type: string, format: date }
         - name: dateTo
           in: query
-          description: 'Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Interpretado en zona horaria de Lima (UTC-5).'
+          description: 'Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Día calendario en America/Lima.'
           schema: { type: string, format: date }
       responses:
         '200':
@@ -519,7 +519,8 @@ paths:
       description: |
         Crea una cotización con su cabecera + ítems + stand-by costs en una
         transacción atómica. El backend genera el `code` (formato `YYYY-NNNNN`)
-        usando advisory lock por año (reinicio anual automático del contador).
+        usando advisory lock por año calendario de America/Lima (reinicio anual automático
+        del contador).
       x-required-roles: [admin, sales, general_manager, operations_manager]
       requestBody:
         required: true

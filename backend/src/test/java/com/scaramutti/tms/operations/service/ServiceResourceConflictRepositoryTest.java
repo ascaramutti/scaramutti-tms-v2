@@ -6,6 +6,7 @@ import com.scaramutti.tms.shared.repository.ServiceAssignmentRepository;
 import com.scaramutti.tms.shared.repository.ServiceAssignmentRepository.ServiceAdditionalResourceRow;
 import com.scaramutti.tms.shared.repository.ServiceResourceConflictRepository;
 import com.scaramutti.tms.shared.repository.ServiceResourceConflictRepository.ServiceResourceConflictRow;
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -299,7 +300,7 @@ class ServiceResourceConflictRepositoryTest {
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("clientId", clientId);
         body.put("tripScope", "PROVINCIA");
-        body.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        body.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         // ruta propia por viaje: el alta rechaza como doble-click dos altas del mismo cliente y la
         // misma ruta dentro de la ventana, y cada caso de acá arma dos o tres seguidos
         body.put("origin", "Piura " + (++routeSeq));

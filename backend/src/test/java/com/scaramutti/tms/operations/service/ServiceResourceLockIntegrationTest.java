@@ -2,6 +2,7 @@ package com.scaramutti.tms.operations.service;
 
 import com.scaramutti.tms.operations.model.ServiceResourceKind;
 import com.scaramutti.tms.shared.repository.ServiceResourceConflictRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.OperationsTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -387,7 +388,7 @@ class ServiceResourceLockIntegrationTest {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
         payload.put("tripScope", "PROVINCIA");
-        payload.put("tentativeDate", LocalDate.now().plusDays(3).toString());
+        payload.put("tentativeDate", LocalDate.now(DateUtils.LIMA).plusDays(3).toString());
         payload.put("origin", "Piura");
         payload.put("destination", "Lima");
         payload.put("cargoTypeId", cargoTypeId);

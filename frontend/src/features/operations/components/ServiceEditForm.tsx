@@ -13,7 +13,7 @@ import { getApiErrorMessage, isPreconditionFailedError } from '../../../shared/u
 import { handleApiFormError } from '../../../shared/utils/handleApiFormError'
 import { stripControlChars } from '../../../shared/utils/sanitizeText'
 import { cn } from '../../../shared/utils/cn'
-import { nowInLimaForInput } from '../utils/limaDate'
+import { nowInLimaForInput } from '../../../shared/utils/limaDate'
 import { useServiceCurrencies } from '../hooks/useServiceCurrencies'
 import { useUpdateService } from '../hooks/useUpdateService'
 import {

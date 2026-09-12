@@ -1,7 +1,7 @@
 import { useRef } from 'react'
 import { CalendarRange } from 'lucide-react'
 import { cn } from '../../../shared/utils/cn'
-import { todayIsoDate } from '../../../shared/utils/formatters'
+import { todayInLima } from '../../../shared/utils/limaDate'
 import {
   currentMonthStart,
   isReportRangeIncomplete,
@@ -138,7 +138,7 @@ export function ReportFilterBar({ value, onChange }: ReportFilterBarProps) {
         <Button
           variant="secondary"
           onClick={() =>
-            onChange({ ...value, dateFrom: currentMonthStart(), dateTo: todayIsoDate() })
+            onChange({ ...value, dateFrom: currentMonthStart(), dateTo: todayInLima() })
           }
         >
           <CalendarRange className="mr-2 h-4 w-4" aria-hidden="true" />

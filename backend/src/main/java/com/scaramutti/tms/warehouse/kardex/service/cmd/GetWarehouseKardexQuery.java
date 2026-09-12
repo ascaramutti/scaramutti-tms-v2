@@ -6,7 +6,7 @@ import java.time.LocalDate;
  * Query interna del kardex (GET /warehouse/products/{id}/kardex).
  *
  *  - productId: requerido, valida existencia (WH-003) en el service.
- *  - dateFrom/dateTo: rango opcional sobre movedAt en zona Lima (UTC-5), ambos
+ *  - dateFrom/dateTo: rango opcional sobre movedAt en dias calendario de America/Lima, ambos
  *    inclusive del dia completo (el repo interpreta dateTo como
  *    {@code < dateTo+1dia}). null = sin filtro. dateFrom &gt; dateTo NO es un
  *    400: produce una pagina vacia (mismo criterio que ListQuotationsQuery,

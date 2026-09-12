@@ -7,14 +7,7 @@ import { QuotationTypeCards } from './QuotationTypeCards'
 import type { ImmutableField, WizardFormInput } from './quotation-wizard.schema'
 import type { ClientResponse, CurrencyResponse, PaymentTermResponse } from '../../../api'
 import { Card } from '../../../shared/ui/Card'
-
-function todayISO(): string {
-  const now = new Date()
-  const year = now.getFullYear()
-  const month = String(now.getMonth() + 1).padStart(2, '0')
-  const day = String(now.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
+import { todayInLima } from '../../../shared/utils/limaDate'
 
 interface Step1InfoGeneralProps {
   currencies: CurrencyResponse[]
@@ -139,7 +132,7 @@ export function Step1InfoGeneral({
             label="Fecha tentativa (opcional)"
             name="tentativeServiceDate"
             control={control}
-            min={todayISO()}
+            min={todayInLima()}
             error={errors.tentativeServiceDate?.message}
             labelClassName={COMMERCIAL_LABEL}
           />

@@ -302,11 +302,11 @@ paths:
           schema: { type: integer }
         - name: dateFrom
           in: query
-          description: 'Filtro por `createdAt` desde (ISO date, inclusivo). Interpretado en zona horaria de Lima (UTC-5).'
+          description: 'Filtro por `createdAt` desde (ISO date, inclusivo). Día calendario en America/Lima.'
           schema: { type: string, format: date }
         - name: dateTo
           in: query
-          description: 'Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Interpretado en zona horaria de Lima (UTC-5).'
+          description: 'Filtro por `createdAt` hasta (ISO date, inclusivo del día completo). Día calendario en America/Lima.'
           schema: { type: string, format: date }
       responses:
         '200':
