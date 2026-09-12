@@ -9,6 +9,37 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.7.1] - 2026-09-12
+
+La zona del negocio en todos los relojes: PRs #208 a #211. El "hoy" de los formularios y el año
+del código de cotización salen del día calendario de America/Lima, no de la zona del navegador ni
+de UTC; toda lectura de "ahora" del backend pasa por una fuente única, el helper del día de Lima
+pasa a los utilitarios compartidos del frontend y la suite del backend corre con el reloj fijo en
+UTC. Sin migraciones; el contrato cambia solo en cuatro descripciones.
+
+### Fixed
+
+- El año del código de cotización (`YYYY-NNNNN`) sale del día calendario de Lima. Entre las 19:00
+  y la medianoche del 31 de diciembre, UTC ya está en el año siguiente, así que la primera
+  cotización de esa noche salía numerada con un año que todavía no empezó para quien la emite, y
+  además se llevaba el `00001` del año nuevo (#209).
+- Los formularios de almacén y el asistente de cotizaciones calculan "hoy" en Lima y no en la zona
+  del navegador: el valor propuesto de la fecha, el tope de los inputs y la regla de fecha
+  tentativa no pasada. Se veía solo desde otra zona: entre las 19:00 y la medianoche de Perú
+  proponían el día siguiente (#211).
+
+### Changed
+
+- Los sellados de creación y las ventanas anti doble clic del backend leen "ahora" desde la misma
+  fuente, truncada a microsegundos como la columna que los guarda; un test recorre el código de
+  producción y falla si vuelve un reloj fuera de ella. Cuatro descripciones del contrato dicen
+  "día calendario en America/Lima" en vez de "UTC-5", y la del alta de cotización nombra el año de
+  Lima; el cliente generado se regenera con ellas, sin cambio de tipos ni de URLs (#209).
+- La hora del kardex se formatea con el ciclo de 24 horas explícito en vez de dejar que el locale
+  decida si la medianoche es `00` o `24`; con el motor actual el texto es el mismo (#211).
+- La suite del backend fija el reloj de su JVM en UTC en vez de heredarlo de la máquina que la
+  corre, y un test avisa si esa línea del `pom.xml` desaparece (#208).
+
 ## [2.7.0] - 2026-09-10
 
 Quarkus en la línea 3.33 con soporte hasta marzo de 2027, que cierra de raíz el aviso de
