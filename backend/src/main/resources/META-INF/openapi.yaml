@@ -447,6 +447,32 @@ paths:
 
   # ----- Quotations ---------------------------------------------------------
 
+  /clients/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int32 } }
+    get:
+      tags: [Clients]
+      operationId: getClient
+      summary: Obtener cliente por ID
+      description: |
+        Devuelve el cliente con ese `id`, esté activo o inactivo: un cliente
+        desactivado también puede leerse. Sin roles: cualquier sesión puede
+        leerlo (misma exposición que `listClients`).
+
+        `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
+        existe (incluidos `0` y negativos) → `CLI-003` con cuerpo `Problem`;
+        `id` que NO encaja (porque no es numérico, como `abc`, o porque se pasa
+        de rango, como `99999999999999`) → `404` sin cuerpo, porque el conversor
+        de parámetros falla antes de llegar al recurso.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClientResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /quotations:
     get:
       tags: [Quotations]
@@ -2899,6 +2925,16 @@ components:
                 instance: '/api/v1/services/999'
                 code: 'OPS-005'
                 traceId: '9f2c1e4a-3b7d-4c2e-9a1f-6d5b8c3e7a12'
+            clientNotFound:
+              summary: Cliente inexistente
+              value:
+                type: 'urn:tms:error:cli-003'
+                title: 'Not Found'
+                status: 404
+                detail: 'Cliente no encontrado'
+                instance: '/api/v1/clients/999'
+                code: 'CLI-003'
+                traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
             quotationNotFound:
               summary: Cotización inexistente
               value:

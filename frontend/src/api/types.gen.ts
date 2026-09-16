@@ -2034,6 +2034,37 @@ export type CreateClientResponses = {
 
 export type CreateClientResponse = CreateClientResponses[keyof CreateClientResponses];
 
+export type GetClientData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/clients/{id}';
+};
+
+export type GetClientErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetClientError = GetClientErrors[keyof GetClientErrors];
+
+export type GetClientResponses = {
+    /**
+     * OK
+     */
+    200: ClientResponse;
+};
+
+export type GetClientResponse = GetClientResponses[keyof GetClientResponses];
+
 export type ListQuotationsData = {
     body?: never;
     path?: never;

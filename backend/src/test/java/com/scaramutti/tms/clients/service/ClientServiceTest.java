@@ -372,4 +372,42 @@ class ClientServiceTest {
         assertTrue(response.last());
         assertTrue(response.empty());
     }
+    // ================= findById =================================================
+    // Ya estaba en produccion (lo usa el loader de cotizaciones) y no tenia ningun
+    // test unitario. GET /clients/{id} lo expone directo, asi que entra ahora.
+
+    @Test
+    void findById_existingClient_returnsMappedResponse() {
+        Client entity = new Client();
+        ClientResponse expected = new ClientResponse(
+            7, "ACME CORP", "20123456789", null, null, true, OffsetDateTime.now());
+        when(clientRepository.findById(7)).thenReturn(entity);
+        when(clientServiceMapper.toClientResponse(entity)).thenReturn(expected);
+
+        assertSame(expected, clientService.findById(7));
+    }
+
+    @Test
+    void findById_missingClient_throwsCLI003() {
+        when(clientRepository.findById(999)).thenReturn(null);
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.findById(999));
+
+        assertEquals("CLI-003", ex.code());
+        assertEquals(404, ex.status());
+        verify(clientServiceMapper, never()).toClientResponse(any());
+    }
+
+    /** No filtra por isActive: la regla vale para el GET y para el loader de cotizaciones. */
+    @Test
+    void findById_inactiveClient_returnsResponseWithoutFilteringByIsActive() {
+        Client entity = new Client();
+        entity.isActive = false;
+        ClientResponse expected = new ClientResponse(
+            7, "ACME CORP", "20123456789", null, null, false, OffsetDateTime.now());
+        when(clientRepository.findById(7)).thenReturn(entity);
+        when(clientServiceMapper.toClientResponse(entity)).thenReturn(expected);
+
+        assertSame(expected, clientService.findById(7));
+    }
 }

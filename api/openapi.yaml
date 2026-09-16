@@ -682,6 +682,16 @@ paths:
       tags: [Clients]
       operationId: getClient
       summary: Obtener cliente por ID
+      description: |
+        Devuelve el cliente con ese `id`, esté activo o inactivo: un cliente
+        desactivado también puede leerse. Sin roles: cualquier sesión puede
+        leerlo (misma exposición que `listClients`).
+
+        `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
+        existe (incluidos `0` y negativos) → `CLI-003` con cuerpo `Problem`;
+        `id` que NO encaja (porque no es numérico, como `abc`, o porque se pasa
+        de rango, como `99999999999999`) → `404` sin cuerpo, porque el conversor
+        de parámetros falla antes de llegar al recurso.
       responses:
         '200':
           description: OK
@@ -3119,6 +3129,16 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            clientNotFound:
+              summary: Cliente inexistente
+              value:
+                type: 'urn:tms:error:cli-003'
+                title: 'Not Found'
+                status: 404
+                detail: 'Cliente no encontrado'
+                instance: '/api/v1/clients/999'
+                code: 'CLI-003'
+                traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
             quotationNotFound:
               summary: Cotización inexistente
               value:

@@ -18,6 +18,7 @@ import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
@@ -63,6 +64,23 @@ public class ClientResource {
         return clientService.listClients(
             clientResourceMapper.toListClientsQuery(q, isActive, page, size)
         );
+    }
+
+    /**
+     * Sin @RolesAllowed: el contrato getClient no tiene `x-required-roles`, o sea
+     * que cualquier sesion puede leerlo, igual que el listado. El @Authenticated
+     * de la clase y la policy protected-paths exigen la sesion.
+     *
+     * Devuelve activos e inactivos: el service no filtra por isActive.
+     *
+     * Un id que no es entero NO llega aca: el conversor de parametros falla antes
+     * del match de ruta y RESTEasy responde 404 sin cuerpo. Un id numerico que no
+     * existe (incluidos 0 y negativos) si llega, y sale como 404 CLI-003.
+     */
+    @GET
+    @Path("/{id}")
+    public ClientResponse getClient(@PathParam("id") Integer id) {
+        return clientService.findById(id);
     }
 
     @POST
