@@ -372,6 +372,59 @@ class ClientsResourceTest {
             .body("errors.field", hasItem("phone"));
     }
 
+    /**
+     * Las cotas SUPERIORES del RUC y del teléfono, y el teléfono vacío.
+     *
+     * <p>Los casos de acá cubrían solo el lado corto, así que quitarle la cota superior al patrón
+     * del RUC dejaba entrar RUCs de doce dígitos con la suite entera en verde, y aceptar la
+     * cadena vacía en el teléfono guardaba un teléfono vacío. El alta y la edición comparten el
+     * mismo request, así que el agujero era el mismo en los dos y se tapa en los dos.
+     */
+    @Test
+    void create_withRucTooLong_returns400() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("LongRuc", "201234567890", null, null))
+        .when()
+            .post("/clients")
+        .then()
+            .statusCode(400)
+            .body("errors.field", hasItem("ruc"));
+    }
+
+    @Test
+    void create_withPhoneTooLong_returns400() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("LongPhone", "20122222223", "1234567890", null))
+        .when()
+            .post("/clients")
+        .then()
+            .statusCode(400)
+            .body("errors.field", hasItem("phone"));
+    }
+
+    @Test
+    void create_withEmptyPhone_returns400() {
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(body("EmptyPhone", "20122222224", "", null))
+        .when()
+            .post("/clients")
+        .then()
+            .statusCode(400)
+            .body("errors.field", hasItem("phone"));
+    }
+
     @Test
     void create_withNameTooLong_returns400() {
         String token = login("admin", "Admin1234");
