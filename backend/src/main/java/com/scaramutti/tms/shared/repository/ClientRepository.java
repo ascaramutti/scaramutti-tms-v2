@@ -35,6 +35,31 @@ public class ClientRepository implements PanacheRepositoryBase<Client, Integer> 
     }
 
     /**
+     * Relee la fila de un cliente gestionado y pisa con ella el estado en memoria.
+     *
+     * Vive aca y no en el service porque el EntityManager es detalle de esta capa. La usa la
+     * edicion, para que el cuerpo de la respuesta sea lo que quedo guardado.
+     */
+    public void refresh(Client client) {
+        entityManager.refresh(client);
+    }
+
+    /**
+     * Mismo predicado que {@link #existsByRuc} mas {@code and id <> ?2}, para la
+     * edicion. El del alta no excluye id porque en un alta el cliente todavia no
+     * existe; en una edicion que no cambia el RUC, no excluirlo encontraria al
+     * propio cliente y daria un 409 contra si mismo.
+     */
+    public boolean existsByRucExcludingId(String ruc, Integer id) {
+        return count(Client_.RUC + " = ?1 and " + Client_.ID + " <> ?2", ruc, id) > 0;
+    }
+
+    /** Gemelo de {@link #existsByRucExcludingId} para la razon social. */
+    public boolean existsByNameExcludingId(String name, Integer id) {
+        return count(Client_.NAME + " = ?1 and " + Client_.ID + " <> ?2", name, id) > 0;
+    }
+
+    /**
      * Busca clientes paginados aplicando filtros opcionales.
      *
      *  - q: si != null → ILIKE substring match (`%q%`) contra `name` y `ruc`.
