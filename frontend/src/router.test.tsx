@@ -317,6 +317,42 @@ describe('router - URL viejas y la raíz del dominio', () => {
         expect(await screen.findByText(/sin acceso a clientes/i)).toBeInTheDocument()
       },
     )
+
+    it.each(['admin', 'general_manager', 'operations_manager'] as const)(
+      '%s abre el detalle de un cliente',
+      async (role) => {
+        renderRouteAs(role, `${CLIENTS_BASE}/7`)
+        expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('ACME S.A.C.')
+      },
+    )
+
+    /**
+     * Los cuatro roles, no uno. Con `warehouse_keeper` solo, ensanchar la lista a
+     * la de cotizaciones pasaría sin que nada falle, y esa lista incluye a
+     * ventas, que es justo a quien esta pantalla no se le abre.
+     */
+    it.each(['sales', 'dispatcher', 'finance_manager', 'warehouse_keeper'] as const)(
+      '%s no abre el detalle de un cliente',
+      async (role) => {
+        renderRouteAs(role, `${CLIENTS_BASE}/7`)
+        expect(await screen.findByText(/sin acceso a clientes/i)).toBeInTheDocument()
+      },
+    )
+
+    /**
+     * El id inválido desvía al aterrizaje del rol ANTES de evaluar permisos. El rol
+     * elegido es todo el caso: con uno permitido, el desvío se vería igual con las
+     * guardas en cualquier orden, porque pasaría la de permisos y caería igual en su
+     * aterrizaje.
+     */
+    it.each(['0', '-3', '1e2', 'abc'])(
+      'el id %s del detalle desvía al aterrizaje del rol',
+      async (id) => {
+        const router = goTo('warehouse_keeper', `${CLIENTS_BASE}/${id}`)
+        await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
+        expect(screen.queryByText(/sin acceso/i)).not.toBeInTheDocument()
+      },
+    )
   })
 
 })

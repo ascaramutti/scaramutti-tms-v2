@@ -31,4 +31,9 @@ describe('clientKeys', () => {
       clientKeys.search({ q: 'acme', isActive: true }),
     )
   })
+
+  it('el detalle cuelga de la raíz y distingue por id', () => {
+    expect(clientKeys.detail(7)).toEqual(['clients', 'detail', 7])
+    expect(clientKeys.detail(7)).not.toEqual(clientKeys.detail(8))
+  })
 })
