@@ -122,6 +122,14 @@ describe('CotizacionWizardPage', () => {
     await user.type(screen.getByLabelText('Cliente'), 'acme')
     await screen.findByText('ACME S.A.C.')
     expect(sink.params?.get('q')).toBe('acme')
+    // El maestro de clientes tiene pantalla propia y busca SOLO entre los
+    // activos, compartiendo este hook. Si ese filtro se mete adentro del hook, o
+    // si alguien "empareja" este buscador con aquél, un vendedor deja de poder
+    // cotizarle a un cliente dado de baja y nada más lo delata.
+    expect(sink.params?.has('isActive')).toBe(false)
+    // Y el tamaño de página: acá son opciones para elegir, en el maestro son
+    // filas de un listado. Moverlo allá no puede arrastrar a este desplegable.
+    expect(sink.params?.get('size')).toBe('10')
   })
 
   it('al seleccionar un cliente precarga el contacto', async () => {

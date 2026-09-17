@@ -122,3 +122,13 @@ export const WAREHOUSE_ROLES: UserRole[] = [
  * backend, esta lista solo decide qué esconde la UI.
  */
 export const OPENING_BALANCE_REGISTER_ROLES: UserRole[] = ['admin']
+
+/**
+ * Quién edita el maestro de clientes: gobierna el ítem del menú y las rutas del
+ * módulo. Espejo del `x-required-roles` de `updateClient`.
+ *
+ * No reusa `QUOTATION_ROLES`: esa lista incluye a `sales`, que da clientes de
+ * alta al vuelo desde el asistente pero no los corrige. Reusarla le abriría el
+ * módulo entero.
+ */
+export const CLIENT_EDIT_ROLES: UserRole[] = ['admin', 'general_manager', 'operations_manager']

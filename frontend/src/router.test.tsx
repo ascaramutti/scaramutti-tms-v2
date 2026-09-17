@@ -1,9 +1,11 @@
-import { LOGIN_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
+import { CLIENTS_BASE, LOGIN_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
+import userEvent from '@testing-library/user-event'
+import { fakeClient } from './test/mocks/handlers/clients'
 import { routes } from './router'
 import { AuthProvider } from './shared/auth/AuthContext'
 import { ThemeProvider } from './shared/ui/theme/ThemeContext'
@@ -296,4 +298,125 @@ describe('router - URL viejas y la raíz del dominio', () => {
     const router = goTo('warehouse_keeper', '/')
     await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
   })
+  describe('maestro de clientes', () => {
+    it.each(['admin', 'general_manager', 'operations_manager'] as const)(
+      '%s abre la búsqueda de clientes',
+      async (role) => {
+        renderRouteAs(role, CLIENTS_BASE)
+        expect(await screen.findByRole('heading', { level: 1, name: /^clientes$/i })).toBeInTheDocument()
+      },
+    )
+
+    /**
+     * El nombre del módulo en el mensaje no es decorado: sin él la pantalla diría
+     * "Sin acceso" a secas, y este caso pasaría igual con la guarda apuntando al
+     * módulo equivocado.
+     */
+    it.each(['sales', 'dispatcher', 'finance_manager', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso al escribir la URL de clientes',
+      async (role) => {
+        renderRouteAs(role, CLIENTS_BASE)
+        expect(await screen.findByText(/sin acceso a clientes/i)).toBeInTheDocument()
+      },
+    )
+
+    it.each(['admin', 'general_manager', 'operations_manager'] as const)(
+      '%s abre el formulario de un cliente',
+      async (role) => {
+        renderRouteAs(role, `${CLIENTS_BASE}/7/editar`)
+        expect(await screen.findByLabelText('Razón social')).toBeInTheDocument()
+      },
+    )
+
+    /**
+     * El rol elegido es todo el caso. Con uno permitido, el desvío se vería igual
+     * con las guardas en cualquier orden, porque pasaría la de permisos y caería
+     * igual en su aterrizaje: solo un rol que NO puede abrir clientes distingue
+     * "desvió antes" de "mostró sin acceso".
+     *
+     * El `1e2` entra a propósito: convertido a número da 100, así que validar con
+     * una conversión en vez de con el texto dejaría pasar un id que la aplicación
+     * nunca escribió.
+     */
+    it.each(['0', '-3', '1e2', 'abc'])(
+      'el id %s desvía al aterrizaje del rol antes de evaluar permisos',
+      async (id) => {
+        const router = goTo('warehouse_keeper', `${CLIENTS_BASE}/${id}/editar`)
+        await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
+        expect(screen.queryByText(/sin acceso/i)).not.toBeInTheDocument()
+      },
+    )
+
+    it.each(['sales', 'dispatcher', 'finance_manager', 'warehouse_keeper'] as const)(
+      '%s no abre el formulario de un cliente',
+      async (role) => {
+        renderRouteAs(role, `${CLIENTS_BASE}/7/editar`)
+        expect(await screen.findByText(/sin acceso a clientes/i)).toBeInTheDocument()
+      },
+    )
+
+    it.each(['admin', 'general_manager', 'operations_manager'] as const)(
+      '%s abre el detalle de un cliente',
+      async (role) => {
+        renderRouteAs(role, `${CLIENTS_BASE}/7`)
+        expect(await screen.findByRole('heading', { level: 1 })).toHaveTextContent('ACME S.A.C.')
+      },
+    )
+
+    /**
+     * Los cuatro roles, no uno. Con `warehouse_keeper` solo, ensanchar la lista a
+     * la de cotizaciones pasaría sin que nada falle, y esa lista incluye a
+     * ventas, que es justo a quien esta pantalla no se le abre.
+     */
+    it.each(['sales', 'dispatcher', 'finance_manager', 'warehouse_keeper'] as const)(
+      '%s no abre el detalle de un cliente',
+      async (role) => {
+        renderRouteAs(role, `${CLIENTS_BASE}/7`)
+        expect(await screen.findByText(/sin acceso a clientes/i)).toBeInTheDocument()
+      },
+    )
+
+
+    /**
+     * El destino de un `navigate()` se mide contra la tabla REAL de rutas, no
+     * contra la que declara el test de una pantalla.
+     *
+     * El test de la pantalla de edición se fabrica su propia tabla, así que por
+     * construcción no puede notar que el router no tenga el destino: pasaría
+     * igual apuntando a una URL inexistente, y el usuario terminaría en el
+     * aterrizaje de su rol después de guardar. Esta red vive acá, que es donde
+     * se monta el router de verdad.
+     */
+    it('guardar una edición aterriza en el detalle, contra la tabla real de rutas', async () => {
+      const user = userEvent.setup()
+      server.use(
+        http.get(`${API}/clients/:id`, ({ params }) =>
+          HttpResponse.json(fakeClient({ id: Number(params.id) })),
+        ),
+        http.put(`${API}/clients/:id`, ({ params }) =>
+          HttpResponse.json(fakeClient({ id: Number(params.id), name: 'ACME CORREGIDA' })),
+        ),
+      )
+      const router = goTo('admin', `${CLIENTS_BASE}/7/editar`)
+
+      await user.type(await screen.findByLabelText('Razón social'), 'X')
+      await user.click(screen.getByRole('button', { name: /guardar/i }))
+
+      await waitFor(() => expect(router.state.location.pathname).toBe(`${CLIENTS_BASE}/7`))
+      // Y esa URL rinde el detalle de verdad: sin la ruta en la tabla, el comodín
+      // mandaría al aterrizaje del rol y el camino terminaría en otra pantalla.
+      expect(await screen.findByRole('link', { name: /^editar$/i })).toBeInTheDocument()
+    })
+
+    it.each(['0', '-3', '1e2', 'abc'])(
+      'el id %s del detalle desvía al aterrizaje del rol',
+      async (id) => {
+        const router = goTo('warehouse_keeper', `${CLIENTS_BASE}/${id}`)
+        await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
+        expect(screen.queryByText(/sin acceso/i)).not.toBeInTheDocument()
+      },
+    )
+
+  })
+
 })
