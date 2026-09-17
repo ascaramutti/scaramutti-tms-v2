@@ -17,7 +17,9 @@ import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
@@ -63,6 +65,42 @@ public class ClientResource {
         return clientService.listClients(
             clientResourceMapper.toListClientsQuery(q, isActive, page, size)
         );
+    }
+
+    /**
+     * Sin @RolesAllowed: el contrato getClient no tiene `x-required-roles`, o sea
+     * que cualquier sesion puede leerlo, igual que el listado. El @Authenticated
+     * de la clase y la policy protected-paths exigen la sesion.
+     *
+     * Devuelve activos e inactivos: el service no filtra por isActive.
+     *
+     * Un id que no es entero NO llega aca: el conversor de parametros falla antes
+     * del match de ruta y RESTEasy responde 404 sin cuerpo. Un id numerico que no
+     * existe (incluidos 0 y negativos) si llega, y sale como 404 CLI-003.
+     */
+    @GET
+    @Path("/{id}")
+    public ClientResponse getClient(@PathParam("id") Integer id) {
+        return clientService.findById(id);
+    }
+
+    /**
+     * Reemplaza los cuatro datos editables. Sin @ResponseStatus: 200 ya es el
+     * default de JAX-RS para un metodo con cuerpo (el 201 del POST se declara
+     * justamente porque no lo es). Devuelve el DTO y no un Response porque no
+     * hay header que colgar: sin If-Match no hay ETag que versionar.
+     *
+     * `@Valid @NotNull` los dos: sin @NotNull un cuerpo vacio llegaria como null
+     * al mapper y saldria un 500 en vez del 400 que declara el contrato.
+     */
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager"})
+    public ClientResponse updateClient(
+        @PathParam("id") Integer id,
+        @Valid @NotNull ClientRequest clientRequest
+    ) {
+        return clientService.updateClient(id, clientResourceMapper.toUpdateClientCommand(clientRequest));
     }
 
     @POST

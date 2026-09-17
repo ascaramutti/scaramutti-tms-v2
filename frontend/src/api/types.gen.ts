@@ -2034,6 +2034,80 @@ export type CreateClientResponses = {
 
 export type CreateClientResponse = CreateClientResponses[keyof CreateClientResponses];
 
+export type GetClientData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/clients/{id}';
+};
+
+export type GetClientErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetClientError = GetClientErrors[keyof GetClientErrors];
+
+export type GetClientResponses = {
+    /**
+     * OK
+     */
+    200: ClientResponse;
+};
+
+export type GetClientResponse = GetClientResponses[keyof GetClientResponses];
+
+export type UpdateClientData = {
+    body: ClientRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/clients/{id}';
+};
+
+export type UpdateClientErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type UpdateClientError = UpdateClientErrors[keyof UpdateClientErrors];
+
+export type UpdateClientResponses = {
+    /**
+     * Actualizado
+     */
+    200: ClientResponse;
+};
+
+export type UpdateClientResponse = UpdateClientResponses[keyof UpdateClientResponses];
+
 export type ListQuotationsData = {
     body?: never;
     path?: never;
