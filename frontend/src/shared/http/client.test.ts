@@ -18,7 +18,10 @@ const FAKE_USER = {
 }
 
 describe('http client interceptor (refresh-on-401)', () => {
-  let onSessionExpired: ReturnType<typeof vi.fn>
+  // El tipo del espía se declara desde el salto a Vitest 5: `vi.fn()` sin parámetro
+  // de tipo ya no se asigna a una firma concreta. Se escribe la firma que el código
+  // bajo prueba pide, así que el tipo dejó de ser un comodín y pasó a medir algo.
+  let onSessionExpired: ReturnType<typeof vi.fn<() => void>>
 
   beforeAll(() => {
     // configureHttpClient lee VITE_API_BASE_URL al ejecutarse.
@@ -27,7 +30,7 @@ describe('http client interceptor (refresh-on-401)', () => {
 
   beforeEach(() => {
     tokenStorage.clear()
-    onSessionExpired = vi.fn()
+    onSessionExpired = vi.fn<() => void>()
     // Limpiar interceptores antes de re-configurar (cada configure agrega uno).
     client.instance.interceptors.response.clear()
     configureHttpClient(onSessionExpired)
