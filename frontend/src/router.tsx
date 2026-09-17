@@ -24,6 +24,7 @@ import { CotizacionesListPage } from './features/quotations/pages/CotizacionesLi
 import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDetailPage'
 import { CotizacionEditPage } from './features/quotations/pages/CotizacionEditPage'
 import { ClientsSearchPage } from './features/clients/pages/ClientsSearchPage'
+import { ClientEditPage } from './features/clients/pages/ClientEditPage'
 import { ClientDetailPage } from './features/clients/pages/ClientDetailPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
@@ -118,12 +119,22 @@ export const routes: RouteObject[] = [
       {
         path: `${CLIENTS_BASE}/:id`,
         element: (
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={CLIENT_EDIT_ROLES} moduleName="Clientes">
+              <ClientDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
+        ),
+      },
+      {
+        path: `${CLIENTS_BASE}/:id/editar`,
+        element: (
           // La validación del id va ANTES de la guarda de rol: un id inválido cae
           // al aterrizaje del rol y no a "Sin acceso", que sería un error de
           // permisos donde lo que hay es una URL mal escrita.
           <RequireNumericId>
             <ProtectedRoute allowedRoles={CLIENT_EDIT_ROLES} moduleName="Clientes">
-              <ClientDetailPage />
+              <ClientEditPage />
             </ProtectedRoute>
           </RequireNumericId>
         ),

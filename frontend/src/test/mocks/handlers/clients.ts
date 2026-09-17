@@ -156,3 +156,50 @@ export function getClientError(status = 500) {
     problema('COM-500', status, 'Error interno del servidor'),
   )
 }
+
+// ----- Guardar la edición -----
+
+/** Captura el cuerpo y el id: lo que importa es qué se manda y a quién. */
+export function updateClientCapture(
+  sink: { body?: ClientRequest; id?: number },
+  response?: ClientResponse,
+) {
+  return http.put(`${API}/clients/:id`, async ({ request, params }) => {
+    sink.body = (await request.json()) as ClientRequest
+    sink.id = Number(params.id)
+    return HttpResponse.json(response ?? fakeClient({ id: sink.id }))
+  })
+}
+
+/** 409 con el código y el detalle reales del backend. */
+export function updateClientConflict(code: 'CLI-001' | 'CLI-002') {
+  const detail =
+    code === 'CLI-001'
+      ? 'Ya existe un cliente con el RUC indicado'
+      : 'Ya existe un cliente con el nombre indicado'
+  return http.put(`${API}/clients/:id`, () => problema(code, 409, detail))
+}
+
+export function updateClientForbidden() {
+  return http.put(`${API}/clients/:id`, () =>
+    problema('COM-003', 403, 'No tiene permisos para acceder a este recurso'),
+  )
+}
+
+export function updateClientNotFound() {
+  return http.put(`${API}/clients/:id`, () => problema('CLI-003', 404, 'Cliente no encontrado'))
+}
+
+export function updateClientValidation(errors: Array<{ field: string; message: string }>) {
+  return http.put(`${API}/clients/:id`, () =>
+    problema('COM-001', 400, 'La solicitud contiene errores de validación', { errors }),
+  )
+}
+
+/** Guardado que tarda: para observar el estado "Guardando…" antes de la respuesta. */
+export function updateClientSlow(client: ClientResponse, ms = 60) {
+  return http.put(`${API}/clients/:id`, async () => {
+    await delay(ms)
+    return HttpResponse.json(client)
+  })
+}
