@@ -1,4 +1,10 @@
-import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
+import {
+  CHANGE_PASSWORD_PATH,
+  CLIENTS_BASE,
+  OPERATIONS_BASE,
+  QUOTATIONS_BASE,
+  WAREHOUSE_BASE,
+} from '../../shared/paths'
 import {
   ArrowDownToLine,
   ArrowUpFromLine,
@@ -18,6 +24,7 @@ import { SidebarSection } from './SidebarSection'
 import { SidebarFooter } from './SidebarFooter'
 import { useAuth } from '../auth/AuthContext'
 import {
+  CLIENT_EDIT_ROLES,
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
   SERVICES_REPORT_ROLES,
@@ -129,10 +136,20 @@ const MENU: MenuGroup[] = [
         to: QUOTATIONS_BASE,
         allowedRoles: QUOTATION_ROLES,
       },
+    ],
+  },
+  {
+    // El maestro de clientes es transversal: lo consultan cotizaciones y
+    // operaciones, así que no cuelga de ninguno de los dos. Acá va a vivir
+    // también el maestro de usuarios cuando exista. Distinto de "Administrar
+    // cuenta", que es lo personal de quien está usando el sistema.
+    label: 'Administración',
+    items: [
       {
         icon: Users,
         label: 'Clientes',
-        allowedRoles: QUOTATION_ROLES,
+        to: CLIENTS_BASE,
+        allowedRoles: CLIENT_EDIT_ROLES,
       },
     ],
   },

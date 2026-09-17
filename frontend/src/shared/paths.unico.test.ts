@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ACCOUNT_BASE,
   CHANGE_PASSWORD_PATH,
+  CLIENTS_BASE,
   LOGIN_PATH,
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
@@ -47,6 +48,7 @@ const VALORES = [
   ACCOUNT_BASE,
   CHANGE_PASSWORD_PATH,
   QUOTATIONS_BASE,
+  CLIENTS_BASE,
   WAREHOUSE_BASE,
   OPERATIONS_BASE,
 ].filter((valor) => valor !== '/')

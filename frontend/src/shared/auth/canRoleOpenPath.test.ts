@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { canRoleOpenPath } from './canRoleOpenPath'
-import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../paths'
+import {
+  CHANGE_PASSWORD_PATH,
+  CLIENTS_BASE,
+  OPERATIONS_BASE,
+  QUOTATIONS_BASE,
+  WAREHOUSE_BASE,
+} from '../paths'
 
 describe('canRoleOpenPath', () => {
   it.each([
@@ -91,4 +97,35 @@ describe('canRoleOpenPath', () => {
   it('sin rol no abre nada', () => {
     expect(canRoleOpenPath(QUOTATIONS_BASE, undefined)).toBe(false)
   })
+  /**
+   * El maestro de clientes. Las filas negativas son las que detectan que falte la
+   * regla: sin ella `canRoleOpenPath` cae en su "si no hay regla, que pase" y un
+   * vendedor con un enlace guardado a clientes aterriza en "Sin acceso", que es
+   * exactamente lo que esta función existe para evitar. Las positivas impiden que
+   * alguien "arregle" eso poniendo una lista vacía.
+   */
+  it.each(['admin', 'general_manager', 'operations_manager'] as const)(
+    '%s abre el maestro de clientes',
+    (role) => {
+      expect(canRoleOpenPath(CLIENTS_BASE, role)).toBe(true)
+    },
+  )
+
+  it.each(['sales', 'dispatcher', 'finance_manager', 'warehouse_keeper'] as const)(
+    '%s no abre el maestro de clientes',
+    (role) => {
+      expect(canRoleOpenPath(CLIENTS_BASE, role)).toBe(false)
+    },
+  )
+
+  it('el formulario de un cliente hereda el permiso de la búsqueda', () => {
+    expect(canRoleOpenPath(`${CLIENTS_BASE}/7/editar`, 'operations_manager')).toBe(true)
+    expect(canRoleOpenPath(`${CLIENTS_BASE}/7/editar`, 'sales')).toBe(false)
+  })
+
+  /** Una ruta que empieza igual pero es otro segmento no hereda nada. */
+  it('no confunde una ruta que solo comparte el comienzo', () => {
+    expect(canRoleOpenPath(`${CLIENTS_BASE}X`, 'sales')).toBe(true)
+  })
+
 })

@@ -22,6 +22,7 @@ const RUTAS = [
   '/cotizaciones/nueva',
   '/cotizaciones/:id/editar',
   '/cotizaciones/:id',
+  '/clientes',
   '/almacen',
   '/almacen/entradas/nueva',
   '/almacen/entradas',

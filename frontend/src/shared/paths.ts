@@ -28,6 +28,13 @@ export const CHANGE_PASSWORD_PATH = `${ACCOUNT_BASE}/cambiar-contrasena`
  */
 export const QUOTATIONS_BASE = '/cotizaciones'
 
+/**
+ * Módulo Clientes. Raíz propia y no un hijo de cotizaciones: el maestro de
+ * clientes lo consultan cotizaciones y operaciones, y quién lo edita no es quién
+ * cotiza.
+ */
+export const CLIENTS_BASE = '/clientes'
+
 /** Módulo Almacén. */
 export const WAREHOUSE_BASE = '/almacen'
 

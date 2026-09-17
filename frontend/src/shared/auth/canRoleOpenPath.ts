@@ -1,7 +1,8 @@
 import type { UserRole } from '../../api'
-import { OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../paths'
+import { CLIENTS_BASE, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../paths'
 import { matchesPathPrefix } from '../layout/pathMatching'
 import {
+  CLIENT_EDIT_ROLES,
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
@@ -30,6 +31,11 @@ const POR_RUTA: ReadonlyArray<readonly [string, UserRole[]]> = [
   [`${OPERATIONS_BASE}/servicios/nuevo`, SERVICE_PRICE_WRITE_ROLES],
   [`${OPERATIONS_BASE}/servicios/:id/editar`, SERVICE_PRICE_WRITE_ROLES],
   [QUOTATIONS_BASE, QUOTATION_ROLES],
+  // Una sola fila para las dos rutas del módulo: el formulario cuelga de la
+  // misma base y `matchesPathPrefix` lo alcanza. Sin ella, un vendedor con un
+  // enlace guardado a clientes aterrizaría en "Sin acceso", que es justo lo que
+  // esta función existe para evitar.
+  [CLIENTS_BASE, CLIENT_EDIT_ROLES],
   [WAREHOUSE_BASE, WAREHOUSE_ROLES],
   [OPERATIONS_BASE, OPERATIONS_ROLES],
 ]

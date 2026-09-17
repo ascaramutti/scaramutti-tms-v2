@@ -1,4 +1,4 @@
-import { LOGIN_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
+import { CLIENTS_BASE, LOGIN_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
@@ -296,4 +296,27 @@ describe('router - URL viejas y la raíz del dominio', () => {
     const router = goTo('warehouse_keeper', '/')
     await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
   })
+  describe('maestro de clientes', () => {
+    it.each(['admin', 'general_manager', 'operations_manager'] as const)(
+      '%s abre la búsqueda de clientes',
+      async (role) => {
+        renderRouteAs(role, CLIENTS_BASE)
+        expect(await screen.findByRole('heading', { level: 1, name: /^clientes$/i })).toBeInTheDocument()
+      },
+    )
+
+    /**
+     * El nombre del módulo en el mensaje no es decorado: sin él la pantalla diría
+     * "Sin acceso" a secas, y este caso pasaría igual con la guarda apuntando al
+     * módulo equivocado.
+     */
+    it.each(['sales', 'dispatcher', 'finance_manager', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso al escribir la URL de clientes',
+      async (role) => {
+        renderRouteAs(role, CLIENTS_BASE)
+        expect(await screen.findByText(/sin acceso a clientes/i)).toBeInTheDocument()
+      },
+    )
+  })
+
 })

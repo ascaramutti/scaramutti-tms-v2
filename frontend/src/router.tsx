@@ -1,9 +1,16 @@
-import { CHANGE_PASSWORD_PATH, LOGIN_PATH, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
+import {
+  CHANGE_PASSWORD_PATH,
+  CLIENTS_BASE,
+  LOGIN_PATH,
+  QUOTATIONS_BASE,
+  WAREHOUSE_BASE,
+} from './shared/paths'
 import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
 import { RequireNumericId } from './shared/auth/RequireNumericId'
 import {
+  CLIENT_EDIT_ROLES,
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
@@ -16,6 +23,7 @@ import { ChangePasswordPage } from './features/auth/components/ChangePasswordPag
 import { CotizacionesListPage } from './features/quotations/pages/CotizacionesListPage'
 import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDetailPage'
 import { CotizacionEditPage } from './features/quotations/pages/CotizacionEditPage'
+import { ClientsSearchPage } from './features/clients/pages/ClientsSearchPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -93,6 +101,17 @@ export const routes: RouteObject[] = [
               <CotizacionDetailPage />
             </ProtectedRoute>
           </RequireNumericId>
+        ),
+      },
+      // Módulo Clientes: el maestro que cotizaciones y operaciones consultan, con
+      // lista de roles propia, porque quien cotiza no necesariamente corrige
+      // clientes. Su ítem del menú vive en el grupo Administración.
+      {
+        path: CLIENTS_BASE,
+        element: (
+          <ProtectedRoute allowedRoles={CLIENT_EDIT_ROLES} moduleName="Clientes">
+            <ClientsSearchPage />
+          </ProtectedRoute>
         ),
       },
       // Módulo Almacén, con su propia raíz. Hasta la mudanza de 2026-09 colgaba

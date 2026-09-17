@@ -1,4 +1,10 @@
-import { CHANGE_PASSWORD_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
+import {
+  CHANGE_PASSWORD_PATH,
+  CLIENTS_BASE,
+  OPERATIONS_BASE,
+  QUOTATIONS_BASE,
+  WAREHOUSE_BASE,
+} from '../../shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
@@ -74,13 +80,24 @@ describe('Sidebar - filtrado por rol', () => {
     expect(screen.getByText(/administrar cuenta/i)).toBeInTheDocument()
   })
 
-  it('sales ve Cotizaciones + Clientes + Cambiar contraseña', async () => {
+  /**
+   * `sales` veía "Clientes" hasta que el maestro tuvo pantalla propia: el ítem
+   * usaba la lista de cotizaciones, que lo incluye. Da clientes de alta al vuelo
+   * desde el asistente, pero corregirlos no es suyo.
+   *
+   * La espera del nombre del usuario no es decorado: sin ella, la consulta del
+   * ítem corre con la barra a medio montar y devuelve nulo por el motivo
+   * equivocado, o sea que el caso pasaría aunque el ítem siguiera visible. Y la
+   * afirmación de "Cotizaciones" distingue "se ocultó el ítem" de "no se dibujó
+   * ninguno".
+   */
+  it('sales ya no ve Clientes, pero sigue viendo Cotizaciones', async () => {
     renderSidebarAs('sales')
     await waitFor(() => {
       expect(screen.getByText(/usuario sales/i)).toBeInTheDocument()
     })
     expect(screen.getByText('Cotizaciones')).toBeInTheDocument()
-    expect(screen.getByText('Clientes')).toBeInTheDocument()
+    expect(screen.queryByText('Clientes')).not.toBeInTheDocument()
     expect(screen.getByText(/cambiar contraseña/i)).toBeInTheDocument()
   })
 
@@ -307,5 +324,99 @@ describe('Sidebar - módulo Operaciones', () => {
     renderSidebarAs('dispatcher', OPERATIONS_BASE)
     expect(await screen.findByRole('link', { name: /^servicios$/i })).toBeInTheDocument()
     expect(screen.queryByText('Reportes de operaciones')).not.toBeInTheDocument()
+  })
+})
+
+describe('Sidebar - maestro de clientes', () => {
+  /**
+   * El ítem pasó de deshabilitado a navegable. Se afirma por `link` y no por
+   * texto: hasta esta unidad era un `<span aria-disabled>` con el título
+   * "Próximamente", que una consulta por texto encontraría igual.
+   */
+  it.each(['admin', 'general_manager', 'operations_manager'] as const)(
+    '%s ve Clientes como enlace a la pantalla',
+    async (role) => {
+      renderSidebarAs(role)
+      await waitFor(() => {
+        expect(screen.getByText(new RegExp(`usuario ${role}`, 'i'))).toBeInTheDocument()
+      })
+      expect(screen.getByRole('link', { name: /^clientes$/i })).toHaveAttribute('href', CLIENTS_BASE)
+    },
+  )
+
+  it.each(['finance_manager', 'warehouse_keeper'] as const)(
+    '%s no ve Clientes',
+    async (role) => {
+      renderSidebarAs(role)
+      await waitFor(() => {
+        expect(screen.getByText(new RegExp(`usuario ${role}`, 'i'))).toBeInTheDocument()
+      })
+      expect(screen.queryByText('Clientes')).not.toBeInTheDocument()
+    },
+  )
+
+  it('estando en la búsqueda, Clientes queda marcado como la página actual', async () => {
+    renderSidebarAs('admin', CLIENTS_BASE)
+    await waitFor(() => {
+      expect(screen.getByText(/usuario admin/i)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('link', { name: /^clientes$/i })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  /**
+   * Y sigue marcado dentro del formulario de un cliente. El ítem no lleva un
+   * matcher propio: el resaltado por omisión ya compara por prefijo de segmento.
+   * Sin este caso, agregarle uno de igualdad exacta "por simetría con los otros"
+   * pasa sin que nadie lo note, y el menú se apagaría al abrir un cliente.
+   */
+  it('estando en el formulario de un cliente, Clientes sigue marcado', async () => {
+    renderSidebarAs('admin', `${CLIENTS_BASE}/7/editar`)
+    await waitFor(() => {
+      expect(screen.getByText(/usuario admin/i)).toBeInTheDocument()
+    })
+    expect(screen.getByRole('link', { name: /^clientes$/i })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  /**
+   * El maestro de clientes dejó el grupo Comercial: es transversal a cotizaciones
+   * y a operaciones, y ahí va a vivir también el maestro de usuarios. Se afirma
+   * el grupo y no solo el ítem, porque mover el ítem de grupo no rompe ninguna
+   * aserción de visibilidad.
+   */
+  it('Clientes vive en el grupo Administración y no en Comercial', async () => {
+    renderSidebarAs('admin')
+    await waitFor(() => {
+      expect(screen.getByText(/usuario admin/i)).toBeInTheDocument()
+    })
+
+    const administracion = screen.getByText(/^administración$/i)
+    const comercial = screen.getByText(/^comercial$/i)
+    const clientes = screen.getByRole('link', { name: /^clientes$/i })
+
+    // El ítem está después del encabezado de Administración, y ese encabezado
+    // está después del de Comercial.
+    expect(comercial.compareDocumentPosition(administracion) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy()
+    expect(administracion.compareDocumentPosition(clientes) & Node.DOCUMENT_POSITION_FOLLOWING)
+      .toBeTruthy()
+  })
+
+  /** Un grupo sin ítems visibles no se dibuja, encabezado incluido. */
+  it('sales no ve el grupo Administración, pero sí Comercial', async () => {
+    renderSidebarAs('sales')
+    await waitFor(() => {
+      expect(screen.getByText(/usuario sales/i)).toBeInTheDocument()
+    })
+
+    expect(screen.queryByText(/^administración$/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/^comercial$/i)).toBeInTheDocument()
+    // Y "Administrar cuenta", que es lo personal, sigue visible para todos.
+    expect(screen.getByText(/administrar cuenta/i)).toBeInTheDocument()
   })
 })
