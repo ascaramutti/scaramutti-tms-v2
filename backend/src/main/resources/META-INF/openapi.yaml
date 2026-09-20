@@ -52,6 +52,8 @@ tags:
     description: Operaciones — servicios de transporte (viajes)
   - name: SharedCatalogs
     description: 'Catálogos compartidos de `public` reutilizados por Almacén y Operaciones: el listado de trabajadores, la flota unificada y los conductores'
+  - name: Workers
+    description: Trabajadores — el padrón. Hoy trae el detalle de un trabajador y sus catálogos (tipos de documento y roles); el alta, la edición y el cambio de estado llegan con las historias siguientes
 
 # =============================================================================
 paths:
@@ -1813,6 +1815,41 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /workers/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Workers]
+      operationId: getWorker
+      summary: Obtener un trabajador por ID (ficha completa)
+      description: |
+        Devuelve el trabajador con ese `id`, esté activo o inactivo, con su tipo
+        de documento, su rol (`role`: nombre de sistema, nombre visible, nivel,
+        si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
+        de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
+        usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
+        última vez (`createdBy` y `updatedBy` son nulos en las filas anteriores
+        a esta unidad: nadie sabe quién las cargó).
+
+        Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
+        (el detalle expone documento y teléfono, que el combobox no muestra).
+        La lectura no aplica rango: cualquiera de los cuatro ve cualquier
+        detalle.
+
+        `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
+        cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
+        conversor de parámetros falla antes de llegar al recurso.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /fleet-units:
     get:
       tags: [SharedCatalogs]
@@ -2985,6 +3022,16 @@ components:
                 instance: '/api/v1/clients/999'
                 code: 'CLI-003'
                 traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+            workerNotFound:
+              summary: Trabajador inexistente
+              value:
+                type: 'urn:tms:error:wrk-001'
+                title: 'Not Found'
+                status: 404
+                detail: 'Trabajador no encontrado'
+                instance: '/api/v1/workers/999'
+                code: 'WRK-001'
+                traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
             serviceNotFound:
               summary: Servicio de transporte inexistente
               value:
@@ -4179,6 +4226,103 @@ components:
             phone:           { type: [string, 'null'], pattern: '^\d{9}$' }
             status:          { $ref: '#/components/schemas/FleetResourceStatus' }
             isActive:        { type: boolean }
+
+    # -------- Workers: catálogos ----------------------------------------------
+    DriverProfileMode:
+      type: string
+      enum: [REQUIRED, OPTIONAL, NONE]
+      description: |
+        Si el rol lleva ficha de conductor: `REQUIRED` (`driver`, `escort`:
+        obligatoria), `OPTIONAL` (`assistant`: solo si viene la licencia),
+        `NONE` (el resto: la ficha se rechaza). Columna
+        `roles.driver_profile`.
+
+    RoleResponse:
+      type: object
+      description: |
+        Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
+        nombre de sistema (el que llevan `users.role` y el token de sesión, y
+        el que se manda en `role` del request); `description` es el nombre
+        visible del cargo (también es el `position` que llevan el token de
+        sesión, `/auth/me` y `listWorkers`); `level` es el nivel del
+        organigrama (4 `admin`; 3 `general_manager`, `operations_manager`; 2
+        `finance_manager`, `dispatcher`, `sales`, `warehouse_keeper`; 1
+        `driver`, `escort`, `assistant`, `operator`); `canLogin` dice si el rol
+        puede tener usuario (los cuatro de nivel 1, no).
+      required: [name, description, level, canLogin, driverProfile]
+      properties:
+        name:          { type: string, maxLength: 50, example: 'driver' }
+        description:   { type: string, example: 'Conductor' }
+        level:         { type: integer, minimum: 1, maximum: 4, example: 1 }
+        canLogin:      { type: boolean, example: false }
+        driverProfile: { $ref: '#/components/schemas/DriverProfileMode' }
+
+    DocumentTypeResponse:
+      type: object
+      description: |
+        Tipo de documento de identidad (`public.document_types`). `maxLength` y
+        `validationPattern` (expresión regular completa, nula si el tipo no
+        define patrón) son los que el backend aplica al número (`WRK-004`).
+      required: [id, code, name, maxLength]
+      properties:
+        id:                { type: integer, format: int32, example: 1 }
+        code:              { type: string, maxLength: 10, example: 'DNI' }
+        name:              { type: string, maxLength: 50, example: 'DNI' }
+        maxLength:         { type: integer, example: 8 }
+        validationPattern: { type: [string, 'null'], maxLength: 255, example: '^\d{8}$' }
+
+    # -------- Workers: ficha de conductor --------------------------------------
+    WorkerDriverProfileResponse:
+      type: object
+      description: |
+        La fila de `public.drivers` del trabajador. `id` es el que guardan las
+        asignaciones de operaciones. `isActive` en `false` significa ficha
+        apagada (el rol dejó de llevarla o el trabajador está inactivo): no
+        aparece en el combobox de conductores y no se borra nunca.
+      required: [id, licenseNumber, status, isActive]
+      properties:
+        id:              { type: integer, format: int32, example: 8 }
+        licenseNumber:   { type: string, example: 'Q12345678' }
+        licenseCategory: { type: [string, 'null'], example: 'A-IIIc' }
+        status:          { $ref: '#/components/schemas/FleetResourceStatus' }
+        isActive:        { type: boolean }
+
+    # -------- Workers: trabajador ----------------------------------------------
+    WorkerDetailResponse:
+      type: object
+      description: |
+        Ficha completa de un trabajador. `role` es su rol (la misma fila que
+        lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
+        `public.users` para él (el usuario lo administra el módulo de
+        usuarios). `createdBy` y `updatedBy` son nulos en los trabajadores
+        cargados antes de que existiera esta unidad. Instantes en UTC
+        (`createdAt`, `updatedAt`); `hireDate` es día calendario.
+      required: [id, firstName, lastName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
+      properties:
+        id:             { type: integer, format: int32, example: 8 }
+        firstName:      { type: string, example: 'Juan' }
+        lastName:       { type: string, example: 'Pérez Huamán' }
+        documentType:   { $ref: '#/components/schemas/DocumentTypeResponse' }
+        documentNumber: { type: string, example: '45678912' }
+        phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }
+        role:           { $ref: '#/components/schemas/RoleResponse' }
+        hireDate:       { type: string, format: date, example: '2026-09-01' }
+        isActive:       { type: boolean }
+        createdAt:      { type: string, format: date-time, example: '2026-09-19T15:00:00Z' }
+        createdBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        updatedAt:      { type: string, format: date-time, example: '2026-09-19T15:00:00Z' }
+        updatedBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        driver:
+          anyOf:
+            - $ref: '#/components/schemas/WorkerDriverProfileResponse'
+            - type: 'null'
+        hasUser:        { type: boolean }
 
     WarehouseWithdrawalRequest:
       type: object

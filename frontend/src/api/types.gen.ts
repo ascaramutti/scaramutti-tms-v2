@@ -1033,6 +1033,91 @@ export type DriverResponse = DriverRef & {
 };
 
 /**
+ * Si el rol lleva ficha de conductor: `REQUIRED` (`driver`, `escort`:
+ * obligatoria), `OPTIONAL` (`assistant`: solo si viene la licencia),
+ * `NONE` (el resto: la ficha se rechaza). Columna
+ * `roles.driver_profile`.
+ *
+ */
+export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
+
+/**
+ * Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
+ * nombre de sistema (el que llevan `users.role` y el token de sesión, y
+ * el que se manda en `role` del request); `description` es el nombre
+ * visible del cargo (también es el `position` que llevan el token de
+ * sesión, `/auth/me` y `listWorkers`); `level` es el nivel del
+ * organigrama (4 `admin`; 3 `general_manager`, `operations_manager`; 2
+ * `finance_manager`, `dispatcher`, `sales`, `warehouse_keeper`; 1
+ * `driver`, `escort`, `assistant`, `operator`); `canLogin` dice si el rol
+ * puede tener usuario (los cuatro de nivel 1, no).
+ *
+ */
+export type RoleResponse = {
+    name: string;
+    description: string;
+    level: number;
+    canLogin: boolean;
+    driverProfile: DriverProfileMode;
+};
+
+/**
+ * Tipo de documento de identidad (`public.document_types`). `maxLength` y
+ * `validationPattern` (expresión regular completa, nula si el tipo no
+ * define patrón) son los que el backend aplica al número (`WRK-004`).
+ *
+ */
+export type DocumentTypeResponse = {
+    id: number;
+    code: string;
+    name: string;
+    maxLength: number;
+    validationPattern?: string | null;
+};
+
+/**
+ * La fila de `public.drivers` del trabajador. `id` es el que guardan las
+ * asignaciones de operaciones. `isActive` en `false` significa ficha
+ * apagada (el rol dejó de llevarla o el trabajador está inactivo): no
+ * aparece en el combobox de conductores y no se borra nunca.
+ *
+ */
+export type WorkerDriverProfileResponse = {
+    id: number;
+    licenseNumber: string;
+    licenseCategory?: string | null;
+    status: FleetResourceStatus;
+    isActive: boolean;
+};
+
+/**
+ * Ficha completa de un trabajador. `role` es su rol (la misma fila que
+ * lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
+ * `public.users` para él (el usuario lo administra el módulo de
+ * usuarios). `createdBy` y `updatedBy` son nulos en los trabajadores
+ * cargados antes de que existiera esta unidad. Instantes en UTC
+ * (`createdAt`, `updatedAt`); `hireDate` es día calendario.
+ *
+ */
+export type WorkerDetailResponse = {
+    id: number;
+    firstName: string;
+    lastName: string;
+    documentType: DocumentTypeResponse;
+    documentNumber: string;
+    phone?: string | null;
+    role: RoleResponse;
+    hireDate: string;
+    isActive: boolean;
+    createdAt: string;
+    createdBy?: UserRef | null;
+    updatedAt: string;
+    updatedBy?: UserRef | null;
+    driver?: WorkerDriverProfileResponse | null;
+    hasUser: boolean;
+};
+
+/**
  * RN-WH2: `receivedByWorkerId` SIEMPRE obligatorio; unidad destino OPCIONAL y a lo
  * sumo UNA (tractorId | trailerId | escortVehicleId, subtipos disyuntos; mas de una
  * -> 400 WH-005). `withdrawnAt` lo asigna el server.
@@ -3485,6 +3570,41 @@ export type ListWorkersResponses = {
 };
 
 export type ListWorkersResponse = ListWorkersResponses[keyof ListWorkersResponses];
+
+export type GetWorkerData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}';
+};
+
+export type GetWorkerErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWorkerError = GetWorkerErrors[keyof GetWorkerErrors];
+
+export type GetWorkerResponses = {
+    /**
+     * OK
+     */
+    200: WorkerDetailResponse;
+};
+
+export type GetWorkerResponse = GetWorkerResponses[keyof GetWorkerResponses];
 
 export type ListFleetUnitsData = {
     body?: never;
