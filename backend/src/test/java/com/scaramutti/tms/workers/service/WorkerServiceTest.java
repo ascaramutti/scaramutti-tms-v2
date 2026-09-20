@@ -1,10 +1,10 @@
-package com.scaramutti.tms.sharedcatalogs.worker.service;
+package com.scaramutti.tms.workers.service;
 
-import com.scaramutti.tms.sharedcatalogs.worker.mapper.WorkerServiceMapper;
+import com.scaramutti.tms.workers.mapper.WorkerServiceMapper;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
-import com.scaramutti.tms.sharedcatalogs.worker.service.cmd.ListWorkersQuery;
+import com.scaramutti.tms.workers.service.cmd.ListWorkersQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

@@ -73,9 +73,11 @@ public interface WarehouseWithdrawalServiceMapper extends WarehouseProductSummar
     );
 
     /**
-     * Declaración gemela de {@code WorkerServiceMapper.toWorkerResponse} (sharedcatalogs):
-     * no se comparte para no crear un ciclo de packages warehouse <-> sharedcatalogs
-     * (sharedcatalogs ya importa warehouse.model.FleetUnitKind).
+     * Declaración gemela de {@code WorkerServiceMapper.toWorkerResponse}, que ahora vive en
+     * el módulo workers. El motivo original ya no vale: nacio para no cerrar un ciclo con
+     * sharedcatalogs, que importa warehouse.model.FleetUnitKind, y workers no importa nada
+     * de warehouse. Sigue duplicada porque unificarla es un cambio de estructura y esta
+     * mudanza no hace ninguno; queda anotado para cuando el modulo crezca.
      */
     @Mapping(target = "fullName", expression = "java(worker.fullName())")
     WorkerResponse toWorkerResponse(Worker worker);

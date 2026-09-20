@@ -1,4 +1,4 @@
-package com.scaramutti.tms.sharedcatalogs.worker.service.cmd;
+package com.scaramutti.tms.workers.service.cmd;
 
 /**
  * Filtros del listado de trabajadores (GET /workers), agrupados desde la capa REST.

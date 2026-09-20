@@ -1,4 +1,4 @@
-package com.scaramutti.tms.sharedcatalogs.worker.mapper;
+package com.scaramutti.tms.workers.mapper;
 
 import com.scaramutti.tms.shared.dto.WorkerResponse;
 import com.scaramutti.tms.shared.entity.Worker;
