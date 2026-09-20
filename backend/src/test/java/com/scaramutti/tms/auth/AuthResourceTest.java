@@ -20,7 +20,7 @@ class AuthResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body("""
-                {"username":"lcampos","password":"Sales1234"}
+                {"username":"sales","password":"Sales1234"}
                 """)
         .when()
             .post("/auth/login")
@@ -29,7 +29,7 @@ class AuthResourceTest {
             .body("token", notNullValue())
             .body("refreshToken", notNullValue())
             .body("expiresIn", equalTo(3600))
-            .body("user.username", equalTo("lcampos"))
+            .body("user.username", equalTo("sales"))
             .body("user.role", equalTo("sales"))
             .body("user.fullName", equalTo("Valeria Torres"));
     }
@@ -39,7 +39,7 @@ class AuthResourceTest {
         given()
             .contentType(ContentType.JSON)
             .body("""
-                {"username":"lcampos","password":"WRONG12345"}
+                {"username":"sales","password":"WRONG12345"}
                 """)
         .when()
             .post("/auth/login")

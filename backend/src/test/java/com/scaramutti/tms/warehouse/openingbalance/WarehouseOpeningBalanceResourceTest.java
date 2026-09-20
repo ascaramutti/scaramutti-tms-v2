@@ -423,7 +423,7 @@ class WarehouseOpeningBalanceResourceTest {
     @Test
     void create_withSalesRole_returns403_COM003() {
         int productId = fixtures.seedProduct("ZTEST_OB RoleSales");
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -679,7 +679,7 @@ class WarehouseOpeningBalanceResourceTest {
 
     @Test
     void list_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

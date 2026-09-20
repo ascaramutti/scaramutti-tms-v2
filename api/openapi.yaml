@@ -101,7 +101,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/LoginRequest' }
             example:
-              username: lcampos
+              username: sales
               password: 'P@ssw0rd123'
       responses:
         '200':
@@ -3442,7 +3442,7 @@ components:
           minLength: 3
           maxLength: 50
           pattern: '^[a-zA-Z0-9._-]+$'
-          example: 'lcampos'
+          example: 'sales'
         password:
           type: string
           format: password

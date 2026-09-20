@@ -35,10 +35,10 @@ import java.time.OffsetDateTime;
  *    general_manager, operations_manager
  *  - Usuarios dev con passwords conocidas:
  *      - admin / Admin1234       (role admin, activo)
- *      - lcampos / Sales1234     (role sales, activo)
+ *      - sales / Sales1234     (role sales, activo)
  *      - inactivo / Inactivo1234 (role sales, isActive=false, para tests AUTH-002)
  *
- * Cuando la BD viene de un restore de prod, los usuarios admin/lcampos ya existen
+ * Cuando la BD viene de un restore de prod, los usuarios admin/sales ya existen
  * con sus password hashes reales (desconocidos). En dev forzamos el password al
  * documentado para que el equipo pueda autenticarse, Y forzamos el nombre de
  * display al valor SINTÉTICO de acá (de-realificación): así ningún nombre real
@@ -70,9 +70,9 @@ public class DevDataSeeder {
         ensureRole("general_manager", "Gerente General");
         ensureRole("operations_manager", "Gerente de Operaciones");
 
-        ensureUser("admin",    "Admin1234",    "Admin",    "TMS",      "00000001", "Administrador del sistema", admin, true,  dniId);
-        ensureUser("lcampos",  "Sales1234",    "Valeria",  "Torres",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
-        ensureUser("inactivo", "Inactivo1234", "Usuario",  "Inactivo", "00000003", "Inactivo de prueba",        sales, false, dniId);
+        ensureUser("admin",    null,       "Admin1234",    "Admin",   "TMS",      "00000001", "Administrador del sistema", admin, true,  dniId);
+        ensureUser("sales",    "lcampos",  "Sales1234",    "Valeria", "Torres",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
+        ensureUser("inactivo", null,       "Inactivo1234", "Usuario", "Inactivo", "00000003", "Inactivo de prueba",        sales, false, dniId);
 
         ensureCurrency("USD", "$",  "Dólar Estadounidense");
         ensureCurrency("PEN", "S/", "Sol Peruano");
@@ -116,7 +116,7 @@ public class DevDataSeeder {
         // Integral (prefijo I → kind=INTEGRAL)
         ensureQuotationServiceType("INT", "Servicio Integral",                                         "Servicio integral con jerarquía padre+hijos (transporte + complementarios en un solo precio con descuento)");
 
-        LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo. "
+        LOG.info("Dev seed: usuarios garantizados — admin, sales, inactivo. "
             + "Monedas garantizadas — USD, PEN. "
             + "Términos de pago garantizados — Contado, 15d, 30d, 60d, 50/50. "
             + "Tipos de servicio cotizable garantizados — 8 servicios (S), 9 alquileres (A), 6 complementarios (C), 1 integral (I) = 24 total.");
@@ -195,11 +195,22 @@ public class DevDataSeeder {
      *   isActive Y el nombre del worker al valor sintético (de-realificación —
      *   dev/test nunca muestra el nombre real). Respeta role.
      * - Si no existe: lo crea junto con su worker.
+     *
+     * <p>{@code legacyUsername} es el nombre que el usuario tenía antes de que los
+     * sembrados pasaran a llamarse como su rol. Sin esto, una base restaurada de
+     * produccion conserva la fila vieja con el nombre REAL de una persona y el seeder
+     * crea otra al lado, o sea que la de-realificacion de arriba deja de cumplirse
+     * justo donde importa. Se puede borrar cuando ninguna base viva traiga el nombre
+     * viejo.
      */
-    private void ensureUser(String username, String password,
+    private void ensureUser(String username, String legacyUsername, String password,
                             String firstName, String lastName, String documentNumber, String position,
                             Role role, boolean isActive, Integer documentTypeId) {
         var existing = userRepository.findByUsername(username);
+        if (existing.isEmpty() && legacyUsername != null) {
+            existing = userRepository.findByUsername(legacyUsername);
+            existing.ifPresent(legacy -> legacy.username = username);
+        }
         if (existing.isPresent()) {
             User user = existing.get();
             user.passwordHash = passwordService.hash(password);

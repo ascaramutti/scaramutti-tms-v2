@@ -162,7 +162,7 @@ class WarehouseReportResourceTest {
 
     @Test
     void getReport_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         report(token, "BY_PRODUCT", "2026-06-01", "2026-06-30")
             .statusCode(403).body("code", equalTo("COM-003"));
     }

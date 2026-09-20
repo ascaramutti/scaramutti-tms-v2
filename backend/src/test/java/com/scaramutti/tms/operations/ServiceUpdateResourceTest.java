@@ -1279,8 +1279,8 @@ class ServiceUpdateResourceTest {
     @Test
     void update_signsTheChangeWithTheEditor() {
         long id = createService();
-        int salesUserId = fixtures.userId("lcampos");
-        String token = TestAuth.fabricateTokenForUser(salesUserId, "lcampos", "sales");
+        int salesUserId = fixtures.userId("sales");
+        String token = TestAuth.fabricateTokenForUser(salesUserId, "sales", "sales");
 
         Map<String, Object> payload = payloadOf(id);
         payload.put("price", 4100);
@@ -1296,7 +1296,7 @@ class ServiceUpdateResourceTest {
             .statusCode(200)
             // el creador NO cambia: lo editó otro
             .body("createdBy.username", equalTo("admin"))
-            .body("events[1].createdBy.username", equalTo("lcampos"));
+            .body("events[1].createdBy.username", equalTo("sales"));
 
         assertEquals(salesUserId, auditChangedBy(id), "la auditoría la firma quien editó");
         assertEquals(salesUserId, updatedByOf(id), "el servicio queda firmado por quien editó");

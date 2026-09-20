@@ -267,7 +267,7 @@ class WarehouseWithdrawalListResourceTest {
 
     @Test
     void list_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token)
         .when().get("/warehouse/withdrawals").then().statusCode(403).body("code", equalTo("COM-003"));
     }

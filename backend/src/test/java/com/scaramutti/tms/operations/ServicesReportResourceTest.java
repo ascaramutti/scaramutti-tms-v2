@@ -687,7 +687,7 @@ class ServicesReportResourceTest {
         seedCompleted(limaNoon(ANCHOR), penId, new BigDecimal("1234.56"));
 
         List<Map<String, Object>> rows = reportRequest(
-                TestAuth.fabricateAccessToken("lcampos", "sales"), ANCHOR.toString())
+                TestAuth.fabricateAccessToken("sales", "sales"), ANCHOR.toString())
             .then().statusCode(200).extract().jsonPath().getList("rows");
         assertEquals(1, rows.size(), "el caso esperaba exactamente una fila");
         Map<String, Object> row = rows.get(0);

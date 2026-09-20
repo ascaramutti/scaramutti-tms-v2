@@ -252,7 +252,7 @@ class CurrenciesResourceTest {
         // El admin ya esta cubierto en los happy path. Aca validamos que un rol
         // distinto (sales) tambien puede consultar — confirma que el endpoint
         // no discrimina por rol, solo exige autenticacion.
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

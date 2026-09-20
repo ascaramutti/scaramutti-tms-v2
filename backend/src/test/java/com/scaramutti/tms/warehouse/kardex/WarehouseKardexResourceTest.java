@@ -541,7 +541,7 @@ class WarehouseKardexResourceTest {
     @Test
     void kardex_withSalesRole_returns403_COM003() {
         int productId = fixtures.seedProduct("ZTEST_Kardex RoleSales");
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

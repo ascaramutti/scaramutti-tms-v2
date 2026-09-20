@@ -577,7 +577,7 @@ class CargoTypesResourceTest {
 
     @Test
     void list_withSalesRole_returns200() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token)
         .when().get("/cargo-types").then().statusCode(200);
     }
@@ -1224,7 +1224,7 @@ class CargoTypesResourceTest {
     void create_withSalesRole_returns201() {
         String name = "ZTEST_SALES_OK";
         try {
-            String token = login("lcampos", "Sales1234");
+            String token = login("sales", "Sales1234");
             given()
                 .header("Authorization", "Bearer " + token)
                 .contentType(ContentType.JSON)

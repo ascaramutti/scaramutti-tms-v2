@@ -6,7 +6,7 @@ public record UserResponse(
     @Schema(description = "ID del usuario", example = "2")
     Integer id,
 
-    @Schema(description = "Username (unico)", example = "lcampos")
+    @Schema(description = "Username (unico)", example = "sales")
     String username,
 
     @Schema(description = "Nombre completo (snapshot del Worker)", example = "Valeria Torres")

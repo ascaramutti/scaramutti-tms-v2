@@ -12,7 +12,7 @@ public record ServiceUserSummary(
     @Schema(description = "ID interno del usuario", example = "4")
     Integer id,
 
-    @Schema(description = "Usuario de acceso", example = "lcampos")
+    @Schema(description = "Usuario de acceso", example = "sales")
     String username,
 
     @Schema(description = "Nombre completo", example = "Valeria Torres")
