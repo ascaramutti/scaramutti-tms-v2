@@ -80,5 +80,6 @@ public interface WarehouseWithdrawalServiceMapper extends WarehouseProductSummar
      * mudanza no hace ninguno; queda anotado para cuando el modulo crezca.
      */
     @Mapping(target = "fullName", expression = "java(worker.fullName())")
+    @Mapping(target = "position", source = "role.description")
     WorkerResponse toWorkerResponse(Worker worker);
 }

@@ -18,6 +18,6 @@ public record ServiceUserSummary(
     @Schema(description = "Nombre completo", example = "Valeria Torres")
     String fullName,
 
-    @Schema(nullable = true, description = "Cargo del trabajador", example = "Ejecutiva de Ventas")
+    @Schema(nullable = true, description = "Cargo del trabajador", example = "Ejecutivo de Ventas")
     String position
 ) {}

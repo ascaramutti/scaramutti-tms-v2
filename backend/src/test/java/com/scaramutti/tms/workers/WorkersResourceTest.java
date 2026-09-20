@@ -39,13 +39,13 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_returnsSeededWorkerWithComposedFullName() {
-        int id = fixtures.seedWorker("ZTESTW900", "Juan", "Perez", "Mecánico", true);
+        int id = fixtures.seedWorker("ZTESTW900", "Juan", "Perez", "operator", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/workers")
         .then().statusCode(200)
             .body("find { it.id == " + id + " }.fullName", equalTo("Juan Perez"))
-            .body("find { it.id == " + id + " }.position", equalTo("Mecánico"))
+            .body("find { it.id == " + id + " }.position", equalTo("Operador"))
             .body("find { it.id == " + id + " }.isActive", equalTo(true));
     }
 
@@ -53,7 +53,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qMatchesPartialNameCaseInsensitive() {
-        int id = fixtures.seedWorker("ZTESTW902", "Carlos", "Ramirez", "Chofer", true);
+        int id = fixtures.seedWorker("ZTESTW902", "Carlos", "Ramirez", "driver", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("q", "carlos")
@@ -65,7 +65,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qMultiWordMatchesFirstAndLastName() {
-        int id = fixtures.seedWorker("ZTESTW903", "Juan", "Perez", "Mecánico", true);
+        int id = fixtures.seedWorker("ZTESTW903", "Juan", "Perez", "operator", true);
         String token = adminToken();
 
         // "juan perez": cada palabra matchea first_name O last_name (MultiWordSearch, AND de ORs)
@@ -76,7 +76,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qNoMatchReturnsEmptyArray() {
-        fixtures.seedWorker("ZTESTW910", "Ana", "Silva", "Ayudante", true);
+        fixtures.seedWorker("ZTESTW910", "Ana", "Silva", "assistant", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("q", "zzzznomatch999")
@@ -96,7 +96,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_isActiveFalseIncludesInactive() {
-        int id = fixtures.seedWorker("ZTESTW904", "Ines", "Torres", "Ayudante", false);
+        int id = fixtures.seedWorker("ZTESTW904", "Ines", "Torres", "assistant", false);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", false)
@@ -108,7 +108,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_isActiveTrueExcludesInactive() {
-        int id = fixtures.seedWorker("ZTESTW905", "Pedro", "Diaz", "Chofer", false);
+        int id = fixtures.seedWorker("ZTESTW905", "Pedro", "Diaz", "driver", false);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).queryParam("isActive", true)
@@ -118,8 +118,8 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_qAndIsActiveCombined() {
-        int active = fixtures.seedWorker("ZTESTW920", "Aaa", "Ztcombo", "Chofer", true);
-        int inactive = fixtures.seedWorker("ZTESTW921", "Bbb", "Ztcombo", "Chofer", false);
+        int active = fixtures.seedWorker("ZTESTW920", "Aaa", "Ztcombo", "driver", true);
+        int inactive = fixtures.seedWorker("ZTESTW921", "Bbb", "Ztcombo", "driver", false);
         String token = adminToken();
 
         // q acota por apellido comun; isActive=true debe excluir al inactivo (AND de las 2 condiciones)
@@ -133,7 +133,7 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_noFiltersIncludesSeeded() {
-        int id = fixtures.seedWorker("ZTESTW906", "Luis", "Vega", "Mecánico", true);
+        int id = fixtures.seedWorker("ZTESTW906", "Luis", "Vega", "operator", true);
         String token = adminToken();
 
         given().header("Authorization", "Bearer " + token).when().get("/workers")
@@ -142,8 +142,8 @@ class WorkersResourceTest {
 
     @Test
     void listWorkers_orderedByFirstNameAsc() {
-        int zeta = fixtures.seedWorker("ZTESTW907", "Zzz", "Ztestord", "Chofer", true);
-        int alfa = fixtures.seedWorker("ZTESTW908", "Aaa", "Ztestord", "Chofer", true);
+        int zeta = fixtures.seedWorker("ZTESTW907", "Zzz", "Ztestord", "driver", true);
+        int alfa = fixtures.seedWorker("ZTESTW908", "Aaa", "Ztestord", "driver", true);
         String token = adminToken();
 
         // q acota el universo a los 2 sembrados (last_name comun); orden por first_name: Aaa antes que Zzz

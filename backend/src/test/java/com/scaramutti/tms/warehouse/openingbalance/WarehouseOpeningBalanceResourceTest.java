@@ -277,7 +277,7 @@ class WarehouseOpeningBalanceResourceTest {
     @Test
     void create_productWithActiveSalida_returns409_WH011() {
         int productId = fixtures.seedProduct("ZTEST_OB ConSalida");
-        int workerId = fixtures.seedWorker("ZTESTW100", "Pedro", "Rios", "ZTEST Operario", true);
+        int workerId = fixtures.seedWorker("ZTESTW100", "Pedro", "Rios", "operator", true);
         seedWithdrawal(productId, "5", OffsetDateTime.now(), workerId, false);
         String token = login("admin", "Admin1234");
 
@@ -299,7 +299,7 @@ class WarehouseOpeningBalanceResourceTest {
         int supplierId = fixtures.seedSupplier("ZTEST_Proveedor OB Anulado");
         int cancelledInvoice = seedPurchaseInvoice(supplierId, "ZTEST-OB-INV2", OffsetDateTime.now(), true);
         seedPurchaseInvoiceItem(cancelledInvoice, productId, "999");
-        int workerId = fixtures.seedWorker("ZTESTW101", "Julia", "Soto", "ZTEST Operario", true);
+        int workerId = fixtures.seedWorker("ZTESTW101", "Julia", "Soto", "operator", true);
         seedWithdrawal(productId, "999", OffsetDateTime.now(), workerId, true);
         String token = login("admin", "Admin1234");
 

@@ -12,7 +12,7 @@ public record UserResponse(
     @Schema(description = "Nombre completo (snapshot del Worker)", example = "Valeria Torres")
     String fullName,
 
-    @Schema(description = "Cargo (Worker.position)", example = "Ejecutiva de Ventas")
+    @Schema(description = "Cargo: el nombre visible del rol del trabajador", example = "Ejecutivo de Ventas")
     String position,
 
     @Schema(description = "Rol del sistema", example = "sales")

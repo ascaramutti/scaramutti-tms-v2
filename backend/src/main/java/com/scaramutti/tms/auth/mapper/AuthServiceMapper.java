@@ -36,7 +36,7 @@ public interface AuthServiceMapper {
      */
     @Mapping(target = "fullName",
              expression = "java(user.worker != null ? user.worker.fullName() : null)")
-    @Mapping(target = "position", source = "worker.position")
+    @Mapping(target = "position", source = "worker.role.description")
     @Mapping(target = "role",     source = "role.name")
     UserResponse toUserResponse(User user);
 

@@ -2,6 +2,7 @@ package com.scaramutti.tms.workers.service;
 
 import com.scaramutti.tms.workers.mapper.WorkerServiceMapper;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
+import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
 import com.scaramutti.tms.workers.service.cmd.ListWorkersQuery;
@@ -37,12 +38,14 @@ class WorkerServiceTest {
         workerService.workerServiceMapper = Mappers.getMapper(WorkerServiceMapper.class);
     }
 
-    private Worker worker(int id, String first, String last, String position, boolean isActive) {
+    private Worker worker(int id, String first, String last, String roleDescription, boolean isActive) {
         Worker w = new Worker();
         w.id = id;
         w.firstName = first;
         w.lastName = last;
-        w.position = position;
+        Role role = new Role();
+        role.description = roleDescription;
+        w.role = role;
         w.isActive = isActive;
         return w;
     }
@@ -50,7 +53,7 @@ class WorkerServiceTest {
     @Test
     void listWorkers_delegatesFilterToRepositoryAndMapsFullName() {
         when(workerRepository.search("juan", true))
-            .thenReturn(List.of(worker(8, "Juan", "Perez", "Mecánico", true)));
+            .thenReturn(List.of(worker(8, "Juan", "Perez", "Operador", true)));
 
         List<WorkerResponse> result = workerService.listWorkers(new ListWorkersQuery("juan", true));
 
@@ -59,7 +62,7 @@ class WorkerServiceTest {
         WorkerResponse r = result.get(0);
         assertEquals(8, r.id());
         assertEquals("Juan Perez", r.fullName());
-        assertEquals("Mecánico", r.position());
+        assertEquals("Operador", r.position());
         assertEquals(true, r.isActive());
     }
 

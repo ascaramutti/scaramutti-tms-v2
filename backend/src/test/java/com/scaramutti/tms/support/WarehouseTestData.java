@@ -4,6 +4,7 @@ import com.scaramutti.tms.shared.entity.Product;
 import com.scaramutti.tms.shared.entity.Supplier;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.ProductRepository;
+import com.scaramutti.tms.shared.repository.RoleRepository;
 import com.scaramutti.tms.shared.repository.SupplierRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
@@ -14,6 +15,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -69,6 +71,10 @@ public class WarehouseTestData {
     @Inject ProductRepository productRepository;
     @Inject SupplierRepository supplierRepository;
     @Inject WorkerRepository workerRepository;
+    @Inject RoleRepository roleRepository;
+
+    /** Fecha de ingreso de los trabajadores de prueba: fija, para que nada dependa del día. */
+    private static final LocalDate SEEDED_HIRE_DATE = LocalDate.of(2024, 1, 1);
     @Inject UserRepository userRepository;
     @Inject EntityManager entityManager;
 
@@ -183,16 +189,23 @@ public class WarehouseTestData {
 
     /** Operario activo genérico ({@code ZTEST}/{@code Operario}). */
     public int seedWorker(String documentNumber) {
-        return seedWorker(documentNumber, "ZTEST", "Operario", "ZTEST Operario", true);
+        return seedWorker(documentNumber, "ZTEST", "Operario", "operator", true);
     }
 
     /** Operario genérico con {@code isActive} explícito. */
     public int seedWorker(String documentNumber, boolean isActive) {
-        return seedWorker(documentNumber, "ZTEST", "Operario", "ZTEST Operario", isActive);
+        return seedWorker(documentNumber, "ZTEST", "Operario", "operator", isActive);
     }
 
-    /** Trabajador con nombre/apellido/puesto/estado explícitos. */
-    public int seedWorker(String documentNumber, String firstName, String lastName, String position,
+    /**
+     * Trabajador con nombre, apellido, ROL y estado explícitos. El cuarto parámetro es el
+     * NOMBRE DE SISTEMA del rol ("operator", "driver", "assistant"…), no el texto visible
+     * del cargo: desde que el cargo es el rol, un texto libre no identifica ninguna fila.
+     *
+     * <p>La fecha de ingreso es fija y no "hoy": una fecha móvil hace que un caso que la
+     * compare falle un día al año.
+     */
+    public int seedWorker(String documentNumber, String firstName, String lastName, String roleName,
             boolean isActive) {
         return QuarkusTransaction.requiringNew().call(() -> {
             Worker worker = new Worker();
@@ -200,7 +213,9 @@ public class WarehouseTestData {
             worker.lastName = lastName;
             worker.documentTypeId = dniDocumentTypeId();
             worker.documentNumber = documentNumber;
-            worker.position = position;
+            worker.role = roleRepository.findByName(roleName).orElseThrow(
+                () -> new IllegalArgumentException("El rol " + roleName + " no existe: el fixture lo necesita sembrado"));
+            worker.hireDate = SEEDED_HIRE_DATE;
             worker.isActive = isActive;
             worker.createdAt = OffsetDateTime.now();
             workerRepository.persist(worker);

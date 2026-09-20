@@ -98,6 +98,9 @@ class WarehouseWithdrawalByIdResourceTest {
             .body("product.id", equalTo(productId))
             .body("quantity", equalTo(3.0f))
             .body("receivedBy.id", equalTo(workerId))
+            // Y su cargo, que desde el modulo de trabajadores sale del nombre visible del
+            // rol. El trabajador sembrado nace con rol de operador.
+            .body("receivedBy.position", equalTo("Operador"))
             .body("fleetUnit", nullValue())
             .body("status", equalTo("ACTIVE"))
             .body("registeredBy.username", equalTo("admin"))

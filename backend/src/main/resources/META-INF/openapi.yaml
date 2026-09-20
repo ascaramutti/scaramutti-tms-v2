@@ -51,7 +51,7 @@ tags:
   - name: Operations
     description: Operaciones — servicios de transporte (viajes)
   - name: SharedCatalogs
-    description: 'Catálogos compartidos read-only (public): trabajadores y unidades de flota, reutilizados por Almacén y Operaciones'
+    description: 'Catálogos compartidos de `public` reutilizados por Almacén y Operaciones: el listado de trabajadores, la flota unificada y los conductores'
 
 # =============================================================================
 paths:
@@ -3143,7 +3143,7 @@ components:
         id:       { type: integer, format: int32 }
         username: { type: string, example: 'sales' }
         fullName: { type: string, example: 'Valeria Torres' }
-        position: { type: [string, 'null'], description: 'Cargo del trabajador (ej: Ejecutiva de Ventas)', example: 'Ejecutiva de Ventas' }
+        position: { type: [string, 'null'], description: 'Cargo: el nombre visible del rol del trabajador', example: 'Ejecutivo de Ventas' }
 
     UserResponse:
       allOf:
@@ -4109,12 +4109,12 @@ components:
     # -------- Warehouse: retiros ---------------------------------------------------
     WorkerResponse:
       type: object
-      description: Trabajador de public.workers (catalogo compartido con v1, read-only desde v2).
+      description: Trabajador de public.workers; es la forma del LISTADO, la que alimenta los combobox.
       required: [id, fullName, isActive]
       properties:
         id:       { type: integer }
         fullName: { type: string, example: 'Juan Pérez Huamán' }
-        position: { type: [string, 'null'], example: 'Mecánico' }
+        position: { type: [string, 'null'], example: 'Operador' }
         isActive: { type: boolean }
 
     FleetUnitKind:

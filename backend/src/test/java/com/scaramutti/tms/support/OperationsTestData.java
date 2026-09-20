@@ -297,7 +297,7 @@ public class OperationsTestData {
             String statusName, boolean isActive, boolean workerIsActive) {
         long n = SEQ.incrementAndGet();
         int workerId = warehouseFixtures.seedWorker(
-            "ZTESTD" + n, firstName, lastName, "Conductor", workerIsActive);
+            "ZTESTD" + n, firstName, lastName, "driver", workerIsActive);
         if (phone != null) {
             QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
                 "UPDATE public.workers SET phone = ?1 WHERE id = ?2")

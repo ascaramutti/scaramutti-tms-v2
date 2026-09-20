@@ -3,6 +3,7 @@ package com.scaramutti.tms.warehouse.withdrawal.service;
 import com.scaramutti.tms.auth.dto.UserResponse;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.UserLookup;
+import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.Product;
 import com.scaramutti.tms.shared.entity.Tractor;
 import com.scaramutti.tms.shared.entity.UnitOfMeasure;
@@ -91,7 +92,9 @@ class WarehouseWithdrawalServiceTest {
         w.id = WORKER_ID;
         w.firstName = "Juan";
         w.lastName = "Perez";
-        w.position = "Mecanico";
+        Role role = new Role();
+        role.description = "Operador";
+        w.role = role;
         w.isActive = true;
         return w;
     }

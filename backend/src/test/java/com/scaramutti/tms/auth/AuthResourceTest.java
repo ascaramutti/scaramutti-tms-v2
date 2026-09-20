@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Instant;
 
 import static io.restassured.RestAssured.given;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 
@@ -30,6 +31,10 @@ class AuthResourceTest {
             .body("refreshToken", notNullValue())
             .body("expiresIn", equalTo(3600))
             .body("user.username", equalTo("sales"))
+            // El cargo de la sesion es el NOMBRE VISIBLE del rol, no su nombre de sistema.
+            // Los dos son texto y compilan igual en el mapeo, asi que sin esta linea cambiar
+            // uno por el otro pasa entero: el pie del menu diria "sales" en vez del cargo.
+            .body("user.position", equalTo("Ejecutivo de Ventas"))
             .body("user.role", equalTo("sales"))
             .body("user.fullName", equalTo("Valeria Torres"));
     }
@@ -478,4 +483,28 @@ class AuthResourceTest {
             "/auth/change-password",
             "{\"currentPassword\":\"Admin1234\",\"newPassword\":\"Otra12345\"}");
     }
+    /**
+     * El cargo que viaja DENTRO del token de acceso.
+     *
+     * <p>Es el tercer lector del nombre visible del rol y el unico sin respuesta propia que
+     * mirar: el pie del menu y la firma de auditoria del frontend lo leen de acá y no de una
+     * llamada. Se decodifica la carga util del token sin verificar la firma, que ya cuida
+     * cualquier request autenticado; lo que se mide es el contenido de un claim.
+     */
+    @Test
+    void login_theAccessTokenCarriesTheVisibleNameOfTheRole() {
+        String token = given()
+            .contentType(ContentType.JSON)
+            .body("{\"username\":\"sales\",\"password\":\"Sales1234\"}")
+        .when()
+            .post("/auth/login")
+        .then().statusCode(200).extract().jsonPath().getString("token");
+
+        String payload = new String(java.util.Base64.getUrlDecoder()
+            .decode(token.split("\\.")[1]), java.nio.charset.StandardCharsets.UTF_8);
+
+        assertTrue(payload.contains("\"position\":\"Ejecutivo de Ventas\""),
+            "el claim del cargo tiene que traer el nombre visible del rol; carga util: " + payload);
+    }
+
 }

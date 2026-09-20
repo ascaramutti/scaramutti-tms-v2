@@ -75,7 +75,7 @@ export type UserRef = {
     username: string;
     fullName: string;
     /**
-     * Cargo del trabajador (ej: Ejecutiva de Ventas)
+     * Cargo: el nombre visible del rol del trabajador
      */
     position?: string | null;
 };
@@ -968,7 +968,7 @@ export type PageOfWarehousePurchaseInvoiceSummary = PageMeta & {
 };
 
 /**
- * Trabajador de public.workers (catalogo compartido con v1, read-only desde v2).
+ * Trabajador de public.workers; es la forma del LISTADO, la que alimenta los combobox.
  */
 export type WorkerResponse = {
     id: number;

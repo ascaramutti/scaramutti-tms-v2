@@ -192,7 +192,7 @@ class WarehouseKardexResourceTest {
     void kardex_salida_withUnit_referenceIncludesPlate() {
         int productId = fixtures.seedProduct("ZTEST_Kardex SalidaConUnidad");
         seedOpeningBalance(productId, "50", lima(2026, 1, 1, 8, 0));
-        int workerId = fixtures.seedWorker("ZTESTW001", "Carlos", "Quispe", "ZTEST Operario", true);
+        int workerId = fixtures.seedWorker("ZTESTW001", "Carlos", "Quispe", "operator", true);
         int tractorId = fixtures.seedTractor("Z90001");
         int withdrawalId = seedWithdrawal(productId, "10", lima(2026, 1, 2, 10, 0), workerId, tractorId, false);
         String token = login("admin", "Admin1234");
@@ -214,7 +214,7 @@ class WarehouseKardexResourceTest {
     void kardex_salida_withoutUnit_referenceOmitsPlateGracefully() {
         int productId = fixtures.seedProduct("ZTEST_Kardex SalidaSinUnidad");
         seedOpeningBalance(productId, "50", lima(2026, 1, 1, 8, 0));
-        int workerId = fixtures.seedWorker("ZTESTW002", "Rosa", "Diaz", "ZTEST Operario", true);
+        int workerId = fixtures.seedWorker("ZTESTW002", "Rosa", "Diaz", "operator", true);
         seedWithdrawal(productId, "5", lima(2026, 1, 2, 10, 0), workerId, null, false);
         String token = login("admin", "Admin1234");
 
@@ -243,7 +243,7 @@ class WarehouseKardexResourceTest {
         seedOpeningBalance(productId, "100", lima(2026, 2, 1, 8, 0));
         int invoice1 = seedPurchaseInvoice(supplierId, "ZTEST-INV-PAG1", lima(2026, 2, 2, 8, 0), false);
         seedPurchaseInvoiceItem(invoice1, productId, "50");
-        int workerId = fixtures.seedWorker("ZTESTW010", "Luis", "Mamani", "ZTEST Operario", true);
+        int workerId = fixtures.seedWorker("ZTESTW010", "Luis", "Mamani", "operator", true);
         seedWithdrawal(productId, "30", lima(2026, 2, 3, 8, 0), workerId, null, false);
         int invoice2 = seedPurchaseInvoice(supplierId, "ZTEST-INV-PAG2", lima(2026, 2, 4, 8, 0), false);
         seedPurchaseInvoiceItem(invoice2, productId, "20");
@@ -353,7 +353,7 @@ class WarehouseKardexResourceTest {
         seedOpeningBalance(productId, "100", lima(2026, 6, 1, 8, 0));
         int cancelledInvoice = seedPurchaseInvoice(supplierId, "ZTEST-INV-CAN1", lima(2026, 6, 2, 8, 0), true);
         seedPurchaseInvoiceItem(cancelledInvoice, productId, "999");
-        int workerId = fixtures.seedWorker("ZTESTW020", "Ana", "Vega", "ZTEST Operario", true);
+        int workerId = fixtures.seedWorker("ZTESTW020", "Ana", "Vega", "operator", true);
         seedWithdrawal(productId, "999", lima(2026, 6, 3, 8, 0), workerId, null, true);
         int activeInvoice = seedPurchaseInvoice(supplierId, "ZTEST-INV-CAN2", lima(2026, 6, 4, 8, 0), false);
         seedPurchaseInvoiceItem(activeInvoice, productId, "30");
