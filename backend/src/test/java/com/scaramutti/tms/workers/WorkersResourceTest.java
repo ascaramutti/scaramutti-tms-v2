@@ -1,4 +1,4 @@
-package com.scaramutti.tms.sharedcatalogs.worker;
+package com.scaramutti.tms.workers;
 
 import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;

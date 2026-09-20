@@ -12,7 +12,8 @@ import java.time.OffsetDateTime;
 /**
  * Conductor de {@code public.drivers} (catalogo compartido con v1, read-only desde v2: el
  * alta pertenece a la futura gestion de flota y personal). Vive en {@code shared/entity/}
- * porque {@code drivers} no tiene un modulo dueno en v2, igual que {@link Worker}.
+ * como las 31 entidades del proyecto, sin excepcion: es la convencion, no una consecuencia
+ * de que el catalogo no tenga modulo.
  *
  * <p>El nombre no esta aca: sale del trabajador asociado ({@code worker_id}), y la
  * disponibilidad es una FK al catalogo {@code public.resource_statuses}. El listado los

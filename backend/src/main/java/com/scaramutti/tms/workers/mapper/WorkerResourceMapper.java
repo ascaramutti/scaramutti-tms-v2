@@ -1,8 +1,8 @@
-package com.scaramutti.tms.sharedcatalogs.worker.mapper;
+package com.scaramutti.tms.workers.mapper;
 
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.StringUtils;
-import com.scaramutti.tms.sharedcatalogs.worker.service.cmd.ListWorkersQuery;
+import com.scaramutti.tms.workers.service.cmd.ListWorkersQuery;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.NullValueMappingStrategy;

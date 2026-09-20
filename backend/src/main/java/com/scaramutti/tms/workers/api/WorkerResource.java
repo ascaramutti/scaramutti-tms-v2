@@ -1,8 +1,8 @@
-package com.scaramutti.tms.sharedcatalogs.worker.api;
+package com.scaramutti.tms.workers.api;
 
 import com.scaramutti.tms.shared.dto.WorkerResponse;
-import com.scaramutti.tms.sharedcatalogs.worker.mapper.WorkerResourceMapper;
-import com.scaramutti.tms.sharedcatalogs.worker.service.WorkerService;
+import com.scaramutti.tms.workers.mapper.WorkerResourceMapper;
+import com.scaramutti.tms.workers.service.WorkerService;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.validation.constraints.Size;
