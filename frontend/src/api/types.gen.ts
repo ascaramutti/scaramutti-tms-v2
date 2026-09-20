@@ -3532,6 +3532,35 @@ export type GetWarehouseReportResponses = {
 
 export type GetWarehouseReportResponse = GetWarehouseReportResponses[keyof GetWarehouseReportResponses];
 
+export type ListDocumentTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/document-types';
+};
+
+export type ListDocumentTypesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListDocumentTypesError = ListDocumentTypesErrors[keyof ListDocumentTypesErrors];
+
+export type ListDocumentTypesResponses = {
+    /**
+     * Tipos de documento activos
+     */
+    200: Array<DocumentTypeResponse>;
+};
+
+export type ListDocumentTypesResponse = ListDocumentTypesResponses[keyof ListDocumentTypesResponses];
+
 export type ListWorkersData = {
     body?: never;
     path?: never;

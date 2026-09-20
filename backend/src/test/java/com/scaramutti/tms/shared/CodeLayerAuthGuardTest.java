@@ -67,6 +67,8 @@ class CodeLayerAuthGuardTest {
         "/cargo-types",
         "/clients",
         "/workers",
+        "/document-types",
+        "/document-types",
         "/auth/me",
     })
     void withoutToken_andWithoutTheRoutePolicy_returns401(String path) {
@@ -113,6 +115,8 @@ class CodeLayerAuthGuardTest {
         "/cargo-types",
         "/clients",
         "/workers",
+        "/document-types",
+        "/document-types",
         "/auth/me",
     })
     void withAValidToken_theGuardLetsThrough(String path) {
@@ -190,6 +194,8 @@ class CodeLayerAuthGuardTest {
         "/cargo-types",
         "/clients",
         "/workers",
+        "/document-types",
+        "/document-types",
         "/auth/me",
     })
     void withTrickyUrls_andWithoutTheRoutePolicy_returns401(String path) {

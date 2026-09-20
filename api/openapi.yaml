@@ -1179,6 +1179,31 @@ paths:
 
   # ----- Catálogos compartidos (schema public) --------------------------------
 
+  /document-types:
+    get:
+      tags: [Workers]
+      operationId: listDocumentTypes
+      summary: Listar tipos de documento vigentes
+      description: |
+        Catálogo `public.document_types`, solo los activos, ordenados por `id`
+        (el orden de carga del catálogo). Cada uno trae el largo máximo y el
+        patrón de validación (nulo si no tiene) para que el formulario limite el
+        número antes de enviarlo; la autoridad sigue siendo el backend (`WRK-003`,
+        `WRK-004`). Sin paginar: dos filas. Roles: los cuatro que mantienen el
+        padrón.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: Tipos de documento activos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DocumentTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+
   /workers:
     get:
       tags: [SharedCatalogs]
