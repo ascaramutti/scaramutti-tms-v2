@@ -29,6 +29,7 @@ import static org.mockito.Mockito.when;
 class WorkerServiceTest {
 
     @Mock WorkerRepository workerRepository;
+    @Mock WorkerDocumentSearchVisibility workerDocumentSearchVisibility;
     @InjectMocks WorkerService workerService;
 
     // El mapper es un colaborador REAL (impl generada por MapStruct), no un mock:
@@ -52,12 +53,13 @@ class WorkerServiceTest {
 
     @Test
     void listWorkers_delegatesFilterToRepositoryAndMapsFullName() {
-        when(workerRepository.search("juan", true))
+        when(workerDocumentSearchVisibility.includeDocumentNumber()).thenReturn(true);
+        when(workerRepository.search("juan", true, true))
             .thenReturn(List.of(worker(8, "Juan", "Perez", "Operador", true)));
 
         List<WorkerResponse> result = workerService.listWorkers(new ListWorkersQuery("juan", true));
 
-        verify(workerRepository).search("juan", true);
+        verify(workerRepository).search("juan", true, true);
         assertEquals(1, result.size());
         WorkerResponse r = result.get(0);
         assertEquals(8, r.id());
@@ -68,10 +70,27 @@ class WorkerServiceTest {
 
     @Test
     void listWorkers_emptyRepositoryResult_returnsEmptyList() {
-        when(workerRepository.search(null, null)).thenReturn(List.of());
+        when(workerDocumentSearchVisibility.includeDocumentNumber()).thenReturn(true);
+        when(workerRepository.search(null, null, true)).thenReturn(List.of());
 
         List<WorkerResponse> result = workerService.listWorkers(new ListWorkersQuery(null, null));
 
         assertEquals(0, result.size());
     }
+
+    /**
+     * La gemela del caso de arriba. Las dos juntas son lo que distingue "el servicio le pasa
+     * al repositorio lo que la guarda decidio" de "el servicio le pasa siempre lo mismo":
+     * con una sola, devolver una constante pasa igual.
+     */
+    @Test
+    void listWorkers_whenTheGuardDenies_asksTheRepositoryNotToSearchByDocument() {
+        when(workerDocumentSearchVisibility.includeDocumentNumber()).thenReturn(false);
+        when(workerRepository.search("juan", true, false)).thenReturn(List.of());
+
+        workerService.listWorkers(new ListWorkersQuery("juan", true));
+
+        verify(workerRepository).search("juan", true, false);
+    }
+
 }

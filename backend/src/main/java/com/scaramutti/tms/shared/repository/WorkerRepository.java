@@ -39,17 +39,27 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
 
     /**
      * Listado (sin paginar) de {@code public.workers} para el combobox "quien recibe" del
-     * retiro (GET /workers). {@code q} es multi-palabra (RN-WH14, molde suppliers/products):
-     * cada palabra debe matchear en {@code first_name} O {@code last_name}; nulo = sin filtro.
-     * {@code isActive} nulo = ambos. Orden natural {@code first_name, last_name} ASC (el
-     * frontend reordena para presentacion, politica de catalogos). Query nativa para poder
-     * usar {@link MultiWordSearch}; devuelve entidades gestionadas.
+     * retiro y para la busqueda del padron (GET /workers). {@code q} es multi-palabra (molde
+     * suppliers/products): cada palabra debe matchear en alguna de las columnas buscadas;
+     * nulo = sin filtro. {@code isActive} nulo = ambos. Orden natural
+     * {@code first_name, last_name} ASC (el frontend reordena para presentacion, politica de
+     * catalogos). Query nativa para poder usar {@link MultiWordSearch}; devuelve entidades
+     * gestionadas.
+     *
+     * <p>{@code includeDocumentNumber} decide si la busqueda mira tambien el numero de
+     * documento. Es un parametro y no una constante porque no todos los que leen este listado
+     * pueden buscar por documento: quien no ve ese numero en ninguna respuesta tampoco debe
+     * poder confirmarlo probando prefijos. Quien decide es
+     * {@code WorkerDocumentSearchVisibility}; este repositorio solo obedece.
      */
-    public List<Worker> search(String q, Boolean isActive) {
+    public List<Worker> search(String q, Boolean isActive, boolean includeDocumentNumber) {
         Map<String, Object> params = new LinkedHashMap<>();
         List<String> conditions = new ArrayList<>();
         if (q != null) {
-            conditions.addAll(MultiWordSearch.conditions(q, List.of("first_name", "last_name"), "qtok", params));
+            List<String> searchedColumns = includeDocumentNumber
+                ? List.of("first_name", "last_name", "document_number")
+                : List.of("first_name", "last_name");
+            conditions.addAll(MultiWordSearch.conditions(q, searchedColumns, "qtok", params));
         }
         if (isActive != null) {
             conditions.add("is_active = :isActive");

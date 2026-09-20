@@ -1216,8 +1216,8 @@ paths:
         Catálogo `public.document_types`, solo los activos, ordenados por `id`
         (el orden de carga del catálogo). Cada uno trae el largo máximo y el
         patrón de validación (nulo si no tiene) para que el formulario limite el
-        número antes de enviarlo; la autoridad sigue siendo el backend (`WRK-003`,
-        `WRK-004`). Sin paginar: dos filas. Roles: los cuatro que mantienen el
+        número antes de enviarlo; la autoridad será el backend cuando exista el alta (`WRK-003` y
+        `WRK-004`, historia siguiente). Sin paginar: el catálogo es chico. Roles: los cuatro que mantienen el
         padrón.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager]
       responses:
@@ -1236,21 +1236,28 @@ paths:
     get:
       tags: [SharedCatalogs]
       operationId: listWorkers
-      summary: Listar trabajadores (combobox "quién recibe" del retiro)
+      summary: Listar trabajadores (combobox "quién recibe" del retiro y búsqueda del padrón)
       description: |
-        Catálogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
-        en v1). **Solo búsqueda rápida — SIN creación al vuelo** (regla del dueño
-        2026-07-04: trabajadores y unidades de flota nunca se crean desde
-        almacén; RN-WH9). Sin paginar — plantilla chica. `q` es multi-palabra
-        case-insensitive (≥ 3 caracteres): cada palabra debe matchear en el
-        nombre O el apellido (RN-WH14); para no filtrar, OMITIR el parámetro.
+        Catálogo compartido `public.workers`. **Solo búsqueda rápida — SIN
+        creación al vuelo** (regla del dueño 2026-07-04: trabajadores y unidades
+        de flota nunca se crean desde almacén). Sin paginar — plantilla chica.
+        `q` es multi-palabra case-insensitive (≥ 3 caracteres): cada palabra
+        debe matchear en el nombre o el apellido y, **solo para los cuatro roles
+        que mantienen el padrón**, también en el número de documento. Para el
+        encargado de almacén la búsqueda sigue siendo por nombre y apellido: ese
+        número no viaja en esta respuesta, y buscarlo permitiría confirmarlo
+        probando prefijos. (Esta última frase NO se porta a la spec runtime a
+        propósito: ese documento se sirve sin sesión y no tiene por qué
+        describir el ataque que la guarda cierra.) Para no filtrar, OMITIR el
+        parámetro.
         Operaciones NO lo consume: para asignar un viaje necesita conductores
-        (`GET /drivers`), no la planilla completa.
+        (`GET /drivers`), no la planilla completa. El detalle completo de un
+        trabajador es `GET /workers/{id}`.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          description: Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: isActive, in: query, schema: { type: boolean } }
       responses:
@@ -4281,8 +4288,9 @@ components:
         Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
         nombre de sistema (el que llevan `users.role` y el token de sesión, y
         el que se manda en `role` del request); `description` es el nombre
-        visible del cargo (también es el `position` que llevan el token de
-        sesión, `/auth/me` y `listWorkers`); `level` es el nivel del
+        visible del cargo: es el `position` de todo objeto de usuario embebido
+        (sesión, cotizaciones, almacén, operaciones y el detalle de un
+        trabajador) y el `receivedBy` de un retiro; `level` es el nivel del
         organigrama (4 `admin`; 3 `general_manager`, `operations_manager`; 2
         `finance_manager`, `dispatcher`, `sales`, `warehouse_keeper`; 1
         `driver`, `escort`, `assistant`, `operator`); `canLogin` dice si el rol
@@ -4300,7 +4308,7 @@ components:
       description: |
         Tipo de documento de identidad (`public.document_types`). `maxLength` y
         `validationPattern` (expresión regular completa, nula si el tipo no
-        define patrón) son los que el backend aplica al número (`WRK-004`).
+        define patrón) son los que el backend aplicará al número cuando exista el alta (`WRK-004`).
       required: [id, code, name, maxLength]
       properties:
         id:                { type: integer, format: int32, example: 1 }

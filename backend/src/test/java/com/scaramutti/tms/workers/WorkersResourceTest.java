@@ -5,7 +5,10 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
@@ -30,6 +33,7 @@ class WorkersResourceTest {
 
     @Inject WarehouseTestData fixtures;
 
+    @BeforeEach
     @AfterEach
     void cleanupFixtures() {
         QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestWorkers());
@@ -186,4 +190,90 @@ class WorkersResourceTest {
         given().header("Authorization", "Bearer " + fabricateAccessToken("om_test", "operations_manager"))
         .when().get("/workers").then().statusCode(200);
     }
+    // ---------- busqueda por numero de documento ---------------------------------
+
+    @Test
+    void listWorkers_qMatchesTheDocumentNumber() {
+        int id = fixtures.seedWorker("ZTESTW940", "Ana", "Silva", "operator", true);
+        String token = adminToken();
+
+        given().header("Authorization", "Bearer " + token).queryParam("q", "ZTESTW94")
+        .when().get("/workers")
+        .then().statusCode(200).body("id", hasItem(id));
+    }
+
+    /** Cada palabra puede caer en una columna distinta: una en el nombre y otra en el documento. */
+    @Test
+    void listWorkers_qMixesWordsAcrossNameAndDocument() {
+        int id = fixtures.seedWorker("ZTESTW941", "Bruno", "Salas", "operator", true);
+        String token = adminToken();
+
+        given().header("Authorization", "Bearer " + token).queryParam("q", "bruno ZTESTW941")
+        .when().get("/workers")
+        .then().statusCode(200).body("id", hasItem(id));
+    }
+
+    /**
+     * El encargado de almacen NO encuentra por documento. Ese numero no viaja en esta
+     * respuesta, asi que dejarlo buscar permitiria confirmarlo probando prefijos: con tres
+     * digitos por consulta, un documento de ocho sale en unas decenas de intentos.
+     */
+    @Test
+    void listWorkers_qByDocument_asWarehouseKeeper_findsNothing() {
+        int id = fixtures.seedWorker("ZTESTW942", "Clara", "Soto", "operator", true);
+
+        given().header("Authorization", "Bearer "
+                + fabricateAccessToken("ztest-wk", "warehouse_keeper"))
+            .queryParam("q", "ZTESTW94")
+        .when().get("/workers")
+        .then().statusCode(200).body("id", not(hasItem(id)));
+    }
+
+    /**
+     * El control del caso de arriba: la guarda cerro la columna del documento y NO rompio la
+     * busqueda de siempre. Sin este par, "cerre la columna" y "rompi la busqueda" se ven igual.
+     */
+    @Test
+    void listWorkers_qByName_asWarehouseKeeper_stillFinds() {
+        int id = fixtures.seedWorker("ZTESTW943", "Damian", "Ztbusca", "operator", true);
+
+        given().header("Authorization", "Bearer "
+                + fabricateAccessToken("ztest-wk", "warehouse_keeper"))
+            .queryParam("q", "Ztbusca")
+        .when().get("/workers")
+        .then().statusCode(200).body("id", hasItem(id));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "general_manager", "operations_manager", "finance_manager"})
+    void listWorkers_qByDocument_forEachMaintenanceRole_finds(String role) {
+        int id = fixtures.seedWorker("ZTESTW944", "Elsa", "Vera", "operator", true);
+
+        given().header("Authorization", "Bearer " + fabricateAccessToken("ztest-" + role, role))
+            .queryParam("q", "ZTESTW944")
+        .when().get("/workers")
+        .then().statusCode(200).body("id", hasItem(id));
+    }
+
+    /**
+     * El parametro de busqueda VACIO equivale a omitirlo, y esto lo fija porque es
+     * contraintuitivo: la validacion de largo minimo parece que deberia rechazarlo, y no lo
+     * hace, porque un parametro de consulta vacio llega como nulo y esa validacion deja pasar
+     * los nulos. Lo encontro la bateria por curl contra el servidor: al leer la anotacion, la
+     * conclusion es la contraria. Medido ademas en clientes y en tipos de carga, que se
+     * comportan igual.
+     */
+    @Test
+    void listWorkers_withEmptyQ_behavesLikeOmittingIt() {
+        int id = fixtures.seedWorker("ZTESTW950", "Fabio", "Ztvacio", "operator", true);
+        String token = adminToken();
+
+        // No se comparan tamanios entre dos peticiones: la tabla es compartida y cualquier
+        // insercion en el medio voltearia el caso por algo que no es el codigo. Que aparezca
+        // el trabajador sembrado ya prueba lo que el caso promete: el parametro vacio no filtra.
+        given().header("Authorization", "Bearer " + token).queryParam("q", "")
+        .when().get("/workers")
+        .then().statusCode(200).body("id", hasItem(id));
+    }
+
 }

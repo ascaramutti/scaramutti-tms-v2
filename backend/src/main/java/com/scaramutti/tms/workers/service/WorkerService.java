@@ -22,11 +22,13 @@ import java.util.List;
 public class WorkerService {
 
     @Inject WorkerRepository workerRepository;
+    @Inject WorkerDocumentSearchVisibility workerDocumentSearchVisibility;
     @Inject WorkerServiceMapper workerServiceMapper;
 
     public List<WorkerResponse> listWorkers(ListWorkersQuery query) {
         return workerServiceMapper.toWorkerResponseList(
-            workerRepository.search(query.q(), query.isActive())
+            workerRepository.search(query.q(), query.isActive(),
+                workerDocumentSearchVisibility.includeDocumentNumber())
         );
     }
 

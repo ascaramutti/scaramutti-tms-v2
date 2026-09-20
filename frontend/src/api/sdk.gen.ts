@@ -902,8 +902,8 @@ export const listRoles = <ThrowOnError extends boolean = false>(options?: Option
  * Catálogo `public.document_types`, solo los activos, ordenados por `id`
  * (el orden de carga del catálogo). Cada uno trae el largo máximo y el
  * patrón de validación (nulo si no tiene) para que el formulario limite el
- * número antes de enviarlo; la autoridad sigue siendo el backend (`WRK-003`,
- * `WRK-004`). Sin paginar: dos filas. Roles: los cuatro que mantienen el
+ * número antes de enviarlo; la autoridad será el backend cuando exista el alta (`WRK-003` y
+ * `WRK-004`, historia siguiente). Sin paginar: el catálogo es chico. Roles: los cuatro que mantienen el
  * padrón.
  *
  */
@@ -915,14 +915,19 @@ export const listDocumentTypes = <ThrowOnError extends boolean = false>(options?
 });
 
 /**
- * Listar trabajadores (combobox "quien recibe" del retiro)
+ * Listar trabajadores (combobox "quien recibe" del retiro y busqueda del padron)
  *
- * Catalogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
- * en v1). Solo busqueda rapida, SIN creacion al vuelo (RN-WH9: trabajadores
- * y unidades de flota nunca se crean desde almacen). Sin paginar (plantilla
- * chica). `q` es multi-palabra case-insensitive (>= 3 caracteres): cada
- * palabra debe matchear en el nombre O el apellido (RN-WH14); para no
- * filtrar, OMITIR el parametro.
+ * Catalogo compartido `public.workers`. Solo busqueda rapida, SIN creacion
+ * al vuelo (trabajadores y unidades de flota nunca se crean desde almacen).
+ * Sin paginar (plantilla chica). `q` es multi-palabra case-insensitive
+ * (>= 3 caracteres): cada palabra debe matchear en el nombre o el apellido
+ * y, solo para los cuatro roles que mantienen el padron, tambien en el
+ * numero de documento; para el encargado de almacen la busqueda sigue
+ * siendo por nombre y apellido, porque ese numero no viaja en esta
+ * respuesta. Para no filtrar, OMITIR el parametro. Operaciones NO lo
+ * consume: para asignar un viaje necesita conductores (`GET /drivers`), no
+ * la planilla completa.
+ * El detalle completo de un trabajador es `GET /workers/{id}`.
  *
  */
 export const listWorkers = <ThrowOnError extends boolean = false>(options?: Options<ListWorkersData, ThrowOnError>): RequestResult<ListWorkersResponses, ListWorkersErrors, ThrowOnError> => (options?.client ?? client).get<ListWorkersResponses, ListWorkersErrors, ThrowOnError>({

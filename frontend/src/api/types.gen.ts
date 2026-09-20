@@ -1033,10 +1033,11 @@ export type DriverResponse = DriverRef & {
 };
 
 /**
- * Si el rol lleva ficha de conductor: `REQUIRED` (`driver`, `escort`:
- * obligatoria), `OPTIONAL` (`assistant`: solo si viene la licencia),
- * `NONE` (el resto: la ficha se rechaza). Columna
- * `roles.driver_profile`.
+ * Si el rol lleva ficha de conductor: `REQUIRED` (obligatoria),
+ * `OPTIONAL` (solo si viene la licencia) o `NONE` (la ficha se rechaza),
+ * segun la columna `roles.driver_profile`. Que rol cae en cual no se
+ * enumera acá, por el mismo motivo que el nivel: este documento se sirve
+ * sin sesión, y eso es lo que `GET /roles` restringe.
  *
  */
 export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
@@ -1045,12 +1046,12 @@ export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
  * Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
  * nombre de sistema (el que llevan `users.role` y el token de sesión, y
  * el que se manda en `role` del request); `description` es el nombre
- * visible del cargo (también es el `position` que llevan el token de
- * sesión, `/auth/me` y `listWorkers`); `level` es el nivel del
- * organigrama (4 `admin`; 3 `general_manager`, `operations_manager`; 2
- * `finance_manager`, `dispatcher`, `sales`, `warehouse_keeper`; 1
- * `driver`, `escort`, `assistant`, `operator`); `canLogin` dice si el rol
- * puede tener usuario (los cuatro de nivel 1, no).
+ * visible del cargo: es el `position` de todo objeto de usuario embebido
+ * (sesión, cotizaciones, almacén, operaciones y el detalle de un
+ * trabajador) y el `receivedBy` de un retiro; `level` es el nivel del organigrama, de 4 a 1; `canLogin` dice
+ * si el rol puede tener usuario. La tabla completa de nivel por rol no se
+ * enumera acá: este documento se sirve sin sesión, y es justamente lo que
+ * `GET /roles` restringe a los cuatro roles del padrón.
  *
  */
 export type RoleResponse = {
@@ -1064,7 +1065,7 @@ export type RoleResponse = {
 /**
  * Tipo de documento de identidad (`public.document_types`). `maxLength` y
  * `validationPattern` (expresión regular completa, nula si el tipo no
- * define patrón) son los que el backend aplica al número (`WRK-004`).
+ * define patrón) son los que el backend aplicará al número cuando exista el alta (`WRK-004`).
  *
  */
 export type DocumentTypeResponse = {
@@ -3595,7 +3596,7 @@ export type ListWorkersData = {
     path?: never;
     query?: {
         /**
-         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         * Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
          */
         q?: string;
         isActive?: boolean;
