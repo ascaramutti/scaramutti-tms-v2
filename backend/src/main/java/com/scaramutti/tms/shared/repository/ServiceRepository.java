@@ -40,7 +40,7 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         String sql = "SELECT s.id, s.code, s.origin, s.destination, s.tentative_date, s.trip_scope, "
             + "s.status, s.price, cur.code AS currency_code, s.created_at, "
             + "c.id AS client_id, c.name AS client_name, c.ruc, c.phone, c.contact_name, "
-            + "s.driver_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
+            + "s.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
             + "s.tractor_id, tra.plate AS tractor_plate "
             + fromAndWhere(query, params, ASSIGNED_RESOURCE_JOINS)
             + " ORDER BY s.created_at DESC, s.id DESC LIMIT :pageSize OFFSET :pageOffset";
@@ -209,7 +209,7 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
      */
     public ServiceAssignedResourcesRow findAssignedResources(long serviceId) {
         Query query = entityManager.createNativeQuery(
-            "SELECT s.driver_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
+            "SELECT s.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
                 + "s.tractor_id, tra.plate AS tractor_plate, s.trailer_id, tri.plate AS trailer_plate "
                 + "FROM operaciones.services s "
                 + "LEFT JOIN public.drivers d ON d.id = s.driver_id "

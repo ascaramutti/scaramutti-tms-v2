@@ -15,6 +15,24 @@ import java.util.Map;
 public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> {
 
     /**
+     * El nombre completo de un trabajador, armado en SQL con el mismo criterio que
+     * {@link Worker#fullName()}: nombre, espacio, apellido.
+     *
+     * <p>Vive aca y no en otro repositorio porque el nombre es del trabajador, y existe
+     * como metodo y no como literal repetido porque lo componen el listado de conductores,
+     * la asignacion de recursos, los informes de viajes y el detalle de un trabajador: dos
+     * formas de armarlo harian que la misma persona se llame distinto segun por donde se la
+     * mire.
+     *
+     * <p>El alias es parametro porque una misma consulta puede necesitarlo mas de una vez
+     * sobre filas distintas de {@code public.workers}: el detalle lo compone para quien creo
+     * y para quien modifico en la misma sentencia.
+     */
+    public static String fullNameExpression(String workersAlias) {
+        return "trim(" + workersAlias + ".first_name || ' ' || " + workersAlias + ".last_name)";
+    }
+
+    /**
      * Listado (sin paginar) de {@code public.workers} para el combobox "quien recibe" del
      * retiro (GET /workers). {@code q} es multi-palabra (RN-WH14, molde suppliers/products):
      * cada palabra debe matchear en {@code first_name} O {@code last_name}; nulo = sin filtro.
