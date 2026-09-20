@@ -1784,6 +1784,34 @@ paths:
   # ----- Shared catalogs (public, read-only) ---------------------------------
   # Paths planos (no bajo /warehouse/*): son de public y los reutiliza Operaciones.
 
+  /roles:
+    get:
+      tags: [Workers]
+      operationId: listRoles
+      summary: Listar los roles (la jerarquía única de cargos, con nivel y modalidad de ficha)
+      description: |
+        Las filas activas de `public.roles`, en el orden del organigrama
+        (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
+        que viaja en `role` del request y en `users.role`), nombre visible
+        (`description`, el cargo que muestran el pie del menú y el PDF),
+        nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
+        de conductor. El mismo catálogo para todos los roles: el cliente
+        esconde los de nivel igual o mayor al del rol de la sesión (para
+        `admin` ofrece todos); la autoridad es el `403 WRK-006` de las
+        escrituras. Sin texto libre ni alta al vuelo: un rol nuevo entra por
+        migración. El módulo de usuarios lo reutiliza filtrando `canLogin`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: Roles activos, del nivel 4 al 1
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RoleResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /document-types:
     get:
       tags: [Workers]

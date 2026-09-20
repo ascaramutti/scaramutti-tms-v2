@@ -3532,6 +3532,35 @@ export type GetWarehouseReportResponses = {
 
 export type GetWarehouseReportResponse = GetWarehouseReportResponses[keyof GetWarehouseReportResponses];
 
+export type ListRolesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/roles';
+};
+
+export type ListRolesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListRolesError = ListRolesErrors[keyof ListRolesErrors];
+
+export type ListRolesResponses = {
+    /**
+     * Roles activos, del nivel 4 al 1
+     */
+    200: Array<RoleResponse>;
+};
+
+export type ListRolesResponse = ListRolesResponses[keyof ListRolesResponses];
+
 export type ListDocumentTypesData = {
     body?: never;
     path?: never;
