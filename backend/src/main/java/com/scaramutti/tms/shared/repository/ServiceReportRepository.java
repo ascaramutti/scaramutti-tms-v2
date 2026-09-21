@@ -72,7 +72,7 @@ public class ServiceReportRepository {
         Query query = entityManager.createNativeQuery(
             "SELECT s.id, s.code, c.name AS client_name, s.trip_scope, s.origin, s.destination, "
                 + "s.start_date_time, s.end_date_time, s.price, cur.code AS currency_code, "
-                + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name "
+                + WorkerRepository.fullNameExpression("w") + " AS driver_name "
                 + "FROM operaciones.services s "
                 + "JOIN public.clients c ON c.id = s.client_id "
                 + "JOIN public.currencies cur ON cur.id = s.currency_id "
@@ -178,7 +178,7 @@ public class ServiceReportRepository {
             return List.of();
         }
         Query query = entityManager.createNativeQuery(
-            "SELECT a.service_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
+            "SELECT a.service_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
                 + "a.reason "
                 + "FROM operaciones.service_assignments a "
                 + "JOIN public.drivers d ON d.id = a.driver_id "

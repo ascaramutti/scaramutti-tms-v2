@@ -48,7 +48,7 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
      * todos.
      */
     private static final String ADDITIONAL_RESOURCE_SELECT =
-        "SELECT a.id, a.driver_id, " + DriverRepository.FULL_NAME_EXPRESSION + " AS driver_name, "
+        "SELECT a.id, a.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
             + "a.tractor_id, tra.plate AS tractor_plate, a.trailer_id, tri.plate AS trailer_plate, "
             + "a.reason, a.assigned_by, a.assigned_at "
             + "FROM operaciones.service_assignments a "

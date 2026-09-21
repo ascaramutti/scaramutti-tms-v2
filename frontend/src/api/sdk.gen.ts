@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses } from './types.gen';
+import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -875,20 +875,93 @@ export const getWarehouseReport = <ThrowOnError extends boolean = false>(options
 });
 
 /**
- * Listar trabajadores (combobox "quien recibe" del retiro)
+ * Listar los roles (la jerarquía única de cargos, con nivel y modalidad de ficha)
  *
- * Catalogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
- * en v1). Solo busqueda rapida, SIN creacion al vuelo (RN-WH9: trabajadores
- * y unidades de flota nunca se crean desde almacen). Sin paginar (plantilla
- * chica). `q` es multi-palabra case-insensitive (>= 3 caracteres): cada
- * palabra debe matchear en el nombre O el apellido (RN-WH14); para no
- * filtrar, OMITIR el parametro.
+ * Las filas activas de `public.roles`, en el orden del organigrama
+ * (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
+ * que viaja en `role` del request y en `users.role`), nombre visible
+ * (`description`, el cargo que muestran el pie del menú y el PDF),
+ * nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
+ * de conductor. El mismo catálogo para todos los roles: el cliente
+ * esconde los de nivel igual o mayor al del rol de la sesión (para
+ * `admin` ofrece todos); la autoridad es el `403 WRK-006` de las
+ * escrituras. Sin texto libre ni alta al vuelo: un rol nuevo entra por
+ * migración. El módulo de usuarios lo reutiliza filtrando `canLogin`.
+ *
+ */
+export const listRoles = <ThrowOnError extends boolean = false>(options?: Options<ListRolesData, ThrowOnError>): RequestResult<ListRolesResponses, ListRolesErrors, ThrowOnError> => (options?.client ?? client).get<ListRolesResponses, ListRolesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/roles',
+    ...options
+});
+
+/**
+ * Listar tipos de documento vigentes
+ *
+ * Catálogo `public.document_types`, solo los activos, ordenados por `id`
+ * (el orden de carga del catálogo). Cada uno trae el largo máximo y el
+ * patrón de validación (nulo si no tiene) para que el formulario limite el
+ * número antes de enviarlo; la autoridad será el backend cuando exista el alta (`WRK-003` y
+ * `WRK-004`, historia siguiente). Sin paginar: el catálogo es chico. Roles: los cuatro que mantienen el
+ * padrón.
+ *
+ */
+export const listDocumentTypes = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentTypesData, ThrowOnError>): RequestResult<ListDocumentTypesResponses, ListDocumentTypesErrors, ThrowOnError> => (options?.client ?? client).get<ListDocumentTypesResponses, ListDocumentTypesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/document-types',
+    ...options
+});
+
+/**
+ * Listar trabajadores (combobox "quien recibe" del retiro y busqueda del padron)
+ *
+ * Catalogo compartido `public.workers`. Solo busqueda rapida, SIN creacion
+ * al vuelo (trabajadores y unidades de flota nunca se crean desde almacen).
+ * Sin paginar (plantilla chica). `q` es multi-palabra case-insensitive
+ * (>= 3 caracteres): cada palabra debe matchear en el nombre o el apellido
+ * y, solo para los cuatro roles que mantienen el padron, tambien en el
+ * numero de documento; para el encargado de almacen la busqueda sigue
+ * siendo por nombre y apellido, porque ese numero no viaja en esta
+ * respuesta. Para no filtrar, OMITIR el parametro. Operaciones NO lo
+ * consume: para asignar un viaje necesita conductores (`GET /drivers`), no
+ * la planilla completa.
+ * El detalle completo de un trabajador es `GET /workers/{id}`.
  *
  */
 export const listWorkers = <ThrowOnError extends boolean = false>(options?: Options<ListWorkersData, ThrowOnError>): RequestResult<ListWorkersResponses, ListWorkersErrors, ThrowOnError> => (options?.client ?? client).get<ListWorkersResponses, ListWorkersErrors, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workers',
+    ...options
+});
+
+/**
+ * Obtener un trabajador por ID (ficha completa)
+ *
+ * Devuelve el trabajador con ese `id`, esté activo o inactivo, con su tipo
+ * de documento, su rol (`role`: nombre de sistema, nombre visible, nivel,
+ * si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
+ * de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
+ * usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
+ * última vez (`createdBy` y `updatedBy` son nulos en las filas anteriores
+ * a esta unidad: nadie sabe quién las cargó).
+ *
+ * Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
+ * (el detalle expone documento y teléfono, que el combobox no muestra).
+ * La lectura no aplica rango: cualquiera de los cuatro ve cualquier
+ * detalle.
+ *
+ * `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
+ * cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
+ * conversor de parámetros falla antes de llegar al recurso.
+ *
+ */
+export const getWorker = <ThrowOnError extends boolean = false>(options: Options<GetWorkerData, ThrowOnError>): RequestResult<GetWorkerResponses, GetWorkerErrors, ThrowOnError> => (options.client ?? client).get<GetWorkerResponses, GetWorkerErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers/{id}',
     ...options
 });
 

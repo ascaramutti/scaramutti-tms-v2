@@ -24,6 +24,7 @@ import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
 import org.jboss.logging.Logger;
 
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 /**
@@ -31,14 +32,19 @@ import java.time.OffsetDateTime;
  *
  * Garantiza (idempotente):
  *  - DocumentType DNI (si la tabla esta vacia)
- *  - Los 5 roles del sistema (alineados con prod): admin, sales, dispatcher,
- *    general_manager, operations_manager
- *  - Usuarios dev con passwords conocidas:
- *      - admin / Admin1234       (role admin, activo)
- *      - lcampos / Sales1234     (role sales, activo)
- *      - inactivo / Inactivo1234 (role sales, isActive=false, para tests AUTH-002)
+ *  - Los 11 roles del organigrama, con su nivel, si inicia sesion y su modalidad de
+ *    ficha de conductor. Despues de la migracion que los deja ya existen todos y esto no
+ *    crea ninguno; el codigo igual tiene que poder crear un rol COMPLETO, porque una base
+ *    vacia sin esa migracion no debe quedar con roles a medias.
+ *  - Un usuario dev por rol que inicia sesion, llamado como su rol, con password conocida:
+ *      - admin / Admin1234, general_manager / General1234, operations_manager / Operations1234,
+ *        finance_manager / Finance1234, dispatcher / Dispatcher1234, sales / Sales1234,
+ *        warehouse_keeper / Warehouse1234
+ *      - inactivo / Inactivo1234 (rol sales, isActive=false, para tests AUTH-002)
+ *  - Los cuatro roles que nunca inician sesion (conductor, escolta, ayudante, operador) no
+ *    llevan usuario sembrado, a proposito: no pueden tenerlo.
  *
- * Cuando la BD viene de un restore de prod, los usuarios admin/lcampos ya existen
+ * Cuando la BD viene de un restore de prod, los usuarios admin/sales ya existen
  * con sus password hashes reales (desconocidos). En dev forzamos el password al
  * documentado para que el equipo pueda autenticarse, Y forzamos el nombre de
  * display al valor SINTÉTICO de acá (de-realificación): así ningún nombre real
@@ -52,6 +58,9 @@ public class DevDataSeeder {
 
     private static final Logger LOG = Logger.getLogger(DevDataSeeder.class);
 
+    /** Fecha de ingreso de los trabajadores sembrados. Fija, para que nada dependa del dia. */
+    private static final LocalDate SEEDED_HIRE_DATE = LocalDate.of(2024, 1, 1);
+
     @Inject UserRepository userRepository;
     @Inject WorkerRepository workerRepository;
     @Inject RoleRepository roleRepository;
@@ -64,15 +73,26 @@ public class DevDataSeeder {
     @Transactional
     public void onStart(@Observes StartupEvent startupEvent) {
         Integer dniId = ensureDniDocumentType();
-        Role admin = ensureRole("admin", "Administrador del sistema");
-        Role sales = ensureRole("sales", "Encargado de Ventas");
-        ensureRole("dispatcher", "Coordinador de Operaciones");
-        ensureRole("general_manager", "Gerente General");
-        ensureRole("operations_manager", "Gerente de Operaciones");
+        Role admin             = ensureRole("admin",             "Administrador del Sistema",  (short) 4, true,  "NONE");
+        Role generalManager    = ensureRole("general_manager",   "Gerente General",            (short) 3, true,  "NONE");
+        Role operationsManager = ensureRole("operations_manager", "Gerente de Operaciones",    (short) 3, true,  "NONE");
+        Role financeManager    = ensureRole("finance_manager",   "Jefe de Finanzas",           (short) 2, true,  "NONE");
+        Role dispatcher        = ensureRole("dispatcher",        "Coordinador de Operaciones", (short) 2, true,  "NONE");
+        Role sales             = ensureRole("sales",             "Ejecutivo de Ventas",        (short) 2, true,  "NONE");
+        Role warehouseKeeper   = ensureRole("warehouse_keeper",  "Encargado de Almacén",       (short) 1, true,  "NONE");
+        ensureRole("driver",    "Conductor", (short) 1, false, "REQUIRED");
+        ensureRole("escort",    "Escolta",   (short) 1, false, "REQUIRED");
+        ensureRole("assistant", "Ayudante",  (short) 1, false, "OPTIONAL");
+        ensureRole("operator",  "Operador",  (short) 1, false, "NONE");
 
-        ensureUser("admin",    "Admin1234",    "Admin",    "TMS",      "00000001", "Administrador del sistema", admin, true,  dniId);
-        ensureUser("lcampos",  "Sales1234",    "Valeria",  "Torres",   "00000002", "Ejecutiva de Ventas",       sales, true,  dniId);
-        ensureUser("inactivo", "Inactivo1234", "Usuario",  "Inactivo", "00000003", "Inactivo de prueba",        sales, false, dniId);
+        ensureUser("admin",              null,      "Admin1234",      "Admin",    "TMS",      "00000001", admin,             true,  dniId);
+        ensureUser("sales",              "lcampos", "Sales1234",      "Valeria",  "Torres",   "00000002", sales,             true,  dniId);
+        ensureUser("inactivo",           null,      "Inactivo1234",   "Usuario",  "Inactivo", "00000003", sales,             false, dniId);
+        ensureUser("general_manager",    null,      "General1234",    "Gerencia", "General",  "00000004", generalManager,    true,  dniId);
+        ensureUser("operations_manager", null,      "Operations1234", "Gerencia", "Ops",      "00000005", operationsManager, true,  dniId);
+        ensureUser("finance_manager",    null,      "Finance1234",    "Jefatura", "Finanzas", "00000006", financeManager,    true,  dniId);
+        ensureUser("dispatcher",         null,      "Dispatcher1234", "Coord",    "Ops",      "00000007", dispatcher,        true,  dniId);
+        ensureUser("warehouse_keeper",   null,      "Warehouse1234",  "Encargado", "Almacen", "00000008", warehouseKeeper,   true,  dniId);
 
         ensureCurrency("USD", "$",  "Dólar Estadounidense");
         ensureCurrency("PEN", "S/", "Sol Peruano");
@@ -116,7 +136,7 @@ public class DevDataSeeder {
         // Integral (prefijo I → kind=INTEGRAL)
         ensureQuotationServiceType("INT", "Servicio Integral",                                         "Servicio integral con jerarquía padre+hijos (transporte + complementarios en un solo precio con descuento)");
 
-        LOG.info("Dev seed: usuarios garantizados — admin, lcampos, inactivo. "
+        LOG.info("Dev seed: un usuario por rol que inicia sesion, mas inactivo. "
             + "Monedas garantizadas — USD, PEN. "
             + "Términos de pago garantizados — Contado, 15d, 30d, 60d, 50/50. "
             + "Tipos de servicio cotizable garantizados — 8 servicios (S), 9 alquileres (A), 6 complementarios (C), 1 integral (I) = 24 total.");
@@ -178,11 +198,22 @@ public class DevDataSeeder {
         return ((Number) newId).intValue();
     }
 
-    private Role ensureRole(String name, String description) {
+    /**
+     * Garantiza un rol COMPLETO. Los cinco atributos van juntos a proposito: un rol sin
+     * nivel o sin modalidad de ficha no se puede usar, y la columna de nivel no tiene
+     * valor por omision justamente para que no existan roles a medias.
+     *
+     * <p>Si el rol ya existe no lo toca: quien manda sobre nivel, descripcion y modalidad
+     * es la migracion, no este sembrador.
+     */
+    private Role ensureRole(String name, String description, short level, boolean canLogin, String driverProfile) {
         return roleRepository.findByName(name).orElseGet(() -> {
             Role role = new Role();
             role.name = name;
             role.description = description;
+            role.level = level;
+            role.canLogin = canLogin;
+            role.driverProfile = driverProfile;
             role.isActive = true;
             roleRepository.persist(role);
             return role;
@@ -195,11 +226,22 @@ public class DevDataSeeder {
      *   isActive Y el nombre del worker al valor sintético (de-realificación —
      *   dev/test nunca muestra el nombre real). Respeta role.
      * - Si no existe: lo crea junto con su worker.
+     *
+     * <p>{@code legacyUsername} es el nombre que el usuario tenía antes de que los
+     * sembrados pasaran a llamarse como su rol. Sin esto, una base restaurada de
+     * produccion conserva la fila vieja con el nombre REAL de una persona y el seeder
+     * crea otra al lado, o sea que la de-realificacion de arriba deja de cumplirse
+     * justo donde importa. Se puede borrar cuando ninguna base viva traiga el nombre
+     * viejo.
      */
-    private void ensureUser(String username, String password,
-                            String firstName, String lastName, String documentNumber, String position,
+    private void ensureUser(String username, String legacyUsername, String password,
+                            String firstName, String lastName, String documentNumber,
                             Role role, boolean isActive, Integer documentTypeId) {
         var existing = userRepository.findByUsername(username);
+        if (existing.isEmpty() && legacyUsername != null) {
+            existing = userRepository.findByUsername(legacyUsername);
+            existing.ifPresent(legacy -> legacy.username = username);
+        }
         if (existing.isPresent()) {
             User user = existing.get();
             user.passwordHash = passwordService.hash(password);
@@ -215,7 +257,9 @@ public class DevDataSeeder {
         worker.lastName = lastName;
         worker.documentTypeId = documentTypeId;
         worker.documentNumber = documentNumber;
-        worker.position = position;
+        worker.role = role;
+        // Fija y no "hoy": una fecha movil hace que un test que la compare falle un dia al anio.
+        worker.hireDate = SEEDED_HIRE_DATE;
         worker.isActive = true;
         worker.createdAt = DateUtils.nowUtcMicros();
         workerRepository.persist(worker);

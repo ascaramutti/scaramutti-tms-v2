@@ -394,8 +394,8 @@ class ServiceReinforcementDeletionResourceTest {
         long assignmentId = seedReinforcement(id, driverId, null, null, "2026-07-01T11:00:00Z");
         // Un usuario DISTINTO del que creó el viaje: con el mismo, `updatedBy` ya valía eso y no se
         // podía distinguir si la baja lo re-firma o se quedó con el escritor anterior.
-        int operatorId = fixtures.userId("lcampos");
-        String token = TestAuth.fabricateTokenForUser(operatorId, "lcampos", role);
+        int operatorId = fixtures.userId("sales");
+        String token = TestAuth.fabricateTokenForUser(operatorId, "sales", role);
 
         ValidatableResponse response = given()
             .header("Authorization", "Bearer " + token)

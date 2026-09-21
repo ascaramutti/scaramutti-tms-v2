@@ -98,6 +98,9 @@ class WarehouseWithdrawalByIdResourceTest {
             .body("product.id", equalTo(productId))
             .body("quantity", equalTo(3.0f))
             .body("receivedBy.id", equalTo(workerId))
+            // Y su cargo, que desde el modulo de trabajadores sale del nombre visible del
+            // rol. El trabajador sembrado nace con rol de operador.
+            .body("receivedBy.position", equalTo("Operador"))
             .body("fleetUnit", nullValue())
             .body("status", equalTo("ACTIVE"))
             .body("registeredBy.username", equalTo("admin"))
@@ -166,7 +169,7 @@ class WarehouseWithdrawalByIdResourceTest {
 
     @Test
     void get_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token)
         .when().get("/warehouse/withdrawals/1")
         .then().statusCode(403).body("code", equalTo("COM-003"));
@@ -583,7 +586,7 @@ class WarehouseWithdrawalByIdResourceTest {
 
     @Test
     void update_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"")
             .contentType(ContentType.JSON)
             .body("{\"quantity\":2,\"receivedByWorkerId\":1,\"reason\":\"Rol sin permiso de almacen\"}")
@@ -753,7 +756,7 @@ class WarehouseWithdrawalByIdResourceTest {
 
     @Test
     void cancel_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"")
             .contentType(ContentType.JSON).body(cancelBody("Rol de ventas sin permiso de almacen"))
         .when().post("/warehouse/withdrawals/1/cancel").then().statusCode(403).body("code", equalTo("COM-003"));

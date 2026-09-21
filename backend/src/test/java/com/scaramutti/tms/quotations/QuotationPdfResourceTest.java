@@ -292,7 +292,7 @@ class QuotationPdfResourceTest {
 
         String salesToken = given()
             .contentType(ContentType.JSON)
-            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+            .body("{\"username\":\"sales\",\"password\":\"Sales1234\"}")
         .when()
             .post("/auth/login")
         .then()

@@ -1768,7 +1768,7 @@ class ServiceStatusResourceTest {
         // `changed_by` ya valían eso desde el alta y las aserciones comparaban contra un valor
         // derivado de la misma fuente que prueban: borrar `service.updatedBy = userId` quedaba verde.
         String otherUser = TestAuth.fabricateTokenForUser(
-            fixtures.userId("lcampos"), "lcampos", "operations_manager");
+            fixtures.userId("sales"), "sales", "operations_manager");
         io.restassured.response.Response response = post(serviceId,
             body("IN_PROGRESS", "2026-07-10T02:00:00Z", "Salió"), null, otherUser);
         assertEquals(200, response.statusCode(), response.body().asString());
@@ -1796,11 +1796,11 @@ class ServiceStatusResourceTest {
         // reapertura— quedaba verde.
         assertEquals("Cambio de estado a en ruta. Salió", auditDescription(serviceId),
             "la nota tiene que AGREGARSE a la descripción, no reemplazarla");
-        assertEquals(fixtures.userId("lcampos"), auditChangedBy(serviceId),
+        assertEquals(fixtures.userId("sales"), auditChangedBy(serviceId),
             "la auditoría firmó con el creador en vez de con quien actuó");
-        assertEquals(fixtures.userId("lcampos"), updatedByOf(serviceId),
+        assertEquals(fixtures.userId("sales"), updatedByOf(serviceId),
             "updated_by se quedó con el id del alta");
-        assertEquals("lcampos", detail.getList("events.createdBy.username", String.class)
+        assertEquals("sales", detail.getList("events.createdBy.username", String.class)
             .get(countEvents(serviceId) - 1), "el autor de la bitácora no es quien transicionó");
     }
 

@@ -248,7 +248,7 @@ class QuotationServiceTypesResourceTest {
 
     @Test
     void list_isAccessibleBySalesRole() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

@@ -229,7 +229,7 @@ class WarehouseProductCategoriesResourceTest {
 
     @Test
     void list_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -490,7 +490,7 @@ class WarehouseProductCategoriesResourceTest {
 
     @Test
     void create_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

@@ -507,8 +507,8 @@ class ServiceAssignmentResourceTest {
     @Test
     void assign_signsTheTraceWithTheAssigningUser() {
         long id = createService();
-        int dispatcherUserId = fixtures.userId("lcampos");
-        String token = TestAuth.fabricateTokenForUser(dispatcherUserId, "lcampos", "dispatcher");
+        int dispatcherUserId = fixtures.userId("sales");
+        String token = TestAuth.fabricateTokenForUser(dispatcherUserId, "sales", "dispatcher");
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -520,7 +520,7 @@ class ServiceAssignmentResourceTest {
             .statusCode(200)
             // el creador NO cambia: lo asignó otro
             .body("createdBy.username", equalTo("admin"))
-            .body("events[1].createdBy.username", equalTo("lcampos"));
+            .body("events[1].createdBy.username", equalTo("sales"));
 
         assertEquals(dispatcherUserId, auditChangedBy(id));
         assertEquals(dispatcherUserId, updatedByOf(id));
@@ -1405,7 +1405,7 @@ class ServiceAssignmentResourceTest {
     void assign_asDispatcher_omitsPriceAndCurrencyInTheRawJson() {
         long id = createService();
         String token = TestAuth.fabricateTokenForUser(
-            fixtures.userId("lcampos"), "lcampos", "dispatcher");
+            fixtures.userId("sales"), "sales", "dispatcher");
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -1429,7 +1429,7 @@ class ServiceAssignmentResourceTest {
         // anclado a un usuario REAL: este endpoint escribe, y un subject inventado revienta
         // contra la clave foránea antes de que se llegue a medir el veto
         String token = TestAuth.fabricateAccessTokenWithRolesForUser(
-            fixtures.userId("lcampos"), "lcampos", Set.of("dispatcher", "sales"));
+            fixtures.userId("sales"), "sales", Set.of("dispatcher", "sales"));
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -1449,7 +1449,7 @@ class ServiceAssignmentResourceTest {
         long id = createService();
         assign(id, assignmentPayload());
         String token = TestAuth.fabricateTokenForUser(
-            fixtures.userId("lcampos"), "lcampos", "dispatcher");
+            fixtures.userId("sales"), "sales", "dispatcher");
 
         String notes = String.join(" ", given()
             .header("Authorization", "Bearer " + token)

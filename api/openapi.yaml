@@ -81,7 +81,9 @@ tags:
   - name: Operations
     description: Operaciones — servicios de transporte, asignación de recursos, bitácora, dashboard y reporte
   - name: SharedCatalogs
-    description: Catálogos compartidos de `public` (trabajadores, flota unificada y conductores) — read-only; sin prefijo de módulo porque los usan Almacén y Operaciones
+    description: Catálogos compartidos de `public` (el listado de trabajadores, la flota unificada y los conductores); sin prefijo de módulo porque los usan Almacén y Operaciones
+  - name: Workers
+    description: Trabajadores — el padrón. Hoy trae el detalle de un trabajador y sus catálogos (tipos de documento y roles); el alta, la edición y el cambio de estado llegan con las historias siguientes
 
 # =============================================================================
 paths:
@@ -101,7 +103,7 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/LoginRequest' }
             example:
-              username: lcampos
+              username: sales
               password: 'P@ssw0rd123'
       responses:
         '200':
@@ -1177,25 +1179,85 @@ paths:
 
   # ----- Catálogos compartidos (schema public) --------------------------------
 
+  /roles:
+    get:
+      tags: [Workers]
+      operationId: listRoles
+      summary: Listar los roles (la jerarquía única de cargos, con nivel y modalidad de ficha)
+      description: |
+        Las filas activas de `public.roles`, en el orden del organigrama
+        (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
+        que viaja en `role` del request y en `users.role`), nombre visible
+        (`description`, el cargo que muestran el pie del menú y el PDF),
+        nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
+        de conductor. El mismo catálogo para todos los roles: el cliente
+        esconde los de nivel igual o mayor al del rol de la sesión (para
+        `admin` ofrece todos); la autoridad es el `403 WRK-006` de las
+        escrituras. Sin texto libre ni alta al vuelo: un rol nuevo entra por
+        migración. El módulo de usuarios lo reutiliza filtrando `canLogin`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: Roles activos, del nivel 4 al 1
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/RoleResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /document-types:
+    get:
+      tags: [Workers]
+      operationId: listDocumentTypes
+      summary: Listar tipos de documento vigentes
+      description: |
+        Catálogo `public.document_types`, solo los activos, ordenados por `id`
+        (el orden de carga del catálogo). Cada uno trae el largo máximo y el
+        patrón de validación (nulo si no tiene) para que el formulario limite el
+        número antes de enviarlo; la autoridad será el backend cuando exista el alta (`WRK-003` y
+        `WRK-004`, historia siguiente). Sin paginar: el catálogo es chico. Roles: los cuatro que mantienen el
+        padrón.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: Tipos de documento activos
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/DocumentTypeResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+
   /workers:
     get:
       tags: [SharedCatalogs]
       operationId: listWorkers
-      summary: Listar trabajadores (combobox "quién recibe" del retiro)
+      summary: Listar trabajadores (combobox "quién recibe" del retiro y búsqueda del padrón)
       description: |
-        Catálogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
-        en v1). **Solo búsqueda rápida — SIN creación al vuelo** (regla del dueño
-        2026-07-04: trabajadores y unidades de flota nunca se crean desde
-        almacén; RN-WH9). Sin paginar — plantilla chica. `q` es multi-palabra
-        case-insensitive (≥ 3 caracteres): cada palabra debe matchear en el
-        nombre O el apellido (RN-WH14); para no filtrar, OMITIR el parámetro.
+        Catálogo compartido `public.workers`. **Solo búsqueda rápida — SIN
+        creación al vuelo** (regla del dueño 2026-07-04: trabajadores y unidades
+        de flota nunca se crean desde almacén). Sin paginar — plantilla chica.
+        `q` es multi-palabra case-insensitive (≥ 3 caracteres): cada palabra
+        debe matchear en el nombre o el apellido y, **solo para los cuatro roles
+        que mantienen el padrón**, también en el número de documento. Para el
+        encargado de almacén la búsqueda sigue siendo por nombre y apellido: ese
+        número no viaja en esta respuesta, y buscarlo permitiría confirmarlo
+        probando prefijos. (Esta última frase NO se porta a la spec runtime a
+        propósito: ese documento se sirve sin sesión y no tiene por qué
+        describir el ataque que la guarda cierra.) Para no filtrar, OMITIR el
+        parámetro.
         Operaciones NO lo consume: para asignar un viaje necesita conductores
-        (`GET /drivers`), no la planilla completa.
+        (`GET /drivers`), no la planilla completa. El detalle completo de un
+        trabajador es `GET /workers/{id}`.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager, warehouse_keeper]
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          description: Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: isActive, in: query, schema: { type: boolean } }
       responses:
@@ -1209,6 +1271,41 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  /workers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    get:
+      tags: [Workers]
+      operationId: getWorker
+      summary: Obtener un trabajador por ID (ficha completa)
+      description: |
+        Devuelve el trabajador con ese `id`, esté activo o inactivo, con su tipo
+        de documento, su rol (`role`: nombre de sistema, nombre visible, nivel,
+        si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
+        de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
+        usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
+        última vez (`createdBy` y `updatedBy` son nulos en las filas anteriores
+        a esta unidad: nadie sabe quién las cargó).
+
+        Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
+        (el detalle expone documento y teléfono, que el combobox no muestra).
+        La lectura no aplica rango: cualquiera de los cuatro ve cualquier
+        detalle.
+
+        `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
+        cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
+        conversor de parámetros falla antes de llegar al recurso.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
 
   /fleet-units:
     get:
@@ -3181,6 +3278,16 @@ components:
                 instance: '/api/v1/clients/999'
                 code: 'CLI-003'
                 traceId: '2b3c4d5e-6f7a-8b9c-0d1e-2f3a4b5c6d7e'
+            workerNotFound:
+              summary: Trabajador inexistente
+              value:
+                type: 'urn:tms:error:wrk-001'
+                title: 'Not Found'
+                status: 404
+                detail: 'Trabajador no encontrado'
+                instance: '/api/v1/workers/999'
+                code: 'WRK-001'
+                traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
             quotationNotFound:
               summary: Cotización inexistente
               value:
@@ -3442,7 +3549,7 @@ components:
           minLength: 3
           maxLength: 50
           pattern: '^[a-zA-Z0-9._-]+$'
-          example: 'lcampos'
+          example: 'sales'
         password:
           type: string
           format: password
@@ -3484,7 +3591,7 @@ components:
         id:       { type: integer, format: int32 }
         username: { type: string }
         fullName: { type: string, example: 'Valeria Torres' }
-        position: { type: [string, 'null'], description: 'Cargo del trabajador (ej: Ejecutiva de Ventas)', example: 'Ejecutiva de Ventas' }
+        position: { type: [string, 'null'], description: 'Cargo: el nombre visible del rol del trabajador', example: 'Ejecutivo de Ventas' }
 
     UserResponse:
       allOf:
@@ -4092,12 +4199,12 @@ components:
 
     WorkerResponse:
       type: object
-      description: Trabajador de `public.workers` (catálogo compartido con v1; read-only desde v2).
+      description: Trabajador de `public.workers`; es la forma del LISTADO, la que alimenta los combobox.
       required: [id, fullName, isActive]
       properties:
         id:       { type: integer }
         fullName: { type: string, example: 'Juan Pérez Huamán' }
-        position: { type: [string, 'null'], example: 'Mecánico' }
+        position: { type: [string, 'null'], example: 'Operador' }
         isActive: { type: boolean }
 
     FleetUnitKind:
@@ -4164,6 +4271,104 @@ components:
             phone:           { type: [string, 'null'], pattern: '^\d{9}$' }
             status:          { $ref: '#/components/schemas/FleetResourceStatus' }
             isActive:        { type: boolean }
+
+    # -------- Workers: catálogos ----------------------------------------------
+    DriverProfileMode:
+      type: string
+      enum: [REQUIRED, OPTIONAL, NONE]
+      description: |
+        Si el rol lleva ficha de conductor: `REQUIRED` (`driver`, `escort`:
+        obligatoria), `OPTIONAL` (`assistant`: solo si viene la licencia),
+        `NONE` (el resto: la ficha se rechaza). Columna
+        `roles.driver_profile`.
+
+    RoleResponse:
+      type: object
+      description: |
+        Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
+        nombre de sistema (el que llevan `users.role` y el token de sesión, y
+        el que se manda en `role` del request); `description` es el nombre
+        visible del cargo: es el `position` de todo objeto de usuario embebido
+        (sesión, cotizaciones, almacén, operaciones y el detalle de un
+        trabajador) y el `receivedBy` de un retiro; `level` es el nivel del
+        organigrama (4 `admin`; 3 `general_manager`, `operations_manager`; 2
+        `finance_manager`, `dispatcher`, `sales`, `warehouse_keeper`; 1
+        `driver`, `escort`, `assistant`, `operator`); `canLogin` dice si el rol
+        puede tener usuario (los cuatro de nivel 1, no).
+      required: [name, description, level, canLogin, driverProfile]
+      properties:
+        name:          { type: string, maxLength: 50, example: 'driver' }
+        description:   { type: string, example: 'Conductor' }
+        level:         { type: integer, minimum: 1, maximum: 4, example: 1 }
+        canLogin:      { type: boolean, example: false }
+        driverProfile: { $ref: '#/components/schemas/DriverProfileMode' }
+
+    DocumentTypeResponse:
+      type: object
+      description: |
+        Tipo de documento de identidad (`public.document_types`). `maxLength` y
+        `validationPattern` (expresión regular completa, nula si el tipo no
+        define patrón) son los que el backend aplicará al número cuando exista el alta (`WRK-004`).
+      required: [id, code, name, maxLength]
+      properties:
+        id:                { type: integer, format: int32, example: 1 }
+        code:              { type: string, maxLength: 10, example: 'DNI' }
+        name:              { type: string, maxLength: 50, example: 'DNI' }
+        maxLength:         { type: integer, example: 8 }
+        validationPattern: { type: [string, 'null'], maxLength: 255, example: '^\d{8}$' }
+
+    # -------- Workers: ficha de conductor --------------------------------------
+    WorkerDriverProfileResponse:
+      type: object
+      description: |
+        La fila de `public.drivers` del trabajador. `id` es el que guardan las
+        asignaciones de operaciones. `isActive` en `false` significa ficha
+        apagada (el rol dejó de llevarla o el trabajador está inactivo): no
+        aparece en el combobox de conductores y no se borra nunca.
+      required: [id, licenseNumber, status, isActive]
+      properties:
+        id:              { type: integer, format: int32, example: 8 }
+        licenseNumber:   { type: string, example: 'Q12345678' }
+        licenseCategory: { type: [string, 'null'], example: 'A-IIIc' }
+        status:          { $ref: '#/components/schemas/FleetResourceStatus' }
+        isActive:        { type: boolean }
+
+    # -------- Workers: trabajador ----------------------------------------------
+    WorkerDetailResponse:
+      type: object
+      description: |
+        Ficha completa de un trabajador. `role` es su rol (la misma fila que
+        lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
+        `public.users` para él (el usuario lo administra el módulo de
+        usuarios). `createdBy` y `updatedBy` son nulos en los trabajadores
+        cargados antes de que existiera esta unidad. Instantes en UTC
+        (`createdAt`, `updatedAt`); `hireDate` es día calendario.
+      required: [id, firstName, lastName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
+      properties:
+        id:             { type: integer, format: int32, example: 8 }
+        firstName:      { type: string, example: 'Juan' }
+        lastName:       { type: string, example: 'Pérez Huamán' }
+        documentType:   { $ref: '#/components/schemas/DocumentTypeResponse' }
+        documentNumber: { type: string, example: '45678912' }
+        phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }
+        role:           { $ref: '#/components/schemas/RoleResponse' }
+        hireDate:       { type: string, format: date, example: '2026-09-01' }
+        isActive:       { type: boolean }
+        createdAt:      { type: string, format: date-time, example: '2026-09-19T15:00:00Z' }
+        createdBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        updatedAt:      { type: string, format: date-time, example: '2026-09-19T15:00:00Z' }
+        updatedBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        driver:
+          anyOf:
+            - $ref: '#/components/schemas/WorkerDriverProfileResponse'
+            - type: 'null'
+        hasUser:        { type: boolean }
 
     # -------- Warehouse: catálogos del módulo ----------------------------------
     WarehouseProductCategoryResponse:

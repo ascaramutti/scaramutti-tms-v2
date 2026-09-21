@@ -240,7 +240,7 @@ class FleetUnitsResourceTest {
     /** Registra y edita servicios: elige tracto y carreta como quien despacha. */
     @Test
     void listFleetUnits_withSalesRole_returns200() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token).when().get("/fleet-units")
         .then().statusCode(200);
     }

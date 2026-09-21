@@ -21,15 +21,8 @@ import java.util.List;
 @ApplicationScoped
 public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> {
 
-    /**
-     * El nombre completo, armado en SQL (mismo criterio que {@code Worker#fullName}: nombre,
-     * espacio, apellido). Es una constante y no un literal repetido porque lo usan el listado y
-     * la asignacion de recursos: dos formas de componerlo harian que la misma persona se llame
-     * distinto segun por donde se la mire. Visible en el paquete porque {@link ServiceRepository}
-     * la reusa al resolver el conductor asignado a un viaje; espera el alias {@code w} para
-     * {@code public.workers}.
-     */
-    static final String FULL_NAME_EXPRESSION = "trim(w.first_name || ' ' || w.last_name)";
+    /** El nombre completo con el alias que usan las consultas de este repositorio. */
+    private static final String FULL_NAME_EXPRESSION = WorkerRepository.fullNameExpression("w");
 
     /**
      * El nombre del conductor, para etiquetar el rastro de la asignacion. Devuelve null si el id

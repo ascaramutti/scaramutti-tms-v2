@@ -75,7 +75,7 @@ export type UserRef = {
     username: string;
     fullName: string;
     /**
-     * Cargo del trabajador (ej: Ejecutiva de Ventas)
+     * Cargo: el nombre visible del rol del trabajador
      */
     position?: string | null;
 };
@@ -968,7 +968,7 @@ export type PageOfWarehousePurchaseInvoiceSummary = PageMeta & {
 };
 
 /**
- * Trabajador de public.workers (catalogo compartido con v1, read-only desde v2).
+ * Trabajador de public.workers; es la forma del LISTADO, la que alimenta los combobox.
  */
 export type WorkerResponse = {
     id: number;
@@ -1030,6 +1030,92 @@ export type DriverResponse = DriverRef & {
     phone?: string | null;
     status: FleetResourceStatus;
     isActive: boolean;
+};
+
+/**
+ * Si el rol lleva ficha de conductor: `REQUIRED` (obligatoria),
+ * `OPTIONAL` (solo si viene la licencia) o `NONE` (la ficha se rechaza),
+ * segun la columna `roles.driver_profile`. Que rol cae en cual no se
+ * enumera acá, por el mismo motivo que el nivel: este documento se sirve
+ * sin sesión, y eso es lo que `GET /roles` restringe.
+ *
+ */
+export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
+
+/**
+ * Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
+ * nombre de sistema (el que llevan `users.role` y el token de sesión, y
+ * el que se manda en `role` del request); `description` es el nombre
+ * visible del cargo: es el `position` de todo objeto de usuario embebido
+ * (sesión, cotizaciones, almacén, operaciones y el detalle de un
+ * trabajador) y el `receivedBy` de un retiro; `level` es el nivel del organigrama, de 4 a 1; `canLogin` dice
+ * si el rol puede tener usuario. La tabla completa de nivel por rol no se
+ * enumera acá: este documento se sirve sin sesión, y es justamente lo que
+ * `GET /roles` restringe a los cuatro roles del padrón.
+ *
+ */
+export type RoleResponse = {
+    name: string;
+    description: string;
+    level: number;
+    canLogin: boolean;
+    driverProfile: DriverProfileMode;
+};
+
+/**
+ * Tipo de documento de identidad (`public.document_types`). `maxLength` y
+ * `validationPattern` (expresión regular completa, nula si el tipo no
+ * define patrón) son los que el backend aplicará al número cuando exista el alta (`WRK-004`).
+ *
+ */
+export type DocumentTypeResponse = {
+    id: number;
+    code: string;
+    name: string;
+    maxLength: number;
+    validationPattern?: string | null;
+};
+
+/**
+ * La fila de `public.drivers` del trabajador. `id` es el que guardan las
+ * asignaciones de operaciones. `isActive` en `false` significa ficha
+ * apagada (el rol dejó de llevarla o el trabajador está inactivo): no
+ * aparece en el combobox de conductores y no se borra nunca.
+ *
+ */
+export type WorkerDriverProfileResponse = {
+    id: number;
+    licenseNumber: string;
+    licenseCategory?: string | null;
+    status: FleetResourceStatus;
+    isActive: boolean;
+};
+
+/**
+ * Ficha completa de un trabajador. `role` es su rol (la misma fila que
+ * lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
+ * `public.users` para él (el usuario lo administra el módulo de
+ * usuarios). `createdBy` y `updatedBy` son nulos en los trabajadores
+ * cargados antes de que existiera esta unidad. Instantes en UTC
+ * (`createdAt`, `updatedAt`); `hireDate` es día calendario.
+ *
+ */
+export type WorkerDetailResponse = {
+    id: number;
+    firstName: string;
+    lastName: string;
+    documentType: DocumentTypeResponse;
+    documentNumber: string;
+    phone?: string | null;
+    role: RoleResponse;
+    hireDate: string;
+    isActive: boolean;
+    createdAt: string;
+    createdBy?: UserRef | null;
+    updatedAt: string;
+    updatedBy?: UserRef | null;
+    driver?: WorkerDriverProfileResponse | null;
+    hasUser: boolean;
 };
 
 /**
@@ -3447,12 +3533,70 @@ export type GetWarehouseReportResponses = {
 
 export type GetWarehouseReportResponse = GetWarehouseReportResponses[keyof GetWarehouseReportResponses];
 
+export type ListRolesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/roles';
+};
+
+export type ListRolesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListRolesError = ListRolesErrors[keyof ListRolesErrors];
+
+export type ListRolesResponses = {
+    /**
+     * Roles activos, del nivel 4 al 1
+     */
+    200: Array<RoleResponse>;
+};
+
+export type ListRolesResponse = ListRolesResponses[keyof ListRolesResponses];
+
+export type ListDocumentTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/document-types';
+};
+
+export type ListDocumentTypesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListDocumentTypesError = ListDocumentTypesErrors[keyof ListDocumentTypesErrors];
+
+export type ListDocumentTypesResponses = {
+    /**
+     * Tipos de documento activos
+     */
+    200: Array<DocumentTypeResponse>;
+};
+
+export type ListDocumentTypesResponse = ListDocumentTypesResponses[keyof ListDocumentTypesResponses];
+
 export type ListWorkersData = {
     body?: never;
     path?: never;
     query?: {
         /**
-         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         * Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
          */
         q?: string;
         isActive?: boolean;
@@ -3485,6 +3629,41 @@ export type ListWorkersResponses = {
 };
 
 export type ListWorkersResponse = ListWorkersResponses[keyof ListWorkersResponses];
+
+export type GetWorkerData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}';
+};
+
+export type GetWorkerErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWorkerError = GetWorkerErrors[keyof GetWorkerErrors];
+
+export type GetWorkerResponses = {
+    /**
+     * OK
+     */
+    200: WorkerDetailResponse;
+};
+
+export type GetWorkerResponse = GetWorkerResponses[keyof GetWorkerResponses];
 
 export type ListFleetUnitsData = {
     body?: never;

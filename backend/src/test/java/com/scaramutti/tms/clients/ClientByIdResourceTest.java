@@ -223,7 +223,7 @@ class ClientByIdResourceTest {
         Integer id = seedClient(NAME_PREFIX + "SALES", nextRuc());
 
         given()
-            .header("Authorization", "Bearer " + TestAuth.login("lcampos", "Sales1234"))
+            .header("Authorization", "Bearer " + TestAuth.login("sales", "Sales1234"))
         .when()
             .get("/clients/" + id)
         .then()

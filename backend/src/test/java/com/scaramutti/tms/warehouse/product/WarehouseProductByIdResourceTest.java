@@ -178,7 +178,7 @@ class WarehouseProductByIdResourceTest {
     @Test
     void get_withSalesRole_returns403_COM003() {
         int id = seedProduct("ZTEST_GetSales", "0");
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -555,7 +555,7 @@ class WarehouseProductByIdResourceTest {
     @Test
     void update_withSalesRole_returns403_COM003() {
         int id = seedProduct("ZTEST_PutSales", "0");
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)
@@ -666,7 +666,7 @@ class WarehouseProductByIdResourceTest {
     @Test
     void getStock_withSalesRole_returns403_COM003() {
         int id = seedProduct("ZTEST_StockSales", "0");
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

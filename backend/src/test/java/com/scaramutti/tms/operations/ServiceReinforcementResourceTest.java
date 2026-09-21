@@ -486,15 +486,15 @@ class ServiceReinforcementResourceTest {
     @Test
     void addResources_signsTheTraceWithTheAddingUser() {
         long id = serviceInProgress();
-        // lcampos y NO cscaramutti: el sembrador de dev garantiza admin, lcampos e inactivo, y
+        // sales y NO cscaramutti: el sembrador de dev garantiza admin, sales e inactivo, y
         // nada mas. cscaramutti existe en la base de desarrollo porque la comparte con el sistema
         // anterior, asi que el caso pasaba local y reventaba en la CI virgen — y el rojo salia del
         // ARMADO ("usuario sembrado no encontrado"), que no se lee como un problema del endpoint.
         // El rol se fabrica en el token; lo unico que el caso necesita es un usuario REAL distinto
         // del que creo el viaje, porque assigned_by tiene clave foranea.
-        int dispatcherId = fixtures.userId("lcampos");
+        int dispatcherId = fixtures.userId("sales");
         String dispatcherToken =
-            TestAuth.fabricateTokenForUser(dispatcherId, "lcampos", "dispatcher");
+            TestAuth.fabricateTokenForUser(dispatcherId, "sales", "dispatcher");
 
         given()
             .header("Authorization", "Bearer " + dispatcherToken)
@@ -504,7 +504,7 @@ class ServiceReinforcementResourceTest {
             .post("/services/" + id + "/resources")
         .then()
             .statusCode(200)
-            .body("additionalResources[0].assignedBy.username", equalTo("lcampos"));
+            .body("additionalResources[0].assignedBy.username", equalTo("sales"));
 
         assertEquals(dispatcherId, assignmentColumn(id, "assigned_by"));
         assertEquals(dispatcherId, auditChangedBy(id));
@@ -555,7 +555,7 @@ class ServiceReinforcementResourceTest {
         addResources(id, body);   // lo escribe admin, que ve importes
 
         String dispatcherToken = TestAuth.fabricateTokenForUser(
-            fixtures.userId("lcampos"), "lcampos", "dispatcher");
+            fixtures.userId("sales"), "sales", "dispatcher");
         JsonPath asDispatcher = given()
             .header("Authorization", "Bearer " + dispatcherToken)
         .when()

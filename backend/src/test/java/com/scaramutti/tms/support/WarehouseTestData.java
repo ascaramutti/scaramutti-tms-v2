@@ -4,9 +4,11 @@ import com.scaramutti.tms.shared.entity.Product;
 import com.scaramutti.tms.shared.entity.Supplier;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.ProductRepository;
+import com.scaramutti.tms.shared.repository.RoleRepository;
 import com.scaramutti.tms.shared.repository.SupplierRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
+import com.scaramutti.tms.shared.util.DateUtils;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.restassured.http.ContentType;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -14,6 +16,7 @@ import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -69,6 +72,10 @@ public class WarehouseTestData {
     @Inject ProductRepository productRepository;
     @Inject SupplierRepository supplierRepository;
     @Inject WorkerRepository workerRepository;
+    @Inject RoleRepository roleRepository;
+
+    /** Fecha de ingreso de los trabajadores de prueba: fija, para que nada dependa del día. */
+    private static final LocalDate SEEDED_HIRE_DATE = LocalDate.of(2024, 1, 1);
     @Inject UserRepository userRepository;
     @Inject EntityManager entityManager;
 
@@ -183,16 +190,23 @@ public class WarehouseTestData {
 
     /** Operario activo genérico ({@code ZTEST}/{@code Operario}). */
     public int seedWorker(String documentNumber) {
-        return seedWorker(documentNumber, "ZTEST", "Operario", "ZTEST Operario", true);
+        return seedWorker(documentNumber, "ZTEST", "Operario", "operator", true);
     }
 
     /** Operario genérico con {@code isActive} explícito. */
     public int seedWorker(String documentNumber, boolean isActive) {
-        return seedWorker(documentNumber, "ZTEST", "Operario", "ZTEST Operario", isActive);
+        return seedWorker(documentNumber, "ZTEST", "Operario", "operator", isActive);
     }
 
-    /** Trabajador con nombre/apellido/puesto/estado explícitos. */
-    public int seedWorker(String documentNumber, String firstName, String lastName, String position,
+    /**
+     * Trabajador con nombre, apellido, ROL y estado explícitos. El cuarto parámetro es el
+     * NOMBRE DE SISTEMA del rol ("operator", "driver", "assistant"…), no el texto visible
+     * del cargo: desde que el cargo es el rol, un texto libre no identifica ninguna fila.
+     *
+     * <p>La fecha de ingreso es fija y no "hoy": una fecha móvil hace que un caso que la
+     * compare falle un día al año.
+     */
+    public int seedWorker(String documentNumber, String firstName, String lastName, String roleName,
             boolean isActive) {
         return QuarkusTransaction.requiringNew().call(() -> {
             Worker worker = new Worker();
@@ -200,9 +214,11 @@ public class WarehouseTestData {
             worker.lastName = lastName;
             worker.documentTypeId = dniDocumentTypeId();
             worker.documentNumber = documentNumber;
-            worker.position = position;
+            worker.role = roleRepository.findByName(roleName).orElseThrow(
+                () -> new IllegalArgumentException("El rol " + roleName + " no existe: el fixture lo necesita sembrado"));
+            worker.hireDate = SEEDED_HIRE_DATE;
             worker.isActive = isActive;
-            worker.createdAt = OffsetDateTime.now();
+            worker.createdAt = DateUtils.nowUtcMicros();
             workerRepository.persist(worker);
             return worker.id;
         });
@@ -374,6 +390,185 @@ public class WarehouseTestData {
     }
 
     /** Borra los trabajadores de test ({@code document_number} prefijo {@code ZTEST}). */
+
+    // ---------- trabajadores: datos que el detalle necesita ----------------------
+    // Van por SQL nativo a proposito: son columnas que la aplicacion todavia no escribe
+    // (quien creo y quien modifico los pone la unidad de escritura) o que no valen una
+    // sobrecarga mas en la firma de seedWorker.
+
+    /** Telefono de un trabajador sembrado. */
+    public void setWorkerPhone(int workerId, String phone) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "UPDATE public.workers SET phone = ?1 WHERE id = ?2")
+            .setParameter(1, phone).setParameter(2, workerId).executeUpdate());
+    }
+
+    /** Fecha de ingreso de un trabajador sembrado. */
+    public void setWorkerHireDate(int workerId, java.time.LocalDate hireDate) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "UPDATE public.workers SET hire_date = ?1 WHERE id = ?2")
+            .setParameter(1, hireDate).setParameter(2, workerId).executeUpdate());
+    }
+
+    /** El tipo de documento de un trabajador sembrado. */
+    public void setWorkerDocumentType(int workerId, int documentTypeId) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "UPDATE public.workers SET document_type_id = ?1 WHERE id = ?2")
+            .setParameter(1, documentTypeId).setParameter(2, workerId).executeUpdate());
+    }
+
+    /** Las dos marcas de tiempo de un trabajador sembrado, para poder distinguirlas. */
+    public void setWorkerTimestamps(int workerId, java.time.OffsetDateTime createdAt,
+            java.time.OffsetDateTime updatedAt) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "UPDATE public.workers SET created_at = ?1, updated_at = ?2 WHERE id = ?3")
+            .setParameter(1, createdAt).setParameter(2, updatedAt).setParameter(3, workerId).executeUpdate());
+    }
+
+    /** Quien creo y quien modifico. Cualquiera de los dos puede ir en nulo. */
+    public void setWorkerAudit(int workerId, Integer createdByUserId, Integer updatedByUserId) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "UPDATE public.workers SET created_by = ?1, updated_by = ?2 WHERE id = ?3")
+            .setParameter(1, createdByUserId).setParameter(2, updatedByUserId)
+            .setParameter(3, workerId).executeUpdate());
+    }
+
+    /**
+     * Ficha de conductor sobre un trabajador YA sembrado. El fixture de operaciones siembra
+     * siempre el suyo; el detalle necesita ponerle una ficha a uno que ya existe.
+     */
+    public int seedDriverProfileFor(int workerId, String licenseNumber, String licenseCategory,
+            String statusName, boolean isActive) {
+        return QuarkusTransaction.requiringNew().call(() -> {
+            Object id = entityManager.createNativeQuery(
+                "INSERT INTO public.drivers (worker_id, license_number, category, status_id, is_active) "
+                    + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
+                .setParameter(1, workerId).setParameter(2, licenseNumber)
+                .setParameter(3, licenseCategory).setParameter(4, resourceStatusId(statusName))
+                .setParameter(5, isActive)
+                .getSingleResult();
+            return ((Number) id).intValue();
+        });
+    }
+
+    /** Usuario de prueba ACTIVO sobre un trabajador ya sembrado; devuelve su id. */
+    public int seedUserFor(int workerId, String username, String roleName) {
+        return seedUserFor(workerId, username, roleName, true);
+    }
+
+    /**
+     * Usuario de prueba sobre un trabajador ya sembrado; devuelve su id.
+     *
+     * <p>El nombre DEBE empezar con el prefijo que usa la limpieza. Se comprueba acá y no se
+     * confía en quien llama: la limpieza borra por prefijo, así que un nombre fuera de él
+     * queda para siempre, y desde ese momento el borrado de trabajadores falla por la clave
+     * foránea y se lleva puesta también la clase de al lado.
+     */
+    public int seedUserFor(int workerId, String username, String roleName, boolean isActive) {
+        requirePrefix(username, "ztestuser", "seedUserFor");
+        return QuarkusTransaction.requiringNew().call(() -> {
+            Object id = entityManager.createNativeQuery(
+                "INSERT INTO public.users (username, password_hash, worker_id, role_id, is_active, created_at) "
+                    + "VALUES (?1, 'ztest-no-login', ?2, "
+                    + "(SELECT id FROM public.roles WHERE name = ?3), ?4, CURRENT_TIMESTAMP) RETURNING id")
+                .setParameter(1, username).setParameter(2, workerId).setParameter(3, roleName)
+                .setParameter(4, isActive)
+                .getSingleResult();
+            return ((Number) id).intValue();
+        });
+    }
+
+    /**
+     * Borra lo que cuelga de los trabajadores de prueba y despues los trabajadores.
+     *
+     * <p>El ORDEN no es opcional y por eso esta escrito: hay un ciclo de claves foraneas
+     * entre el usuario, que apunta a su trabajador, y el trabajador, que apunta al usuario
+     * que lo creo. Primero se sueltan esas dos columnas, despues se borran los hijos y al
+     * final el padre. Sin esto, la primera corrida que siembre un usuario de prueba deja la
+     * base trabada y el error culpa al fixture y no al defecto.
+     */
+    public void deleteTestWorkerDependents() {
+        QuarkusTransaction.requiringNew().run(() -> {
+            entityManager.createNativeQuery(
+                "DELETE FROM public.worker_audit_logs WHERE worker_id IN "
+                    + "(SELECT id FROM public.workers WHERE document_number LIKE 'ZTEST%')").executeUpdate();
+            entityManager.createNativeQuery(
+                "UPDATE public.workers SET created_by = NULL, updated_by = NULL "
+                    + "WHERE document_number LIKE 'ZTEST%'").executeUpdate();
+            entityManager.createNativeQuery(
+                "DELETE FROM public.drivers WHERE worker_id IN "
+                    + "(SELECT id FROM public.workers WHERE document_number LIKE 'ZTEST%')").executeUpdate();
+            // La bitacora apunta a su AUTOR ademas de a su trabajador: una fila de un
+            // trabajador ajeno escrita por un usuario de prueba traba este borrado.
+            entityManager.createNativeQuery(
+                "DELETE FROM public.worker_audit_logs WHERE changed_by IN "
+                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+            entityManager.createNativeQuery(
+                "DELETE FROM public.users WHERE username LIKE 'ztestuser%'").executeUpdate();
+        });
+    }
+
+    /** Tipo de documento de prueba; devuelve su id. El patron puede ir en nulo. */
+    public int seedDocumentType(String code, String name, int maxLength, String validationPattern,
+            boolean isActive) {
+        requirePrefix(code, "ZTDOC", "seedDocumentType");
+        return QuarkusTransaction.requiringNew().call(() -> {
+            Object id = entityManager.createNativeQuery(
+                "INSERT INTO public.document_types (code, name, max_length, validation_pattern, is_active) "
+                    + "VALUES (?1, ?2, ?3, ?4, ?5) RETURNING id")
+                .setParameter(1, code).setParameter(2, name).setParameter(3, maxLength)
+                .setParameter(4, validationPattern).setParameter(5, isActive)
+                .getSingleResult();
+            return ((Number) id).intValue();
+        });
+    }
+
+    /** Borra los tipos de documento de prueba. */
+    public void deleteTestDocumentTypes() {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "DELETE FROM public.document_types WHERE code LIKE 'ZTDOC%'").executeUpdate());
+    }
+
+    /** Rol de prueba; devuelve su id. */
+    public int seedRole(String name, String description, int level, boolean canLogin,
+            String driverProfile, boolean isActive) {
+        requirePrefix(name, "ztestrole", "seedRole");
+        return QuarkusTransaction.requiringNew().call(() -> {
+            Object id = entityManager.createNativeQuery(
+                "INSERT INTO public.roles (name, description, level, can_login, driver_profile, is_active) "
+                    + "VALUES (?1, ?2, ?3, ?4, ?5, ?6) RETURNING id")
+                .setParameter(1, name).setParameter(2, description).setParameter(3, (short) level)
+                .setParameter(4, canLogin).setParameter(5, driverProfile).setParameter(6, isActive)
+                .getSingleResult();
+            return ((Number) id).intValue();
+        });
+    }
+
+    /**
+     * Borra los roles de prueba, soltando primero los trabajadores que les apunten.
+     *
+     * <p>El paso previo NO es decorativo: desde que el trabajador tiene clave foránea a su
+     * rol, una corrida cortada entre sembrar el rol y borrar su trabajador deja la clase de
+     * al lado sin poder limpiar, y el error culpa al fixture y no al corte.
+     */
+    public void deleteTestRoles() {
+        QuarkusTransaction.requiringNew().run(() -> {
+            entityManager.createNativeQuery(
+                "DELETE FROM public.workers WHERE document_number LIKE 'ZTEST%' AND role_id IN "
+                    + "(SELECT id FROM public.roles WHERE name LIKE 'ztestrole%')").executeUpdate();
+            entityManager.createNativeQuery(
+                "DELETE FROM public.roles WHERE name LIKE 'ztestrole%'").executeUpdate();
+        });
+    }
+
+    /** El nombre de un dato de prueba tiene que empezar con el prefijo que lo limpia. */
+    private void requirePrefix(String value, String prefix, String fixture) {
+        if (value == null || !value.startsWith(prefix)) {
+            throw new IllegalArgumentException(
+                fixture + " exige el prefijo " + prefix + " porque la limpieza borra por prefijo; recibió: " + value);
+        }
+    }
+
     public void deleteTestWorkers() {
         entityManager.createNativeQuery("DELETE FROM public.workers WHERE document_number LIKE 'ZTEST%'")
             .executeUpdate();
