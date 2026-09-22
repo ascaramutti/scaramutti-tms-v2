@@ -215,6 +215,23 @@ class WorkersSchemaMigrationTest {
                 + " AND indexname IN ('idx_workers_role', 'idx_worker_audit_worker')"));
     }
 
+    /**
+     * Las dos restricciones unicas que el alta traduce a un codigo de negocio existen con ESE
+     * nombre exacto.
+     *
+     * <p>Sin esta guarda, el nombre vive en dos lugares que se copian entre si: la constante
+     * del servicio y el literal del caso que la ejercita. Si el nombre real fuera otro, los dos
+     * estarian mal JUNTOS y nada se pondria en rojo; lo que se rompe en cambio es la respuesta
+     * de una carrera real, que saldria como error interno en vez del conflicto que el contrato
+     * declara. Este caso es el unico punto donde el nombre se compara contra la base.
+     */
+    @Test
+    void theUniqueConstraintsTranslatedByTheCreateEndpoint_exist() throws SQLException {
+        assertEquals(2, count(
+            "SELECT count(*) FROM pg_constraint WHERE contype = 'u'"
+                + " AND conname IN ('workers_document_number_key', 'drivers_license_number_key')"));
+    }
+
     // ---------- utilidades -------------------------------------------------------
 
     /**

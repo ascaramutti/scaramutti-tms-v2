@@ -2,27 +2,33 @@ package com.scaramutti.tms.workers.api;
 
 import com.scaramutti.tms.shared.dto.WorkerResponse;
 import com.scaramutti.tms.workers.dto.WorkerDetailResponse;
+import com.scaramutti.tms.workers.dto.WorkerRequest;
 import io.quarkus.security.Authenticated;
 import com.scaramutti.tms.workers.mapper.WorkerResourceMapper;
 import com.scaramutti.tms.workers.service.WorkerService;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
+import org.jboss.resteasy.reactive.ResponseStatus;
 
 import java.util.List;
 
 /**
- * Listado de trabajadores (GET /workers), catalogo compartido {@code public.workers}
- * (de lectura: el alta y la edicion llegan con las historias siguientes del modulo). Path
- * PLANO (no bajo /warehouse/*): es de {@code public} y lo
- * reutilizara Operaciones. Sin creacion al vuelo (RN-WH9: los trabajadores y las unidades
- * de flota nunca se crean desde almacen, solo se buscan). Sin paginar (plantilla chica).
+ * Trabajadores del catalogo compartido {@code public.workers}: el listado, el detalle y el
+ * alta. Path PLANO (no bajo /warehouse/*): es de {@code public} y lo
+ * reutilizara Operaciones. Sin creacion al vuelo DESDE ALMACEN: los trabajadores y las
+ * unidades de flota nunca se crean desde el combobox de un retiro, solo se buscan; el alta es
+ * de esta pantalla y el encargado de almacen no la alcanza. Sin paginar (plantilla chica).
  */
 /*
  * `@Authenticated` en la clase es REDUNDANTE mientras todos los metodos lleven
@@ -35,6 +41,7 @@ import java.util.List;
 @Authenticated
 @Path("/workers")
 @Produces(MediaType.APPLICATION_JSON)
+@Consumes(MediaType.APPLICATION_JSON)
 public class WorkerResource {
 
     @Inject WorkerService workerService;
@@ -67,4 +74,26 @@ public class WorkerResource {
     public WorkerDetailResponse getWorker(@PathParam("id") Integer id) {
         return workerService.getWorker(id);
     }
+
+    /**
+     * El alta de un trabajador. La escriben los CUATRO roles de mantenimiento, no los cinco
+     * que leen el listado: el encargado de almacen busca trabajadores para un retiro, pero no
+     * los da de alta.
+     *
+     * <p>Esa lista es el primer filtro y no el unico: quien pasa todavia tiene que estar por
+     * ENCIMA en el organigrama del cargo que quiere crear, y eso lo decide el servicio, que es
+     * donde vive el nivel de cada uno.
+     *
+     * <p>{@code @NotNull} ademas de {@code @Valid}: con {@code @Valid} solo, un cuerpo ausente
+     * pasa como nulo y revienta mas adentro con un 500 sin cuerpo.
+     */
+    @POST
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    @ResponseStatus(201)
+    public WorkerDetailResponse createWorker(@Valid @NotNull WorkerRequest workerRequest) {
+        return workerService.createWorker(
+            workerResourceMapper.toCreateWorkerCommand(workerRequest)
+        );
+    }
+
 }

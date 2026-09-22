@@ -1,6 +1,7 @@
 package com.scaramutti.tms.shared.repository;
 
 import com.scaramutti.tms.shared.entity.Worker;
+import com.scaramutti.tms.shared.entity.Worker_;
 import com.scaramutti.tms.shared.util.DateUtils;
 import com.scaramutti.tms.shared.util.MultiWordSearch;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
@@ -18,6 +19,11 @@ import java.util.Optional;
 
 @ApplicationScoped
 public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> {
+
+    /** Si el numero de documento ya es de algun trabajador. Es unico en toda la tabla. */
+    public boolean existsByDocumentNumber(String documentNumber) {
+        return count(Worker_.DOCUMENT_NUMBER + " = ?1", documentNumber) > 0;
+    }
 
     /**
      * El nombre completo de un trabajador, armado en SQL con el mismo criterio que

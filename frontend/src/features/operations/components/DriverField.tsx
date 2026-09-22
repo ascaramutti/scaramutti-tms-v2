@@ -38,8 +38,8 @@ function toOption(driver: DriverResponse): ComboboxOption {
  * de licencia o categoría.
  *
  * No ofrece dar de alta al vuelo: un conductor es una fila de `public.drivers` ligada
- * a un trabajador, y el contrato deja su alta para la futura gestión de flota y
- * personal, que todavía no existe.
+ * a un trabajador, y esa ficha se crea junto con él, en la misma transacción, por el alta de
+ * trabajadores; la pantalla que la consume todavía no existe.
  */
 export function DriverField({
   id,

@@ -1050,8 +1050,9 @@ export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
  * (sesión, cotizaciones, almacén, operaciones y el detalle de un
  * trabajador) y el `receivedBy` de un retiro; `level` es el nivel del organigrama, de 4 a 1; `canLogin` dice
  * si el rol puede tener usuario. La tabla completa de nivel por rol no se
- * enumera acá: este documento se sirve sin sesión, y es justamente lo que
- * `GET /roles` restringe a los cuatro roles del padrón.
+ * enumera en ningún contrato: este documento se sirve sin sesión, y el nivel
+ * de cada cargo es justamente lo que `GET /roles` restringe a los cuatro
+ * roles del padrón.
  *
  */
 export type RoleResponse = {
@@ -1065,7 +1066,7 @@ export type RoleResponse = {
 /**
  * Tipo de documento de identidad (`public.document_types`). `maxLength` y
  * `validationPattern` (expresión regular completa, nula si el tipo no
- * define patrón) son los que el backend aplicará al número cuando exista el alta (`WRK-004`).
+ * define patrón) son los que el backend aplica al número en el alta (`WRK-004`).
  *
  */
 export type DocumentTypeResponse = {
@@ -1089,6 +1090,36 @@ export type WorkerDriverProfileResponse = {
     licenseCategory?: string | null;
     status: FleetResourceStatus;
     isActive: boolean;
+};
+
+/**
+ * Alta de un trabajador. `role` es el `name` de `GET /roles` (un valor
+ * que no sea un rol activo → `400 WRK-005`; se valida en el servicio, no
+ * como enum: la lista vive en la base). `hireDate` es un día calendario
+ * (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
+ * nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
+ *
+ */
+export type WorkerRequest = {
+    firstName: string;
+    lastName: string;
+    documentTypeId: number;
+    documentNumber: string;
+    phone?: string | null;
+    role: string;
+    hireDate: string;
+    driver?: WorkerDriverProfileRequest | null;
+};
+
+/**
+ * Ficha de conductor que viaja dentro del trabajador. `status` ausente en
+ * el alta → `AVAILABLE`.
+ *
+ */
+export type WorkerDriverProfileRequest = {
+    licenseNumber: string;
+    licenseCategory?: string | null;
+    status?: FleetResourceStatus | null;
 };
 
 /**
@@ -3629,6 +3660,43 @@ export type ListWorkersResponses = {
 };
 
 export type ListWorkersResponse = ListWorkersResponses[keyof ListWorkersResponses];
+
+export type CreateWorkerData = {
+    body: WorkerRequest;
+    path?: never;
+    query?: never;
+    url: '/workers';
+};
+
+export type CreateWorkerErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type CreateWorkerError = CreateWorkerErrors[keyof CreateWorkerErrors];
+
+export type CreateWorkerResponses = {
+    /**
+     * Creado
+     */
+    201: WorkerDetailResponse;
+};
+
+export type CreateWorkerResponse = CreateWorkerResponses[keyof CreateWorkerResponses];
 
 export type GetWorkerData = {
     body?: never;

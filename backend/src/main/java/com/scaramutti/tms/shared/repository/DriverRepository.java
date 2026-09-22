@@ -1,6 +1,7 @@
 package com.scaramutti.tms.shared.repository;
 
 import com.scaramutti.tms.shared.entity.Driver;
+import com.scaramutti.tms.shared.entity.Driver_;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.Query;
@@ -79,4 +80,10 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
         String statusName,
         Boolean isActive
     ) {}
+
+    /** Si la licencia ya es de alguna ficha. Es unica en toda la tabla. */
+    public boolean existsByLicenseNumber(String licenseNumber) {
+        return count(Driver_.LICENSE_NUMBER + " = ?1", licenseNumber) > 0;
+    }
+
 }

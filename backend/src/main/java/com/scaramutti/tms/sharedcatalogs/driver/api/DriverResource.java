@@ -14,9 +14,10 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 
 /**
- * Listado de conductores (GET /drivers), catalogo compartido {@code public.drivers}
- * (read-only desde v2: el alta pertenece a la futura gestion de flota y personal). Path
- * PLANO, como el resto de los catalogos de {@code public}. Sin paginar (plantilla chica).
+ * Listado de conductores (GET /drivers), catalogo compartido {@code public.drivers}. Este
+ * endpoint es de lectura y no va a tener alta propia: la ficha de conductor se crea junto con
+ * su trabajador, en la misma transaccion que el, porque no existe sin su persona. Path PLANO, como el resto de los catalogos de {@code public}. Sin paginar
+ * (plantilla chica).
  *
  * <p>Lo alcanzan quienes asignan recursos ({@code dispatcher} y los mandos) y {@code sales},
  * que registra y edita servicios. Almacen no: el conductor no interviene en un retiro.
