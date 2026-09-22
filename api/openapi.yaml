@@ -83,7 +83,7 @@ tags:
   - name: SharedCatalogs
     description: Catálogos compartidos de `public` (el listado de trabajadores, la flota unificada y los conductores); sin prefijo de módulo porque los usan Almacén y Operaciones
   - name: Workers
-    description: Trabajadores — el padrón. Hoy trae el detalle de un trabajador y sus catálogos (tipos de documento y roles); el alta, la edición y el cambio de estado llegan con las historias siguientes
+    description: Trabajadores — el padrón. Hoy trae el alta de un trabajador, su detalle y sus catálogos (tipos de documento y roles); la edición y el cambio de estado llegan con las historias siguientes
 
 # =============================================================================
 paths:
@@ -1216,8 +1216,8 @@ paths:
         Catálogo `public.document_types`, solo los activos, ordenados por `id`
         (el orden de carga del catálogo). Cada uno trae el largo máximo y el
         patrón de validación (nulo si no tiene) para que el formulario limite el
-        número antes de enviarlo; la autoridad será el backend cuando exista el alta (`WRK-003` y
-        `WRK-004`, historia siguiente). Sin paginar: el catálogo es chico. Roles: los cuatro que mantienen el
+        número antes de enviarlo; la autoridad es el backend, que los aplica en el alta (`WRK-003`
+        y `WRK-004`). Sin paginar: el catálogo es chico. Roles: los cuatro que mantienen el
         padrón.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager]
       responses:
@@ -1271,6 +1271,73 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Workers]
+      operationId: createWorker
+      summary: Dar de alta un trabajador (con su ficha de conductor si el rol la lleva)
+      description: |
+        Crea la fila en `public.workers` apuntando al rol del cuerpo (`role`:
+        el `name` de `GET /roles`) y, según la modalidad de ficha de ese rol,
+        la fila en `public.drivers`, en la MISMA transacción: si la ficha falla,
+        no queda el trabajador. `REQUIRED` (`driver`, `escort`): `driver`
+        obligatorio → si falta, `400 WRK-008`. `OPTIONAL` (`assistant`): la
+        ficha se crea solo si viene `driver`. `NONE` (el resto): `driver` en el
+        cuerpo → `400 WRK-008`. `driver.status` ausente → `AVAILABLE`. Crear la ficha hace que el nombre, el
+        teléfono y la licencia de esa persona pasen a salir también por
+        `GET /drivers`, que leen además `dispatcher` y `sales`: para un cargo de
+        ficha OPCIONAL, mandarla o no cambia quién ve a esa persona.
+
+        Normalización: `firstName`, `lastName`, `documentNumber`,
+        `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
+        bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
+
+        Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
+        WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;
+        número más largo que `maxLength` del tipo o que no cumple su
+        `validationPattern` completo (cuando lo tiene) → `400 WRK-004`; número
+        de documento de OTRO trabajador, sea cual sea el tipo → `409 WRK-002`;
+        licencia de OTRA ficha → `409 WRK-007`. La carrera entre dos altas la
+        resuelven las restricciones únicas de la base y también sale como
+        `409`.
+
+        Organigrama (RN-09): el nivel del rol del cuerpo tiene que ser
+        estrictamente menor al nivel del rol de la sesión (el de `users.role`,
+        leído de la base) → si no, `403 WRK-006`. `admin` está exento.
+        `hireDate` futura se acepta: el backend no la rechaza a propósito, para
+        permitir correcciones a mano; la guarda es del formulario. Deja una fila
+        de auditoría `CREATED`. `isActive`, `createdAt`, `createdBy`,
+        `updatedAt` y `updatedBy` los pone el servidor y el cuerpo no los mueve;
+        `hasUser` sale en `false` (el usuario lo crea el módulo de usuarios,
+        con el rol del trabajador).
+
+        Orden de evaluación: `401` → `403 COM-003` → `400 COM-001` (cuerpo
+        vacío, nulo o campo inválido, incluida la ficha) → `400 WRK-005` →
+        `403 WRK-006` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `409
+        WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no existe o fue dada
+        de baja sale como `403 COM-003` en el escalón del organigrama: el token
+        vale hasta que vence, pero ya no hay quien escriba.
+
+        Un cuerpo que no se puede leer (`hireDate` mal formada, `documentTypeId`
+        no numérico, `driver.status` fuera del dominio) sale como `400` SIN
+        cuerpo `Problem` y sin `code`: falla el deserializador antes de llegar
+        a la validación.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/WorkerRequest' }
+      responses:
+        '201':
+          description: Creado
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /workers/{id}:
     parameters:
@@ -1358,8 +1425,8 @@ paths:
         Catálogo compartido `public.drivers`: quién puede conducir, con su
         licencia y su disponibilidad. El nombre sale del trabajador asociado, y
         el `id` que devuelve es el que guarda la asignación del servicio.
-        **Solo lectura desde v2, sin creación al vuelo** — el alta de conductores
-        pertenece a la futura gestión de flota y personal. Sin paginar: plantilla
+        **Este endpoint es de lectura y no va a tener alta propia**: la ficha de
+        conductor se crea junto con su trabajador, en la misma transacción que él, porque no existe sin su persona. Sin paginar: plantilla
         chica. Además de quienes asignan recursos, `sales` puede consultarlos:
         registra y edita servicios.
       x-required-roles: [admin, general_manager, operations_manager, dispatcher, sales]
@@ -3252,6 +3319,16 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            workerRankOutOfScope:
+              summary: Cargo fuera del alcance del organigrama
+              value:
+                type: 'urn:tms:error:wrk-006'
+                title: 'Forbidden'
+                status: 403
+                detail: 'No puedes dar de alta ni modificar trabajadores de ese cargo'
+                instance: '/api/v1/workers'
+                code: 'WRK-006'
+                traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
             insufficientRole:
               summary: Rol insuficiente para la operación
               value:
@@ -3324,6 +3401,26 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            duplicateWorkerLicense:
+              summary: Numero de licencia de otra ficha
+              value:
+                type: 'urn:tms:error:wrk-007'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe una ficha de conductor con ese numero de licencia'
+                instance: '/api/v1/workers'
+                code: 'WRK-007'
+                traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            duplicateWorkerDocument:
+              summary: Numero de documento de otro trabajador
+              value:
+                type: 'urn:tms:error:wrk-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe un trabajador con ese numero de documento'
+                instance: '/api/v1/workers'
+                code: 'WRK-002'
+                traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
             serviceNotEditable:
               summary: Servicio cancelado o eliminado (inmutable)
               value:
@@ -4291,10 +4388,11 @@ components:
         visible del cargo: es el `position` de todo objeto de usuario embebido
         (sesión, cotizaciones, almacén, operaciones y el detalle de un
         trabajador) y el `receivedBy` de un retiro; `level` es el nivel del
-        organigrama (4 `admin`; 3 `general_manager`, `operations_manager`; 2
-        `finance_manager`, `dispatcher`, `sales`, `warehouse_keeper`; 1
-        `driver`, `escort`, `assistant`, `operator`); `canLogin` dice si el rol
-        puede tener usuario (los cuatro de nivel 1, no).
+        organigrama, de 4 a 1, y llega en este mismo catálogo: solo se escribe
+        sobre cargos de nivel estrictamente menor al propio, con `admin` exento;
+        `canLogin` dice si
+        el rol puede tener usuario, y NO se deduce del nivel (hay cargos del
+        mismo nivel que sí inician sesión y otros que nunca).
       required: [name, description, level, canLogin, driverProfile]
       properties:
         name:          { type: string, maxLength: 50, example: 'driver' }
@@ -4308,7 +4406,7 @@ components:
       description: |
         Tipo de documento de identidad (`public.document_types`). `maxLength` y
         `validationPattern` (expresión regular completa, nula si el tipo no
-        define patrón) son los que el backend aplicará al número cuando exista el alta (`WRK-004`).
+        define patrón) son los que el backend aplica al número en el alta (`WRK-004`).
       required: [id, code, name, maxLength]
       properties:
         id:                { type: integer, format: int32, example: 1 }
@@ -4334,6 +4432,42 @@ components:
         isActive:        { type: boolean }
 
     # -------- Workers: trabajador ----------------------------------------------
+    WorkerRequest:
+      type: object
+      description: |
+        Alta de un trabajador. `role` es el `name` de `GET /roles` (un valor
+        que no sea un rol activo → `400 WRK-005`; se valida en el servicio, no
+        como enum: la lista vive en la base). `hireDate` es un día calendario
+        (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
+        nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
+      required: [firstName, lastName, documentTypeId, documentNumber, role, hireDate]
+      properties:
+        firstName:      { type: string, minLength: 1, maxLength: 100, example: 'Juan' }
+        lastName:       { type: string, minLength: 1, maxLength: 100, example: 'Pérez Huamán' }
+        documentTypeId: { type: integer, format: int32, example: 1 }
+        documentNumber: { type: string, minLength: 1, maxLength: 20, example: '45678912' }
+        phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }
+        role:           { type: string, minLength: 1, maxLength: 50, example: 'driver' }
+        hireDate:       { type: string, format: date, example: '2026-09-01' }
+        driver:
+          anyOf:
+            - $ref: '#/components/schemas/WorkerDriverProfileRequest'
+            - type: 'null'
+
+    WorkerDriverProfileRequest:
+      type: object
+      description: |
+        Ficha de conductor que viaja dentro del trabajador. `status` ausente en
+        el alta → `AVAILABLE`.
+      required: [licenseNumber]
+      properties:
+        licenseNumber:   { type: string, minLength: 1, maxLength: 20, example: 'Q12345678' }
+        licenseCategory: { type: [string, 'null'], maxLength: 20, example: 'A-IIIc' }
+        status:
+          anyOf:
+            - $ref: '#/components/schemas/FleetResourceStatus'
+            - type: 'null'
+
     WorkerDetailResponse:
       type: object
       description: |

@@ -119,8 +119,16 @@ public class WarehouseTestData {
      * <p>Los nombres son los REALES del catálogo ({@code available}, {@code maintenance},
      * {@code not_available}), no uno sintético: la API traduce ese nombre a su enum de
      * disponibilidad y revienta ante cualquier otro, así que un fixture inventado rompería el
-     * listado. Las filas que crea quedan (son catálogo legítimo e idempotente); lo que se
-     * limpia es la flota.
+     * listado. Esos tres nombres son los que tiene producción, medido en la copia diaria.
+     *
+     * <p>Lo que crea NO se limpia, y eso tiene una consecuencia que conviene saber: en una base
+     * cuyo catálogo esté escrito con otra caja, la búsqueda por nombre exacto no encuentra nada
+     * y este método INSERTA una fila más, que queda conviviendo con la que ya estaba. Es lo que
+     * pasó en la base de desarrollo compartida, y la huella lo dice: sus tres filas en minúscula
+     * no tienen descripción, que es exactamente la forma que inserta este método, mientras que
+     * las tres en mayúscula sí la tienen. No lo rompe nada porque las lecturas traducen el
+     * nombre a mayúsculas antes de comparar; alinear ese catálogo con producción está anotado
+     * como deuda. Lo que sí se limpia acá es la flota.
      */
     public int resourceStatusId(String catalogName) {
         var rows = entityManager.createNativeQuery(
@@ -135,6 +143,25 @@ public class WarehouseTestData {
         return ((Number) entityManager.createNativeQuery(
             "SELECT id FROM public.resource_statuses WHERE name = ?1")
             .setParameter(1, catalogName).getSingleResult()).intValue();
+    }
+
+    /**
+     * Una fila de disponibilidad de PRUEBA, en minúscula, con su prefijo propio. Existe para
+     * poder medir cómo se resuelve un nombre sin depender de cómo esté escrito el catálogo de
+     * la base, que difiere entre ambientes. A diferencia del método de arriba, esta sí se
+     * borra.
+     */
+    public int seedResourceStatus(String name) {
+        requirePrefix(name, "ztest_", "seedResourceStatus");
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager
+            .createNativeQuery("INSERT INTO public.resource_statuses (name, is_active) "
+                + "VALUES (?1, true) RETURNING id")
+            .setParameter(1, name).getSingleResult()).intValue());
+    }
+
+    public void deleteTestResourceStatuses() {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "DELETE FROM public.resource_statuses WHERE name LIKE 'ztest\\_%'").executeUpdate());
     }
 
     /** Estado por defecto de la flota de test: disponible. */
@@ -506,6 +533,191 @@ public class WarehouseTestData {
             entityManager.createNativeQuery(
                 "DELETE FROM public.users WHERE username LIKE 'ztestuser%'").executeUpdate();
         });
+    }
+
+    // ---------- lectores para medir lo que dejo una escritura --------------------
+
+    /**
+     * Cuantos trabajadores hay con ese numero de documento. Es la aserción de "el rechazo no
+     * dejo nada": un 4xx que igual grabo la fila se ve solo contando.
+     */
+    public int countWorkersByDocumentNumber(String documentNumber) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT count(*) FROM public.workers WHERE document_number = ?1")
+            .setParameter(1, documentNumber).getSingleResult()).intValue();
+    }
+
+    /** Lo que quedo en la fila del trabajador, incluida la columna muerta. */
+    public record WorkerRow(int roleId, LocalDate hireDate, Integer createdBy, Integer updatedBy,
+        String position) {}
+
+    public WorkerRow workerRowOf(int workerId) {
+        Object[] row = (Object[]) entityManager.createNativeQuery(
+            "SELECT role_id, hire_date, created_by, updated_by, position "
+                + "FROM public.workers WHERE id = ?1")
+            .setParameter(1, workerId).getSingleResult();
+        return new WorkerRow(((Number) row[0]).intValue(), (LocalDate) row[1],
+            row[2] == null ? null : ((Number) row[2]).intValue(),
+            row[3] == null ? null : ((Number) row[3]).intValue(),
+            (String) row[4]);
+    }
+
+    /** Lo que quedo en la ficha de conductor de un trabajador, o nulo si no tiene. */
+    public record DriverRow(int id, String licenseNumber, String category, int statusId,
+        boolean isActive, OffsetDateTime createdAt) {}
+
+    public DriverRow driverRowOf(int workerId) {
+        var rows = entityManager.createNativeQuery(
+            "SELECT id, license_number, category, status_id, is_active, created_at "
+                + "FROM public.drivers WHERE worker_id = ?1")
+            .setParameter(1, workerId).getResultList();
+        if (rows.isEmpty()) {
+            return null;
+        }
+        Object[] row = (Object[]) rows.get(0);
+        return new DriverRow(((Number) row[0]).intValue(), (String) row[1], (String) row[2],
+            ((Number) row[3]).intValue(), (Boolean) row[4], timestampOf(row[5]));
+    }
+
+    /** Las filas de bitacora de un trabajador, de la mas vieja a la mas nueva. */
+    public record WorkerAuditRow(String changeType, String fieldName, String fieldLabel,
+        String oldValue, String newValue, String reason, Integer changedBy,
+        OffsetDateTime loggedAt) {}
+
+    @SuppressWarnings("unchecked")
+    public List<WorkerAuditRow> workerAuditRows(int workerId) {
+        List<Object[]> rows = entityManager.createNativeQuery(
+            "SELECT change_type, field_name, field_label, old_value, new_value, reason, "
+                + "changed_by, logged_at FROM public.worker_audit_logs "
+                + "WHERE worker_id = ?1 ORDER BY id")
+            .setParameter(1, workerId).getResultList();
+        return rows.stream().map(row -> new WorkerAuditRow((String) row[0], (String) row[1],
+            (String) row[2], (String) row[3], (String) row[4], (String) row[5],
+            row[6] == null ? null : ((Number) row[6]).intValue(),
+            timestampOf(row[7]))).toList();
+    }
+
+    /** Cuantas filas de bitacora escribio un usuario, en toda la tabla. */
+    public int countWorkerAuditRowsByAuthor(int userId) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT count(*) FROM public.worker_audit_logs WHERE changed_by = ?1")
+            .setParameter(1, userId).getSingleResult()).intValue();
+    }
+
+    /**
+     * Una columna con zona, venga como venga. Una consulta nativa no promete el tipo Java de
+     * un {@code timestamptz}: segun el driver y la version llega como instante o con desfase,
+     * y convertir a ciegas revienta con un error que no dice nada del caso que fallo.
+     */
+    private static OffsetDateTime timestampOf(Object value) {
+        if (value == null) {
+            return null;
+        }
+        if (value instanceof OffsetDateTime offsetDateTime) {
+            return offsetDateTime;
+        }
+        if (value instanceof java.time.Instant instant) {
+            return instant.atOffset(java.time.ZoneOffset.UTC);
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant().atOffset(java.time.ZoneOffset.UTC);
+        }
+        throw new IllegalStateException("tipo inesperado para una marca de tiempo: " + value.getClass());
+    }
+
+    /** El id de un cargo por su nombre de sistema, para afirmar contra la fila. */
+    public int roleIdOf(String roleName) {
+        return roleRepository.findByName(roleName).orElseThrow(
+            () -> new IllegalArgumentException("El rol " + roleName + " no existe")).id;
+    }
+
+    /** El nombre del trabajador que tiene ese documento, para saber CUAL fila sobrevivio. */
+    public String firstNameOfWorkerByDocument(String documentNumber) {
+        var rows = entityManager.createNativeQuery(
+            "SELECT first_name FROM public.workers WHERE document_number = ?1")
+            .setParameter(1, documentNumber).getResultList();
+        return rows.isEmpty() ? null : (String) rows.get(0);
+    }
+
+    /** Cuantas fichas hay con esa licencia. */
+    public int countDriversByLicense(String licenseNumber) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT count(*) FROM public.drivers WHERE license_number = ?1")
+            .setParameter(1, licenseNumber).getSingleResult()).intValue();
+    }
+
+    /**
+     * El id de la fila del catalogo de disponibilidad para ese nombre, sin distinguir caja, o
+     * nulo si el catalogo de ESTE ambiente no la tiene. Devuelve nulo en vez de reventar porque
+     * quien lo usa mide justamente la ausencia.
+     */
+    public Integer resourceStatusRowIdIgnoringCase(String catalogName) {
+        var rows = entityManager.createNativeQuery(
+            "SELECT id FROM public.resource_statuses WHERE lower(name) = lower(?1) ORDER BY id")
+            .setParameter(1, catalogName).getResultList();
+        return rows.isEmpty() ? null : ((Number) rows.get(0)).intValue();
+    }
+
+    /**
+     * Apaga un usuario de prueba, para medir que una escritura exija un actor VIGENTE y no solo
+     * existente. Mismo guardia de prefijo que el resto: apagar al administrador sembrado
+     * dejaria en rojo toda la suite.
+     */
+    public void deactivateUser(int userId) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            int changed = entityManager.createNativeQuery(
+                "UPDATE public.users SET is_active = false "
+                    + "WHERE id = ?1 AND username LIKE 'ztestuser%'")
+                .setParameter(1, userId).executeUpdate();
+            if (changed != 1) {
+                throw new IllegalArgumentException(
+                    "deactivateUser solo toca usuarios ztestuser%; no cambio nada para el id " + userId);
+            }
+        });
+    }
+
+    /**
+     * El MENOR id del catalogo de disponibilidad para ese nombre, sin distinguir caja. Es lo
+     * que una escritura tiene que elegir cuando la base arrastra la misma fila en dos cajas.
+     */
+    public int lowestResourceStatusIdIgnoringCase(String catalogName) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT min(id) FROM public.resource_statuses WHERE lower(name) = lower(?1)")
+            .setParameter(1, catalogName).getSingleResult()).intValue();
+    }
+
+    /**
+     * Le cambia el rol a un usuario de prueba, para medir que una regla lea el rol de la BASE
+     * y no el grupo del token.
+     *
+     * <p>Exige el prefijo igual que el sembrador: sin eso, un descuido le cambia el rol al
+     * administrador sembrado y deja en rojo toda la suite, en clases que no tienen nada que
+     * ver con la que lo hizo.
+     */
+    public void setUserRole(int userId, String roleName) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            int changed = entityManager.createNativeQuery(
+                "UPDATE public.users SET role_id = (SELECT id FROM public.roles WHERE name = ?1) "
+                    + "WHERE id = ?2 AND username LIKE 'ztestuser%'")
+                .setParameter(1, roleName).setParameter(2, userId).executeUpdate();
+            if (changed != 1) {
+                throw new IllegalArgumentException(
+                    "setUserRole solo toca usuarios ztestuser%; no cambio nada para el id " + userId);
+            }
+        });
+    }
+
+    /**
+     * Un ACTOR de prueba completo: el trabajador con ese cargo y su usuario con el mismo rol.
+     * Devuelve el id del usuario, que es lo que va como sujeto del token.
+     *
+     * <p>Vive en el fixture compartido y no en una clase de test porque la edicion y el cambio
+     * de estado necesitan exactamente el mismo actor, y la regla de rango que los tres miden
+     * lee el rol de la fila del usuario.
+     */
+    public int seedActorUser(String roleName, String suffix) {
+        int workerId = seedWorker("ZTESTA" + suffix, "Actor", roleName, roleName, true);
+        return seedUserFor(workerId, "ztestuser" + suffix, roleName);
     }
 
     /** Tipo de documento de prueba; devuelve su id. El patron puede ir en nulo. */

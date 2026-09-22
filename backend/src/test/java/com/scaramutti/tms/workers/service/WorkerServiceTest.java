@@ -1,10 +1,19 @@
 package com.scaramutti.tms.workers.service;
 
+import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.workers.mapper.WorkerServiceMapper;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
+import com.scaramutti.tms.shared.entity.DocumentType;
 import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.Worker;
+import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.repository.DocumentTypeRepository;
+import com.scaramutti.tms.shared.repository.DriverRepository;
+import com.scaramutti.tms.shared.repository.ResourceStatusRepository;
+import com.scaramutti.tms.shared.repository.RoleRepository;
+import com.scaramutti.tms.shared.repository.WorkerAuditLogRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
+import com.scaramutti.tms.workers.service.cmd.CreateWorkerCommand;
 import com.scaramutti.tms.workers.service.cmd.ListWorkersQuery;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,7 +38,14 @@ import static org.mockito.Mockito.when;
 class WorkerServiceTest {
 
     @Mock WorkerRepository workerRepository;
+    @Mock DriverRepository driverRepository;
+    @Mock RoleRepository roleRepository;
+    @Mock DocumentTypeRepository documentTypeRepository;
+    @Mock ResourceStatusRepository resourceStatusRepository;
+    @Mock WorkerAuditLogRepository workerAuditLogRepository;
     @Mock WorkerDocumentSearchVisibility workerDocumentSearchVisibility;
+    @Mock WorkerRankPolicy workerRankPolicy;
+    @Mock CurrentUser currentUser;
     @InjectMocks WorkerService workerService;
 
     // El mapper es un colaborador REAL (impl generada por MapStruct), no un mock:
@@ -91,6 +107,236 @@ class WorkerServiceTest {
         workerService.listWorkers(new ListWorkersQuery("juan", true));
 
         verify(workerRepository).search("juan", true, false);
+    }
+
+
+    // ---------- el alta: lo que por HTTP no se alcanza ---------------------------
+
+    private CreateWorkerCommand createCommand() {
+        return new CreateWorkerCommand("Juan", "Pérez", 1, "45678912", null, "operator",
+            java.time.LocalDate.of(2024, 3, 1), null);
+    }
+
+    /** Un cargo activo, sin ficha, y un tipo de documento sin restricciones. */
+    private void catalogsAreValid() {
+        Role role = new Role();
+        role.name = "operator";
+        role.level = (short) 1;
+        role.driverProfile = "NONE";
+        role.isActive = true;
+        when(roleRepository.findByName("operator")).thenReturn(java.util.Optional.of(role));
+
+        DocumentType documentType = new DocumentType();
+        documentType.id = 1;
+        documentType.isActive = true;
+        documentType.maxLength = 20;
+        when(documentTypeRepository.findByIdOptional(1)).thenReturn(java.util.Optional.of(documentType));
+
+        when(currentUser.requireId()).thenReturn(7);
+    }
+
+    private jakarta.persistence.PersistenceException violationOf(String constraintName) {
+        return new jakarta.persistence.PersistenceException(
+            new org.hibernate.exception.ConstraintViolationException(
+                "duplicate key", new java.sql.SQLException("23505"), constraintName));
+    }
+
+    /**
+     * La carrera del documento: dos altas pasan el chequeo previo a la vez y chocan recien
+     * contra el indice. Por HTTP hace falta una transaccion sin confirmar para forzarlo; aca
+     * se mide la traduccion sola.
+     */
+    @Test
+    void createWorker_whenTheInsertViolatesTheDocumentKey_throwsWRK002() {
+        catalogsAreValid();
+        org.mockito.Mockito.doThrow(violationOf("workers_document_number_key"))
+            .when(workerRepository).flush();
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            ApiException.class, () -> workerService.createWorker(createCommand()));
+
+        assertEquals("WRK-002", thrown.code());
+        assertEquals(409, thrown.status());
+    }
+
+    /**
+     * ESTE es el caso que impide relajar la comparacion a un fragmento. La descarga vacia el
+     * contexto de persistencia entero, asi que puede aflorar aca la violacion de otro modulo;
+     * con un "contiene document", el numero repetido de un proveedor saldria disfrazado de
+     * "ya existe un trabajador con ese documento". Tiene que propagarse, no traducirse.
+     */
+    @Test
+    void createWorker_withAnUnknownConstraint_propagatesTheOriginalException() {
+        catalogsAreValid();
+        var original = violationOf("suppliers_document_number_key");
+        org.mockito.Mockito.doThrow(original).when(workerRepository).flush();
+
+        jakarta.persistence.PersistenceException thrown =
+            org.junit.jupiter.api.Assertions.assertThrows(
+                jakarta.persistence.PersistenceException.class,
+                () -> workerService.createWorker(createCommand()));
+
+        assertEquals(original, thrown);
+    }
+
+    /** Una violacion sin nombre de restriccion no puede caer en ninguna rama: se propaga. */
+    @Test
+    void createWorker_whenTheViolationHasNoConstraintName_propagatesIt() {
+        catalogsAreValid();
+        org.mockito.Mockito.doThrow(violationOf(null)).when(workerRepository).flush();
+
+        org.junit.jupiter.api.Assertions.assertThrows(
+            jakarta.persistence.PersistenceException.class,
+            () -> workerService.createWorker(createCommand()));
+    }
+
+    /**
+     * La regla de rango se pregunta ANTES de tocar ningun catalogo mas y, sobre todo, antes de
+     * grabar: por HTTP el orden solo se ve cuando dos errores conviven, aca se ve siempre.
+     */
+    @Test
+    void createWorker_whenTheRankPolicyRejects_persistsNothing() {
+        Role role = new Role();
+        role.name = "sales";
+        role.level = (short) 2;
+        role.driverProfile = "NONE";
+        role.isActive = true;
+        when(roleRepository.findByName("sales")).thenReturn(java.util.Optional.of(role));
+        org.mockito.Mockito.doThrow(
+            com.scaramutti.tms.workers.WorkersError.ROLE_OUT_OF_RANK.toException())
+            .when(workerRankPolicy).assertCanActOn(role);
+
+        CreateWorkerCommand command = new CreateWorkerCommand("Juan", "Pérez", 1, "45678912",
+            null, "sales", java.time.LocalDate.of(2024, 3, 1), null);
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            ApiException.class, () -> workerService.createWorker(command));
+
+        assertEquals("WRK-006", thrown.code());
+        org.mockito.Mockito.verifyNoInteractions(
+            workerRepository, driverRepository, workerAuditLogRepository, documentTypeRepository);
+    }
+
+    /** Un cargo inactivo es cargo invalido: se retira poniendolo inactivo, no borrandolo. */
+    @Test
+    void createWorker_inactiveRole_throwsWRK005_withoutPersisting() {
+        Role retired = new Role();
+        retired.name = "operator";
+        retired.level = (short) 1;
+        retired.isActive = false;
+        when(roleRepository.findByName("operator")).thenReturn(java.util.Optional.of(retired));
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            ApiException.class, () -> workerService.createWorker(createCommand()));
+
+        assertEquals("WRK-005", thrown.code());
+        org.mockito.Mockito.verifyNoInteractions(workerRepository, workerAuditLogRepository);
+    }
+
+    /** Un cargo de ficha opcional SIN ficha no toca el repositorio de fichas. */
+    @Test
+    void createWorker_roleOptionalWithoutProfile_neverTouchesTheDriverRepository() {
+        Role optional = new Role();
+        optional.name = "assistant";
+        optional.level = (short) 1;
+        optional.driverProfile = "OPTIONAL";
+        optional.isActive = true;
+        when(roleRepository.findByName("assistant")).thenReturn(java.util.Optional.of(optional));
+
+        DocumentType documentType = new DocumentType();
+        documentType.id = 1;
+        documentType.isActive = true;
+        documentType.maxLength = 20;
+        when(documentTypeRepository.findByIdOptional(1)).thenReturn(java.util.Optional.of(documentType));
+        when(currentUser.requireId()).thenReturn(7);
+
+        CreateWorkerCommand command = new CreateWorkerCommand("Juan", "Pérez", 1, "45678912",
+            null, "assistant", java.time.LocalDate.of(2024, 3, 1), null);
+
+        // El detalle se relee al final; con el repositorio mockeado devuelve vacio y sale
+        // WRK-001. Se afirma ESE codigo y no solo que hubo excepcion: si el cargo opcional sin
+        // ficha se rechazara mal con el error de correspondencia, la verificacion de abajo
+        // seguiria valiendo y el caso pasaria igual.
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            ApiException.class, () -> workerService.createWorker(command));
+        assertEquals("WRK-001", thrown.code(), "tiene que llegar hasta la relectura del detalle");
+
+        org.mockito.Mockito.verifyNoInteractions(driverRepository, resourceStatusRepository);
+    }
+
+
+    /** Un cargo que lleva ficha, con su ficha, y el catalogo de estados resolviendo. */
+    private void driverRoleIsValid() {
+        Role role = new Role();
+        role.name = "driver";
+        role.level = (short) 1;
+        role.driverProfile = "REQUIRED";
+        role.isActive = true;
+        when(roleRepository.findByName("driver")).thenReturn(java.util.Optional.of(role));
+
+        DocumentType documentType = new DocumentType();
+        documentType.id = 1;
+        documentType.isActive = true;
+        documentType.maxLength = 20;
+        when(documentTypeRepository.findByIdOptional(1)).thenReturn(java.util.Optional.of(documentType));
+        when(currentUser.requireId()).thenReturn(7);
+    }
+
+    private CreateWorkerCommand createDriverCommand() {
+        return new CreateWorkerCommand("Juan", "Pérez", 1, "45678912", null, "driver",
+            java.time.LocalDate.of(2024, 3, 1),
+            new com.scaramutti.tms.workers.service.cmd.WorkerDriverProfileCommand(
+                "Q12345678", null, null));
+    }
+
+    /**
+     * El gemelo del lado de la licencia. Sin el, cambiar el nombre de esa restriccion por uno
+     * que no existe deja los unitarios enteros en verde: la unica red que quedaba era el caso
+     * de integracion de la transaccion sin confirmar, y ese depende de una espera.
+     */
+    @Test
+    void createWorker_whenTheDriverInsertViolatesTheLicenseKey_throwsWRK007() {
+        driverRoleIsValid();
+        var resourceStatus = new com.scaramutti.tms.shared.entity.ResourceStatus();
+        resourceStatus.id = 1;
+        when(resourceStatusRepository.findByNameIgnoringCase("AVAILABLE"))
+            .thenReturn(java.util.Optional.of(resourceStatus));
+        org.mockito.Mockito.doThrow(violationOf("drivers_license_number_key"))
+            .when(driverRepository).flush();
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            ApiException.class, () -> workerService.createWorker(createDriverCommand()));
+
+        assertEquals("WRK-007", thrown.code());
+        assertEquals(409, thrown.status());
+    }
+
+    /**
+     * El estado de la ficha se resuelve por el metodo que NO distingue caja.
+     *
+     * <p>Por HTTP esto no se puede medir en esta maquina: la base de desarrollo tiene la fila en
+     * mayuscula con el id mas bajo, asi que una busqueda por nombre exacto devuelve la misma
+     * fila y el caso de integracion sigue en verde. En produccion, que solo tiene minusculas,
+     * esa busqueda no encontraria nada y toda alta con ficha se caeria. Aca el mock solo
+     * responde al metodo correcto: cualquier otro deja el estado sin resolver y el caso muere.
+     */
+    @Test
+    void createWorker_resolvesTheProfileStatusIgnoringCase() {
+        driverRoleIsValid();
+        var resourceStatus = new com.scaramutti.tms.shared.entity.ResourceStatus();
+        resourceStatus.id = 3;
+        when(resourceStatusRepository.findByNameIgnoringCase("AVAILABLE"))
+            .thenReturn(java.util.Optional.of(resourceStatus));
+
+        // La relectura del detalle sale WRK-001 con el repositorio mockeado; para cuando llega
+        // ahi, la ficha ya se armo, que es lo que este caso mide.
+        org.junit.jupiter.api.Assertions.assertThrows(ApiException.class,
+            () -> workerService.createWorker(createDriverCommand()));
+
+        verify(resourceStatusRepository).findByNameIgnoringCase("AVAILABLE");
+        var captor = org.mockito.ArgumentCaptor.forClass(com.scaramutti.tms.shared.entity.Driver.class);
+        verify(driverRepository).persist(captor.capture());
+        assertEquals(3, captor.getValue().statusId);
     }
 
 }
