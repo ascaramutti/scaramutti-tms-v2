@@ -8,6 +8,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.OffsetDateTime;
 
@@ -20,8 +21,17 @@ import java.time.OffsetDateTime;
  * <p>El nombre no esta aca: sale del trabajador asociado ({@code worker_id}), y la
  * disponibilidad es una FK al catalogo {@code public.resource_statuses}. El listado los
  * resuelve por join en el repositorio.
+ *
+ * <p>{@code @DynamicUpdate} por el mismo motivo que {@code User}, y desde que la edicion de un
+ * trabajador la convirtio en una fila que se ESCRIBE: la edicion reescribiria columnas completas
+ * desde una fila que leyo sin bloqueo, asi que un cuerpo que solo corrige la licencia devolveria
+ * {@code status_id} e {@code is_active} a los valores que tenian cuando arranco la transaccion.
+ * Hoy nadie mas escribe esas dos columnas y por eso no rompe nada; el dia que un viaje ponga a un
+ * conductor NO DISPONIBLE al asignarlo, una correccion de telefono se lo revertiria en silencio y
+ * con 200. Escribiendo solo lo que cada transaccion cambia, las dos tocan columnas distintas.
  */
 @Entity
+@DynamicUpdate
 @Table(name = "drivers")
 public class Driver {
 

@@ -3,6 +3,7 @@ package com.scaramutti.tms.workers.api;
 import com.scaramutti.tms.shared.dto.WorkerResponse;
 import com.scaramutti.tms.workers.dto.WorkerDetailResponse;
 import com.scaramutti.tms.workers.dto.WorkerRequest;
+import com.scaramutti.tms.workers.dto.WorkerUpdateRequest;
 import io.quarkus.security.Authenticated;
 import com.scaramutti.tms.workers.mapper.WorkerResourceMapper;
 import com.scaramutti.tms.workers.service.WorkerService;
@@ -14,6 +15,7 @@ import jakarta.validation.constraints.Size;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -24,8 +26,8 @@ import org.jboss.resteasy.reactive.ResponseStatus;
 import java.util.List;
 
 /**
- * Trabajadores del catalogo compartido {@code public.workers}: el listado, el detalle y el
- * alta. Path PLANO (no bajo /warehouse/*): es de {@code public} y lo
+ * Trabajadores del catalogo compartido {@code public.workers}: el listado, el detalle, el alta
+ * y la edicion. Path PLANO (no bajo /warehouse/*): es de {@code public} y lo
  * reutilizara Operaciones. Sin creacion al vuelo DESDE ALMACEN: los trabajadores y las
  * unidades de flota nunca se crean desde el combobox de un retiro, solo se buscan; el alta es
  * de esta pantalla y el encargado de almacen no la alcanza. Sin paginar (plantilla chica).
@@ -93,6 +95,29 @@ public class WorkerResource {
     public WorkerDetailResponse createWorker(@Valid @NotNull WorkerRequest workerRequest) {
         return workerService.createWorker(
             workerResourceMapper.toCreateWorkerCommand(workerRequest)
+        );
+    }
+
+
+    /**
+     * La edicion de un trabajador. Misma lista de roles que el alta: los cuatro que mantienen el
+     * padron.
+     *
+     * <p>Es un REEMPLAZO y no un parche: un campo opcional que no viene queda vacio. Quien busque
+     * por que no hay comprobaciones de nulo antes de asignar, la respuesta esta en el contrato.
+     *
+     * <p>El id viene de la RUTA y el cuerpo no lo declara: es lo que impide editar a un trabajador
+     * mandando el id de otro adentro del JSON.
+     */
+    @PUT
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public WorkerDetailResponse updateWorker(
+        @PathParam("id") Integer id,
+        @Valid @NotNull WorkerUpdateRequest workerUpdateRequest
+    ) {
+        return workerService.updateWorker(
+            workerResourceMapper.toUpdateWorkerCommand(id, workerUpdateRequest)
         );
     }
 
