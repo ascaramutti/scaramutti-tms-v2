@@ -29,7 +29,7 @@ scaramutti-tms-v2/
 └── README.md
 ```
 
-Módulos del backend (vertical por dominio): `auth`, `clients`, `quotations`, `operations` (operaciones), `catalogs`, `cargotypes`, `settings`, `warehouse` (almacén), `sharedcatalogs` (catálogos compartidos read-only) y `shared` (infra transversal).
+Módulos del backend (vertical por dominio): `auth`, `clients`, `quotations`, `operations` (operaciones), `catalogs`, `cargotypes`, `settings`, `warehouse` (almacén), `workers` (trabajadores), `sharedcatalogs` (catálogos compartidos read-only) y `shared` (infra transversal).
 
 ## Requisitos
 
@@ -76,7 +76,12 @@ Usuarios seed disponibles en perfil `dev` (creados por `DevDataSeeder`):
 | Username | Password | Rol | Estado |
 |---|---|---|---|
 | `admin` | `Admin1234` | `admin` | activo |
-| `lcampos` | `Sales1234` | `sales` | activo |
+| `general_manager` | `General1234` | `general_manager` | activo |
+| `operations_manager` | `Operations1234` | `operations_manager` | activo |
+| `finance_manager` | `Finance1234` | `finance_manager` | activo |
+| `dispatcher` | `Dispatcher1234` | `dispatcher` | activo |
+| `sales` | `Sales1234` | `sales` | activo |
+| `warehouse_keeper` | `Warehouse1234` | `warehouse_keeper` | activo |
 | `inactivo` | `Inactivo1234` | `sales` | inactivo (para probar AUTH-002) |
 
 Para probar autenticación: `POST /api/v1/auth/login` con `{ "username": "admin", "password": "Admin1234" }`. Usar el `token` devuelto como `Authorization: Bearer <token>` en endpoints protegidos.
@@ -97,7 +102,7 @@ npm ci        # instala exactamente el lockfile
 npm run dev
 ```
 
-Levanta Vite en `http://localhost:5173`. La aplicación se sirve desde la raíz del dominio: `/` lleva al login o a la pantalla principal del rol, y los módulos viven en `/cotizaciones`, `/almacen` y `/operaciones`.
+Levanta Vite en `http://localhost:5173`. La aplicación se sirve desde la raíz del dominio: `/` lleva al login o a la pantalla principal del rol, y los módulos viven en `/operaciones`, `/almacen`, `/cotizaciones` y `/clientes`, en el orden del menú.
 
 ## Comandos útiles
 
