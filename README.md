@@ -102,7 +102,7 @@ npm ci        # instala exactamente el lockfile
 npm run dev
 ```
 
-Levanta Vite en `http://localhost:5173`. La aplicación se sirve desde la raíz del dominio: `/` lleva al login o a la pantalla principal del rol, y los módulos viven en `/cotizaciones`, `/almacen` y `/operaciones`.
+Levanta Vite en `http://localhost:5173`. La aplicación se sirve desde la raíz del dominio: `/` lleva al login o a la pantalla principal del rol, y los módulos viven en `/operaciones`, `/almacen`, `/cotizaciones` y `/clientes`, en el orden del menú.
 
 ## Comandos útiles
 
