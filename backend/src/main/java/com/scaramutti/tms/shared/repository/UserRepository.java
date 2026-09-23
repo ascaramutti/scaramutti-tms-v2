@@ -23,4 +23,17 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
     public Optional<User> findByUsername(String username) {
         return find(User_.USERNAME, username).singleResultOptional();
     }
+
+    /**
+     * El usuario de un trabajador, o vacio. Hay a lo sumo uno: la columna es unica.
+     *
+     * <p>NO filtra por vigente a proposito. Quien pregunta esto esta decidiendo si un cambio de
+     * cargo dejaria una cuenta con un rol sin permisos, y una cuenta apagada tambien se puede
+     * volver a encender: filtrarla aca dejaria armada exactamente la cuenta rota que esa regla
+     * existe para evitar.
+     */
+    public Optional<User> findByWorkerIdOptional(Integer workerId) {
+        return find("worker.id", workerId).singleResultOptional();
+    }
+
 }

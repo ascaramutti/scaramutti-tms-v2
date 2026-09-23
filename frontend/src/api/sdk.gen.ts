@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, CreateWorkerData, CreateWorkerErrors, CreateWorkerResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses } from './types.gen';
+import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, CreateWorkerData, CreateWorkerErrors, CreateWorkerResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses, UpdateWorkerData, UpdateWorkerErrors, UpdateWorkerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -1025,6 +1025,108 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workers/{id}',
     ...options
+});
+
+/**
+ * Actualizar un trabajador (su ficha de conductor y, si tiene usuario, el rol del usuario)
+ *
+ * Reemplaza los datos editables con las mismas validaciones, normalización
+ * y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
+ * que no viene queda VACÍO (omitir `phone` lo borra). `isActive`,
+ * `createdAt` y `createdBy` no cambian aunque el cuerpo intente mandarlos;
+ * `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
+ * cuerpo no cambia nada. Un trabajador inactivo también se edita.
+ *
+ * Unicidad contra los demás: guardar el propio número de documento o la
+ * propia licencia sin cambios es `200`, no `409`.
+ *
+ * Motivo (RN-14): si `documentNumber` cambió respecto del guardado,
+ * `reason` es obligatorio: de 10 caracteres ya recortado, y de 500 tal
+ * como llega (el máximo lo mide la forma del cuerpo, antes de recortar) →
+ * si falta o es más corto, `400 WRK-009`; en cualquier otro cambio es opcional y,
+ * si viene, queda en TODAS las filas de auditoría de esa edición. El
+ * mínimo lo mide el servidor y no la forma del cuerpo, justamente porque
+ * es condicional: exigirlo en la forma lo pediría también donde el
+ * contrato dice que es libre.
+ *
+ * Cada campo efectivamente cambiado deja UNA fila de auditoría con el
+ * valor anterior y el nuevo; los campos que se reenvían sin cambios no
+ * dejan ninguna. El cargo se guarda por su nombre de sistema y el tipo de
+ * documento por su código, nunca por su id ni por su nombre visible: un
+ * renombre dejaría el historial mintiendo.
+ *
+ * Rol y usuario (RN-15): si el trabajador tiene usuario y `role` cambia,
+ * `users.role` queda con el rol nuevo en la MISMA transacción (los
+ * permisos rigen en el próximo inicio de sesión o refresco; la sesión
+ * abierta conserva el rol viejo hasta que venza su access token) y la
+ * auditoría registra el cambio del trabajador y el del usuario. Cambiar a
+ * un rol que no inicia sesión a alguien que tiene usuario → `400
+ * WRK-011`: una cuenta no puede quedar con un rol sin permisos; el camino
+ * para dejar a alguien sin acceso es desactivarlo. Cuenta que la fila de
+ * usuario EXISTA, esté activa o no.
+ *
+ * El rol contra el que se mide "cambia" es el de la CUENTA, no el
+ * guardado en el trabajador: es la fila que esta operación escribe y la
+ * que otorga los permisos. Hoy los dos coinciden siempre y nada en esta
+ * API los separa, pero nada los obliga a coincidir, y con la comparación
+ * sobre el trabajador un cuerpo que reenvía su cargo sin cambios movería
+ * la cuenta en silencio. Por el mismo motivo, `WRK-012` mira las DOS
+ * filas: nadie cambia su propio cargo ni en el trabajador ni en su
+ * cuenta.
+ *
+ * Ficha (RN-11): si hay fila en `drivers`, `driver` la actualiza
+ * (`status` ausente → se conserva el actual, a diferencia del alta); si
+ * el rol nuevo no la lleva (`NONE`), la fila queda inactiva y NO se borra
+ * (operaciones la referencia por su id); si el rol vuelve a llevarla y
+ * viene `driver`, la MISMA fila vuelve a activa; si no había fila y el
+ * rol la exige, se crea. Rol `OPTIONAL` sin `driver` con fila existente:
+ * la fila queda inactiva. Sobre un trabajador inactivo: si YA hay fila, sus
+ * datos se corrigen y la fila queda o sigue apagada; si NO hay fila y viene
+ * `driver`, la fila nace apagada con esos datos, y su licencia se compara
+ * contra las demás igual que en cualquier alta (`409 WRK-007`). El
+ * `driver` del cuerpo nunca se descarta. La fila NUNCA se enciende sobre un inactivo:
+ * reactivarlo es lo que la vuelve a encender, y encenderla acá devolvería a
+ * esa persona al combobox de conductores sin pasar por ahí.
+ *
+ * Organigrama (RN-09): el nivel del rol ACTUAL del trabajador, el del rol
+ * NUEVO y el del rol de su CUENTA del sistema, si la tiene, tienen que ser
+ * los tres estrictamente menores al nivel del rol de la sesión; si uno no
+ * lo es → `403 WRK-006`. El de la cuenta se mira aparte porque es la fila
+ * que esta operación escribe, y nada obliga a que coincida con el del
+ * trabajador. `admin` exento. Nadie
+ * cambia su propio cargo, tampoco `admin` → `403 WRK-012`, y se miran las
+ * DOS filas que la edición mueve: la del trabajador y la de su cuenta. Un
+ * `admin` sí edita el resto de su propia ficha. Mientras las dos filas
+ * coincidan, a quien no es `admin` la regla de niveles ya lo frena antes,
+ * con `WRK-006`, porque su propio cargo es de su propio nivel; si
+ * divergen y la del trabajador quedó en un cargo de nivel menor, pasa esa
+ * regla y llega a `WRK-012`.
+ *
+ * Concurrencia: la fila se toma con un bloqueo al leerla, que serializa
+ * dos escrituras sobre el mismo trabajador. Si la espera se agota porque
+ * otra operación la tiene tomada → `409 WRK-013`, que es transitorio y se
+ * reintenta. Sin `If-Match`: entre dos escrituras serializadas gana la
+ * última.
+ *
+ * Orden de evaluación (el `409 WRK-013` no entra en esta cadena: es un
+ * conflicto transitorio que puede interponerse al tomar la fila o al
+ * guardar, ver Concurrencia): `401` → `403 COM-003` → `400 COM-001` (cuerpo
+ * vacío, nulo o campo inválido, incluida la ficha) → `404 WRK-001` (el
+ * `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
+ * actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
+ * `403 WRK-006` (rol de la cuenta) → `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
+ * WRK-009` → `409 WRK-002` → `409 WRK-007`.
+ *
+ */
+export const updateWorker = <ThrowOnError extends boolean = false>(options: Options<UpdateWorkerData, ThrowOnError>): RequestResult<UpdateWorkerResponses, UpdateWorkerErrors, ThrowOnError> => (options.client ?? client).put<UpdateWorkerResponses, UpdateWorkerErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
 });
 
 /**

@@ -98,4 +98,49 @@ class WorkerResourceMapperTest {
         assertEquals(" 987654321 ", command.phone());
         assertEquals(" operator ", command.role());
     }
+
+    // ---------- el cuerpo de la EDICION ----------
+
+    private com.scaramutti.tms.workers.dto.WorkerUpdateRequest updateRequest(
+            String firstName, String lastName, String documentNumber, String reason) {
+        return new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(firstName, lastName, 1,
+            documentNumber, null, "operator", LocalDate.of(2024, 3, 1), null, reason);
+    }
+
+    /**
+     * Los mismos tres textos recortados que en el alta.
+     *
+     * <p>Importa mas que en el alta: un documento con espacios al borde se leeria como distinto
+     * del guardado, y entonces la edicion pediria un motivo por un cambio que no hubo.
+     */
+    @Test
+    void toUpdateWorkerCommand_trimsTheThreeTextsWithoutChangingCase() {
+        var command = mapper.toUpdateWorkerCommand(8,
+            updateRequest("  juan Carlos  ", " PÉREZ huamán ", "  45678912  ", null));
+
+        assertEquals("juan Carlos", command.firstName());
+        assertEquals("PÉREZ huamán", command.lastName());
+        assertEquals("45678912", command.documentNumber());
+    }
+
+    /** El id viene de la RUTA y no del cuerpo: es lo que impide editar a otro. */
+    @Test
+    void toUpdateWorkerCommand_takesTheIdFromTheArgument() {
+        assertEquals(8, mapper.toUpdateWorkerCommand(8,
+            updateRequest("Juan", "Pérez", "45678912", null)).workerId());
+    }
+
+    /** El motivo en blanco llega NULO: diez espacios no son una justificacion. */
+    @Test
+    void toUpdateWorkerCommand_aBlankReasonArrivesAsNull() {
+        assertNull(mapper.toUpdateWorkerCommand(8,
+            updateRequest("Juan", "Pérez", "45678912", "     ")).reason());
+    }
+
+    @Test
+    void toUpdateWorkerCommand_aRealReasonTravelsTrimmed() {
+        assertEquals("Correccion pedida", mapper.toUpdateWorkerCommand(8,
+            updateRequest("Juan", "Pérez", "45678912", "  Correccion pedida  ")).reason());
+    }
+
 }

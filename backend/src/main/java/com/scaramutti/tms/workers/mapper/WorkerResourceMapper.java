@@ -4,8 +4,10 @@ import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.shared.util.StringUtils;
 import com.scaramutti.tms.workers.dto.WorkerDriverProfileRequest;
 import com.scaramutti.tms.workers.dto.WorkerRequest;
+import com.scaramutti.tms.workers.dto.WorkerUpdateRequest;
 import com.scaramutti.tms.workers.service.cmd.CreateWorkerCommand;
 import com.scaramutti.tms.workers.service.cmd.ListWorkersQuery;
+import com.scaramutti.tms.workers.service.cmd.UpdateWorkerCommand;
 import com.scaramutti.tms.workers.service.cmd.WorkerDriverProfileCommand;
 import org.mapstruct.BeanMapping;
 import org.mapstruct.Mapper;
@@ -66,4 +68,20 @@ public interface WorkerResourceMapper {
     @Mapping(target = "licenseCategory", source = "licenseCategory", qualifiedByName = "trimToNull")
     WorkerDriverProfileCommand toWorkerDriverProfileCommand(
         WorkerDriverProfileRequest workerDriverProfileRequest);
+
+    /**
+     * El cuerpo de la edicion al command. Recorta los mismos tres textos que el alta y ademas el
+     * MOTIVO: diez espacios no son una justificacion, y al llegar nulo el servicio los trata como
+     * ausentes, que es lo que el caso de negocio quiere.
+     *
+     * <p>El id viaja aparte porque viene de la ruta y no del cuerpo: es lo que impide que alguien
+     * edite a un trabajador mandando el id de otro adentro del JSON.
+     */
+    @Mapping(target = "workerId",       source = "workerId")
+    @Mapping(target = "firstName",      source = "workerUpdateRequest.firstName",      qualifiedByName = "trimToNull")
+    @Mapping(target = "lastName",       source = "workerUpdateRequest.lastName",       qualifiedByName = "trimToNull")
+    @Mapping(target = "documentNumber", source = "workerUpdateRequest.documentNumber", qualifiedByName = "trimToNull")
+    @Mapping(target = "reason",         source = "workerUpdateRequest.reason",         qualifiedByName = "trimToNull")
+    UpdateWorkerCommand toUpdateWorkerCommand(Integer workerId, WorkerUpdateRequest workerUpdateRequest);
+
 }

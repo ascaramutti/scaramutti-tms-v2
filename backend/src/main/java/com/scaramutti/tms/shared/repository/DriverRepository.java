@@ -8,6 +8,7 @@ import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Repositorio del catalogo de conductores (GET /drivers). Vive en {@code shared/repository/}
@@ -84,6 +85,26 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
     /** Si la licencia ya es de alguna ficha. Es unica en toda la tabla. */
     public boolean existsByLicenseNumber(String licenseNumber) {
         return count(Driver_.LICENSE_NUMBER + " = ?1", licenseNumber) > 0;
+    }
+
+    /**
+     * Si la licencia ya es de la ficha de OTRO trabajador. La propia no cuenta.
+     *
+     * <p>Se excluye por el TRABAJADOR y no por el id de la ficha, y la diferencia importa: el
+     * trabajador puede todavia no tener ficha (su cargo acaba de pasar a llevarla), y en ese caso
+     * el id de la ficha seria nulo y no excluiria nada. Con el trabajador, el predicado es
+     * correcto exista la fila o no.
+     *
+     * <p>NO filtra por vigente: una ficha apagada sigue ocupando su numero de licencia.
+     */
+    public boolean existsByLicenseNumberExcludingWorker(String licenseNumber, Integer workerId) {
+        return count(Driver_.LICENSE_NUMBER + " = ?1 and " + Driver_.WORKER_ID + " <> ?2",
+            licenseNumber, workerId) > 0;
+    }
+
+    /** La ficha de un trabajador, o vacio. Hay a lo sumo una: la columna es unica. */
+    public Optional<Driver> findByWorkerIdOptional(Integer workerId) {
+        return find(Driver_.WORKER_ID, workerId).singleResultOptional();
     }
 
 }

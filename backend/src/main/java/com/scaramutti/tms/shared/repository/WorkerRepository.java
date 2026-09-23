@@ -26,6 +26,19 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
+     * Si el numero ya es de OTRO trabajador. La fila propia no cuenta: reenviar el documento
+     * de uno mismo sin cambios tiene que responder bien, no como conflicto.
+     *
+     * <p>Se excluye por el ID del trabajador y no por el numero, porque el numero es justamente
+     * lo que puede estar cambiando. Y NO filtra por vigente: dar de baja a alguien no libera su
+     * documento, igual que en el alta.
+     */
+    public boolean existsByDocumentNumberExcluding(String documentNumber, Integer workerId) {
+        return count(Worker_.DOCUMENT_NUMBER + " = ?1 and " + Worker_.ID + " <> ?2",
+            documentNumber, workerId) > 0;
+    }
+
+    /**
      * El nombre completo de un trabajador, armado en SQL con el mismo criterio que
      * {@link Worker#fullName()}: nombre, espacio, apellido.
      *

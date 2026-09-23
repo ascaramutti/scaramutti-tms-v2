@@ -3,6 +3,7 @@ package com.scaramutti.tms.workers.service;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.User;
+import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import org.junit.jupiter.api.Test;
@@ -158,6 +159,163 @@ class WorkerRankPolicyTest {
         ApiException thrown = assertThrows(ApiException.class,
             () -> workerRankPolicy.assertCanActOn(role("operator", 1)));
         assertEquals("COM-003", thrown.code());
+    }
+
+
+    // ---------- nadie se cambia su propio cargo ----------
+
+    private void actorOwnsWorker(Worker worker, String roleName, int level) {
+        User actor = new User();
+        actor.id = 7;
+        actor.isActive = true;
+        actor.role = role(roleName, level);
+        actor.worker = worker;
+        when(currentUser.requireId()).thenReturn(7);
+        when(userRepository.findByIdOptional(7)).thenReturn(Optional.of(actor));
+    }
+
+    private Worker workerWith(int id, Role role) {
+        Worker worker = new Worker();
+        worker.id = id;
+        worker.role = role;
+        return worker;
+    }
+
+    /** La cuenta del sistema del trabajador que se edita: la OTRA fila que la edicion mueve. */
+    private User accountWith(int id, Role role) {
+        User account = new User();
+        account.id = id;
+        account.isActive = true;
+        account.role = role;
+        return account;
+    }
+
+    @Test
+    void assertCanChangeRoleOf_whenItIsItsOwnWorker_andTheRoleChanges_throwsWRK012() {
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        Worker own = workerWith(10, adminRole);
+        actorOwnsWorker(own, "admin", 4);
+        Role other = role("general_manager", 3);
+        other.id = 2;
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertCanChangeRoleOf(own, accountWith(7, own.role), other));
+        assertEquals("WRK-012", thrown.code());
+        assertEquals(403, thrown.status());
+    }
+
+    /** El mismo cargo sobre uno mismo pasa: lo cerrado es el CAMBIO, no editarse. */
+    @Test
+    void assertCanChangeRoleOf_whenItIsItsOwnWorker_andTheRoleIsTheSame_passes() {
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        Worker own = workerWith(10, adminRole);
+        actorOwnsWorker(own, "admin", 4);
+        Role same = role("admin", 4);
+        same.id = 1;
+
+        assertDoesNotThrow(
+            () -> workerRankPolicy.assertCanChangeRoleOf(own, accountWith(7, own.role), same));
+    }
+
+    /** Sobre el trabajador de OTRO no aplica, aunque el actor sea administrador. */
+    @Test
+    void assertCanChangeRoleOf_whenItIsSomeoneElse_passes() {
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        actorOwnsWorker(workerWith(10, adminRole), "admin", 4);
+        Role target = role("sales", 2);
+        target.id = 3;
+        Role newRole = role("driver", 1);
+        newRole.id = 4;
+
+        assertDoesNotThrow(() -> workerRankPolicy.assertCanChangeRoleOf(
+            workerWith(11, target), accountWith(99, target), newRole));
+    }
+
+    /**
+     * LA FILA DE LA CUENTA TAMBIEN. Es el caso que separa esta guarda de la que tenia antes: el
+     * cuerpo reenvia el cargo del TRABAJADOR sin cambios —asi que mirando solo esa fila no pasa
+     * nada— mientras la cascada mueve el de la cuenta, que es la que otorga los permisos. Con la
+     * guarda vieja esto devolvia 200 y el administrador se degradaba solo.
+     */
+    @Test
+    void assertCanChangeRoleOf_whenOnlyItsOwnAccountRoleWouldMove_throwsWRK012() {
+        Role generalManager = role("general_manager", 3);
+        generalManager.id = 2;
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        Worker own = workerWith(10, generalManager);
+        actorOwnsWorker(own, "admin", 4);
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertCanChangeRoleOf(own, accountWith(7, adminRole),
+                generalManager));
+        assertEquals("WRK-012", thrown.code());
+        assertEquals(403, thrown.status());
+    }
+
+    /**
+     * Y al reves: si lo que se mueve es el cargo del TRABAJADOR mientras la cuenta ya esta en el
+     * nuevo, tampoco pasa. Las dos filas estan cerradas, no una.
+     */
+    @Test
+    void assertCanChangeRoleOf_whenOnlyItsOwnWorkerRoleWouldMove_throwsWRK012() {
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        Role generalManager = role("general_manager", 3);
+        generalManager.id = 2;
+        Worker own = workerWith(10, adminRole);
+        actorOwnsWorker(own, "admin", 4);
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertCanChangeRoleOf(own, accountWith(7, generalManager),
+                generalManager));
+        assertEquals("WRK-012", thrown.code());
+    }
+
+    /** Con las dos filas ya en el cargo pedido no hay nada que mover, y editarse sigue permitido. */
+    @Test
+    void assertCanChangeRoleOf_whenNeitherRowWouldMove_passes() {
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        Worker own = workerWith(10, adminRole);
+        actorOwnsWorker(own, "admin", 4);
+        Role same = role("admin", 4);
+        same.id = 1;
+
+        assertDoesNotThrow(
+            () -> workerRankPolicy.assertCanChangeRoleOf(own, accountWith(7, adminRole), same));
+    }
+
+    /** Un trabajador SIN cuenta no tiene esa segunda fila, y la regla no se la inventa. */
+    @Test
+    void assertCanChangeRoleOf_whenItsOwnWorkerHasNoAccount_looksOnlyAtTheWorkerRow() {
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        Worker own = workerWith(10, adminRole);
+        actorOwnsWorker(own, "admin", 4);
+        Role same = role("admin", 4);
+        same.id = 1;
+
+        assertDoesNotThrow(() -> workerRankPolicy.assertCanChangeRoleOf(own, null, same));
+    }
+
+    /** El detalle es constante y no lleva datos propios: no se deduce nada de la jerarquia. */
+    @Test
+    void theSelfRoleChangeDetail_carriesNothingOfItsOwn() {
+        Role adminRole = role("admin", 4);
+        adminRole.id = 1;
+        Worker own = workerWith(10, adminRole);
+        actorOwnsWorker(own, "admin", 4);
+        Role other = role("general_manager", 3);
+        other.id = 2;
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertCanChangeRoleOf(own, accountWith(7, own.role), other));
+        assertEquals("No puedes cambiar tu propio cargo", thrown.getMessage());
+        assertEquals(Map.of(), thrown.extensions());
     }
 
 }

@@ -15,6 +15,8 @@ import com.scaramutti.tms.shared.repository.WorkerAuditLogRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
 import com.scaramutti.tms.workers.service.cmd.CreateWorkerCommand;
 import com.scaramutti.tms.workers.service.cmd.ListWorkersQuery;
+import com.scaramutti.tms.workers.service.cmd.UpdateWorkerCommand;
+import com.scaramutti.tms.workers.service.cmd.WorkerDriverProfileCommand;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +47,8 @@ class WorkerServiceTest {
     @Mock WorkerAuditLogRepository workerAuditLogRepository;
     @Mock WorkerDocumentSearchVisibility workerDocumentSearchVisibility;
     @Mock WorkerRankPolicy workerRankPolicy;
+    @Mock com.scaramutti.tms.shared.repository.UserRepository userRepository;
+    @Mock WorkerRowLock workerRowLock;
     @Mock CurrentUser currentUser;
     @InjectMocks WorkerService workerService;
 
@@ -115,6 +119,154 @@ class WorkerServiceTest {
     private CreateWorkerCommand createCommand() {
         return new CreateWorkerCommand("Juan", "Pérez", 1, "45678912", null, "operator",
             java.time.LocalDate.of(2024, 3, 1), null);
+    }
+
+    // ---------- la traduccion de duplicados en la EDICION ----------
+    //
+    // El alta y la edicion NO comparten el mapa de restricciones, y no es un detalle: el alta
+    // inserta y la edicion puede chocar contra el documento O contra la licencia. El mapa de la
+    // edicion nacio con UNA sola entrada y esa fue exactamente la falla que devolvia un error del
+    // servidor en la rama que crea la ficha. Estos casos existen para que no vuelva.
+
+    /**
+     * Prepara una edicion que llega hasta la fase de escritura: catalogos validos, la fila tomada,
+     * y el envoltorio del bloqueo corriendo DE VERDAD el bloque que envuelve.
+     *
+     * <p>Que el envoltorio se comporte es lo que hace que estos casos midan algo: un mock que
+     * devuelve nulo sin invocar el bloque los dejaria verdes con el traductor borrado.
+     */
+    private Worker anEditableWorker() {
+        catalogsAreValid();
+        Worker existing = worker(5, "Juan", "Pérez", "Operario", true);
+        existing.documentNumber = "45678912";
+        existing.role.id = 9;
+        existing.role.name = "operator";
+        existing.role.driverProfile = "NONE";
+        when(workerRowLock.findByIdForUpdate(5)).thenReturn(existing);
+        org.mockito.Mockito.lenient().when(workerRowLock.runTranslatingLockConflicts(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(5)))
+            .thenAnswer(invocation ->
+                ((java.util.function.Supplier<?>) invocation.getArgument(0)).get());
+        when(userRepository.findByWorkerIdOptional(5)).thenReturn(java.util.Optional.empty());
+        when(driverRepository.findByWorkerIdOptional(5)).thenReturn(java.util.Optional.empty());
+        return existing;
+    }
+
+    /**
+     * El cargo NUEVO exige ficha. Se re-declara el del repositorio y no el de la fila: la
+     * modalidad la decide el cargo al que se va, no el que se tenia.
+     */
+    private void theNewRoleRequiresADriverProfile() {
+        Role role = new Role();
+        role.id = 9;
+        role.name = "operator";
+        role.level = (short) 1;
+        role.driverProfile = "REQUIRED";
+        role.isActive = true;
+        when(roleRepository.findByName("operator")).thenReturn(java.util.Optional.of(role));
+    }
+
+    /** El catalogo de disponibilidad que la ficha que nace necesita para su estado por omision. */
+    private void driverProfileCatalogIsValid() {
+        com.scaramutti.tms.shared.entity.ResourceStatus available =
+            new com.scaramutti.tms.shared.entity.ResourceStatus();
+        available.id = 1;
+        available.name = "AVAILABLE";
+        when(resourceStatusRepository.findByNameIgnoringCase("AVAILABLE"))
+            .thenReturn(java.util.Optional.of(available));
+    }
+
+    private UpdateWorkerCommand updateCommand(WorkerDriverProfileCommand driver) {
+        return new UpdateWorkerCommand(5, "Juan", "Pérez", 1, "45678912", null, "operator",
+            java.time.LocalDate.of(2024, 3, 1), driver, null);
+    }
+
+    /** La carrera del documento en una edicion SIN ficha nueva: la descarga del trabajador. */
+    @Test
+    void updateWorker_whenTheFlushViolatesTheDocumentKey_throwsWRK002() {
+        anEditableWorker();
+        org.mockito.Mockito.doThrow(violationOf("workers_document_number_key"))
+            .when(workerRepository).flush();
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            ApiException.class, () -> workerService.updateWorker(updateCommand(null)));
+
+        assertEquals("WRK-002", thrown.code());
+        assertEquals(409, thrown.status());
+    }
+
+    /**
+     * Y la carrera de la LICENCIA por el mismo camino. Es la entrada que el mapa de la edicion
+     * siempre tuvo: si estos dos casos fueran uno solo, quitar la otra entrada no se notaria.
+     */
+    @Test
+    void updateWorker_whenTheFlushViolatesTheLicenseKey_throwsWRK007() {
+        anEditableWorker();
+        org.mockito.Mockito.doThrow(violationOf("drivers_license_number_key"))
+            .when(workerRepository).flush();
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
+            ApiException.class, () -> workerService.updateWorker(updateCommand(null)));
+
+        assertEquals("WRK-007", thrown.code());
+        assertEquals(409, thrown.status());
+    }
+
+    /**
+     * EL CASO DEL DEFECTO: la rama que CREA la ficha durante una edicion. Su descarga vacia el
+     * contexto entero, asi que por ahi puede aflorar la violacion del DOCUMENTO del trabajador y
+     * no solo la de la licencia. Con el mapa de una sola entrada que esta rama tuvo, esto salia
+     * como error del servidor, y la misma carrera respondia distinto segun el trabajador tuviera
+     * ficha o no.
+     */
+    @Test
+    void updateWorker_whenTheNewProfileFlushViolatesTheDocumentKey_throwsWRK002() {
+        anEditableWorker();
+        theNewRoleRequiresADriverProfile();
+        driverProfileCatalogIsValid();
+        org.mockito.Mockito.doThrow(violationOf("workers_document_number_key"))
+            .when(driverRepository).flush();
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(ApiException.class,
+            () -> workerService.updateWorker(updateCommand(
+                new WorkerDriverProfileCommand("Q45678912", "A-IIb", null))));
+
+        assertEquals("WRK-002", thrown.code());
+        assertEquals(409, thrown.status());
+    }
+
+    /** Y la licencia por esa misma rama, que es la entrada que ya estaba. */
+    @Test
+    void updateWorker_whenTheNewProfileFlushViolatesTheLicenseKey_throwsWRK007() {
+        anEditableWorker();
+        theNewRoleRequiresADriverProfile();
+        driverProfileCatalogIsValid();
+        org.mockito.Mockito.doThrow(violationOf("drivers_license_number_key"))
+            .when(driverRepository).flush();
+
+        ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(ApiException.class,
+            () -> workerService.updateWorker(updateCommand(
+                new WorkerDriverProfileCommand("Q45678912", "A-IIb", null))));
+
+        assertEquals("WRK-007", thrown.code());
+    }
+
+    /**
+     * La restriccion DESCONOCIDA se propaga tal cual, igual que en el alta. Es el caso que impide
+     * relajar la comparacion a un fragmento: la descarga puede aflorar la violacion de otro
+     * modulo, y traducirla la disfrazaria de un problema de este.
+     */
+    @Test
+    void updateWorker_withAnUnknownConstraint_propagatesTheOriginalException() {
+        anEditableWorker();
+        var original = violationOf("suppliers_document_number_key");
+        org.mockito.Mockito.doThrow(original).when(workerRepository).flush();
+
+        jakarta.persistence.PersistenceException thrown =
+            org.junit.jupiter.api.Assertions.assertThrows(
+                jakarta.persistence.PersistenceException.class,
+                () -> workerService.updateWorker(updateCommand(null)));
+        assertEquals(original, thrown);
     }
 
     /** Un cargo activo, sin ficha, y un tipo de documento sin restricciones. */

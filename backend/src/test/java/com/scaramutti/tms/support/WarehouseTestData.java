@@ -430,6 +430,13 @@ public class WarehouseTestData {
             .setParameter(1, phone).setParameter(2, workerId).executeUpdate());
     }
 
+    /** El nombre de un trabajador sembrado, para medir que una relectura traiga lo nuevo. */
+    public void setWorkerFirstName(int workerId, String firstName) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "UPDATE public.workers SET first_name = ?1 WHERE id = ?2")
+            .setParameter(1, firstName).setParameter(2, workerId).executeUpdate());
+    }
+
     /** Fecha de ingreso de un trabajador sembrado. */
     public void setWorkerHireDate(int workerId, java.time.LocalDate hireDate) {
         QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
@@ -549,17 +556,21 @@ public class WarehouseTestData {
 
     /** Lo que quedo en la fila del trabajador, incluida la columna muerta. */
     public record WorkerRow(int roleId, LocalDate hireDate, Integer createdBy, Integer updatedBy,
-        String position) {}
+        String position, String firstName, String lastName, String documentNumber, String phone,
+        boolean isActive, OffsetDateTime createdAt, OffsetDateTime updatedAt, int documentTypeId) {}
 
     public WorkerRow workerRowOf(int workerId) {
         Object[] row = (Object[]) entityManager.createNativeQuery(
-            "SELECT role_id, hire_date, created_by, updated_by, position "
+            "SELECT role_id, hire_date, created_by, updated_by, position, first_name, last_name, "
+                + "document_number, phone, is_active, created_at, updated_at, document_type_id "
                 + "FROM public.workers WHERE id = ?1")
             .setParameter(1, workerId).getSingleResult();
         return new WorkerRow(((Number) row[0]).intValue(), (LocalDate) row[1],
             row[2] == null ? null : ((Number) row[2]).intValue(),
             row[3] == null ? null : ((Number) row[3]).intValue(),
-            (String) row[4]);
+            (String) row[4], (String) row[5], (String) row[6], (String) row[7], (String) row[8],
+            (Boolean) row[9], timestampOf(row[10]), timestampOf(row[11]),
+            ((Number) row[12]).intValue());
     }
 
     /** Lo que quedo en la ficha de conductor de un trabajador, o nulo si no tiene. */
@@ -708,6 +719,54 @@ public class WarehouseTestData {
     }
 
     /**
+     * Le cambia la disponibilidad a la FICHA de un conductor de prueba, desde su propia
+     * transaccion. Gemelo de {@link #setUserRole(int, String)} y por el mismo motivo: medir que dos
+     * escrituras sin coordinar sobre la misma fila no se pisen.
+     *
+     * <p>Mismo guardia de prefijo que el resto: solo toca fichas cuya licencia sea de prueba.
+     */
+    public void setDriverStatus(int workerId, String statusName) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            int changed = entityManager.createNativeQuery(
+                "UPDATE public.drivers SET status_id = ?1 WHERE worker_id = ?2 "
+                    + "AND license_number LIKE 'ZTESTL%'")
+                .setParameter(1, resourceStatusId(statusName)).setParameter(2, workerId)
+                .executeUpdate();
+            if (changed != 1) {
+                throw new IllegalArgumentException(
+                    "setDriverStatus solo toca fichas ZTESTL%; no cambio nada para el trabajador "
+                        + workerId);
+            }
+        });
+    }
+
+    /**
+     * Le cambia el cargo al TRABAJADOR, gemelo de {@link #setUserRole(int, String)}.
+     *
+     * <p>Existe para sembrar a mano la DIVERGENCIA entre el cargo de un trabajador y el de su
+     * cuenta. Ninguna ruta de la aplicacion la produce hoy —por eso hace falta sembrarla— y varias
+     * reglas se decidieron sobre el supuesto de que puede existir: sin este helper, esas reglas
+     * solo se pueden medir en la mitad de los casos en que rigen.
+     *
+     * <p>Mismo guardia de prefijo que su gemelo, y por el mismo motivo: sin el, un descuido le
+     * cambia el cargo a un trabajador sembrado del catalogo y deja en rojo clases que no tienen
+     * nada que ver con la que lo hizo.
+     */
+    public void setWorkerRole(int workerId, String roleName) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            int changed = entityManager.createNativeQuery(
+                "UPDATE public.workers SET role_id = (SELECT id FROM public.roles WHERE name = ?1) "
+                    + "WHERE id = ?2 AND document_number LIKE 'ZTEST%'")
+                .setParameter(1, roleName).setParameter(2, workerId).executeUpdate();
+            if (changed != 1) {
+                throw new IllegalArgumentException(
+                    "setWorkerRole solo toca trabajadores ZTEST%; no cambio nada para el id "
+                        + workerId);
+            }
+        });
+    }
+
+    /**
      * Un ACTOR de prueba completo: el trabajador con ese cargo y su usuario con el mismo rol.
      * Devuelve el id del usuario, que es lo que va como sujeto del token.
      *
@@ -716,8 +775,47 @@ public class WarehouseTestData {
      * lee el rol de la fila del usuario.
      */
     public int seedActorUser(String roleName, String suffix) {
+        return seedActor(roleName, suffix).userId();
+    }
+
+    /** Un actor de prueba, con el id de su usuario Y el de su trabajador. */
+    public record ActorSeed(int userId, int workerId) {}
+
+    /**
+     * El actor completo. La edicion lo necesita porque hay reglas sobre el trabajador DE LA
+     * SESION (nadie se cambia su propio cargo), y sin el id del trabajador esos casos no se
+     * pueden escribir.
+     */
+    public ActorSeed seedActor(String roleName, String suffix) {
         int workerId = seedWorker("ZTESTA" + suffix, "Actor", roleName, roleName, true);
-        return seedUserFor(workerId, "ztestuser" + suffix, roleName);
+        return new ActorSeed(seedUserFor(workerId, "ztestuser" + suffix, roleName), workerId);
+    }
+
+    /** El nombre de sistema del rol de un usuario, para medir la cascada del cambio de cargo. */
+    public String userRoleNameOf(int userId) {
+        return (String) entityManager.createNativeQuery(
+            "SELECT r.name FROM public.users u JOIN public.roles r ON r.id = u.role_id "
+                + "WHERE u.id = ?1").setParameter(1, userId).getSingleResult();
+    }
+
+    /** Cuantos usuarios tiene un trabajador. Es cero o uno: la columna es unica. */
+    public int countUsersByWorkerId(int workerId) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT count(*) FROM public.users WHERE worker_id = ?1")
+            .setParameter(1, workerId).getSingleResult()).intValue();
+    }
+
+    /** Enciende o apaga un usuario de prueba, con el mismo guardia de prefijo que el resto. */
+    public void setUserActive(int userId, boolean isActive) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            int changed = entityManager.createNativeQuery(
+                "UPDATE public.users SET is_active = ?1 WHERE id = ?2 AND username LIKE 'ztestuser%'")
+                .setParameter(1, isActive).setParameter(2, userId).executeUpdate();
+            if (changed != 1) {
+                throw new IllegalArgumentException(
+                    "setUserActive solo toca usuarios ztestuser%; no cambio nada para el id " + userId);
+            }
+        });
     }
 
     /** Tipo de documento de prueba; devuelve su id. El patron puede ir en nulo. */

@@ -10,9 +10,18 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.OffsetDateTime;
 
+/*
+ * `@DynamicUpdate` porque DOS transacciones distintas escriben esta fila sin coordinarse: el
+ * cambio de contrasena y la edicion de un trabajador, que le cambia el rol. Con la escritura de
+ * columnas completas, la que llegue segunda pisa lo que la primera acababa de guardar, y una de
+ * las dos se pierde sin ningun error. Escribiendo solo lo que cada una cambia, las dos tocan
+ * columnas distintas y ninguna borra a la otra.
+ */
+@DynamicUpdate
 @Entity
 @Table(name = "users")
 public class User {

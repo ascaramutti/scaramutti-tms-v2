@@ -1112,14 +1112,27 @@ export type WorkerRequest = {
 };
 
 /**
- * Ficha de conductor que viaja dentro del trabajador. `status` ausente en
- * el alta → `AVAILABLE`.
+ * Ficha de conductor que viaja dentro del trabajador. `status` ausente
+ * significa cosas distintas según la operación: en el alta `AVAILABLE`, en
+ * la edición conserva el que está guardado.
  *
  */
 export type WorkerDriverProfileRequest = {
     licenseNumber: string;
     licenseCategory?: string | null;
     status?: FleetResourceStatus | null;
+};
+
+/**
+ * Edición: los mismos campos del alta más `reason`. El mínimo de `reason`
+ * NO se declara acá a propósito: es condicional (obligatorio solo cuando
+ * `documentNumber` cambia) y lo mide el servidor, que es lo único que
+ * permite devolver `WRK-009` en vez de un error de forma y no exigirlo
+ * donde el contrato dice que es libre.
+ *
+ */
+export type WorkerUpdateRequest = WorkerRequest & {
+    reason?: string | null;
 };
 
 /**
@@ -3732,6 +3745,49 @@ export type GetWorkerResponses = {
 };
 
 export type GetWorkerResponse = GetWorkerResponses[keyof GetWorkerResponses];
+
+export type UpdateWorkerData = {
+    body: WorkerUpdateRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}';
+};
+
+export type UpdateWorkerErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type UpdateWorkerError = UpdateWorkerErrors[keyof UpdateWorkerErrors];
+
+export type UpdateWorkerResponses = {
+    /**
+     * Actualizado
+     */
+    200: WorkerDetailResponse;
+};
+
+export type UpdateWorkerResponse = UpdateWorkerResponses[keyof UpdateWorkerResponses];
 
 export type ListFleetUnitsData = {
     body?: never;
