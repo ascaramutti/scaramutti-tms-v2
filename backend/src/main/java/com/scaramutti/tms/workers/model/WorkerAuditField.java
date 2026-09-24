@@ -12,7 +12,8 @@ package com.scaramutti.tms.workers.model;
  * proposito, asi que nada ni nadie mira estas filas hoy. Un nombre de campo mal escrito no lo
  * descubre ninguna pantalla; con el enum, lo descubre un caso que lo recorre.
  *
- * <p>El cambio de estado suma los suyos cuando llegue: hoy serian codigo sin llamador.
+ * <p>El cambio de estado registra el trabajador y cada fila que su cascada movio. Las tres
+ * etiquetas nombran la cosa que se prendio o se apago: el trabajador, su ficha, su cuenta.
  */
 public enum WorkerAuditField {
 
@@ -27,7 +28,9 @@ public enum WorkerAuditField {
     DRIVER_LICENSE_CATEGORY ("driver.licenseCategory", "Categoría de licencia"),
     DRIVER_STATUS           ("driver.status",          "Disponibilidad"),
     DRIVER_IS_ACTIVE        ("driver.isActive",        "Ficha de conductor"),
-    USER_ROLE               ("user.role",              "Rol del usuario");
+    USER_ROLE               ("user.role",              "Rol del usuario"),
+    IS_ACTIVE               ("isActive",               "Trabajador"),
+    USER_IS_ACTIVE          ("user.isActive",          "Usuario del sistema");
 
     private final String fieldName;
     private final String label;

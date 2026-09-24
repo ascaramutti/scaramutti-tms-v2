@@ -44,8 +44,8 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Trabajadores del catalogo compartido {@code public.workers}: el listado, el detalle, el alta
- * y la edicion. Las lecturas no abren transaccion (misma convencion que los listados de catalogo
+ * Trabajadores del catalogo compartido {@code public.workers}: el listado, el detalle, el alta,
+ * la edicion y el cambio de estado. Las lecturas no abren transaccion (misma convencion que los listados de catalogo
  * de conductores y unidades); las escrituras si, y cada una es la RAIZ de la suya. El filtro y el orden los
  * resuelve {@link WorkerRepository#search}; el shaping al response vive en el mapper.
  */
@@ -459,12 +459,126 @@ public class WorkerService {
             applyDriverProfile(worker, existingDriver, transition, updateWorkerCommand.driver(), changes);
             applyUserRole(user, newRole, changes);
 
-            writeFieldEditAuditLogs(worker.id, changes.asList(), updateWorkerCommand.reason(), currentUserId);
+            writeAuditLogs(worker.id, WorkerAuditChangeType.FIELD_EDIT, changes.asList(),
+                updateWorkerCommand.reason(), currentUserId);
             flushTranslatingDuplicates();
             return null;
         }, worker.id);
 
         return getWorker(worker.id);
+    }
+
+    /**
+     * Desactiva al trabajador y, en la MISMA transaccion, a su ficha y a su cuenta si existen.
+     * Las guardas corren ANTES del corte idempotente: repetir sobre alguien fuera de rango es un
+     * 403. Y la repeticion no escribe nada, ni la marca de modificacion: una firma sin fila de
+     * rastro que la respalde afirmaria un cambio que no hubo.
+     */
+    @Transactional
+    public WorkerDetailResponse deactivateWorker(Integer workerId) {
+        Worker worker = lockTargetAndOwnWorker(workerId);
+        workerRankPolicy.assertIsNotOwnWorker(worker);
+        User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
+        assertCanChangeStatusOf(worker, user);
+        if (!Boolean.TRUE.equals(worker.isActive)) {
+            return getWorker(worker.id);
+        }
+
+        Driver driver = driverRepository.findByWorkerIdOptional(worker.id).orElse(null);
+        Integer currentUserId = currentUser.requireId();
+        WorkerFieldChanges changes = new WorkerFieldChanges();
+        workerRowLock.runTranslatingLockConflicts(() -> {
+            changes.compare(WorkerAuditField.IS_ACTIVE, "true", "false");
+            worker.isActive = false;
+            worker.updatedBy = currentUserId;
+            // La cascada solo audita lo que MOVIO: una ficha o una cuenta que ya estaban
+            // apagadas no dejan fila, porque no cambiaron.
+            // Una asignacion de viaje o un retiro de almacen simultaneos leen la vigencia sin
+            // bloqueo, y pueden quedar a nombre de alguien ya dado de baja. Se acepta: el estado
+            // final es el de registrar y despues desactivar (no el mismo orden en el rastro), y la
+            // baja de un conductor con viajes pendientes esta permitida por decision de producto.
+            if (driver != null && Boolean.TRUE.equals(driver.isActive)) {
+                changes.compare(WorkerAuditField.DRIVER_IS_ACTIVE, "true", "false");
+                driver.isActive = false;
+            }
+            if (user != null && Boolean.TRUE.equals(user.isActive)) {
+                changes.compare(WorkerAuditField.USER_IS_ACTIVE, "true", "false");
+                user.isActive = false;
+            }
+            writeAuditLogs(worker.id, WorkerAuditChangeType.DEACTIVATED, changes.asList(), null,
+                currentUserId);
+            workerRepository.flush();
+            return null;
+        }, worker.id);
+
+        return getWorker(worker.id);
+    }
+
+    /**
+     * Reactiva al trabajador y enciende su ficha solo si existe y el cargo actual la lleva. La
+     * cuenta NO: eso lo decide el modulo de usuarios, que exigira trabajador activo. Tampoco
+     * crea una ficha que no existe; si el cargo la exige, el siguiente PUT la pide.
+     */
+    @Transactional
+    public WorkerDetailResponse reactivateWorker(Integer workerId) {
+        Worker worker = workerRowLock.findByIdForUpdate(workerId);
+        User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
+        assertCanChangeStatusOf(worker, user);
+        if (Boolean.TRUE.equals(worker.isActive)) {
+            return getWorker(worker.id);
+        }
+
+        Driver driver = driverRepository.findByWorkerIdOptional(worker.id).orElse(null);
+        boolean roleCarriesProfile =
+            DriverProfileMode.fromColumn(worker.role.driverProfile) != DriverProfileMode.NONE;
+        Integer currentUserId = currentUser.requireId();
+        WorkerFieldChanges changes = new WorkerFieldChanges();
+        workerRowLock.runTranslatingLockConflicts(() -> {
+            changes.compare(WorkerAuditField.IS_ACTIVE, "false", "true");
+            worker.isActive = true;
+            worker.updatedBy = currentUserId;
+            if (driver != null && !Boolean.TRUE.equals(driver.isActive) && roleCarriesProfile) {
+                changes.compare(WorkerAuditField.DRIVER_IS_ACTIVE, "false", "true");
+                driver.isActive = true;
+            }
+            writeAuditLogs(worker.id, WorkerAuditChangeType.REACTIVATED, changes.asList(), null,
+                currentUserId);
+            workerRepository.flush();
+            return null;
+        }, worker.id);
+
+        return getWorker(worker.id);
+    }
+
+    /**
+     * Toma la fila del destino Y la del trabajador de la sesion, en orden de id, antes de validar
+     * al actor. Sin la segunda, dos administradores que se desactivan entre si a la vez pasaban los
+     * dos la validacion y quedaban los dos apagados; con ella, el segundo espera y encuentra su
+     * propia cuenta ya apagada. El orden por id es lo que impide el abrazo mortal.
+     */
+    private Worker lockTargetAndOwnWorker(Integer targetId) {
+        Integer ownWorkerId = userRepository.findWorkerIdByUserId(currentUser.requireId()).orElse(null);
+        if (ownWorkerId == null || ownWorkerId.equals(targetId)) {
+            return workerRowLock.findByIdForUpdate(targetId);
+        }
+        if (ownWorkerId < targetId) {
+            workerRowLock.findByIdForUpdate(ownWorkerId);
+            return workerRowLock.findByIdForUpdate(targetId);
+        }
+        Worker target = workerRowLock.findByIdForUpdate(targetId);
+        workerRowLock.findByIdForUpdate(ownWorkerId);
+        return target;
+    }
+
+    /**
+     * El rango del cambio de estado: el cargo ACTUAL del trabajador y, si tiene cuenta, el de la
+     * cuenta, que es la que da los permisos. Mismo criterio que la edicion.
+     */
+    private void assertCanChangeStatusOf(Worker worker, User user) {
+        workerRankPolicy.assertCanActOn(worker.role);
+        if (user != null) {
+            workerRankPolicy.assertCanActOn(user.role);
+        }
     }
 
     /**
@@ -634,13 +748,13 @@ public class WorkerService {
         user.role = newRole;
     }
 
-    /** Una fila por campo cambiado, con el motivo en todas las de esta edicion. */
-    private void writeFieldEditAuditLogs(Integer workerId, List<WorkerFieldChange> changes,
-            String reason, Integer currentUserId) {
+    /** Una fila por campo cambiado, todas con el mismo tipo de cambio y el mismo motivo si lo hay. */
+    private void writeAuditLogs(Integer workerId, WorkerAuditChangeType changeType,
+            List<WorkerFieldChange> changes, String reason, Integer currentUserId) {
         for (WorkerFieldChange change : changes) {
             WorkerAuditLog log = new WorkerAuditLog();
             log.workerId = workerId;
-            log.changeType = WorkerAuditChangeType.FIELD_EDIT.name();
+            log.changeType = changeType.name();
             log.fieldName = change.field().fieldName();
             log.fieldLabel = change.field().label();
             log.oldValue = change.oldValue();

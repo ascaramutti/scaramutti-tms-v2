@@ -36,4 +36,15 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
         return find("worker.id", workerId).singleResultOptional();
     }
 
+    /**
+     * El id del trabajador de una cuenta, como valor suelto y SIN cargar la cuenta. Quien lo pide
+     * va a bloquear esa fila y recien despues leer la cuenta: si la cuenta ya estuviera en memoria,
+     * esa lectura devolveria la copia de antes de esperar y no la confirmada.
+     */
+    public Optional<Integer> findWorkerIdByUserId(Integer userId) {
+        return getEntityManager()
+            .createQuery("SELECT u.worker.id FROM User u WHERE u.id = :userId", Integer.class)
+            .setParameter("userId", userId).getResultStream().findFirst();
+    }
+
 }

@@ -818,6 +818,44 @@ public class WarehouseTestData {
         });
     }
 
+    /** Si la cuenta esta vigente, leido de la fila: el cambio de estado la apaga en cascada. */
+    public boolean userIsActive(int userId) {
+        return (Boolean) entityManager.createNativeQuery(
+            "SELECT is_active FROM public.users WHERE id = ?1").setParameter(1, userId).getSingleResult();
+    }
+
+    /** Enciende o apaga un trabajador de prueba por SQL, con el guardia de prefijo. */
+    public void setWorkerActive(int workerId, boolean isActive) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            int changed = entityManager.createNativeQuery(
+                "UPDATE public.workers SET is_active = ?1 WHERE id = ?2 AND document_number LIKE 'ZTEST%'")
+                .setParameter(1, isActive).setParameter(2, workerId).executeUpdate();
+            if (changed != 1) {
+                throw new IllegalArgumentException(
+                    "setWorkerActive solo toca trabajadores ZTEST%; no cambio nada para el id " + workerId);
+            }
+        });
+    }
+
+    /**
+     * Le da a una cuenta de prueba la contrasena de una cuenta sembrada, copiando su hash. Las
+     * cuentas de prueba nacen sin contrasena usable, y el inicio de sesion mira la contrasena
+     * ANTES que la vigencia: sin esto, medir que una cuenta apagada no entra daria "credenciales
+     * invalidas" en vez de "cuenta inactiva". Solo escribe sobre ztestuser%.
+     */
+    public void copyPasswordHashFrom(int userId, String sourceUsername) {
+        QuarkusTransaction.requiringNew().run(() -> {
+            int changed = entityManager.createNativeQuery(
+                "UPDATE public.users SET password_hash = (SELECT password_hash FROM public.users "
+                    + "WHERE username = ?1) WHERE id = ?2 AND username LIKE 'ztestuser%'")
+                .setParameter(1, sourceUsername).setParameter(2, userId).executeUpdate();
+            if (changed != 1) {
+                throw new IllegalArgumentException(
+                    "copyPasswordHashFrom solo toca usuarios ztestuser%; no cambio nada para el id " + userId);
+            }
+        });
+    }
+
     /** Tipo de documento de prueba; devuelve su id. El patron puede ir en nulo. */
     public int seedDocumentType(String code, String name, int maxLength, String validationPattern,
             boolean isActive) {

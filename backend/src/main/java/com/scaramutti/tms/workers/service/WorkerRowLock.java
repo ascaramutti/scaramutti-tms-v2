@@ -24,7 +24,7 @@ import java.util.TreeSet;
  * Lectura con LOCK de la fila de un trabajador, con su tope de espera y la traduccion del choque.
  *
  * <p>Es un componente propio y no tres lineas dentro del servicio porque las tres van SIEMPRE
- * juntas, y las dos escrituras que vienen (el cambio de estado) las necesitan igual. Separadas se
+ * juntas, y las usan igual la edicion y el cambio de estado. Separadas se
  * heredan de memoria, y al que se olvide del tope PostgreSQL le hace esperar para siempre,
  * inmovilizando un hilo y una conexion del pool COMPARTIDO con los otros modulos.
  *
@@ -102,7 +102,10 @@ public class WorkerRowLock {
      * de la propia fila no espera contra nadie. Sumar una columna unica obliga a recontar aca solo
      * si la edicion la escribe.
      *
-     * <p>El INSERT de la ficha que nace no suma un septimo: es excluyente con su UPDATE.
+     * <p>El INSERT de la ficha que nace no suma un septimo: es excluyente con su UPDATE. El
+     * cambio de estado toma cuatro filas (la suya, la del trabajador de la sesion, la ficha y la
+     * cuenta) y no cambia ninguna columna unica. Con una cola sobre la misma fila, tomarla puede
+     * gastar el tope dos veces; ese recuento se revisa aparte.
      */
     static final int MAX_LOCK_WAITS_PER_TRANSACTION = 6;
 
@@ -275,7 +278,7 @@ public class WorkerRowLock {
                 // trabajador, con la de su ficha o con un catalogo. El mensaje del motor es lo
                 // unico que nombra la relacion, y no trae valores de la fila: dice que sentencia
                 // se cancelo y sobre que tabla. El id va; datos de la persona, ninguno.
-                LOG.warnf("Conflicto de lock (%s) en la transaccion que escribe el trabajador id=%d "
+                LOG.warnf("Conflicto de lock (%s) sobre la fila del trabajador id=%d "
                         + "con un tope de %dms: %s", sqlException.getSQLState(), workerId,
                     lockTimeoutMillis, primaryMessageOf(sqlException));
                 return WorkersError.WORKER_LOCKED.toException();

@@ -26,8 +26,8 @@ import org.jboss.resteasy.reactive.ResponseStatus;
 import java.util.List;
 
 /**
- * Trabajadores del catalogo compartido {@code public.workers}: el listado, el detalle, el alta
- * y la edicion. Path PLANO (no bajo /warehouse/*): es de {@code public} y lo
+ * Trabajadores del catalogo compartido {@code public.workers}: el listado, el detalle, el alta,
+ * la edicion y el cambio de estado. Path PLANO (no bajo /warehouse/*): es de {@code public} y lo
  * reutilizara Operaciones. Sin creacion al vuelo DESDE ALMACEN: los trabajadores y las
  * unidades de flota nunca se crean desde el combobox de un retiro, solo se buscan; el alta es
  * de esta pantalla y el encargado de almacen no la alcanza. Sin paginar (plantilla chica).
@@ -119,6 +119,29 @@ public class WorkerResource {
         return workerService.updateWorker(
             workerResourceMapper.toUpdateWorkerCommand(id, workerUpdateRequest)
         );
+    }
+
+    /**
+     * Desactivar. SIN CUERPO, y acepta cualquier tipo de contenido a proposito: la clase declara
+     * JSON, y sin este comodin un tipo ajeno responderia 415, que el contrato no declara. La fila
+     * se bloquea ANTES de autorizar, aceptado: alguien fuera de rango puede provocar esperas o
+     * 409 a otros, pero no se entera de nada que su rol no lea ya.
+     */
+    @POST
+    @Path("/{id}/deactivate")
+    @Consumes(MediaType.WILDCARD)
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public WorkerDetailResponse deactivateWorker(@PathParam("id") Integer id) {
+        return workerService.deactivateWorker(id);
+    }
+
+    /** Reactivar. Sin cuerpo, por lo mismo que desactivar. */
+    @POST
+    @Path("/{id}/reactivate")
+    @Consumes(MediaType.WILDCARD)
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public WorkerDetailResponse reactivateWorker(@PathParam("id") Integer id) {
+        return workerService.reactivateWorker(id);
     }
 
 }

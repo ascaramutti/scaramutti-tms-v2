@@ -137,7 +137,7 @@ class WorkerRankPolicyTest {
             () -> workerRankPolicy.assertCanActOn(role("general_manager", 3)));
 
         assertEquals(sameLevel.getMessage(), higherLevel.getMessage());
-        assertEquals("No puedes dar de alta ni modificar trabajadores de ese cargo",
+        assertEquals("No puedes gestionar trabajadores de ese cargo",
             sameLevel.getMessage());
         // Y sin datos propios en el cuerpo: ni cargo, ni nivel, ni id.
         assertEquals(Map.of(), sameLevel.extensions());
@@ -300,6 +300,36 @@ class WorkerRankPolicyTest {
         same.id = 1;
 
         assertDoesNotThrow(() -> workerRankPolicy.assertCanChangeRoleOf(own, null, same));
+    }
+
+    // ---------- nadie desactiva su propio trabajador (WRK-010) ----------
+
+    /** Tampoco el administrador, que es a quien existe para frenar: el rango lo deja pasar. */
+    @Test
+    void assertIsNotOwnWorker_whenItIsItsOwnWorker_evenForAdmin_throwsWRK010() {
+        Role adminRole = role("admin", 4);
+        Worker own = workerWith(10, adminRole);
+        actorOwnsWorker(own, "admin", 4);
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertIsNotOwnWorker(own));
+        assertEquals("WRK-010", thrown.code());
+        assertEquals(403, thrown.status());
+        assertEquals("No puedes darte de baja a ti mismo", thrown.getMessage());
+        assertEquals(Map.of(), thrown.extensions());
+    }
+
+    /**
+     * Sobre OTRO trabajador no aplica. El id del trabajador ajeno se elige IGUAL al id del usuario
+     * de la sesion (7) a proposito: comparar contra el id del usuario en vez del de su trabajador
+     * es el error facil, y con ids distintos pasaria igual.
+     */
+    @Test
+    void assertIsNotOwnWorker_whenItIsSomeoneElse_passes_evenIfItsIdMatchesTheActorUserId() {
+        Role adminRole = role("admin", 4);
+        actorOwnsWorker(workerWith(10, adminRole), "admin", 4);
+
+        assertDoesNotThrow(() -> workerRankPolicy.assertIsNotOwnWorker(workerWith(7, role("sales", 2))));
     }
 
     /** El detalle es constante y no lleva datos propios: no se deduce nada de la jerarquia. */
