@@ -1535,6 +1535,46 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /workers/{id}/reactivate:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    post:
+      tags: [Workers]
+      operationId: reactivateWorker
+      summary: Reactivar un trabajador (y su ficha de conductor; el usuario no)
+      description: |
+        Marca `isActive = true` y enciende su ficha de conductor solo si existe
+        y el rol actual la lleva; un rol `OPTIONAL` la enciende aunque una
+        edición anterior la haya apagado. **No reactiva el usuario**: eso lo
+        hace el módulo de usuarios, que exigirá trabajador activo. Tampoco crea
+        una ficha que no existe. Idempotente: sobre un activo responde `200` sin
+        cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
+        llega uno, o cualquier `Content-Type`, se ignora.
+
+        Organigrama (RN-09): igual que desactivar, sobre el rol actual y el de
+        la cuenta (`403 WRK-006`, `admin` exento). Reactivarse a uno mismo no es
+        posible en la práctica: el propio usuario está apagado desde la
+        desactivación. Auditoría, solo cuando hubo cambio: una fila
+        `REACTIVATED` por el trabajador y otra si se encendió la ficha
+        (`driver.isActive`); nunca una de la cuenta.
+
+        Concurrencia: `409 WRK-013`, como en `deactivateWorker`.
+
+        Orden (el `409 WRK-013` no entra en la cadena): `401` → `403 COM-003` →
+        `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no está vigente) →
+        `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la cuenta) → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: Trabajador con el estado resultante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /fleet-units:
     get:
       tags: [SharedCatalogs]

@@ -135,4 +135,13 @@ public class WorkerResource {
         return workerService.deactivateWorker(id);
     }
 
+    /** Reactivar. Sin cuerpo, por lo mismo que desactivar. */
+    @POST
+    @Path("/{id}/reactivate")
+    @Consumes(MediaType.WILDCARD)
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public WorkerDetailResponse reactivateWorker(@PathParam("id") Integer id) {
+        return workerService.reactivateWorker(id);
+    }
+
 }

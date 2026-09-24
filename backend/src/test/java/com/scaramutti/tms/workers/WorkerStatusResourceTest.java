@@ -35,7 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * El cambio de estado de un trabajador: desactivar, en cascada sobre su ficha y su cuenta.
+ * El cambio de estado de un trabajador: desactivar en cascada y reactivar sin tocar la cuenta.
  * Toda escritura se afirma contra la FILA releida (trabajador, ficha, cuenta y rastro) y no solo
  * contra la respuesta: la respuesta sale de la misma relectura, y mirarla sola no distinguiria
  * una fila que no se movio de una respuesta armada a mano.
@@ -44,6 +44,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class WorkerStatusResourceTest {
 
     private static final String DEACTIVATE = "deactivate";
+    private static final String REACTIVATE = "reactivate";
 
     @Inject WarehouseTestData fixtures;
     @Inject com.scaramutti.tms.support.OperationsTestData operationsFixtures;
@@ -190,6 +191,73 @@ class WorkerStatusResourceTest {
         assertEquals(detalle, respuesta);
     }
 
+    // ---------- reactivar: la ficha si el cargo la lleva, la cuenta nunca ----------
+
+    /**
+     * La ficha vuelve solo si existe y el cargo ACTUAL la lleva; reactivar no crea ninguna. Un
+     * cargo OPTIONAL la enciende aunque la hubiera apagado una edicion: no hay forma de
+     * distinguirlo, y asi quedo decidido.
+     */
+    @ParameterizedTest(name = "{0}: ficha={1} -> {2}")
+    @CsvSource(delimiter = '|', value = {
+        // cargo   | ficha apagada | ficha despues | filas de rastro
+        "driver    | si            | si            | isActive,driver.isActive",
+        "escort    | si            | si            | isActive,driver.isActive",
+        "assistant | si            | si            | isActive,driver.isActive",
+        "operator  | si            | no            | isActive",
+        "sales     | si            | no            | isActive",
+        "driver    | no            | -             | isActive",
+        "assistant | no            | -             | isActive",
+    })
+    void reactivate_turnsTheProfileOnOnlyWhenTheRoleCarriesIt(String role, String hasProfile,
+            String profileAfter, String expectedFields) {
+        int id = fixtures.seedWorker("ZTESTS010", "Juan", "Pérez", role, false);
+        if ("si".equals(hasProfile)) {
+            fixtures.seedDriverProfileFor(id, "ZTESTLS010", null, WarehouseTestData.STATUS_AVAILABLE, false);
+        }
+
+        post(adminToken(), id, REACTIVATE).statusCode(200).body("isActive", equalTo(true));
+
+        assertTrue(fixtures.workerRowOf(id).isActive());
+        if ("si".equals(hasProfile)) {
+            assertEquals("si".equals(profileAfter), fixtures.driverRowOf(id).isActive(), "la ficha");
+        } else {
+            assertNull(fixtures.driverRowOf(id), "reactivar no crea una ficha");
+        }
+        assertEquals(List.of(expectedFields.split(",")), auditFieldNames(id));
+        var rows = fixtures.workerAuditRows(id);
+        assertStatusRow(rows.get(0), "REACTIVATED", "isActive", "Trabajador", "false", "true", fixtures.adminId());
+        if (rows.size() > 1) {
+            assertStatusRow(rows.get(1), "REACTIVATED", "driver.isActive", "Ficha de conductor", "false", "true",
+                fixtures.adminId());
+        }
+    }
+
+    /** Una ficha que ya estaba encendida no se "enciende": no hay fila de rastro de un cambio que no hubo. */
+    @Test
+    void reactivate_aProfileAlreadyOn_leavesNoProfileRow() {
+        int id = fixtures.seedWorker("ZTESTS012", "Juan", "Pérez", "driver", false);
+        fixtures.seedDriverProfileFor(id, "ZTESTLS012", null, WarehouseTestData.STATUS_AVAILABLE, true);
+
+        post(adminToken(), id, REACTIVATE).statusCode(200);
+
+        assertTrue(fixtures.driverRowOf(id).isActive());
+        assertEquals(List.of("isActive"), auditFieldNames(id));
+    }
+
+    /** La cuenta NUNCA: ni la enciende estando apagada, ni la apaga estando encendida. */
+    @ParameterizedTest(name = "cuenta encendida={0}")
+    @ValueSource(booleans = {false, true})
+    void reactivate_neverTouchesTheAccount(boolean accountOn) {
+        int id = fixtures.seedWorker("ZTESTS011", "Juan", "Pérez", "sales", false);
+        int userId = fixtures.seedUserFor(id, "ztestuserS011", "sales", accountOn);
+
+        post(adminToken(), id, REACTIVATE).statusCode(200).body("isActive", equalTo(true));
+
+        assertEquals(accountOn, fixtures.userIsActive(userId), "la cuenta quedo como estaba");
+        assertEquals(List.of("isActive"), auditFieldNames(id), "y el rastro no la nombra");
+    }
+
     // ---------- idempotencia ----------
 
     /**
@@ -215,6 +283,21 @@ class WorkerStatusResourceTest {
         assertEquals(List.of(), auditFieldNames(id));
     }
 
+    /** Y del otro lado: reactivar a un activo no enciende una ficha que una edicion apago. */
+    @Test
+    void reactivate_anActiveWorker_returns200_withoutAnyWrite() {
+        int id = fixtures.seedWorker("ZTESTS021", "Juan", "Pérez", "assistant", true);
+        fixtures.seedDriverProfileFor(id, "ZTESTLS021", null, WarehouseTestData.STATUS_AVAILABLE, false);
+        var antes = fixtures.workerRowOf(id);
+
+        post(adminToken(), id, REACTIVATE).statusCode(200).body("isActive", equalTo(true));
+
+        assertEquals(antes.updatedAt(), fixtures.workerRowOf(id).updatedAt());
+        assertEquals(antes.updatedBy(), fixtures.workerRowOf(id).updatedBy());
+        assertTrue(!fixtures.driverRowOf(id).isActive(), "la ficha sigue apagada");
+        assertEquals(List.of(), auditFieldNames(id));
+    }
+
     /** Un cambio efectivo SI mueve la marca y la firma. */
     @Test
     void deactivate_anActiveWorker_movesTheModificationStamp() {
@@ -224,6 +307,21 @@ class WorkerStatusResourceTest {
 
         post(fabricateTokenForUser(actor.userId(), "ztestuserS02", "general_manager"), id, DEACTIVATE)
             .statusCode(200);
+
+        var despues = fixtures.workerRowOf(id);
+        assertNotEquals(antes.updatedAt(), despues.updatedAt(), "la marca se mueve");
+        assertEquals(actor.userId(), despues.updatedBy(), "y firma quien tiene la sesion");
+    }
+
+    /** Y reactivar tambien firma: el caso de desactivar no lo mide, y la firma es otra linea. */
+    @Test
+    void reactivate_anInactiveWorker_movesTheModificationStamp() {
+        var actor = fixtures.seedActor("general_manager", "S04");
+        int id = fixtures.seedWorker("ZTESTS023", "Juan", "Pérez", "operator", false);
+        var antes = fixtures.workerRowOf(id);
+
+        post(fabricateTokenForUser(actor.userId(), "ztestuserS04", "general_manager"), id, REACTIVATE)
+            .statusCode(200).body("updatedBy.username", equalTo("ztestuserS04"));
 
         var despues = fixtures.workerRowOf(id);
         assertNotEquals(antes.updatedAt(), despues.updatedAt(), "la marca se mueve");
@@ -264,6 +362,79 @@ class WorkerStatusResourceTest {
             .extract().jsonPath().getLong("id");
     }
 
+    // ---------- ida y vuelta ----------
+
+    /**
+     * Desactivar, reactivar, desactivar, con la fila releida en cada paso. En el tercero la cuenta
+     * ya estaba apagada (reactivar no la encendio) y por eso no deja fila de cuenta.
+     */
+    @Test
+    void roundTrip_workerWithProfileAndAccount() {
+        var actor = fixtures.seedActor("general_manager", "S03");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserS03", "general_manager");
+        int id = fixtures.seedWorker("ZTESTS030", "Juan", "Pérez", "driver", true);
+        fixtures.seedDriverProfileFor(id, "ZTESTLS030", null, WarehouseTestData.STATUS_AVAILABLE, true);
+        int driverId = fixtures.driverRowOf(id).id();
+        int userId = fixtures.seedUserFor(id, "ztestuserS030", "sales");
+
+        post(token, id, DEACTIVATE).statusCode(200);
+        assertTrue(!fixtures.workerRowOf(id).isActive());
+        assertTrue(!fixtures.driverRowOf(id).isActive());
+        assertTrue(!fixtures.userIsActive(userId));
+        assertEquals(List.of("isActive", "driver.isActive", "user.isActive"), auditFieldNames(id));
+
+        post(token, id, REACTIVATE).statusCode(200);
+        assertTrue(fixtures.workerRowOf(id).isActive());
+        assertTrue(fixtures.driverRowOf(id).isActive());
+        assertTrue(!fixtures.userIsActive(userId), "la cuenta sigue apagada");
+        assertEquals(List.of("isActive", "driver.isActive", "user.isActive", "isActive", "driver.isActive"),
+            auditFieldNames(id));
+
+        post(token, id, DEACTIVATE).statusCode(200);
+        assertTrue(!fixtures.workerRowOf(id).isActive());
+        assertTrue(!fixtures.driverRowOf(id).isActive());
+        assertEquals(driverId, fixtures.driverRowOf(id).id(), "siempre la misma ficha");
+        assertEquals(List.of("isActive", "driver.isActive", "user.isActive", "isActive", "driver.isActive",
+            "isActive", "driver.isActive"), auditFieldNames(id));
+        fixtures.workerAuditRows(id).forEach(r -> assertEquals(actor.userId(), r.changedBy()));
+    }
+
+    /**
+     * Lo que ven los dos combobox en cada paso: el de conductores (filtra la ficha) y el de
+     * almacen (filtra el trabajador). Se mide por la API, que es lo que consumen las pantallas.
+     */
+    @Test
+    void roundTrip_whatTheDriverAndWarehouseComboboxesSee() {
+        int id = fixtures.seedWorker("ZTESTS031", "Juan", "Pérez", "driver", true);
+        fixtures.seedDriverProfileFor(id, "ZTESTLS031", null, WarehouseTestData.STATUS_AVAILABLE, true);
+
+        assertVisibility(id, "ZTESTLS031", true, true);
+        post(adminToken(), id, DEACTIVATE).statusCode(200);
+        assertVisibility(id, "ZTESTLS031", false, false);
+        post(adminToken(), id, REACTIVATE).statusCode(200);
+        assertVisibility(id, "ZTESTLS031", true, true);
+    }
+
+    /** Un cargo sin ficha, reactivado, vuelve al de almacen y NO al de conductores. */
+    @Test
+    void reactivate_aRoleWithoutProfile_returnsToTheWarehouseComboboxOnly() {
+        int id = fixtures.seedWorker("ZTESTS032", "Juan", "Pérez", "operator", false);
+        fixtures.seedDriverProfileFor(id, "ZTESTLS032", null, WarehouseTestData.STATUS_AVAILABLE, false);
+
+        post(adminToken(), id, REACTIVATE).statusCode(200);
+
+        assertVisibility(id, "ZTESTLS032", false, true);
+    }
+
+    private void assertVisibility(int workerId, String license, boolean inDrivers, boolean inWorkers) {
+        var conductores = given().header("Authorization", "Bearer " + adminToken())
+            .queryParam("isActive", true).when().get("/drivers").then().statusCode(200);
+        conductores.body("licenseNumber", inDrivers ? hasItem(license) : not(hasItem(license)));
+        var trabajadores = given().header("Authorization", "Bearer " + adminToken())
+            .queryParam("isActive", true).queryParam("q", "ZTESTS").when().get("/workers").then().statusCode(200);
+        trabajadores.body("id", inWorkers ? hasItem(workerId) : not(hasItem(workerId)));
+    }
+
     // ---------- rango: roles cruzados ----------
 
     /**
@@ -286,6 +457,13 @@ class WorkerStatusResourceTest {
         "finance_manager,    driver,             deactivate, 200",
         "admin,              admin,              deactivate, 200",
         "admin,              general_manager,    deactivate, 200",
+        "general_manager,    admin,              reactivate, 403",
+        "general_manager,    general_manager,    reactivate, 403",
+        "general_manager,    finance_manager,    reactivate, 200",
+        "finance_manager,    sales,              reactivate, 403",
+        "finance_manager,    assistant,          reactivate, 200",
+        "operations_manager, dispatcher,         reactivate, 200",
+        "admin,              admin,              reactivate, 200",
     })
     void rankMatrix(String actorRole, String targetRole, String operation, int expected) {
         var actor = fixtures.seedActor(actorRole, "S10");
@@ -310,10 +488,11 @@ class WorkerStatusResourceTest {
      * rango sigue siendo un 403, no un 200 con su detalle. El destino ya esta en el estado pedido.
      */
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {DEACTIVATE})
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
     void theGuardsRunBeforeTheIdempotentCut(String operation) {
         var actor = fixtures.seedActor("operations_manager", "S16");
-        int id = fixtures.seedWorker("ZTESTS105", "Juan", "Pérez", "general_manager", false);
+        boolean alreadyInTheRequestedState = REACTIVATE.equals(operation);
+        int id = fixtures.seedWorker("ZTESTS105", "Juan", "Pérez", "general_manager", alreadyInTheRequestedState);
 
         post(fabricateTokenForUser(actor.userId(), "ztestuserS16", "operations_manager"), id, operation)
             .statusCode(403).body("code", equalTo("WRK-006"));
@@ -339,7 +518,7 @@ class WorkerStatusResourceTest {
      * guarda un gerente apagaria la cuenta de un administrador.
      */
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {DEACTIVATE})
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
     void theRankAlsoLooksAtTheAccountRole(String operation) {
         var actor = fixtures.seedActor("general_manager", "S13");
         boolean startsActive = DEACTIVATE.equals(operation);
@@ -455,9 +634,31 @@ class WorkerStatusResourceTest {
             .statusCode(403).body("code", equalTo("WRK-010"));
     }
 
+    /**
+     * Reactivar no tiene la regla de uno mismo: en la practica no se llega, porque la cuenta
+     * propia queda apagada al desactivar. Con la divergencia sembrada, un no administrador sale
+     * por el rango y el administrador pasa.
+     */
+    @ParameterizedTest(name = "{0} -> {1}")
+    @CsvSource({"admin, 200", "general_manager, 403"})
+    void reactivate_ownWorker_hasNoSelfRule(String role, int expected) {
+        var actor = fixtures.seedActor(role, "S22");
+        fixtures.setWorkerActive(actor.workerId(), false);
+
+        var response = post(fabricateTokenForUser(actor.userId(), "ztestuserS22", role), actor.workerId(), REACTIVATE)
+            .statusCode(expected);
+        if (expected == 403) {
+            response.body("code", equalTo("WRK-006"));
+            assertTrue(!fixtures.workerRowOf(actor.workerId()).isActive(), "nada se movio");
+        } else {
+            assertTrue(fixtures.workerRowOf(actor.workerId()).isActive(), "se reactivo de verdad");
+            assertEquals(List.of("isActive"), auditFieldNames(actor.workerId()));
+        }
+    }
+
     /** Una sesion cuyo usuario ya no esta vigente no escribe, aunque su token siga valiendo. */
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {DEACTIVATE})
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
     void byAnActorWhoseAccountIsInactive_returns403_COM003(String operation) {
         var actor = fixtures.seedActor("general_manager", "S23");
         fixtures.setUserActive(actor.userId(), false);
@@ -493,10 +694,10 @@ class WorkerStatusResourceTest {
 
     /**
      * Tras desactivar, la cuenta no vuelve a entrar ni a renovar; el token que ya tenia sigue
-     * valiendo hasta que vence. El caso DOCUMENTA la ventana, no la niega.
+     * valiendo hasta que vence. El caso DOCUMENTA la ventana, no la niega. Y reactivar no la reabre.
      */
     @Test
-    void deactivate_liveSession_refreshAndLoginFail_theAccessTokenStillAnswers() {
+    void deactivate_liveSession_refreshAndLoginFail_theAccessTokenStillAnswers_andReactivateDoesNotReopen() {
         int id = fixtures.seedWorker("ZTESTS040", "Juan", "Pérez", "sales", true);
         int userId = fixtures.seedUserFor(id, "ztestuserS040", "sales");
         fixtures.copyPasswordHashFrom(userId, "sales");
@@ -514,12 +715,16 @@ class WorkerStatusResourceTest {
             .when().post("/auth/login").then().statusCode(401).body("code", equalTo("AUTH-002"));
         given().header("Authorization", "Bearer " + access)
             .when().get("/auth/me").then().statusCode(200);
+
+        post(adminToken(), id, REACTIVATE).statusCode(200);
+        given().contentType("application/json").body(loginBody)
+            .when().post("/auth/login").then().statusCode(401).body("code", equalTo("AUTH-002"));
     }
 
     // ---------- autenticacion, roles y 404 ----------
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {DEACTIVATE})
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
     void withoutToken_returns401(String operation) {
         int id = fixtures.seedWorker("ZTESTS050", "Juan", "Pérez", "sales", true);
         given().when().post("/workers/" + id + "/" + operation).then().statusCode(401);
@@ -529,6 +734,7 @@ class WorkerStatusResourceTest {
     @ParameterizedTest(name = "{0} {1}")
     @CsvSource({
         "warehouse_keeper, deactivate", "sales, deactivate", "dispatcher, deactivate",
+        "warehouse_keeper, reactivate", "sales, reactivate", "dispatcher, reactivate",
     })
     void withARoleOutsideTheFour_returns403_COM003(String role, String operation) {
         var actor = fixtures.seedActor(role, "S51");
@@ -540,7 +746,7 @@ class WorkerStatusResourceTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {DEACTIVATE})
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
     void withAnIdThatDoesNotExist_returns404_WRK001(String operation) {
         post(adminToken(), 999999, operation).statusCode(404).body("code", equalTo("WRK-001"));
     }
@@ -554,7 +760,7 @@ class WorkerStatusResourceTest {
     }
 
     @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {DEACTIVATE})
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
     void withANonNumericId_returns404(String operation) {
         given().header("Authorization", "Bearer " + adminToken())
             .when().post("/workers/abc/" + operation).then().statusCode(404);
@@ -581,6 +787,16 @@ class WorkerStatusResourceTest {
 
         assertTrue(!fixtures.workerRowOf(id).isActive());
         assertNull(fixtures.workerAuditRows(id).get(0).reason(), "el motivo del cuerpo no se leyo");
+    }
+
+    @Test
+    void reactivate_withABodyTryingToKeepItInactive_ignoresIt() {
+        int id = fixtures.seedWorker("ZTESTS061", "Juan", "Pérez", "sales", false);
+
+        given().header("Authorization", "Bearer " + adminToken()).contentType("application/json")
+            .body("{\"isActive\":false}")
+            .when().post("/workers/" + id + "/reactivate").then().statusCode(200).body("isActive", equalTo(true));
+        assertTrue(fixtures.workerRowOf(id).isActive());
     }
 
     // ---------- bloqueo (WRK-013) ----------
@@ -624,6 +840,7 @@ class WorkerStatusResourceTest {
     @ParameterizedTest(name = "{0} con {1} tomada")
     @CsvSource({
         "deactivate, workers", "deactivate, drivers", "deactivate, users",
+        "reactivate, workers", "reactivate, drivers",
     })
     void whenAnotherTransactionHoldsARow_returns409_WRK013_andNothingMoves(String operation, String table)
             throws Exception {

@@ -515,6 +515,42 @@ public class WorkerService {
     }
 
     /**
+     * Reactiva al trabajador y enciende su ficha solo si existe y el cargo actual la lleva. La
+     * cuenta NO: eso lo decide el modulo de usuarios, que exigira trabajador activo. Tampoco
+     * crea una ficha que no existe; si el cargo la exige, el siguiente PUT la pide.
+     */
+    @Transactional
+    public WorkerDetailResponse reactivateWorker(Integer workerId) {
+        Worker worker = workerRowLock.findByIdForUpdate(workerId);
+        User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
+        assertCanChangeStatusOf(worker, user);
+        if (Boolean.TRUE.equals(worker.isActive)) {
+            return getWorker(worker.id);
+        }
+
+        Driver driver = driverRepository.findByWorkerIdOptional(worker.id).orElse(null);
+        boolean roleCarriesProfile =
+            DriverProfileMode.fromColumn(worker.role.driverProfile) != DriverProfileMode.NONE;
+        Integer currentUserId = currentUser.requireId();
+        WorkerFieldChanges changes = new WorkerFieldChanges();
+        workerRowLock.runTranslatingLockConflicts(() -> {
+            changes.compare(WorkerAuditField.IS_ACTIVE, "false", "true");
+            worker.isActive = true;
+            worker.updatedBy = currentUserId;
+            if (driver != null && !Boolean.TRUE.equals(driver.isActive) && roleCarriesProfile) {
+                changes.compare(WorkerAuditField.DRIVER_IS_ACTIVE, "false", "true");
+                driver.isActive = true;
+            }
+            writeAuditLogs(worker.id, WorkerAuditChangeType.REACTIVATED, changes.asList(), null,
+                currentUserId);
+            workerRepository.flush();
+            return null;
+        }, worker.id);
+
+        return getWorker(worker.id);
+    }
+
+    /**
      * Toma la fila del destino Y la del trabajador de la sesion, en orden de id, antes de validar
      * al actor. Sin la segunda, dos administradores que se desactivan entre si a la vez pasaban los
      * dos la validacion y quedaban los dos apagados; con ella, el segundo espera y encuentra su
