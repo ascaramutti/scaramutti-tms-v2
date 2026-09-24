@@ -13,6 +13,7 @@ public enum WorkerAuditChangeType {
     CREATED,
     /** Edicion: una fila por campo efectivamente cambiado. */
     FIELD_EDIT,
+    /** Desactivar: una fila por el trabajador y una por cada fila que la cascada apago. */
     DEACTIVATED,
     REACTIVATED
 }

@@ -2084,6 +2084,58 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
 
+  /workers/{id}/deactivate:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Workers]
+      operationId: deactivateWorker
+      summary: 'Desactivar un trabajador (en cascada: ficha de conductor y usuario)'
+      description: |
+        Marca `isActive = false` y, en la MISMA transacción, deja inactivos su
+        ficha de conductor (`drivers.is_active`) y su usuario del sistema
+        (`users.is_active`), si existen: quien se fue no inicia sesión ni se
+        asigna a un viaje (la sesión abierta, si la hay, sigue hasta que venza
+        su access token; el refresco ya la frena). Idempotente: sobre un
+        inactivo responde `200` sin cambio, sin código de error, sin fila de
+        auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si llega uno,
+        o cualquier `Content-Type`, se ignora.
+
+        Nadie desactiva su propio trabajador (el de `users.worker_id` de la
+        sesión), tampoco `admin` → `403 WRK-010`. Organigrama (RN-09): el nivel
+        del rol actual del trabajador, y el del rol de su cuenta si la tiene,
+        tiene que ser estrictamente menor al de la sesión → si no, `403
+        WRK-006`; `admin` exento, y un `admin` puede desactivar a otro `admin`.
+        Las guardas corren antes del corte idempotente: repetir sobre alguien
+        fuera de rango responde `403`.
+
+        Auditoría, solo cuando hubo cambio: una fila `DEACTIVATED` por el
+        trabajador y una más por cada fila que la cascada apagó (`driver.isActive`
+        y `user.isActive`); una ficha o una cuenta que ya estaban apagadas no
+        dejan fila.
+
+        Concurrencia: toma la fila del trabajador y también la del trabajador de
+        la sesión, en orden: dos desactivaciones cruzadas se serializan y la
+        segunda encuentra a su actor ya apagado (`403 COM-003`). Si otra
+        operación retiene una de las dos más allá del tope de espera → `409
+        WRK-013`, transitorio.
+
+        Orden (el `409 WRK-013` no entra en la cadena): `401` → `403 COM-003` →
+        `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no está vigente) →
+        `403 WRK-010` → `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la
+        cuenta) → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: Trabajador con el estado resultante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
   /fleet-units:
     get:
       tags: [SharedCatalogs]
@@ -3123,6 +3175,16 @@ components:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
           examples:
+            workerSelfDeactivation:
+              summary: Desactivacion del propio trabajador
+              value:
+                type: 'urn:tms:error:wrk-010'
+                title: 'Forbidden'
+                status: 403
+                detail: 'No puedes darte de baja a ti mismo'
+                instance: '/api/v1/workers/8/deactivate'
+                code: 'WRK-010'
+                traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
             workerSelfRoleChange:
               summary: Cambio del cargo propio
               value:
@@ -3139,7 +3201,7 @@ components:
                 type: 'urn:tms:error:wrk-006'
                 title: 'Forbidden'
                 status: 403
-                detail: 'No puedes dar de alta ni modificar trabajadores de ese cargo'
+                detail: 'No puedes gestionar trabajadores de ese cargo'
                 instance: '/api/v1/workers'
                 code: 'WRK-006'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'

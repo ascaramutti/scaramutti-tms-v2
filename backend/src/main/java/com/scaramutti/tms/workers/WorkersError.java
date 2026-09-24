@@ -25,7 +25,7 @@ public enum WorkersError implements ApiError {
      * publica el nivel de cada uno a estos mismos cuatro roles.
      */
     ROLE_OUT_OF_RANK         ("WRK-006", 403, "Forbidden",
-        "No puedes dar de alta ni modificar trabajadores de ese cargo"),
+        "No puedes gestionar trabajadores de ese cargo"),
     DUPLICATE_LICENSE        ("WRK-007", 409, "Conflict",
         "Ya existe una ficha de conductor con ese numero de licencia"),
     DRIVER_PROFILE_MISMATCH  ("WRK-008", 400, "Bad Request",
@@ -38,9 +38,13 @@ public enum WorkersError implements ApiError {
      */
     DOCUMENT_CHANGE_REASON_REQUIRED ("WRK-009", 400, "Bad Request",
         "Cambiar el numero de documento exige un motivo de al menos 10 caracteres"),
-    // WRK-010 no esta y no es un olvido: es el de desactivarse a uno mismo, y nace con el
-    // endpoint de cambio de estado. Un hueco en un catalogo de errores normalmente es una guarda
-    // que se cayo, asi que conviene que este dicho.
+    /**
+     * Nadie desactiva su propio trabajador, tampoco el administrador: con eso y con la fila de la
+     * sesion bloqueada, desactivar no deja a la empresa sin administradores (dos ediciones cruzadas
+     * todavia pueden: la edicion se endurece aparte). Detalle CONSTANTE, sin rol, nivel ni id.
+     */
+    SELF_DEACTIVATION        ("WRK-010", 403, "Forbidden",
+        "No puedes darte de baja a ti mismo"),
     ROLE_CANNOT_LOGIN_WITH_USER ("WRK-011", 400, "Bad Request",
         "Ese cargo no inicia sesion y el trabajador tiene usuario del sistema"),
     /**

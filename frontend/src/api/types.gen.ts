@@ -3789,6 +3789,45 @@ export type UpdateWorkerResponses = {
 
 export type UpdateWorkerResponse = UpdateWorkerResponses[keyof UpdateWorkerResponses];
 
+export type DeactivateWorkerData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}/deactivate';
+};
+
+export type DeactivateWorkerErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type DeactivateWorkerError = DeactivateWorkerErrors[keyof DeactivateWorkerErrors];
+
+export type DeactivateWorkerResponses = {
+    /**
+     * Trabajador con el estado resultante
+     */
+    200: WorkerDetailResponse;
+};
+
+export type DeactivateWorkerResponse = DeactivateWorkerResponses[keyof DeactivateWorkerResponses];
+
 export type ListFleetUnitsData = {
     body?: never;
     path?: never;

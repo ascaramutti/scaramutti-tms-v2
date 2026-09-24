@@ -17,8 +17,8 @@ import jakarta.inject.Inject;
  * <p>Vive sola y no adentro del servicio porque la usan todas las escrituras del modulo y
  * tienen que decidir igual: dos copias de esta regla es la forma en que una jerarquia se pudre.
  * El alta pregunta por el cargo del cuerpo; la edicion pregunta por el actual, por el nuevo y
- * por el de la cuenta; el cambio de estado, cuando llegue, por el actual. Esta clase no sabe
- * cual de ellas la llama, y por eso no tuvo que cambiar cuando llego la segunda.
+ * por el de la cuenta; el cambio de estado, por el actual y el de la cuenta. Esta clase no sabe
+ * cual de ellas la llama, y por eso no tuvo que cambiar cuando llegaron las otras.
  *
  * <p>EL NIVEL DEL ACTOR SE LEE DE LA BASE, no del token, y no es un detalle: el token no lleva
  * el nivel, y su grupo de rol puede estar viejo, porque cambiar el cargo de un trabajador con
@@ -51,6 +51,19 @@ public class WorkerRankPolicy {
         }
         if (targetRole.level >= actor.role.level) {
             throw WorkersError.ROLE_OUT_OF_RANK.toException();
+        }
+    }
+
+    /**
+     * Exige que quien tiene la sesion no desactive SU PROPIO trabajador, tampoco el
+     * administrador (WRK-010). No es rango: el administrador esta exento del rango y esta regla
+     * es justamente para el. Para cualquier otro corre ANTES que el rango, porque su propio
+     * cargo es de su propio nivel y el rango lo frenaria con un codigo que no dice por que.
+     */
+    public void assertIsNotOwnWorker(Worker targetWorker) {
+        User actor = requireActor();
+        if (actor.worker != null && actor.worker.id.equals(targetWorker.id)) {
+            throw WorkersError.SELF_DEACTIVATION.toException();
         }
     }
 
