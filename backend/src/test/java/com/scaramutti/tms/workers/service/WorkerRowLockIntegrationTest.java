@@ -49,6 +49,9 @@ class WorkerRowLockIntegrationTest {
     @org.eclipse.microprofile.config.inject.ConfigProperty(name = "quarkus.datasource.jdbc.max-size")
     int maxPoolSize;
 
+    @org.eclipse.microprofile.config.inject.ConfigProperty(name = "app.workers.edit-lock-timeout-ms")
+    int configuredLockTimeoutMillis;
+
     @Inject WorkerRowLock workerRowLock;
     @Inject WarehouseTestData fixtures;
     @Inject DataSource dataSource;
@@ -254,7 +257,7 @@ class WorkerRowLockIntegrationTest {
             return (String) entityManager.createNativeQuery("SHOW lock_timeout").getSingleResult();
         });
 
-        assertEquals("700ms", aplicado, "el tope se configura en milisegundos, con su unidad");
+        assertEquals(configuredLockTimeoutMillis + "ms", aplicado, "el tope se configura en milisegundos, con su unidad");
     }
 
     /**

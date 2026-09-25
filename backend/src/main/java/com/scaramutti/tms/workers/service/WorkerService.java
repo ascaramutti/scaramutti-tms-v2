@@ -363,11 +363,12 @@ public class WorkerService {
      * resuelve el contenedor antes de entrar. Cada par contiguo tiene su caso, porque mover un
      * bloque cambia que error ve quien manda un cuerpo con dos problemas a la vez.
      *
-     * <p>LA FILA SE TOMA CON BLOQUEO ANTES DE DECIDIR NADA, y eso no es cosmetico: todo lo que
-     * sigue decide sobre un estado que una desactivacion simultanea cambia (el cargo guardado, la
-     * fila del usuario, la de la ficha). Tomar el bloqueo relee la fila, asi que tiene que ocurrir
-     * antes de tocar la entidad: quien mute primero y bloquee despues pierde su cambio sin ningun
-     * error y deja un rastro que afirma algo que en la fila no esta.
+     * <p>LA FILA SE TOMA CON BLOQUEO ANTES DE DECIDIR NADA, junto con la de quien actua, y eso no
+     * es cosmetico: todo lo que sigue decide sobre un estado que otra escritura simultanea cambia
+     * (el cargo guardado, la fila del usuario, la de la ficha, el cargo de quien actua). Tomar el
+     * bloqueo relee la fila, asi que tiene que ocurrir antes de tocar la entidad: quien mute primero
+     * y bloquee despues pierde su cambio sin ningun error y deja un rastro que afirma algo que en la
+     * fila no esta.
      *
      * <p>DEUDA ANOTADA: la fila de la CUENTA se lee SIN bloqueo, se le mide el rango y se escribe
      * al final. Hoy no es alcanzable —el unico otro escritor de esa columna es el sembrador de dev,
@@ -380,7 +381,7 @@ public class WorkerService {
      */
     @Transactional
     public WorkerDetailResponse updateWorker(UpdateWorkerCommand updateWorkerCommand) {
-        Worker worker = workerRowLock.findByIdForUpdate(updateWorkerCommand.workerId());
+        Worker worker = lockTargetAndOwnWorker(updateWorkerCommand.workerId());
 
         workerRankPolicy.assertCanActOn(worker.role);
 
@@ -552,9 +553,11 @@ public class WorkerService {
 
     /**
      * Toma la fila del destino Y la del trabajador de la sesion, en orden de id, antes de validar
-     * al actor. Sin la segunda, dos administradores que se desactivan entre si a la vez pasaban los
-     * dos la validacion y quedaban los dos apagados; con ella, el segundo espera y encuentra su
-     * propia cuenta ya apagada. El orden por id es lo que impide el abrazo mortal.
+     * al actor. Sin la segunda, dos administradores que se desactivan o se bajan el cargo entre si
+     * a la vez pasaban los dos la validacion y la empresa podia quedar sin administradores; con
+     * ella, el segundo espera y relee su propia cuenta ya cambiada. El orden por id impide el
+     * abrazo mortal. Protege a la cuenta solo porque quien le escribe el cargo o la vigencia toma
+     * antes la fila de su trabajador: un escritor nuevo de cuentas tiene que hacer lo mismo.
      */
     private Worker lockTargetAndOwnWorker(Integer targetId) {
         Integer ownWorkerId = userRepository.findWorkerIdByUserId(currentUser.requireId()).orElse(null);
