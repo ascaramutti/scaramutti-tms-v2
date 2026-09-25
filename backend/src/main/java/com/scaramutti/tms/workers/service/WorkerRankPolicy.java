@@ -10,6 +10,8 @@ import com.scaramutti.tms.workers.WorkersError;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
+import java.util.Set;
+
 /**
  * La regla del organigrama, en UN solo lugar: quien escribe actua solo sobre cargos de nivel
  * estrictamente MENOR al suyo, y el administrador esta exento.
@@ -31,6 +33,13 @@ public class WorkerRankPolicy {
     /** El unico rol exento: actua sobre cualquier cargo, incluido el suyo. */
     private static final String EXEMPT_ROLE = "admin";
 
+    /**
+     * Los roles que escriben trabajadores: la misma lista que el {@code @RolesAllowed} de cada
+     * escritura del recurso, que mira el token. Esta mira la fila; un test compara las dos.
+     */
+    static final Set<String> WRITE_ROLES =
+        Set.of("admin", "general_manager", "operations_manager", "finance_manager");
+
     @Inject CurrentUser currentUser;
     @Inject UserRepository userRepository;
 
@@ -42,7 +51,7 @@ public class WorkerRankPolicy {
      * porque su propio cargo es de su propio nivel; solo el administrador corrige su ficha.
      *
      * @throws com.scaramutti.tms.shared.exception.ApiException WRK-006 si el cargo esta fuera
-     *         de alcance, o el 403 comun si la sesion no resuelve a un usuario.
+     *         de alcance, o el 403 comun si quien tiene la sesion no esta habilitado para escribir.
      */
     public void assertCanActOn(Role targetRole) {
         User actor = requireActor();
@@ -62,28 +71,24 @@ public class WorkerRankPolicy {
      */
     public void assertIsNotOwnWorker(Worker targetWorker) {
         User actor = requireActor();
-        if (actor.worker != null && actor.worker.id.equals(targetWorker.id)) {
+        if (actor.worker.id.equals(targetWorker.id)) {
             throw WorkersError.SELF_DEACTIVATION.toException();
         }
     }
 
     /**
-     * El usuario de la sesion, con su rol, leido de la base.
-     *
-     * <p>Que el id del token no resuelva a un usuario no es un caso de negocio sino una sesion
-     * que ya no corresponde a nadie, asi que sale por el 403 comun de la aplicacion y no por un
-     * codigo del modulo: no es que el cargo este fuera de alcance, es que no hay actor.
-     *
-     * <p>Y tiene que estar VIGENTE, no solo existir. Dar de baja a un usuario apaga su fila pero
-     * no revoca su token: el inicio de sesion y la renovacion ya lo frenan, pero el token que
-     * tenia en la mano sigue valiendo hasta que vence. Sin este filtro, alguien dado de baja
-     * puede seguir dando de alta personas durante esa ventana, y encima firma con su id las
-     * columnas de auditoria y la bitacora. La fila ya esta cargada aca, asi que mirarla no
-     * cuesta una consulta mas.
+     * El usuario de la sesion, leido de la base, y habilitado HOY para escribir: cuenta vigente,
+     * uno de los cuatro roles de escritura en su fila y su trabajador activo. El token vale hasta
+     * que vence y su rol puede ser viejo: sin esto, a alguien dado de baja o bajado de cargo le
+     * quedaba una ventana para escribir y firmar el rastro. Sin actor habilitado no es un caso
+     * del modulo sino el 403 comun: no es que el cargo este fuera de alcance, es que no hay quien.
+     * Devuelve siempre un actor con trabajador: los metodos de esta clase cuentan con eso.
      */
     private User requireActor() {
         return userRepository.findByIdOptional(currentUser.requireId())
             .filter(user -> Boolean.TRUE.equals(user.isActive))
+            .filter(user -> WRITE_ROLES.contains(user.role.name))
+            .filter(user -> user.worker != null && Boolean.TRUE.equals(user.worker.isActive))
             .orElseThrow(CommonError.FORBIDDEN::toException);
     }
 
@@ -114,11 +119,7 @@ public class WorkerRankPolicy {
      */
     public void assertCanChangeRoleOf(Worker targetWorker, User targetAccount, Role newRole) {
         User actor = requireActor();
-        // La comprobacion de nulo es DEFENSIVA y hoy inalcanzable: la columna que liga un usuario
-        // a su trabajador es obligatoria. Se deja porque de ella depende una regla de
-        // autorizacion, y el dia que esa columna admitiera nulos su ausencia seria un permiso
-        // implicito; pero que nadie la lea como un caso real.
-        if (actor.worker == null || !actor.worker.id.equals(targetWorker.id)) {
+        if (!actor.worker.id.equals(targetWorker.id)) {
             return;
         }
         boolean mueveElCargoDelTrabajador = !targetWorker.role.id.equals(newRole.id);

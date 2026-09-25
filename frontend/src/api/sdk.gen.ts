@@ -978,9 +978,11 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * Orden de evaluación: `401` → `403 COM-003` → `400 COM-001` (cuerpo
  * vacío, nulo o campo inválido, incluida la ficha) → `400 WRK-005` →
  * `403 WRK-006` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `409
- * WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no existe o fue dada
- * de baja sale como `403 COM-003` en el escalón del organigrama: el token
- * vale hasta que vence, pero ya no hay quien escriba.
+ * WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no puede escribir
+ * (no existe, su cuenta está apagada, su rol actual en la base no es uno de
+ * los cuatro de escritura, o su trabajador fue dado de baja) sale como `403
+ * COM-003` en el escalón del organigrama: el token vale hasta que vence y su
+ * rol puede ser viejo, pero ya no hay quien escriba.
  *
  * Un cuerpo que no se puede leer (`hireDate` mal formada, `documentTypeId`
  * no numérico, `driver.status` fuera del dominio) sale como `400` SIN
@@ -1115,7 +1117,10 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
  * actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
  * `403 WRK-006` (rol de la cuenta) → `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
- * WRK-009` → `409 WRK-002` → `409 WRK-007`.
+ * WRK-009` → `409 WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
+ * puede escribir (cuenta apagada, rol actual en la base fuera de los cuatro de
+ * escritura, o trabajador dado de baja) sale como `403 COM-003` en el primer
+ * escalón del organigrama, después del `404`.
  *
  */
 export const updateWorker = <ThrowOnError extends boolean = false>(options: Options<UpdateWorkerData, ThrowOnError>): RequestResult<UpdateWorkerResponses, UpdateWorkerErrors, ThrowOnError> => (options.client ?? client).put<UpdateWorkerResponses, UpdateWorkerErrors, ThrowOnError>({
@@ -1161,7 +1166,9 @@ export const updateWorker = <ThrowOnError extends boolean = false>(options: Opti
  * WRK-013`, transitorio.
  *
  * Orden (el `409 WRK-013` no entra en la cadena): `401` → `403 COM-003` →
- * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no está vigente) →
+ * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
+ * cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
+ * dado de baja) →
  * `403 WRK-010` → `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la
  * cuenta) → `200`.
  *
@@ -1186,15 +1193,17 @@ export const deactivateWorker = <ThrowOnError extends boolean = false>(options: 
  *
  * Organigrama (RN-09): igual que desactivar, sobre el rol actual y el de
  * la cuenta (`403 WRK-006`, `admin` exento). Reactivarse a uno mismo no es
- * posible en la práctica: el propio usuario está apagado desde la
- * desactivación. Auditoría, solo cuando hubo cambio: una fila
+ * posible: con su trabajador dado de baja, quien actúa no está
+ * habilitado para escribir (`403 COM-003`). Auditoría, solo cuando hubo cambio: una fila
  * `REACTIVATED` por el trabajador y otra si se encendió la ficha
  * (`driver.isActive`); nunca una de la cuenta.
  *
  * Concurrencia: `409 WRK-013`, como en `deactivateWorker`.
  *
  * Orden (el `409 WRK-013` no entra en la cadena): `401` → `403 COM-003` →
- * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no está vigente) →
+ * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
+ * cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
+ * dado de baja) →
  * `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la cuenta) → `200`.
  *
  */
