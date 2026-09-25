@@ -42,7 +42,7 @@ import java.util.TreeSet;
  * choque sale como el conflicto transitorio del contrato. El lock debil sigue siendo el correcto
  * porque evita ese acople en todas las demas ediciones, que son la mayoria.
  *
- * <p>Por eso el presupuesto cuenta SIETE esperas y no una. La cuenta que importa es cuanto puede
+ * <p>Por eso el presupuesto cuenta ONCE topes y no uno. La cuenta que importa es cuanto puede
  * retener su conexion UNA transaccion, y el detalle esta en
  * {@link #MAX_LOCK_WAITS_PER_TRANSACTION}.
  *
@@ -76,20 +76,29 @@ public class WorkerRowLock {
     private static final String WORKERS_TABLE = "public.workers";
 
     /**
-     * Las esperas que una transaccion de este modulo puede acumular, CONTADAS UNA POR UNA. El tope
-     * del motor rige por INTENTO de lock y no por sentencia, y una sentencia puede intentar dos:
+     * Los topes de espera que una transaccion de este modulo puede gastar, CONTADOS UNO POR UNO con
+     * UN titular y una cola sobre cada fila. El tope del motor rige por cada espera, y no cuestan lo
+     * mismo (medido en un PostgreSQL 16 con tope de 600ms, con una sesion que retiene y otra en cola):
      *
-     * <ol>
-     *   <li>tomar la fila del trabajador;
-     *   <li>tomar la del trabajador de quien actua, que la edicion bloquea junto con la suya;
-     *   <li>el UPDATE de {@code workers} cuando cambia el numero de documento: la tupla,
-     *   <li>y ademas su insercion en {@code workers_document_number_key}, que es un intento aparte
-     *       con su propio tope;
-     *   <li>el UPDATE de {@code drivers} cuando cambia la licencia: la tupla,
-     *   <li>y ademas su insercion en {@code drivers_license_number_key}, por lo mismo;
-     *   <li>el UPDATE de {@code users} cuando el cargo cambia, que no toca ninguna columna unica y
-     *       gasta una sola.
-     * </ol>
+     * <ul>
+     *   <li>tomar una fila, o actualizar una que no se tomo antes, gasta DOS si hay cola: primero el
+     *       bloqueo de la tupla que tiene el primero de la cola y, cuando ese se rinde, otro tope
+     *       entero contra quien la retiene (1211ms);
+     *   <li>esperar en un indice unico, o cambiar la clave de una fila ya tomada, gasta UNO por
+     *       titular (659ms y 601ms).
+     * </ul>
+     *
+     * <p>La edicion es la que mas gasta, ONCE: la fila del destino (2), la de quien actua (2), el
+     * documento (tupla 1 e indice 1), la ficha (tupla 2 e indice de la licencia 1) y la cuenta (2).
+     * Desactivar gasta ocho (destino, quien actua, ficha y cuenta, dos cada una); reactivar, seis
+     * (destino, quien actua y ficha); el alta, cuatro (quien actua 2, documento 1, licencia 1).
+     *
+     * <p>NO ES UN TECHO: la misma espera se repite con cada titular distinto. Tres caminos lo pasan
+     * sin error: cambiar una clave con varios bloqueos de clave de hijas en curso (se espera a cada
+     * uno, medido 936ms con tope de 400), insertadores del mismo valor que abortan uno tras otro en
+     * el indice, y la cadena de versiones de una fila que cambia mientras se la espera. PostgreSQL 16
+     * no tiene techo por transaccion y el margen bajo el pool es lo que absorbe esos casos; el techo
+     * real llega con {@code transaction_timeout} al subir a PostgreSQL 17.
      *
      * <p>ESTE NUMERO FUE 4 Y ESTABA MAL CONTADO: las dos esperas de indice se daban por absorbidas
      * "por la holgura", y la holgura era de un segundo mientras el mecanismo podia gastar dos. Se
@@ -103,15 +112,12 @@ public class WorkerRowLock {
      * de la propia fila no espera contra nadie. Sumar una columna unica obliga a recontar aca solo
      * si la edicion la escribe.
      *
-     * <p>El INSERT de la ficha que nace no suma un octavo: es excluyente con su UPDATE. El
-     * cambio de estado toma cuatro filas (la suya, la del trabajador de la sesion, la ficha y la
-     * cuenta) y no cambia ninguna columna unica. Con una cola sobre la misma fila, tomarla puede
-     * gastar el tope dos veces; ese recuento se revisa aparte.
+     * <p>El INSERT de la ficha que nace no suma: es excluyente con su UPDATE.
      */
-    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 7;
+    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 11;
 
     /**
-     * En MILISEGUNDOS y no en segundos: con siete esperas, el valor entero mas chico expresable en
+     * En MILISEGUNDOS y no en segundos: con once topes, el valor entero mas chico expresable en
      * segundos ya se pasa del techo del pool. La unidad nativa del motor para esta opcion es el
      * milisegundo, asi que ademas se escribe tal cual.
      */
@@ -279,8 +285,8 @@ public class WorkerRowLock {
                 // trabajador, con la de su ficha o con un catalogo. El mensaje del motor es lo
                 // unico que nombra la relacion, y no trae valores de la fila: dice que sentencia
                 // se cancelo y sobre que tabla. El id va; datos de la persona, ninguno.
-                LOG.warnf("Conflicto de lock (%s) sobre la fila del trabajador id=%d "
-                        + "con un tope de %dms: %s", sqlException.getSQLState(), workerId,
+                LOG.warnf("Conflicto de lock (%s) %s con un tope de %dms: %s", sqlException.getSQLState(),
+                    workerId == null ? "en un alta" : "sobre la fila del trabajador id=" + workerId,
                     lockTimeoutMillis, primaryMessageOf(sqlException));
                 return WorkersError.WORKER_LOCKED.toException();
             }

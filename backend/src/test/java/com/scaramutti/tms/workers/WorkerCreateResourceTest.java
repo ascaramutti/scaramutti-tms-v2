@@ -20,6 +20,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.scaramutti.tms.support.LockWaiters.UNTIL_IT_ARRIVES_MILLIS;
+import static com.scaramutti.tms.support.LockWaiters.awaitWaiters;
+import static com.scaramutti.tms.support.LockWaiters.backendPid;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
@@ -1099,9 +1102,8 @@ class WorkerCreateResourceTest {
      * Si el alta y la ficha vivieran en transacciones distintas, el trabajador sobreviviria, y
      * el conteo en cero es lo que lo denuncia.
      *
-     * <p>Honestamente: si la confirmacion llegara antes de que el alta haga su chequeo previo,
-     * el 409 saldria por el chequeo y no por el indice. La espera lo hace improbable, y el
-     * invariante que se afirma (409 y ningun trabajador) vale por los dos caminos.
+     * <p>La otra conexion confirma recien al VER al alta esperando el indice, y antes del tope de
+     * espera: asi el choque sale por el indice y no por el chequeo previo ni por el tope.
      */
     @Test
     void create_whenTheLicenseIsTakenByAnUncommittedTransaction_returns409_andLeavesNoWorker()
@@ -1121,15 +1123,23 @@ class WorkerCreateResourceTest {
                 insert.executeUpdate();
             }
 
-            Future<Integer> statusCode = executor.submit(() -> post(adminToken())
-                .body(bodyWithDriver("ZTEST900", "driver", "{\"licenseNumber\":\"ZTESTL900\"}"))
-                .when().post("/workers").then().extract().statusCode());
+            Future<Respuesta> statusCode = executor.submit(() -> {
+                var extracted = post(adminToken())
+                    .body(bodyWithDriver("ZTEST900", "driver", "{\"licenseNumber\":\"ZTESTL900\"}"))
+                    .when().post("/workers").then().extract();
+                return new Respuesta(extracted.statusCode(), extracted.path("code"));
+            });
 
-            TimeUnit.MILLISECONDS.sleep(1500);
+            try (Connection observer = dataSource.getConnection()) {
+                assertTrue(awaitWaiters(observer, backendPid(uncommitted), 1, statusCode, UNTIL_IT_ARRIVES_MILLIS),
+                    "precondicion: el alta espera el indice de la licencia");
+            }
             uncommitted.commit();
 
-            assertEquals(409, statusCode.get(20, TimeUnit.SECONDS),
+            var response = statusCode.get(20, TimeUnit.SECONDS);
+            assertEquals(409, response.statusCode(),
                 "el choque contra el indice tiene que salir como conflicto, nunca como 500");
+            assertEquals("WRK-007", response.code(), "el de la licencia, no el transitorio del tope");
         } finally {
             shutdown(executor);
         }
@@ -1310,10 +1320,8 @@ class WorkerCreateResourceTest {
      * punta a punta. Sin esto, que el nombre de esa restricción dejara de reconocerse sería un
      * error interno en la primera alta concurrente y ningún caso lo vería.
      *
-     * <p>Honestamente, igual que su gemelo: si la confirmación llegara antes de que el alta
-     * haga su chequeo previo, el conflicto saldría por el chequeo y no por el índice, y la
-     * traducción que este caso viene a proteger no se ejecutaría. La espera lo hace
-     * improbable, y el invariante que se afirma vale por los dos caminos.
+     * <p>Igual que su gemelo, la otra conexion confirma recien al ver al alta esperando el
+     * indice, y antes del tope: la traduccion que este caso protege se ejecuta siempre.
      */
     @Test
     void create_whenTheDocumentIsTakenByAnUncommittedTransaction_returns409_WRK002()
@@ -1339,7 +1347,10 @@ class WorkerCreateResourceTest {
                 return new Respuesta(extracted.statusCode(), extracted.path("code"));
             });
 
-            TimeUnit.MILLISECONDS.sleep(1500);
+            try (Connection observer = dataSource.getConnection()) {
+                assertTrue(awaitWaiters(observer, backendPid(uncommitted), 1, statusCode, UNTIL_IT_ARRIVES_MILLIS),
+                    "precondicion: el alta espera el indice del documento");
+            }
             uncommitted.commit();
 
             var response = statusCode.get(20, TimeUnit.SECONDS);

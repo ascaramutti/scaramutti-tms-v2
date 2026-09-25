@@ -57,6 +57,14 @@ class WorkerServiceTest {
     @BeforeEach
     void wireRealMapper() {
         workerService.workerServiceMapper = Mappers.getMapper(WorkerServiceMapper.class);
+        // El destino existe y la traduccion del choque corre el bloque tal cual: lo que se mide
+        // aca es lo de adentro, y el bloqueo y sus choques los miden los tests de integracion.
+        org.mockito.Mockito.lenient().when(workerRepository.count(
+                org.mockito.ArgumentMatchers.eq("id"), org.mockito.ArgumentMatchers.<Object>any()))
+            .thenReturn(1L);
+        org.mockito.Mockito.lenient().when(workerRowLock.runTranslatingLockConflicts(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenAnswer(invocation -> ((java.util.function.Supplier<?>) invocation.getArgument(0)).get());
     }
 
     private Worker worker(int id, String first, String last, String roleDescription, boolean isActive) {
@@ -143,10 +151,6 @@ class WorkerServiceTest {
         existing.role.name = "operator";
         existing.role.driverProfile = "NONE";
         when(workerRowLock.findByIdForUpdate(5)).thenReturn(existing);
-        org.mockito.Mockito.lenient().when(workerRowLock.runTranslatingLockConflicts(
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(5)))
-            .thenAnswer(invocation ->
-                ((java.util.function.Supplier<?>) invocation.getArgument(0)).get());
         when(userRepository.findByWorkerIdOptional(5)).thenReturn(java.util.Optional.empty());
         when(driverRepository.findByWorkerIdOptional(5)).thenReturn(java.util.Optional.empty());
         return existing;

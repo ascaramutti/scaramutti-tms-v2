@@ -376,4 +376,55 @@ class WorkerRowLockIntegrationTest {
         }
     }
 
+    /**
+     * POR QUE EL PRESUPUESTO CUENTA DOS TOPES POR FILA: con cola, quien llega espera primero el
+     * bloqueo de la tupla que tiene el primero de la fila y, cuando ese se rinde, otro tope entero
+     * contra quien la retiene. Si el motor dejara de hacerlo, el once estaria sobrecontado; si
+     * gastara tres, la guarda dejaria pasar una configuracion que no entra.
+     */
+    @Test
+    void aQueueOnTheSameRow_spendsTheTimeoutTwice() throws Exception {
+        int id = fixtures.seedWorker("ZTESTK031", "Ana", "Silva", "operator", true);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        try (Connection holder = dataSource.getConnection(); Connection first = dataSource.getConnection();
+             Connection observer = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            try (PreparedStatement lock = holder.prepareStatement(
+                    "SELECT id FROM public.workers WHERE id = ? FOR NO KEY UPDATE")) {
+                lock.setInt(1, id);
+                lock.executeQuery().close();
+            }
+            first.setAutoCommit(false);
+            try (var timeout = first.createStatement()) {
+                timeout.execute("SET LOCAL lock_timeout = '" + configuredLockTimeoutMillis + "ms'");
+            }
+            executor.submit(() -> {
+                try (PreparedStatement lock = first.prepareStatement(
+                        "SELECT id FROM public.workers WHERE id = ? FOR NO KEY UPDATE")) {
+                    lock.setInt(1, id);
+                    lock.executeQuery().close();
+                }
+                return null;
+            });
+            assertTrue(com.scaramutti.tms.support.LockWaiters.awaitWaiters(observer,
+                com.scaramutti.tms.support.LockWaiters.backendPid(holder), 1, new java.util.concurrent.CompletableFuture<>(),
+                com.scaramutti.tms.support.LockWaiters.UNTIL_IT_ARRIVES_MILLIS),
+                "precondicion: el primero de la cola esta esperando");
+
+            long start = System.nanoTime();
+            ApiException thrown = assertThrows(ApiException.class, () -> QuarkusTransaction.requiringNew()
+                .call(() -> workerRowLock.findByIdForUpdate(id)));
+            long elapsedMillis = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+
+            assertEquals(409, thrown.status());
+            assertTrue(elapsedMillis >= configuredLockTimeoutMillis * 3 / 2
+                    && elapsedMillis < configuredLockTimeoutMillis * 5 / 2,
+                "con cola se gastan dos topes, ni uno ni tres: " + elapsedMillis + "ms con un tope de "
+                    + configuredLockTimeoutMillis);
+            holder.rollback();
+            first.rollback();
+        } finally {
+            executor.shutdownNow();
+        }
+    }
 }

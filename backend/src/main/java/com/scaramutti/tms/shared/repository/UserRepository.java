@@ -5,6 +5,7 @@ import com.scaramutti.tms.shared.entity.User_;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 
+import java.util.Collection;
 import java.util.Optional;
 
 /**
@@ -45,6 +46,19 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
         return getEntityManager()
             .createQuery("SELECT u.worker.id FROM User u WHERE u.id = :userId", Integer.class)
             .setParameter("userId", userId).getResultStream().findFirst();
+    }
+
+    /**
+     * Si la cuenta esta hoy habilitada para escribir con alguno de esos roles, como valor suelto y
+     * SIN cargarla, por el mismo motivo que el metodo de arriba: se pregunta ANTES de bloquear, y
+     * una cuenta en memoria haria que la validacion de despues leyera la copia vieja.
+     */
+    public boolean isEnabledToWrite(Integer userId, Collection<String> roleNames) {
+        return getEntityManager().createQuery(
+                "SELECT count(u) FROM User u WHERE u.id = :userId AND u.isActive = true "
+                    + "AND u.role.name IN :roleNames AND u.worker.isActive = true", Long.class)
+            .setParameter("userId", userId).setParameter("roleNames", roleNames)
+            .getSingleResult() > 0;
     }
 
 }

@@ -15,7 +15,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import javax.sql.DataSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
-import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -24,6 +23,10 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static com.scaramutti.tms.support.LockWaiters.UNTIL_IT_ARRIVES_MILLIS;
+import static com.scaramutti.tms.support.LockWaiters.WHILE_ANOTHER_WAITS_MILLIS;
+import static com.scaramutti.tms.support.LockWaiters.awaitWaiters;
+import static com.scaramutti.tms.support.LockWaiters.backendPid;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -95,45 +98,6 @@ class WorkerEditOrderedLockTest {
         return code == null ? String.valueOf(extracted.statusCode()) : extracted.statusCode() + " " + code;
     }
 
-    private int backendPid(Connection connection) throws Exception {
-        try (PreparedStatement query = connection.prepareStatement("SELECT pg_backend_pid()");
-             ResultSet rows = query.executeQuery()) {
-            rows.next();
-            return rows.getInt(1);
-        }
-    }
-
-    /**
-     * Cuantas sesiones esperan DETRAS de la conexion que sostiene: a ella, o a alguien que la espera
-     * (el segundo en la cola de una fila espera al primero, no al que la sostiene). Solo las
-     * encadenadas cuentan: una espera ajena en la base compartida no puede cumplir el sondeo.
-     */
-    private int waitersBehind(Connection observer, int holderPid) throws Exception {
-        try (PreparedStatement query = observer.prepareStatement(
-                "SELECT count(*) FROM pg_stat_activity a WHERE ? = ANY(pg_blocking_pids(a.pid)) OR EXISTS "
-                    + "(SELECT 1 FROM unnest(pg_blocking_pids(a.pid)) b WHERE ? = ANY(pg_blocking_pids(b)))")) {
-            query.setInt(1, holderPid);
-            query.setInt(2, holderPid);
-            try (ResultSet rows = query.executeQuery()) {
-                rows.next();
-                return rows.getInt(1);
-            }
-        }
-    }
-
-    /** Espera a ver esas sesiones encadenadas; corta si el pedido ya termino, y antes del tope de 600ms. */
-    private boolean awaitWaiters(Connection observer, int holderPid, int waiters, Future<?> orDone)
-            throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(550);
-        while (!orDone.isDone() && System.nanoTime() < deadline) {
-            if (waitersBehind(observer, holderPid) >= waiters) {
-                return true;
-            }
-            Thread.sleep(5);
-        }
-        return false;
-    }
-
     /**
      * El cruce, sin depender de la suerte: otra conexion sostiene las DOS filas hasta ver a los dos
      * pedidos esperando, y recien ahi suelta. Uno prospera; el otro relee su cuenta ya bajada: fuera
@@ -164,7 +128,8 @@ class WorkerEditOrderedLockTest {
                 edit(tokenA, b.workerId(), actorBody("admin", "K2", newRole)));
             Future<String> bLowersA = executor.submit(() ->
                 edit(tokenB, a.workerId(), actorBody("admin", "K1", newRole)));
-            assertTrue(awaitWaiters(observer, backendPid(holder), 2, bLowersA), "precondicion: los dos esperan");
+            assertTrue(awaitWaiters(observer, backendPid(holder), 2, bLowersA, WHILE_ANOTHER_WAITS_MILLIS),
+                "precondicion: los dos esperan");
             holder.rollback();
 
             List<String> outcomes = Stream.of(aLowersB.get(30, TimeUnit.SECONDS),
@@ -273,12 +238,13 @@ class WorkerEditOrderedLockTest {
             }
             Future<String> edit = executor.submit(() -> edit(actorToken, target, editBody));
             int holderPid = backendPid(holder);
-            assertTrue(awaitWaiters(observer, holderPid, 1, edit), "precondicion: la edicion quedo en pausa");
+            assertTrue(awaitWaiters(observer, holderPid, 1, edit, UNTIL_IT_ARRIVES_MILLIS),
+                "precondicion: la edicion quedo en pausa");
             Future<String> change = executor.submit(() -> "deactivate".equals(adminAction)
                 ? outcomeOf(given().header("Authorization", "Bearer " + adminToken)
                     .when().post("/workers/" + actor.workerId() + "/deactivate").then().extract())
                 : edit(adminToken, actor.workerId(), actorBody(actorRole, "K5", "sales")));
-            adminSeenWaiting = awaitWaiters(observer, holderPid, 2, change);
+            adminSeenWaiting = awaitWaiters(observer, holderPid, 2, change, WHILE_ANOTHER_WAITS_MILLIS);
             adminDoneBeforeTheEdit = change.isDone();
             holder.rollback();
 
