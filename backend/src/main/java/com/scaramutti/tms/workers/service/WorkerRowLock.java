@@ -42,7 +42,7 @@ import java.util.TreeSet;
  * choque sale como el conflicto transitorio del contrato. El lock debil sigue siendo el correcto
  * porque evita ese acople en todas las demas ediciones, que son la mayoria.
  *
- * <p>Por eso el presupuesto cuenta SEIS esperas y no una. La cuenta que importa es cuanto puede
+ * <p>Por eso el presupuesto cuenta SIETE esperas y no una. La cuenta que importa es cuanto puede
  * retener su conexion UNA transaccion, y el detalle esta en
  * {@link #MAX_LOCK_WAITS_PER_TRANSACTION}.
  *
@@ -81,6 +81,7 @@ public class WorkerRowLock {
      *
      * <ol>
      *   <li>tomar la fila del trabajador;
+     *   <li>tomar la del trabajador de quien actua, que la edicion bloquea junto con la suya;
      *   <li>el UPDATE de {@code workers} cuando cambia el numero de documento: la tupla,
      *   <li>y ademas su insercion en {@code workers_document_number_key}, que es un intento aparte
      *       con su propio tope;
@@ -102,15 +103,15 @@ public class WorkerRowLock {
      * de la propia fila no espera contra nadie. Sumar una columna unica obliga a recontar aca solo
      * si la edicion la escribe.
      *
-     * <p>El INSERT de la ficha que nace no suma un septimo: es excluyente con su UPDATE. El
+     * <p>El INSERT de la ficha que nace no suma un octavo: es excluyente con su UPDATE. El
      * cambio de estado toma cuatro filas (la suya, la del trabajador de la sesion, la ficha y la
      * cuenta) y no cambia ninguna columna unica. Con una cola sobre la misma fila, tomarla puede
      * gastar el tope dos veces; ese recuento se revisa aparte.
      */
-    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 6;
+    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 7;
 
     /**
-     * En MILISEGUNDOS y no en segundos: con seis esperas, el valor entero mas chico expresable en
+     * En MILISEGUNDOS y no en segundos: con siete esperas, el valor entero mas chico expresable en
      * segundos ya se pasa del techo del pool. La unidad nativa del motor para esta opcion es el
      * milisegundo, asi que ademas se escribe tal cual.
      */

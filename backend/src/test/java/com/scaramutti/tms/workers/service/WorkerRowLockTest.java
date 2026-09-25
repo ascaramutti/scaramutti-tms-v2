@@ -6,8 +6,10 @@ import com.scaramutti.tms.shared.exception.ApiException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
 
+import java.io.InputStream;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -37,26 +39,31 @@ class WorkerRowLockTest {
         return lock;
     }
 
-    /** El valor que se mergea: 6 x 700ms = 4,2s, con holgura bajo los 5s del pool. */
+    /** El valor que se mergea, leido del archivo y no copiado: hoy 7 x 600ms = 4,2s, bajo los 5s. */
     @Test
-    void requireUsableLockTimeout_acceptsTheConfiguredValue() {
-        assertEquals(700, lockWith(700, 5).requireUsableLockTimeout());
+    void requireUsableLockTimeout_acceptsTheConfiguredValue() throws Exception {
+        Properties config = new Properties();
+        try (InputStream file = getClass().getResourceAsStream("/application.properties")) {
+            config.load(file);
+        }
+        int configured = Integer.parseInt(config.getProperty("app.workers.edit-lock-timeout-ms"));
+        assertEquals(configured, lockWith(configured, 5).requireUsableLockTimeout());
     }
 
     /**
      * El presupuesto multiplica por las esperas REALES, y por eso un valor que parece chico puede
-     * no entrar: con seis esperas, 900ms ya se comen 5,4s de los 5s que el pool tolera. Este es el
-     * caso que separa la cuenta buena de la mala — con las cuatro esperas que este modulo conto
-     * antes, 900ms daban 3,6s y el guarda lo aprobaba.
+     * no entrar: con siete esperas, 750ms ya se comen 5,25s de los 5s que el pool tolera. Este es
+     * el caso que separa la cuenta buena de la anterior: con seis esperas, 750ms daban 4,5s y el
+     * guarda lo aprobaba.
      */
     @Test
     void requireUsableLockTimeout_rejectsAValueThatOnlyFitsIfTheWaitsAreMiscounted() {
-        assertThrows(IllegalStateException.class, () -> lockWith(900, 5).requireUsableLockTimeout());
+        assertThrows(IllegalStateException.class, () -> lockWith(750, 5).requireUsableLockTimeout());
     }
 
     /**
      * Y el valor que este modulo tenia antes de recontar: un segundo entero. Con la cuenta vieja
-     * de cuatro esperas entraba con holgura; con la de seis no entra, y por eso el tope tuvo que
+     * de cuatro esperas entraba con holgura; con la actual no entra, y por eso el tope tuvo que
      * bajar de unidad. Si alguien vuelve a poner 1000, la aplicacion no arranca.
      */
     @Test
@@ -79,15 +86,15 @@ class WorkerRowLockTest {
 
     /**
      * IGUALAR la espera del pool ya invierte el orden de las rendiciones, asi que el limite se
-     * rechaza tambien cuando da exacto. Se elige un techo divisible por las esperas (4,8s / 6 =
-     * 800ms) para que el caso mida la igualdad y no un redondeo: con 5s el cociente entero cae 2ms
+     * rechaza tambien cuando da exacto. Se elige un techo divisible por las esperas (4,9s / 7 =
+     * 700ms) para que el caso mida la igualdad y no un redondeo: con 5s el cociente entero cae 2ms
      * por debajo y el caso pasaria por el motivo equivocado.
      */
     @Test
     void requireUsableLockTimeout_rejectsAValueWhoseBudgetExactlyReachesThePoolWait() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 4800 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4800);
+        lock.lockTimeoutMillis = 4900 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4900);
         assertThrows(IllegalStateException.class, lock::requireUsableLockTimeout);
     }
 
@@ -95,9 +102,9 @@ class WorkerRowLockTest {
     @Test
     void requireUsableLockTimeout_acceptsABudgetOneMillisecondBelowThePoolWait() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 4800 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4801);
-        assertEquals(800, lock.requireUsableLockTimeout());
+        lock.lockTimeoutMillis = 4900 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4901);
+        assertEquals(700, lock.requireUsableLockTimeout());
     }
 
     @Test
@@ -107,28 +114,28 @@ class WorkerRowLockTest {
 
     /**
      * El techo del pool se compara en MILISEGUNDOS: redondearlo a segundos perdia la fraccion que
-     * decide si el presupuesto entra. Con un pool de 4,5s, 700ms x 6 = 4,2s entra; truncando el
-     * techo a 4s, no entraria — y al reves, un truncado hacia arriba aprobaria lo que no cabe.
+     * decide si el presupuesto entra. Con un pool de 4,95s, 700ms x 7 = 4,9s entra; truncando el
+     * techo a 4s, no entraria. La otra direccion, redondear hacia arriba, la mide el caso del borde.
      */
     @Test
     void requireUsableLockTimeout_comparesAgainstThePoolWaitWithoutTruncatingItToSeconds() {
         WorkerRowLock lock = new WorkerRowLock();
         lock.lockTimeoutMillis = 700;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4500);
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4950);
         assertEquals(700, lock.requireUsableLockTimeout());
     }
 
     /**
      * El presupuesto se multiplica por la cantidad de esperas que este modulo puede acumular en una
-     * transaccion. Son SEIS, y el numero no es la cantidad de sentencias: el tope del motor rige
+     * transaccion. Son SIETE, y el numero no es la cantidad de sentencias: el tope del motor rige
      * por INTENTO de lock, y una sentencia que cambia una columna con indice unico gasta dos, la
-     * tupla y el indice. El dia que se sume una septima, la misma configuracion deja de servir y
+     * tupla y el indice. El dia que se sume una octava, la misma configuracion deja de servir y
      * este caso es el que lo dice.
      */
     @Test
     void theBudget_countsTheWaitsThisModuleCanAccumulate() {
-        assertEquals(6, WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION,
-            "la fila al tomarla; el documento: tupla e indice unico; la licencia: tupla e indice "
+        assertEquals(7, WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION,
+            "la fila al tomarla; la de quien actua; el documento: tupla e indice unico; la licencia: tupla e indice "
                 + "unico; y la del usuario si cambia el cargo, que no toca columna unica");
     }
 
@@ -145,7 +152,7 @@ class WorkerRowLockTest {
     void validateLockTimeoutOnStartup_rejectsAValueThatBustsTheBudget() {
         assertThrows(IllegalStateException.class,
             () -> lockWith(900, 5).validateLockTimeoutOnStartup(null));
-        assertDoesNotThrow(() -> lockWith(700, 5).validateLockTimeoutOnStartup(null));
+        assertDoesNotThrow(() -> lockWith(600, 5).validateLockTimeoutOnStartup(null));
     }
 
     @Test

@@ -1453,11 +1453,15 @@ paths:
         divergen y la del trabajador quedó en un cargo de nivel menor, pasa esa
         regla y llega a `WRK-012`.
 
-        Concurrencia: la fila se toma con un bloqueo al leerla, que serializa
-        dos escrituras sobre el mismo trabajador. Si la espera se agota porque
-        otra operación la tiene tomada → `409 WRK-013`, que es transitorio y se
-        reintenta. Sin `If-Match`: entre dos escrituras serializadas gana la
-        última.
+        Concurrencia: toma la fila del trabajador y también la del trabajador de
+        la sesión, en orden, antes de validar: dos escrituras sobre el mismo
+        trabajador se serializan, y dos ediciones cruzadas también. La segunda
+        relee el cargo actual de quien actúa: si dos administradores se bajan el
+        cargo entre sí a la vez, la segunda sale `403 WRK-006` si su cargo nuevo
+        todavía escribe, o `403 COM-003` si ya no. Si otra operación
+        retiene una de las dos más allá del tope de espera → `409 WRK-013`, que
+        es transitorio y se reintenta. Sin `If-Match`: entre dos escrituras
+        serializadas gana la última.
 
         Orden de evaluación (el `409 WRK-013` no entra en esta cadena: es un
         conflicto transitorio que puede interponerse al tomar la fila o al
