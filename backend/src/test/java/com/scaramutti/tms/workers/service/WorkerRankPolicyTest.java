@@ -6,6 +6,12 @@ import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.workers.api.WorkerResource;
+import jakarta.annotation.security.RolesAllowed;
+import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.PATCH;
+import jakarta.ws.rs.POST;
+import jakarta.ws.rs.PUT;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -14,11 +20,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.annotation.Annotation;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -49,8 +58,68 @@ class WorkerRankPolicyTest {
         actor.id = 7;
         actor.isActive = true;
         actor.role = role(roleName, level);
+        actor.worker = new Worker();
+        actor.worker.id = 99;
+        actor.worker.isActive = true;
         when(currentUser.requireId()).thenReturn(7);
         when(userRepository.findByIdOptional(7)).thenReturn(Optional.of(actor));
+    }
+
+    // ---------- quien escribe, habilitado hoy segun la base ----------
+
+    /** Un rol que no escribe trabajadores, aunque su nivel alcance: el token decia otro. */
+    @Test
+    void anActorWhoseRoleInTheDatabaseDoesNotWrite_isForbidden_evenIfItsLevelReaches() {
+        actorIs("sales", 2);
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertCanActOn(role("operator", 1)));
+        assertEquals("COM-003", thrown.code());
+    }
+
+    /** Una cuenta vigente cuyo trabajador fue dado de baja tampoco escribe. */
+    @Test
+    void anActorWhoseWorkerIsInactive_isForbidden() {
+        actorIs("admin", 4);
+        userRepository.findByIdOptional(7).orElseThrow().worker.isActive = false;
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertCanActOn(role("operator", 1)));
+        assertEquals("COM-003", thrown.code());
+    }
+
+    /** Sin trabajador asociado no hay actor: el 403 comun, no un error del servidor. */
+    @Test
+    void anActorWithoutWorker_isForbidden_notAServerError() {
+        actorIs("admin", 4);
+        userRepository.findByIdOptional(7).orElseThrow().worker = null;
+
+        ApiException thrown = assertThrows(ApiException.class,
+            () -> workerRankPolicy.assertCanActOn(role("operator", 1)));
+        assertEquals("COM-003", thrown.code());
+    }
+
+    /**
+     * La lista de roles que escriben, leida de la fila, es la MISMA que el {@code @RolesAllowed} de
+     * cada escritura del recurso, que mira el token. Si una cambia sin la otra, este caso cae; y
+     * cuenta las escrituras, para no quedar verde sin revisar ninguna si se mudan de clase.
+     */
+    @Test
+    void theWriteRoles_areExactlyTheRolesAllowedOfEveryWriteEndpoint() {
+        Set<Class<? extends Annotation>> writeVerbs = Set.of(POST.class, PUT.class, PATCH.class, DELETE.class);
+        int checked = 0;
+        for (var method : WorkerResource.class.getDeclaredMethods()) {
+            if (writeVerbs.stream().noneMatch(method::isAnnotationPresent)) {
+                continue;
+            }
+            RolesAllowed allowed = method.isAnnotationPresent(RolesAllowed.class)
+                ? method.getAnnotation(RolesAllowed.class)
+                : WorkerResource.class.getAnnotation(RolesAllowed.class);
+            assertNotNull(allowed, method.getName() + " escribe sin @RolesAllowed");
+            assertEquals(WorkerRankPolicy.WRITE_ROLES, Set.of(allowed.value()), method.getName());
+            checked++;
+        }
+        assertEquals(4, checked, "alta, edicion, desactivar y reactivar");
     }
 
     @ParameterizedTest(name = "actor nivel {0} sobre cargo nivel {1} -> permitido {2}")

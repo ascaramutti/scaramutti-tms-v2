@@ -624,36 +624,35 @@ class WorkerStatusResourceTest {
         assertEquals(List.of(), auditFieldNames(actor.workerId()));
     }
 
-    /** Aun si su trabajador ya estuviera apagado: la guarda corre antes que el corte idempotente. */
+    /**
+     * Con su propio trabajador ya dado de baja, quien actua no esta habilitado para escribir: sale
+     * el 403 comun, antes que la regla de uno mismo y antes del corte idempotente. Nada se mueve.
+     */
     @Test
-    void deactivate_ownAlreadyInactiveWorker_stillReturns403_WRK010() {
+    void deactivate_ownAlreadyInactiveWorker_returns403_COM003() {
         var actor = fixtures.seedActor("admin", "S21");
         fixtures.setWorkerActive(actor.workerId(), false);
 
         post(fabricateTokenForUser(actor.userId(), "ztestuserS21", "admin"), actor.workerId(), DEACTIVATE)
-            .statusCode(403).body("code", equalTo("WRK-010"));
+            .statusCode(403).body("code", equalTo("COM-003"));
+        assertEquals(List.of(), auditFieldNames(actor.workerId()));
     }
 
     /**
-     * Reactivar no tiene la regla de uno mismo: en la practica no se llega, porque la cuenta
-     * propia queda apagada al desactivar. Con la divergencia sembrada, un no administrador sale
-     * por el rango y el administrador pasa.
+     * Nadie se reactiva a si mismo, tampoco un administrador: con su trabajador dado de baja no esta
+     * habilitado para escribir, aunque la cuenta siga encendida. Antes un administrador en ese
+     * estado se reactivaba solo con 200.
      */
-    @ParameterizedTest(name = "{0} -> {1}")
-    @CsvSource({"admin, 200", "general_manager, 403"})
-    void reactivate_ownWorker_hasNoSelfRule(String role, int expected) {
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"admin", "general_manager"})
+    void reactivate_ownWorker_returns403_COM003(String role) {
         var actor = fixtures.seedActor(role, "S22");
         fixtures.setWorkerActive(actor.workerId(), false);
 
-        var response = post(fabricateTokenForUser(actor.userId(), "ztestuserS22", role), actor.workerId(), REACTIVATE)
-            .statusCode(expected);
-        if (expected == 403) {
-            response.body("code", equalTo("WRK-006"));
-            assertTrue(!fixtures.workerRowOf(actor.workerId()).isActive(), "nada se movio");
-        } else {
-            assertTrue(fixtures.workerRowOf(actor.workerId()).isActive(), "se reactivo de verdad");
-            assertEquals(List.of("isActive"), auditFieldNames(actor.workerId()));
-        }
+        post(fabricateTokenForUser(actor.userId(), "ztestuserS22", role), actor.workerId(), REACTIVATE)
+            .statusCode(403).body("code", equalTo("COM-003"));
+        assertTrue(!fixtures.workerRowOf(actor.workerId()).isActive(), "sigue dado de baja");
+        assertEquals(List.of(), auditFieldNames(actor.workerId()));
     }
 
     /** Una sesion cuyo usuario ya no esta vigente no escribe, aunque su token siga valiendo. */
