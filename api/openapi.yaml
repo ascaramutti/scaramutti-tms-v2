@@ -1301,6 +1301,14 @@ paths:
         resuelven las restricciones únicas de la base y también sale como
         `409`.
 
+        Concurrencia: toma la fila del trabajador de la sesión antes de validar,
+        para que una baja simultánea de quien da el alta no se cuele. Si otra
+        operación la retiene, o la espera por un número de documento o de
+        licencia que otra escritura todavía no confirmó pasa el tope → `409
+        WRK-013`, transitorio; no entra en la cadena de abajo. Si esa otra
+        escritura confirma dentro del tope, sale el duplicado (`409 WRK-002`
+        o `409 WRK-007`).
+
         Organigrama (RN-09): el nivel del rol del cuerpo tiene que ser
         estrictamente menor al nivel del rol de la sesión (el de `users.role`,
         leído de la base) → si no, `403 WRK-006`. `admin` está exento.

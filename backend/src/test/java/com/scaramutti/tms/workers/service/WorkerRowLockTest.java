@@ -39,26 +39,56 @@ class WorkerRowLockTest {
         return lock;
     }
 
-    /** El valor que se mergea, leido del archivo y no copiado: hoy 7 x 600ms = 4,2s, bajo los 5s. */
-    @Test
-    void requireUsableLockTimeout_acceptsTheConfiguredValue() throws Exception {
+    private static Properties applicationProperties() throws Exception {
         Properties config = new Properties();
-        try (InputStream file = getClass().getResourceAsStream("/application.properties")) {
+        try (InputStream file = WorkerRowLockTest.class.getResourceAsStream("/application.properties")) {
             config.load(file);
         }
-        int configured = Integer.parseInt(config.getProperty("app.workers.edit-lock-timeout-ms"));
-        assertEquals(configured, lockWith(configured, 5).requireUsableLockTimeout());
+        return config;
+    }
+
+    private static WorkerRowLock lockFrom(Properties config, String prefix) {
+        WorkerRowLock lock = new WorkerRowLock();
+        lock.lockTimeoutMillis = Integer.parseInt(config.getProperty(prefix + "app.workers.edit-lock-timeout-ms"));
+        lock.poolAcquisitionTimeout = Duration.parse(
+            "PT" + config.getProperty(prefix + "quarkus.datasource.jdbc.acquisition-timeout").toUpperCase());
+        return lock;
+    }
+
+    /**
+     * La configuracion de PRODUCCION, leida del archivo y no copiada: el tope es 380 y entra en la
+     * espera del pool. Los tests corren con otros numeros (mas holgados, en la misma proporcion),
+     * asi que sin este caso nada fijaria los valores reales.
+     */
+    @Test
+    void theProductionConfiguration_hasTheTopeAt380_andPassesTheGuard() throws Exception {
+        WorkerRowLock production = lockFrom(applicationProperties(), "");
+        assertEquals(380, production.lockTimeoutMillis);
+        assertEquals(380, production.requireUsableLockTimeout());
+    }
+
+    /**
+     * Y la del perfil de test pasa la MISMA guarda: sube el tope, pero tambien la espera del pool. El
+     * 600 se fija para que un cambio no pase en silencio, y el sondeo corto de los tests concurrentes
+     * (el que mira llegar al segundo mientras el primero ya espera) tiene que quedar por debajo.
+     */
+    @Test
+    void theTestProfileConfiguration_passesTheSameGuard() throws Exception {
+        WorkerRowLock testProfile = lockFrom(applicationProperties(), "%test.");
+        assertEquals(600, testProfile.lockTimeoutMillis);
+        assertTrue(com.scaramutti.tms.support.LockWaiters.WHILE_ANOTHER_WAITS_MILLIS < testProfile.lockTimeoutMillis);
+        assertEquals(testProfile.lockTimeoutMillis, testProfile.requireUsableLockTimeout());
     }
 
     /**
      * El presupuesto multiplica por las esperas REALES, y por eso un valor que parece chico puede
-     * no entrar: con siete esperas, 750ms ya se comen 5,25s de los 5s que el pool tolera. Este es
-     * el caso que separa la cuenta buena de la anterior: con seis esperas, 750ms daban 4,5s y el
-     * guarda lo aprobaba.
+     * no entrar: con once topes, 600ms ya se comen 6,6s de los 5s que el pool tolera. Este es el
+     * caso que separa la cuenta buena de la anterior: contando siete esperas, sin el doble gasto de
+     * la cola, 600ms daban 4,2s y el guarda lo aprobaba.
      */
     @Test
     void requireUsableLockTimeout_rejectsAValueThatOnlyFitsIfTheWaitsAreMiscounted() {
-        assertThrows(IllegalStateException.class, () -> lockWith(750, 5).requireUsableLockTimeout());
+        assertThrows(IllegalStateException.class, () -> lockWith(600, 5).requireUsableLockTimeout());
     }
 
     /**
@@ -86,15 +116,15 @@ class WorkerRowLockTest {
 
     /**
      * IGUALAR la espera del pool ya invierte el orden de las rendiciones, asi que el limite se
-     * rechaza tambien cuando da exacto. Se elige un techo divisible por las esperas (4,9s / 7 =
-     * 700ms) para que el caso mida la igualdad y no un redondeo: con 5s el cociente entero cae 2ms
+     * rechaza tambien cuando da exacto. Se elige un techo divisible por los topes (4,4s / 11 =
+     * 400ms) para que el caso mida la igualdad y no un redondeo: con 5s el cociente entero cae 6ms
      * por debajo y el caso pasaria por el motivo equivocado.
      */
     @Test
     void requireUsableLockTimeout_rejectsAValueWhoseBudgetExactlyReachesThePoolWait() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 4900 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4900);
+        lock.lockTimeoutMillis = 4400 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4400);
         assertThrows(IllegalStateException.class, lock::requireUsableLockTimeout);
     }
 
@@ -102,9 +132,9 @@ class WorkerRowLockTest {
     @Test
     void requireUsableLockTimeout_acceptsABudgetOneMillisecondBelowThePoolWait() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 4900 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4901);
-        assertEquals(700, lock.requireUsableLockTimeout());
+        lock.lockTimeoutMillis = 4400 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4401);
+        assertEquals(400, lock.requireUsableLockTimeout());
     }
 
     @Test
@@ -114,29 +144,28 @@ class WorkerRowLockTest {
 
     /**
      * El techo del pool se compara en MILISEGUNDOS: redondearlo a segundos perdia la fraccion que
-     * decide si el presupuesto entra. Con un pool de 4,95s, 700ms x 7 = 4,9s entra; truncando el
+     * decide si el presupuesto entra. Con un pool de 4,5s, 400ms x 11 = 4,4s entra; truncando el
      * techo a 4s, no entraria. La otra direccion, redondear hacia arriba, la mide el caso del borde.
      */
     @Test
     void requireUsableLockTimeout_comparesAgainstThePoolWaitWithoutTruncatingItToSeconds() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 700;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4950);
-        assertEquals(700, lock.requireUsableLockTimeout());
+        lock.lockTimeoutMillis = 400;
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4500);
+        assertEquals(400, lock.requireUsableLockTimeout());
     }
 
     /**
-     * El presupuesto se multiplica por la cantidad de esperas que este modulo puede acumular en una
-     * transaccion. Son SIETE, y el numero no es la cantidad de sentencias: el tope del motor rige
-     * por INTENTO de lock, y una sentencia que cambia una columna con indice unico gasta dos, la
-     * tupla y el indice. El dia que se sume una octava, la misma configuracion deja de servir y
-     * este caso es el que lo dice.
+     * El presupuesto se multiplica por los topes que una transaccion de este modulo puede gastar.
+     * Son ONCE en la edicion, y el numero no es la cantidad de sentencias ni de filas: con cola, tomar
+     * una fila gasta dos. El dia que se sume uno, la misma configuracion deja de servir y este caso
+     * es el que lo dice.
      */
     @Test
     void theBudget_countsTheWaitsThisModuleCanAccumulate() {
-        assertEquals(7, WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION,
-            "la fila al tomarla; la de quien actua; el documento: tupla e indice unico; la licencia: tupla e indice "
-                + "unico; y la del usuario si cambia el cargo, que no toca columna unica");
+        assertEquals(11, WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION,
+            "destino 2; quien actua 2; documento: tupla 1 e indice 1; ficha: tupla 2 e indice de la "
+                + "licencia 1; cuenta 2");
     }
 
     /**
@@ -152,7 +181,7 @@ class WorkerRowLockTest {
     void validateLockTimeoutOnStartup_rejectsAValueThatBustsTheBudget() {
         assertThrows(IllegalStateException.class,
             () -> lockWith(900, 5).validateLockTimeoutOnStartup(null));
-        assertDoesNotThrow(() -> lockWith(600, 5).validateLockTimeoutOnStartup(null));
+        assertDoesNotThrow(() -> lockWith(380, 5).validateLockTimeoutOnStartup(null));
     }
 
     @Test

@@ -129,6 +129,7 @@ public class WorkerService {
             .filter(candidate -> Boolean.TRUE.equals(candidate.isActive))
             .orElseThrow(WorkersError.ROLE_INVALID::toException);
 
+        lockOwnWorker();
         workerRankPolicy.assertCanActOn(role);
 
         DocumentType documentType =
@@ -150,13 +151,17 @@ public class WorkerService {
 
         Integer currentUserId = currentUser.requireId();
         Worker worker = newWorker(createWorkerCommand, role, currentUserId);
-        persistWorkerOrTranslateDuplicate(worker);
-
-        if (createWorkerCommand.driver() != null) {
-            persistDriverOrTranslateDuplicate(newDriver(createWorkerCommand.driver(), worker.id));
-        }
-
-        writeCreationAuditLog(worker.id, currentUserId);
+        // Tomar la fila propia puso el tope de espera en la transaccion: una espera agotada en el
+        // indice del documento o de la licencia es el conflicto transitorio, no un error interno.
+        workerRowLock.runTranslatingLockConflicts(() -> {
+            persistWorkerOrTranslateDuplicate(worker);
+            if (createWorkerCommand.driver() != null) {
+                persistDriverOrTranslateDuplicate(newDriver(createWorkerCommand.driver(), worker.id));
+            }
+            writeCreationAuditLog(worker.id, currentUserId);
+            workerRepository.flush();
+            return null;
+        }, null);
 
         return getWorker(worker.id);
     }
@@ -522,7 +527,7 @@ public class WorkerService {
      */
     @Transactional
     public WorkerDetailResponse reactivateWorker(Integer workerId) {
-        Worker worker = workerRowLock.findByIdForUpdate(workerId);
+        Worker worker = lockTargetAndOwnWorker(workerId);
         User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
         assertCanChangeStatusOf(worker, user);
         if (Boolean.TRUE.equals(worker.isActive)) {
@@ -558,8 +563,13 @@ public class WorkerService {
      * ella, el segundo espera y relee su propia cuenta ya cambiada. El orden por id impide el
      * abrazo mortal. Protege a la cuenta solo porque quien le escribe el cargo o la vigencia toma
      * antes la fila de su trabajador: un escritor nuevo de cuentas tiene que hacer lo mismo.
+     * Antes de bloquear: el 404 y el corte a quien ya no escribe, sin cargar nada, en ese orden.
      */
     private Worker lockTargetAndOwnWorker(Integer targetId) {
+        if (workerRepository.count("id", targetId) == 0) {
+            throw WorkersError.NOT_FOUND.toException();
+        }
+        workerRankPolicy.rejectDisabledActorBeforeLocking();
         Integer ownWorkerId = userRepository.findWorkerIdByUserId(currentUser.requireId()).orElse(null);
         if (ownWorkerId == null || ownWorkerId.equals(targetId)) {
             return workerRowLock.findByIdForUpdate(targetId);
@@ -571,6 +581,15 @@ public class WorkerService {
         Worker target = workerRowLock.findByIdForUpdate(targetId);
         workerRowLock.findByIdForUpdate(ownWorkerId);
         return target;
+    }
+
+    /**
+     * El alta no tiene destino que bloquear, pero si la fila de quien actua: sin ella, una baja
+     * concurrente de quien da el alta se colaba entre su validacion y su confirmacion.
+     */
+    private void lockOwnWorker() {
+        workerRankPolicy.rejectDisabledActorBeforeLocking();
+        userRepository.findWorkerIdByUserId(currentUser.requireId()).ifPresent(workerRowLock::findByIdForUpdate);
     }
 
     /**

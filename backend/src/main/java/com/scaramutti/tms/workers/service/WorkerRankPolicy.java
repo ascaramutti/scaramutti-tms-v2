@@ -77,6 +77,17 @@ public class WorkerRankPolicy {
     }
 
     /**
+     * Corta ANTES de bloquear a quien ya no esta habilitado, para que no retenga su propia fila (ni
+     * la del destino) hasta recibir el 403. No reemplaza a la validacion de despues del bloqueo, que
+     * es la que decide: esta consulta no carga la cuenta y puede quedar vieja un instante.
+     */
+    public void rejectDisabledActorBeforeLocking() {
+        if (!userRepository.isEnabledToWrite(currentUser.requireId(), WRITE_ROLES)) {
+            throw CommonError.FORBIDDEN.toException();
+        }
+    }
+
+    /**
      * El usuario de la sesion, leido de la base, y habilitado HOY para escribir: cuenta vigente,
      * uno de los cuatro roles de escritura en su fila y su trabajador activo. El token vale hasta
      * que vence y su rol puede ser viejo: sin esto, a alguien dado de baja o bajado de cargo le
