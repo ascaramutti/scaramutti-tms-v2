@@ -12,6 +12,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static com.scaramutti.tms.support.TestAuth.login;
@@ -146,6 +150,59 @@ class DriversResourceTest {
         .then().statusCode(200)
             .body("id", hasItem(inactive))
             .body("id", hasItem(active));
+    }
+
+    // ---------- solo conductores ---------------------------------------------------
+
+    /**
+     * El escolta y el ayudante con licencia tambien tienen ficha, pero el dueno decidio que en los
+     * servicios se asignan solo conductores: con y sin filtro, sus fichas no salen, activas o no. Y
+     * la del conductor si, en la lista que le toca por su filtro.
+     */
+    @ParameterizedTest(name = "isActive={0}")
+    @NullSource
+    @ValueSource(booleans = {true, false})
+    void listDrivers_onlyTheDriverRole_neverEscortsNorAssistants(Boolean isActive) {
+        int driverOn = fixtures.seedDriver("ZTEST Conductor", "Activo");
+        int driverOff = fixtures.seedDriver("ZTEST Conductor", "Apagado", null, null,
+            WarehouseTestData.STATUS_AVAILABLE, false);
+        int escortOn = fixtures.seedDriverOfRole("ZTEST Escolta", "Activo", "escort", true);
+        int escortOff = fixtures.seedDriverOfRole("ZTEST Escolta", "Apagado", "escort", false);
+        int assistantOn = fixtures.seedDriverOfRole("ZTEST Ayudante", "Activo", "assistant", true);
+        int assistantOff = fixtures.seedDriverOfRole("ZTEST Ayudante", "Apagado", "assistant", false);
+
+        var request = given().header("Authorization", "Bearer " + adminToken());
+        if (isActive != null) {
+            request = request.queryParam("isActive", isActive);
+        }
+        var ids = request.when().get("/drivers").then().statusCode(200).extract().<Integer>jsonPath().getList("id");
+
+        for (int other : new int[] {escortOn, escortOff, assistantOn, assistantOff}) {
+            assertTrue(!ids.contains(other), "una ficha que no es de conductor salio: " + other);
+        }
+        assertEquals(!Boolean.FALSE.equals(isActive), ids.contains(driverOn), "el conductor activo");
+        assertEquals(!Boolean.TRUE.equals(isActive), ids.contains(driverOff), "el conductor apagado");
+    }
+
+    /**
+     * La ficha de alguien que DEJO de ser conductor no sale ni como inactiva, apagada (como la deja
+     * la edicion) o activa (si quedo asi por fuera de la API): lo que decide es el cargo de hoy, no
+     * la bandera de la ficha. El cargo se cambia por SQL; la edicion la mide la bateria.
+     */
+    @ParameterizedTest(name = "ficha activa={0}")
+    @ValueSource(booleans = {false, true})
+    void listDrivers_aFormerDriver_doesNotAppear_withAnyFilter(boolean profileStaysActive) {
+        int former = fixtures.seedDriver("ZTEST Ex", "Conductor", null, null,
+            WarehouseTestData.STATUS_AVAILABLE, profileStaysActive);
+        warehouseFixtures.setWorkerRole(fixtures.workerIdOfDriver(former), "operator");
+
+        for (String filter : new String[] {null, "true", "false"}) {
+            var request = given().header("Authorization", "Bearer " + adminToken());
+            if (filter != null) {
+                request = request.queryParam("isActive", filter);
+            }
+            request.when().get("/drivers").then().statusCode(200).body("id", not(hasItem(former)));
+        }
     }
 
     // ---------- roles ------------------------------------------------------------

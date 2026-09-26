@@ -947,10 +947,10 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * `GET /roles`): `REQUIRED` sin `driver` → `400 WRK-008`; `NONE` con
  * `driver` → `400 WRK-008`; `OPTIONAL`, la ficha se crea solo si viene.
  * Qué cargo cae en cuál no se enumera acá, por el mismo motivo que el
- * nivel. `driver.status` ausente → `AVAILABLE`. Crear la ficha hace que el nombre, el
- * teléfono y la licencia de esa persona pasen a salir también por
- * `GET /drivers`, que leen además `dispatcher` y `sales`: para un cargo de
- * ficha OPCIONAL, mandarla o no cambia quién ve a esa persona.
+ * nivel. `driver.status` ausente → `AVAILABLE`. Solo la ficha del cargo
+ * `driver` sale por `GET /drivers` (que leen además `dispatcher` y `sales`):
+ * la del escolta y la del ayudante con licencia existen, pero no se ofrecen
+ * ni se asignan como conductor en los viajes.
  *
  * Normalización: `firstName`, `lastName`, `documentNumber`,
  * `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
@@ -1264,6 +1264,11 @@ export const listFleetUnits = <ThrowOnError extends boolean = false>(options?: O
  * quienes asignan recursos, `sales` puede consultarlos: registra y edita
  * servicios.
  *
+ * Solo fichas cuyo trabajador tiene HOY el cargo `driver`, con y sin
+ * `isActive`: el escolta y el ayudante con licencia también tienen ficha,
+ * pero en los viajes se asignan solo conductores. La ficha de alguien que
+ * dejó de ser conductor tampoco sale, ni siquiera como inactiva.
+ *
  */
 export const listDrivers = <ThrowOnError extends boolean = false>(options?: Options<ListDriversData, ThrowOnError>): RequestResult<ListDriversResponses, ListDriversErrors, ThrowOnError> => (options?.client ?? client).get<ListDriversResponses, ListDriversErrors, ThrowOnError>({
     responseType: 'json',
@@ -1361,7 +1366,8 @@ export const createService = <ThrowOnError extends boolean = false>(options: Opt
  * Los contadores de recursos miden lo MISMO que el tablero del sistema anterior, para que el
  * número no cambie de significado con el cambio de sistema: `driversOnRoad` = conductores
  * PRINCIPALES distintos en servicios en ruta **(los refuerzos NO cuentan)** sobre el total de
- * conductores de alta; `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
+ * conductores de alta (fichas de cargo `driver`: en el sistema anterior solo el conductor tenía
+ * ficha); `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
  * tampoco) sobre el total de tractos de alta. **Las carretas y las escoltas no participan de
  * ningún indicador**, aunque el nombre del campo diga "units".
  *
@@ -1572,7 +1578,11 @@ export const updateService = <ThrowOnError extends boolean = false>(options: Opt
  * el conflicto avisa, no prohíbe. Mandar `force: true` sin que haya conflicto
  * asigna normal y NO deja registrado que se forzara nada.
  *
- * Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+ * Los recursos tienen que existir y estar activos (400 `COM-001`), y la
+ * ficha del conductor tiene que ser de un trabajador con cargo `driver`
+ * (400 `OPS-011`: el escolta y el ayudante con licencia también tienen
+ * ficha); ese chequeo va justo después del de la ficha, antes que el tracto
+ * y la carreta. Los viajes ya asignados no se revisan. Su
  * disponibilidad NO se valida: un tracto en mantenimiento se puede asignar igual,
  * porque esa es una decisión operativa y el catálogo de estados existe para ordenar
  * la lista de la pantalla, no para prohibir.
@@ -1774,7 +1784,9 @@ export const changeServiceStatus = <ThrowOnError extends boolean = false>(option
  * RN-OP4 declara no forzable. Mandar `force: true` sin que haya conflicto suma
  * el refuerzo normal y NO deja registrado que se forzara nada.
  *
- * Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+ * Los recursos tienen que existir y estar activos (400 `COM-001`), y la
+ * ficha del conductor tiene que ser de un trabajador con cargo `driver`
+ * (400 `OPS-011`), justo después del chequeo de la ficha. Su
  * disponibilidad NO se valida: sumar un refuerzo ELIGE (a diferencia de reabrir,
  * que RESTAURA), así que rige el mismo criterio que la asignación y un tracto en
  * mantenimiento se puede sumar igual.
