@@ -1703,7 +1703,7 @@ export type ServiceStatsResponse = {
      */
     completedThisWeek: number;
     /**
-     * Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan.
+     * Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan. Solo fichas de trabajadores con cargo `driver`, arriba y abajo: el escolta y el ayudante con licencia no cuentan.
      */
     driversOnRoad: {
         active: number;
