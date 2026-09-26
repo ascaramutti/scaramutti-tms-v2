@@ -946,6 +946,37 @@ class ServiceReinforcementResourceTest {
         addResources(id, forced).body("additionalResources.size()", equalTo(1));
     }
 
+    /**
+     * Un refuerzo tambien ELIGE conductor, asi que rige lo mismo que al asignar: la ficha del escolta
+     * o del ayudante con licencia no entra, y no queda fila de refuerzo, ni bitacora ni auditoria.
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"escort", "assistant"})
+    void addResources_withAProfileOfAnotherRole_returns400_OPS011_andWritesNothing(String role) {
+        long id = serviceInProgress();
+        int eventsBefore = countEvents(id);
+        int other = operationsFixtures.seedDriverOfRole("ZTEST Otro", "Cargo", role, true);
+
+        addResourcesExpecting(id, payload(other, null, null), 400)
+            .body("code", equalTo("OPS-011"))
+            .body("detail", equalTo("La ficha indicada no es de un conductor"));
+
+        assertEquals(0, countAdditionalAssignments(id));
+        assertEquals(eventsBefore, countEvents(id));
+        assertEquals(0, countAuditLogs(id, "ASSIGNMENT"));
+    }
+
+    /** El orden, igual que al asignar: el cargo del conductor se mira antes que el tracto. */
+    @Test
+    void addResources_theRoleOfTheProfileIsCheckedBeforeTheTractor() {
+        long id = serviceInProgress();
+        int escort = operationsFixtures.seedDriverOfRole("ZTEST Esc", "Activo", "escort", true);
+        int inactiveTractor = operationsFixtures.seedTractor(false, WarehouseTestData.STATUS_AVAILABLE);
+
+        addResourcesExpecting(id, payload(escort, inactiveTractor, null), 400).body("code", equalTo("OPS-011"));
+        assertEquals(0, countAdditionalAssignments(id));
+    }
+
     @Test
     void addResources_whenRejectedByConflict_writesNothing() {
         long id = serviceInProgress();

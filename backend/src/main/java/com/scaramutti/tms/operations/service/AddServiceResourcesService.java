@@ -185,6 +185,7 @@ public class AddServiceResourcesService {
             Driver driver = driverRepository.findById(command.driverId());
             serviceResourceConflicts.requireActiveResource(driver != null && Boolean.TRUE.equals(driver.isActive),
                 ServiceResourceKind.DRIVER);
+            serviceResourceConflicts.requireDriverRole(driverRepository.belongsToADriver(command.driverId()));
             driverName = driverRepository.findFullNameById(command.driverId());
         }
 

@@ -72,22 +72,29 @@ public class ServiceStatsRepository {
             + "                   AND s.end_date_time >= :weekStart "
             + "                   AND s.end_date_time < :weekEndExclusive) AS completed_this_week, "
             // Los principales del viaje. NO se une service_assignments: ver el javadoc.
-            + "COUNT(DISTINCT s.driver_id) FILTER (WHERE s.status = :inProgress AND d.is_active) "
-            + "  AS principal_drivers_on_road, "
+            // Solo fichas de conductor, arriba y abajo: el escolta y el ayudante con licencia tambien
+            // tienen ficha, y contarlos solo abajo (o solo arriba) desarma el "N de M".
+            + "COUNT(DISTINCT s.driver_id) FILTER (WHERE s.status = :inProgress AND d.is_active "
+            + "  AND drole.name = :driverRole) AS principal_drivers_on_road, "
             + "COUNT(DISTINCT s.tractor_id) FILTER (WHERE s.status = :inProgress AND t.is_active) "
             + "  AS principal_tractors_on_road, "
-            + "(SELECT COUNT(*) FROM public.drivers WHERE is_active) AS active_drivers_total, "
+            + "(SELECT COUNT(*) FROM public.drivers pd JOIN public.workers pw ON pw.id = pd.worker_id "
+            + "  JOIN public.roles pr ON pr.id = pw.role_id "
+            + "  WHERE pd.is_active AND pr.name = :driverRole) AS active_drivers_total, "
             + "(SELECT COUNT(*) FROM public.tractors WHERE is_active) AS active_tractors_total "
             + "FROM operaciones.services s "
             // Uniones EXTERNAS: un viaje sin recursos, o con uno dado de baja, no puede
             // desaparecer de los contadores de VIAJES, que no dependen de la flota.
             + "LEFT JOIN public.drivers d ON d.id = s.driver_id "
+            + "LEFT JOIN public.workers dw ON dw.id = d.worker_id "
+            + "LEFT JOIN public.roles drole ON drole.id = dw.role_id "
             + "LEFT JOIN public.tractors t ON t.id = s.tractor_id",
             Tuple.class)
             .setParameter("pendingAssignment", ServiceStatus.PENDING_ASSIGNMENT.name())
             .setParameter("pendingStart", ServiceStatus.PENDING_START.name())
             .setParameter("inProgress", ServiceStatus.IN_PROGRESS.name())
             .setParameter("completed", ServiceStatus.COMPLETED.name())
+            .setParameter("driverRole", DriverRepository.DRIVER_ROLE)
             .setParameter("weekStart", weekStart)
             .setParameter("weekEndExclusive", weekEndExclusive)
             .getSingleResult();

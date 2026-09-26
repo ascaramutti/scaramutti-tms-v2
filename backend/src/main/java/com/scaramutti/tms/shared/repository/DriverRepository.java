@@ -17,14 +17,20 @@ import java.util.Optional;
  *
  * <p>El listado no devuelve entidades: el nombre sale de {@code public.workers} y la
  * disponibilidad de {@code public.resource_statuses}, asi que la consulta los une y proyecta
- * una fila plana. Un solo query para todo el listado. Orden natural por nombre ASC (el
- * frontend reordena para presentacion, politica de catalogos). Read-only.
+ * una fila plana, y solo trae fichas de trabajadores con cargo de conductor. Orden natural por
+ * nombre ASC (el frontend reordena para presentacion, politica de catalogos). Read-only.
  */
 @ApplicationScoped
 public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> {
 
     /** El nombre completo con el alias que usan las consultas de este repositorio. */
     private static final String FULL_NAME_EXPRESSION = WorkerRepository.fullNameExpression("w");
+
+    /**
+     * El unico cargo cuya ficha cuenta como conductor en los servicios. El escolta y el ayudante
+     * con licencia tambien tienen ficha, pero el dueno decidio que no se asignan como conductor.
+     */
+    static final String DRIVER_ROLE = "driver";
 
     /**
      * El nombre del conductor, para etiquetar el rastro de la asignacion. Devuelve null si el id
@@ -46,10 +52,13 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
             + "FROM public.drivers d "
             + "JOIN public.workers w ON w.id = d.worker_id "
             + "JOIN public.resource_statuses status ON status.id = d.status_id "
-            + (isActive != null ? "WHERE d.is_active = :isActive " : "")
+            + "JOIN public.roles role ON role.id = w.role_id "
+            + "WHERE role.name = :driverRole "
+            + (isActive != null ? "AND d.is_active = :isActive " : "")
             + "ORDER BY w.first_name ASC, w.last_name ASC";
 
         Query query = getEntityManager().createNativeQuery(sql, Tuple.class);
+        query.setParameter("driverRole", DRIVER_ROLE);
         if (isActive != null) {
             query.setParameter("isActive", isActive);
         }
@@ -81,6 +90,20 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
         String statusName,
         Boolean isActive
     ) {}
+
+    /**
+     * Si la ficha es de un trabajador con cargo de conductor HOY, leido de su fila. Sin bloquear:
+     * un cambio de cargo que confirme justo despues tiene el mismo efecto que asignar un instante
+     * antes, y lo ya asignado no se revisa hacia atras.
+     */
+    public boolean belongsToADriver(Integer driverId) {
+        return ((Number) getEntityManager().createNativeQuery(
+                "SELECT count(*) FROM public.drivers d JOIN public.workers w ON w.id = d.worker_id "
+                    + "JOIN public.roles role ON role.id = w.role_id "
+                    + "WHERE d.id = :driverId AND role.name = :driverRole")
+            .setParameter("driverId", driverId).setParameter("driverRole", DRIVER_ROLE)
+            .getSingleResult()).longValue() > 0;
+    }
 
     /** Si la licencia ya es de alguna ficha. Es unica en toda la tabla. */
     public boolean existsByLicenseNumber(String licenseNumber) {

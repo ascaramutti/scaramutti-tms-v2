@@ -182,6 +182,13 @@ public class ServiceResourceConflicts {
         }
     }
 
+    /** Que la ficha elegida como conductor sea de un conductor, y no de otro cargo con ficha. */
+    public void requireDriverRole(boolean isADriver) {
+        if (!isADriver) {
+            throw OperationsError.DRIVER_NOT_A_DRIVER.toException();
+        }
+    }
+
     /**
      * Como se nombra el recurso al usuario. Publico porque lo usa tambien el 400 de "no existe o
      * esta inactivo": la concordancia de genero tiene que decidirse en UN lugar, o el mismo tipo

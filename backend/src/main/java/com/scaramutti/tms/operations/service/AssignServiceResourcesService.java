@@ -164,6 +164,7 @@ public class AssignServiceResourcesService {
         Driver driver = driverRepository.findById(command.driverId());
         serviceResourceConflicts.requireActiveResource(driver != null && Boolean.TRUE.equals(driver.isActive),
             ServiceResourceKind.DRIVER);
+        serviceResourceConflicts.requireDriverRole(driverRepository.belongsToADriver(command.driverId()));
         String driverName = driverRepository.findFullNameById(command.driverId());
 
         Tractor tractor = tractorRepository.findById(command.tractorId());

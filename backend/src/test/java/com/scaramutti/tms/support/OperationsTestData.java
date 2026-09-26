@@ -278,7 +278,7 @@ public class OperationsTestData {
      */
     public int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
             String statusName, boolean isActive) {
-        return seedDriver(firstName, lastName, phone, licenseCategory, statusName, isActive, true);
+        return seedDriver(firstName, lastName, phone, licenseCategory, statusName, isActive, true, "driver");
     }
 
     /**
@@ -290,14 +290,27 @@ public class OperationsTestData {
      * TRABAJADOR sin garantia de bajar tambien su fila de conductor, asi que la poblacion existe.
      */
     public int seedDriverWithInactiveWorker(String firstName, String lastName) {
-        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false);
+        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false, "driver");
+    }
+
+    /** La ficha de un trabajador de OTRO cargo que tambien la lleva: el escolta o el ayudante. */
+    public int seedDriverOfRole(String firstName, String lastName, String roleName, boolean isActive) {
+        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, isActive, true,
+            roleName);
+    }
+
+    /** El trabajador detras de una ficha, para moverle el cargo por fuera como lo haria la base. */
+    public int workerIdOfDriver(int driverId) {
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
+                "SELECT worker_id FROM public.drivers WHERE id = ?1")
+            .setParameter(1, driverId).getSingleResult()).intValue());
     }
 
     private int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
-            String statusName, boolean isActive, boolean workerIsActive) {
+            String statusName, boolean isActive, boolean workerIsActive, String roleName) {
         long n = SEQ.incrementAndGet();
         int workerId = warehouseFixtures.seedWorker(
-            "ZTESTD" + n, firstName, lastName, "driver", workerIsActive);
+            "ZTESTD" + n, firstName, lastName, roleName, workerIsActive);
         if (phone != null) {
             QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
                 "UPDATE public.workers SET phone = ?1 WHERE id = ?2")

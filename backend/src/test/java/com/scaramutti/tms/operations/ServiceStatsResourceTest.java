@@ -343,6 +343,25 @@ class ServiceStatsResourceTest {
     }
 
     /**
+     * Solo cuentan las fichas de conductor, arriba y abajo: el escolta y el ayudante con licencia
+     * tambien tienen ficha. Un viaje antiguo que quedo con el escolta como principal no lo pone en
+     * ruta, y contarlo solo arriba volveria al "N de M" imposible que el repositorio evita.
+     */
+    @Test
+    void profilesOfAnotherRole_countNeitherInTheTotalNorOnTheRoad() {
+        JsonPath base = stats();
+
+        int escort = operationsFixtures.seedDriverOfRole("ZTEST Stats", "Escolta", "escort", true);
+        operationsFixtures.seedDriverOfRole("ZTEST Stats", "Ayudante", "assistant", true);
+        seedInStatus(ServiceStatus.IN_PROGRESS, escort, seedTractor());
+        seedInStatus(ServiceStatus.IN_PROGRESS, seedDriver(), seedTractor());   // gemelo
+
+        JsonPath after = stats();
+        assertEquals(base.getInt("driversOnRoad.total") + 1, after.getInt("driversOnRoad.total"));
+        assertEquals(base.getInt("driversOnRoad.active") + 1, after.getInt("driversOnRoad.active"));
+    }
+
+    /**
      * Y separa "no cuento refuerzos" de "cuento el principal y de paso el refuerzo se coló": acá el
      * viaje NO tiene principal, así que un JOIN de más se vería como un +1 imposible.
      */

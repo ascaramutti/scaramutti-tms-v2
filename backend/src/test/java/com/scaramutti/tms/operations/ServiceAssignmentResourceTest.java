@@ -1001,6 +1001,102 @@ class ServiceAssignmentResourceTest {
             .body("detail", containsString(what));
     }
 
+    // ---------- solo conductores -------------------------------------------------
+
+    private io.restassured.response.ValidatableResponse assignExpecting(long id, Map<String, Object> payload,
+            int status) {
+        return given().header("Authorization", "Bearer " + adminToken).contentType(ContentType.JSON)
+            .body(payload).when().post("/services/" + id + "/assignment").then().statusCode(status);
+    }
+
+    /**
+     * El escolta y el ayudante con licencia tienen ficha, pero en los servicios se asignan solo
+     * conductores (decision del dueno). La ficha existe y esta activa, asi que no es el 400 de
+     * siempre: es el suyo, y el viaje queda como estaba, sin bitacora, sin auditoria y sin version.
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"escort", "assistant"})
+    void assign_withAProfileOfAnotherRole_returns400_OPS011_andTouchesNothing(String role) {
+        long id = createService();
+        String etagBefore = etagOf(id);
+        Map<String, Object> payload = assignmentPayload();
+        payload.put("driverId", operationsFixtures.seedDriverOfRole("ZTEST Otro", "Cargo", role, true));
+
+        assignExpecting(id, payload, 400)
+            .body("code", equalTo("OPS-011"))
+            .body("detail", equalTo("La ficha indicada no es de un conductor"));
+
+        assertEquals(1, countEvents(id), "el rechazo no deja bitácora");
+        assertEquals(0, countAuditLogs(id, "ASSIGNMENT"), "el rechazo no deja auditoría");
+        assertEquals(etagBefore, etagOf(id), "el rechazo no mueve la versión");
+        assertEquals("PENDING_ASSIGNMENT", detailOf(id).getString("status"));
+        assertEquals(null, (Object) detailOf(id).get("driver"));
+    }
+
+    /**
+     * Lo que decide es el cargo de HOY, no la bandera de la ficha: una ficha que quedo activa aunque
+     * su trabajador ya no es conductor (por fuera de la API) tampoco se asigna.
+     */
+    @Test
+    void assign_withAnActiveProfileWhoseWorkerIsNoLongerADriver_returns400_OPS011() {
+        long id = createService();
+        int former = operationsFixtures.seedDriver("ZTEST Ex", "Conductor");
+        warehouseFixtures.setWorkerRole(operationsFixtures.workerIdOfDriver(former), "operator");
+        Map<String, Object> payload = assignmentPayload();
+        payload.put("driverId", former);
+
+        assignExpecting(id, payload, 400)
+            .body("code", equalTo("OPS-011"))
+            .body("detail", equalTo("La ficha indicada no es de un conductor"));
+        assertEquals("PENDING_ASSIGNMENT", detailOf(id).getString("status"));
+        assertEquals(null, (Object) detailOf(id).get("driver"), "el viaje sigue sin conductor");
+    }
+
+    /**
+     * El orden: una ficha apagada es el 400 de "no existe o esta inactivo" aunque ademas sea de otro
+     * cargo; y el cargo se mira justo despues de la ficha, antes que el tracto.
+     */
+    @Test
+    void assign_theInactiveProfileGoesFirst_andTheRoleGoesBeforeTheTractor() {
+        long id = createService();
+        Map<String, Object> inactiveEscort = assignmentPayload();
+        inactiveEscort.put("driverId", operationsFixtures.seedDriverOfRole("ZTEST Esc", "Apagado", "escort", false));
+        assignExpecting(id, inactiveEscort, 400)
+            .body("code", equalTo("COM-001"))
+            .body("detail", equalTo("El conductor indicado no existe o está inactivo"));
+
+        Map<String, Object> escortAndInactiveTractor = assignmentPayload();
+        escortAndInactiveTractor.put("driverId",
+            operationsFixtures.seedDriverOfRole("ZTEST Esc", "Activo", "escort", true));
+        escortAndInactiveTractor.put("tractorId", operationsFixtures.seedTractor(false, WarehouseTestData.STATUS_AVAILABLE));
+        assignExpecting(id, escortAndInactiveTractor, 400).body("code", equalTo("OPS-011"));
+    }
+
+    /**
+     * Lo ya asignado no se revisa hacia atras: un viaje que quedo con la ficha de un escolta se
+     * cancela y se reabre igual, porque reabrir RESTAURA una decision tomada, no elige una nueva.
+     */
+    @Test
+    void aServiceAlreadyAssignedToAnotherRole_isNotRevisited_whenReopened() {
+        long id = createService();
+        int escort = operationsFixtures.seedDriverOfRole("ZTEST Esc", "Asignado", "escort", true);
+        operationsFixtures.forceServiceStatus(id, "PENDING_START");
+        operationsFixtures.forceServiceResources(id, escort, tractorId, trailerId);
+
+        for (String[] step : new String[][] {
+                {"CANCELLED", "El cliente reprogramó el embarque para agosto"},
+                {"REOPENED", "El cliente retomó el embarque que había reprogramado"}}) {
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("target", step[0]);
+            body.put("note", step[1]);
+            given().header("Authorization", "Bearer " + adminToken).header("If-Match", etagOf(id))
+                .contentType(ContentType.JSON).body(body)
+            .when().post("/services/" + id + "/status")
+            .then().statusCode(200);
+        }
+        assertEquals(escort, detailOf(id).getInt("driver.id"), "vuelve con la ficha que tenia");
+    }
+
     @ParameterizedTest
     @CsvSource({
         "driverId,El conductor indicado no existe o está inactivo",
