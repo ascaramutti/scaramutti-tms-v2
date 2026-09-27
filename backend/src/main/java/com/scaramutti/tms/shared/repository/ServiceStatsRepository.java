@@ -54,8 +54,9 @@ public class ServiceStatsRepository {
      * conductor que tambien puede llegar del sistema anterior.
      *
      * <p>Los dos numeradores exigen ademas que el recurso este de ALTA, igual que los
-     * denominadores. Es una DESVIACION consciente del sistema anterior, que solo lo pedia abajo y
-     * por eso podia mostrar "6 de 5".
+     * denominadores; para el conductor, que sea asignable hoy (ficha, trabajador y cargo). Es una
+     * DESVIACION consciente del sistema anterior, que solo lo pedia abajo y por eso podia mostrar
+     * "6 de 5".
      *
      * <p>Lo que NINGUNO de los cuatro numeros mira es la DISPONIBILIDAD del catalogo
      * ({@code status_id}), y se escribe porque el error contrario es razonable: un conductor en
@@ -72,15 +73,15 @@ public class ServiceStatsRepository {
             + "                   AND s.end_date_time >= :weekStart "
             + "                   AND s.end_date_time < :weekEndExclusive) AS completed_this_week, "
             // Los principales del viaje. NO se une service_assignments: ver el javadoc.
-            // Solo fichas de conductor, arriba y abajo: el escolta y el ayudante con licencia tambien
-            // tienen ficha, y contarlos solo abajo (o solo arriba) desarma el "N de M".
-            + "COUNT(DISTINCT s.driver_id) FILTER (WHERE s.status = :inProgress AND d.is_active "
-            + "  AND drole.name = :driverRole) AS principal_drivers_on_road, "
+            // Conductores asignables hoy, arriba y abajo, con la MISMA regla que el catalogo: la
+            // ficha, su trabajador y el cargo. Mirar algo solo abajo (o solo arriba) desarma el "N de M".
+            + "COUNT(DISTINCT s.driver_id) FILTER (WHERE s.status = :inProgress AND "
+            + DriverRepository.assignableToday("d", "dw", "drole") + ") AS principal_drivers_on_road, "
             + "COUNT(DISTINCT s.tractor_id) FILTER (WHERE s.status = :inProgress AND t.is_active) "
             + "  AS principal_tractors_on_road, "
             + "(SELECT COUNT(*) FROM public.drivers pd JOIN public.workers pw ON pw.id = pd.worker_id "
             + "  JOIN public.roles pr ON pr.id = pw.role_id "
-            + "  WHERE pd.is_active AND pr.name = :driverRole) AS active_drivers_total, "
+            + "  WHERE " + DriverRepository.assignableToday("pd", "pw", "pr") + ") AS active_drivers_total, "
             + "(SELECT COUNT(*) FROM public.tractors WHERE is_active) AS active_tractors_total "
             + "FROM operaciones.services s "
             // Uniones EXTERNAS: un viaje sin recursos, o con uno dado de baja, no puede
@@ -94,7 +95,6 @@ public class ServiceStatsRepository {
             .setParameter("pendingStart", ServiceStatus.PENDING_START.name())
             .setParameter("inProgress", ServiceStatus.IN_PROGRESS.name())
             .setParameter("completed", ServiceStatus.COMPLETED.name())
-            .setParameter("driverRole", DriverRepository.DRIVER_ROLE)
             .setParameter("weekStart", weekStart)
             .setParameter("weekEndExclusive", weekEndExclusive)
             .getSingleResult();

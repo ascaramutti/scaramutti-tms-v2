@@ -1029,7 +1029,14 @@ export type DriverResponse = DriverRef & {
     licenseCategory?: string | null;
     phone?: string | null;
     status: FleetResourceStatus;
+    /**
+     * La ficha está encendida.
+     */
     isActive: boolean;
+    /**
+     * Se puede asignar hoy: la ficha encendida y su trabajador activo.
+     */
+    isAssignable: boolean;
 };
 
 /**
@@ -1711,7 +1718,7 @@ export type ServiceStatsResponse = {
      */
     completedThisWeek: number;
     /**
-     * Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan. Solo fichas de trabajadores con cargo `driver`, arriba y abajo: el escolta y el ayudante con licencia no cuentan.
+     * Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan. Arriba y abajo, solo fichas encendidas de trabajadores activos con cargo `driver`: el escolta, el ayudante con licencia y el trabajador dado de baja no cuentan.
      */
     driversOnRoad: {
         active: number;
@@ -3919,7 +3926,14 @@ export type ListDriversData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Solo fichas encendidas (true) o apagadas (false).
+         */
         isActive?: boolean;
+        /**
+         * Solo conductores que se pueden asignar hoy (true) o que no (false).
+         */
+        isAssignable?: boolean;
     };
     url: '/drivers';
 };

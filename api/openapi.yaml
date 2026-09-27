@@ -1653,12 +1653,19 @@ paths:
         registra y edita servicios.
 
         Solo fichas cuyo trabajador tiene HOY el cargo `driver`, con y sin
-        `isActive`: el escolta y el ayudante con licencia también tienen ficha,
+        filtros: el escolta y el ayudante con licencia también tienen ficha,
         pero en los viajes se asignan solo conductores. La ficha de alguien que
         dejó de ser conductor tampoco sale, ni siquiera como inactiva.
+
+        Dos banderas, cada una con su filtro. `isActive`: la ficha está
+        encendida (la columna, tal cual). `isAssignable`: se puede asignar hoy,
+        la ficha encendida y su trabajador activo. La ficha encendida de un
+        trabajador dado de baja sale con `isActive: true` y `isAssignable: false`.
+        El selector de la asignación pide `isAssignable=true`.
       x-required-roles: [admin, general_manager, operations_manager, dispatcher, sales]
       parameters:
-        - { name: isActive, in: query, schema: { type: boolean } }
+        - { name: isActive, in: query, description: 'Solo fichas encendidas (true) o apagadas (false).', schema: { type: boolean } }
+        - { name: isAssignable, in: query, description: 'Solo conductores que se pueden asignar hoy (true) o que no (false).', schema: { type: boolean } }
       responses:
         '200':
           description: Conductores con su disponibilidad
@@ -2758,8 +2765,8 @@ paths:
         anterior, para que el número no cambie de significado con el cambio de
         sistema: `driversOnRoad` = conductores PRINCIPALES distintos en
         servicios en ruta (los refuerzos no cuentan) sobre el total de
-        conductores de alta (fichas de `public.drivers` de cargo `driver`: en el
-        sistema anterior solo el conductor tenía ficha); `unitsOnRoad` = tractos
+        conductores de alta (fichas encendidas de trabajadores activos de cargo
+        `driver`: en el sistema anterior solo el conductor tenía ficha); `unitsOnRoad` = tractos
         PRINCIPALES distintos en servicios en ruta (los de refuerzo tampoco
         cuentan) sobre el total de TRACTOS de alta (carretas y escoltas no
         participan del indicador).
@@ -3043,8 +3050,8 @@ paths:
         prohíbe). Mandar `force: true` sin que haya conflicto asigna normal y NO
         deja registrado que se forzara nada.
 
-        Los recursos tienen que existir y estar activos (400 `COM-001`), y la
-        ficha del conductor tiene que ser de un trabajador con cargo `driver`
+        Los recursos tienen que existir y estar activos (400 `COM-001`; para el
+        conductor, la ficha y su trabajador), y la ficha del conductor tiene que ser de un trabajador con cargo `driver`
         (400 `OPS-011`: el escolta y el ayudante con licencia también tienen
         ficha); ese chequeo va justo después del de la ficha, antes que el tracto
         y la carreta. Los viajes ya asignados no se revisan. Su
@@ -3313,8 +3320,8 @@ paths:
         ruta y sus conductor, tracto y carreta originales no se tocan. Un pedido con
         los tres recursos deja UNA fila de refuerzo, no tres.
 
-        Los recursos tienen que existir y estar activos (400 `COM-001`), y la
-        ficha del conductor tiene que ser de un trabajador con cargo `driver`
+        Los recursos tienen que existir y estar activos (400 `COM-001`; para el
+        conductor, la ficha y su trabajador), y la ficha del conductor tiene que ser de un trabajador con cargo `driver`
         (400 `OPS-011`), justo después del chequeo de la ficha. Su
         disponibilidad NO se valida: sumar un refuerzo ELIGE (a diferencia de
         reabrir, que RESTAURA), así que rige el mismo criterio que la asignación y un
@@ -4625,13 +4632,14 @@ components:
       allOf:
         - $ref: '#/components/schemas/DriverRef'
         - type: object
-          required: [licenseNumber, status, isActive]
+          required: [licenseNumber, status, isActive, isAssignable]
           properties:
             licenseNumber:   { type: string }
             licenseCategory: { type: [string, 'null'] }
             phone:           { type: [string, 'null'], pattern: '^\d{9}$' }
             status:          { $ref: '#/components/schemas/FleetResourceStatus' }
-            isActive:        { type: boolean }
+            isActive:        { type: boolean, description: 'La ficha está encendida.' }
+            isAssignable:    { type: boolean, description: 'Se puede asignar hoy: la ficha encendida y su trabajador activo.' }
 
     # -------- Workers: catálogos ----------------------------------------------
     DriverProfileMode:
@@ -5564,7 +5572,7 @@ components:
         completedThisWeek: { type: integer, minimum: 0, description: 'Completados con fecha de fin real dentro del ciclo operativo miércoles→martes de América/Lima (RN-OP14)' }
         driversOnRoad:
           type: object
-          description: 'Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan. Solo fichas de trabajadores con cargo `driver`, arriba y abajo: el escolta y el ayudante con licencia no cuentan.'
+          description: 'Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan. Arriba y abajo, solo fichas encendidas de trabajadores activos con cargo `driver`: el escolta, el ayudante con licencia y el trabajador dado de baja no cuentan.'
           required: [active, total]
           properties:
             active: { type: integer, minimum: 0 }

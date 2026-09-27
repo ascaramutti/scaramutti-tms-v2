@@ -32,10 +32,11 @@ public class DriverResource {
     @GET
     @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher", "sales"})
     public List<DriverResponse> listDrivers(
-        @QueryParam("isActive") Boolean isActive
+        @QueryParam("isActive") Boolean isActive,
+        @QueryParam("isAssignable") Boolean isAssignable
     ) {
         return driverService.listDrivers(
-            driverResourceMapper.toListDriversQuery(isActive)
+            driverResourceMapper.toListDriversQuery(isActive, isAssignable)
         );
     }
 }

@@ -1265,9 +1265,15 @@ export const listFleetUnits = <ThrowOnError extends boolean = false>(options?: O
  * servicios.
  *
  * Solo fichas cuyo trabajador tiene HOY el cargo `driver`, con y sin
- * `isActive`: el escolta y el ayudante con licencia también tienen ficha,
+ * filtros: el escolta y el ayudante con licencia también tienen ficha,
  * pero en los viajes se asignan solo conductores. La ficha de alguien que
  * dejó de ser conductor tampoco sale, ni siquiera como inactiva.
+ *
+ * Dos banderas, cada una con su filtro. `isActive`: la ficha está
+ * encendida (la columna, tal cual). `isAssignable`: se puede asignar hoy,
+ * la ficha encendida y su trabajador activo. La ficha encendida de un
+ * trabajador dado de baja sale con `isActive: true` y `isAssignable: false`.
+ * El selector de la asignación pide `isAssignable=true`.
  *
  */
 export const listDrivers = <ThrowOnError extends boolean = false>(options?: Options<ListDriversData, ThrowOnError>): RequestResult<ListDriversResponses, ListDriversErrors, ThrowOnError> => (options?.client ?? client).get<ListDriversResponses, ListDriversErrors, ThrowOnError>({
@@ -1366,8 +1372,8 @@ export const createService = <ThrowOnError extends boolean = false>(options: Opt
  * Los contadores de recursos miden lo MISMO que el tablero del sistema anterior, para que el
  * número no cambie de significado con el cambio de sistema: `driversOnRoad` = conductores
  * PRINCIPALES distintos en servicios en ruta **(los refuerzos NO cuentan)** sobre el total de
- * conductores de alta (fichas de cargo `driver`: en el sistema anterior solo el conductor tenía
- * ficha); `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
+ * conductores de alta (fichas encendidas de trabajadores activos de cargo `driver`: en el sistema
+ * anterior solo el conductor tenía ficha); `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
  * tampoco) sobre el total de tractos de alta. **Las carretas y las escoltas no participan de
  * ningún indicador**, aunque el nombre del campo diga "units".
  *
@@ -1578,8 +1584,8 @@ export const updateService = <ThrowOnError extends boolean = false>(options: Opt
  * el conflicto avisa, no prohíbe. Mandar `force: true` sin que haya conflicto
  * asigna normal y NO deja registrado que se forzara nada.
  *
- * Los recursos tienen que existir y estar activos (400 `COM-001`), y la
- * ficha del conductor tiene que ser de un trabajador con cargo `driver`
+ * Los recursos tienen que existir y estar activos (400 `COM-001`; para el
+ * conductor, la ficha y su trabajador), y la ficha del conductor tiene que ser de un trabajador con cargo `driver`
  * (400 `OPS-011`: el escolta y el ayudante con licencia también tienen
  * ficha); ese chequeo va justo después del de la ficha, antes que el tracto
  * y la carreta. Los viajes ya asignados no se revisan. Su
@@ -1784,8 +1790,8 @@ export const changeServiceStatus = <ThrowOnError extends boolean = false>(option
  * RN-OP4 declara no forzable. Mandar `force: true` sin que haya conflicto suma
  * el refuerzo normal y NO deja registrado que se forzara nada.
  *
- * Los recursos tienen que existir y estar activos (400 `COM-001`), y la
- * ficha del conductor tiene que ser de un trabajador con cargo `driver`
+ * Los recursos tienen que existir y estar activos (400 `COM-001`; para el
+ * conductor, la ficha y su trabajador), y la ficha del conductor tiene que ser de un trabajador con cargo `driver`
  * (400 `OPS-011`), justo después del chequeo de la ficha. Su
  * disponibilidad NO se valida: sumar un refuerzo ELIGE (a diferencia de reabrir,
  * que RESTAURA), así que rige el mismo criterio que la asignación y un tracto en

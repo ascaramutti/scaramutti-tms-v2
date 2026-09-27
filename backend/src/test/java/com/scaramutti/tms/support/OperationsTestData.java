@@ -284,10 +284,9 @@ public class OperationsTestData {
     /**
      * Variante que ademas DA DE BAJA al trabajador detras del conductor.
      *
-     * <p>Existe porque son dos banderas distintas y solo una manda: el padron mira
-     * {@code drivers.is_active} y NO {@code workers.is_active}, igual que el buscador que decide a
-     * quien se puede asignar. Cuando un empleado se va, el sistema anterior lo da de baja como
-     * TRABAJADOR sin garantia de bajar tambien su fila de conductor, asi que la poblacion existe.
+     * <p>Existe porque son dos banderas distintas y las dos mandan: la ficha queda encendida y aun
+     * asi el conductor no es asignable hoy. Cuando un empleado se va, el sistema anterior lo da de
+     * baja como TRABAJADOR sin garantia de bajar tambien su fila de conductor.
      */
     public int seedDriverWithInactiveWorker(String firstName, String lastName) {
         return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false, "driver");
