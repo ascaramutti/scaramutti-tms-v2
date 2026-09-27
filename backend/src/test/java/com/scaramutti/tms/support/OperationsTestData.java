@@ -299,6 +299,16 @@ public class OperationsTestData {
             roleName);
     }
 
+    /** Apaga o enciende una ficha SEMBRADA por esta corrida; cualquier otra no se toca. */
+    public void setDriverActive(int driverId, boolean isActive) {
+        if (!seededDriverIds.contains(driverId)) {
+            throw new IllegalArgumentException("setDriverActive solo toca fichas sembradas por el test: " + driverId);
+        }
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE public.drivers SET is_active = ?1 WHERE id = ?2")
+            .setParameter(1, isActive).setParameter(2, driverId).executeUpdate());
+    }
+
     /** El trabajador detras de una ficha, para moverle el cargo por fuera como lo haria la base. */
     public int workerIdOfDriver(int driverId) {
         return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(

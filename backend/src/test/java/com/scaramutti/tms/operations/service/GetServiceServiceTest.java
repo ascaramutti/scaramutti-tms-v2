@@ -83,7 +83,7 @@ class GetServiceServiceTest {
         // feliz no: sin este doble, el NPE taparia lo que de verdad se esta midiendo.
         when(serviceRepository.findAssignedResources(1L)).thenReturn(
             new ServiceRepository.ServiceAssignedResourcesRow(
-                null, null, null, null, null, null));
+                null, null, null, null, null, null, false));
         when(userLookup.requireAllById(any())).thenAnswer(invocation -> {
             List<Integer> requested = invocation.getArgument(0);
             Map<Integer, UserResponse> found = new LinkedHashMap<>();
@@ -149,7 +149,7 @@ class GetServiceServiceTest {
         // lote por la bitacora y el caso pasaria aunque el concat no existiera.
         when(serviceAssignmentRepository.listByServiceId(1L)).thenReturn(List.of(
             new ServiceAdditionalResourceRow(10L, 4, "ZTEST Conductor", null, null, null, null,
-                "Relevo", 9, OffsetDateTime.parse("2026-07-01T10:00:00Z"))));
+                "Relevo", 9, OffsetDateTime.parse("2026-07-01T10:00:00Z"), false)));
 
         getServiceService.getService(1L);
 
@@ -166,7 +166,7 @@ class GetServiceServiceTest {
     private static ServiceAdditionalResourceRow aReinforcementRow(
             long id, int driverId, String reason) {
         return new ServiceAdditionalResourceRow(id, driverId, "ZTEST Conductor",
-            null, null, null, null, reason, 1, OffsetDateTime.parse("2026-07-01T10:00:00Z"));
+            null, null, null, null, reason, 1, OffsetDateTime.parse("2026-07-01T10:00:00Z"), false);
     }
 
     @Test

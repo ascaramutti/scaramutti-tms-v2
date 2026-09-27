@@ -5136,10 +5136,11 @@ components:
 
         Una fila puede traer los tres recursos, uno solo o cualquier combinación: es el
         pedido que la creó, no un recurso suelto. Los que no participaron viajan en null.
-      required: [id, reason, assignedBy, assignedAt]
+      required: [id, reason, assignedBy, assignedAt, driverNeedsReassignment]
       properties:
         id:         { type: integer, format: int64 }
         driver:     { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
+        driverNeedsReassignment: { type: boolean, description: 'true si el viaje está pendiente de inicio o en ruta y el conductor de ESTE refuerzo ya no se puede asignar (mismos tres motivos que el del viaje). Siempre presente; false si el refuerzo no incluyó conductor.' }
         tractor:    { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         trailer:    { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         reason:     { type: string, maxLength: 500, description: 'Por qué se sumó. Obligatorio al crearlo, así que nunca viaja vacío.' }
@@ -5160,7 +5161,7 @@ components:
 
         Los REFUERZOS viajan en `additionalResources` desde que existe el endpoint que
         los suma: lista vacía mientras no haya ninguno, NUNCA null.
-      required: [id, code, client, origin, destination, tentativeDate, tripScope, cargoType, weightKg, status, driver, tractor, trailer, additionalResources, events, createdBy, createdAt, updatedAt]
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, cargoType, weightKg, status, driver, driverNeedsReassignment, tractor, trailer, additionalResources, events, createdBy, createdAt, updatedAt]
       properties:
         id:            { type: integer, format: int64 }
         code:          { type: string, example: 'SRV-0042' }
@@ -5179,6 +5180,7 @@ components:
         currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol de despacho' }
         status:        { $ref: '#/components/schemas/ServiceStatus' }
         driver:        { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
+        driverNeedsReassignment: { type: boolean, description: 'true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.' }
         tractor:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         trailer:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         startDateTime: { type: [string, 'null'], format: date-time, description: 'Inicio real. Lo fija la transición a "en ruta" y la edición lo corrige; null mientras el viaje no haya arrancado' }
@@ -5310,7 +5312,7 @@ components:
         `driver` y `tractor` son null mientras el viaje esté pendiente de asignación: la
         fila los trae desde que existe el endpoint que los asigna. La carreta no está acá
         (es opcional y la tabla no la muestra); vive en el detalle.
-      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, driver, tractor, createdAt]
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, driver, driverNeedsReassignment, tractor, createdAt]
       properties:
         id:            { type: integer, format: int64 }
         code:          { type: string, example: 'SRV-0042' }
@@ -5321,6 +5323,7 @@ components:
         tripScope:     { $ref: '#/components/schemas/TripScope' }
         status:        { $ref: '#/components/schemas/ServiceStatus' }
         driver:        { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
+        driverNeedsReassignment: { type: boolean, description: 'true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.' }
         tractor:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         price:         { type: number, format: double, description: 'Ausente para el rol dispatcher' }
         currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol dispatcher' }

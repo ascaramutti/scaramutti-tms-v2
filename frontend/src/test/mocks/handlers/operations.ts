@@ -70,6 +70,7 @@ export function fakeServiceSummary(
     tripScope: 'PROVINCIA',
     status: 'PENDING_ASSIGNMENT',
     driver: null,
+    driverNeedsReassignment: false,
     tractor: null,
     price: 5800,
     currencyCode: 'PEN',
@@ -298,6 +299,7 @@ export function fakeServiceDetail(
     currencyCode: 'PEN',
     status: 'PENDING_ASSIGNMENT',
     driver: null,
+    driverNeedsReassignment: false,
     tractor: null,
     trailer: null,
     startDateTime: null,
@@ -500,6 +502,7 @@ export function fakeAdditionalResource(
   return {
     id: 51,
     driver: { id: 8, fullName: 'Ana Ríos Chávez' },
+    driverNeedsReassignment: false,
     tractor: { kind: 'TRACTOR', id: 11, plate: 'V1B-911' },
     trailer: null,
     // Ni 10 ni 500 caracteres: son los dos literales de los mensajes de validación, y

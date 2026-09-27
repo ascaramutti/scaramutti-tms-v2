@@ -467,6 +467,7 @@ describe('ServiceDetailPage', () => {
             {
               id: 5,
               driver: { id: 8, fullName: 'Ana Ríos' },
+              driverNeedsReassignment: false,
               tractor: { kind: 'TRACTOR', id: 4, plate: 'XYZ-987' },
               trailer: null,
               reason: 'Relevo por descanso reglamentario del conductor principal',
@@ -504,6 +505,7 @@ describe('ServiceDetailPage', () => {
             {
               id: 7,
               driver: { id: 8, fullName: 'Ana Ríos' },
+              driverNeedsReassignment: false,
               tractor: { kind: 'TRACTOR', id: 4, plate: 'XYZ987' },
               trailer: { kind: 'TRAILER', id: 5, plate: 'QWE456' },
               reason: 'Cambio de unidad por desperfecto en ruta',
@@ -534,6 +536,7 @@ describe('ServiceDetailPage', () => {
             {
               id: 6,
               driver: null,
+              driverNeedsReassignment: false,
               tractor: null,
               trailer: null,
               reason: 'Pedido sin recursos, que el servidor no debería producir',

@@ -50,10 +50,13 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
     private static final String ADDITIONAL_RESOURCE_SELECT =
         "SELECT a.id, a.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
             + "a.tractor_id, tra.plate AS tractor_plate, a.trailer_id, tri.plate AS trailer_plate, "
-            + "a.reason, a.assigned_by, a.assigned_at "
+            + "a.reason, a.assigned_by, a.assigned_at, "
+            + ServiceRepository.driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment "
             + "FROM operaciones.service_assignments a "
+            + "JOIN operaciones.services s ON s.id = a.service_id "
             + "LEFT JOIN public.drivers d ON d.id = a.driver_id "
             + "LEFT JOIN public.workers w ON w.id = d.worker_id "
+            + "LEFT JOIN public.roles drole ON drole.id = w.role_id "
             + "LEFT JOIN public.tractors tra ON tra.id = a.tractor_id "
             + "LEFT JOIN public.trailers tri ON tri.id = a.trailer_id "
             + "WHERE a.service_id = :serviceId ";
@@ -128,7 +131,8 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
             ServiceRepository.toInteger(row.get(8)),
             // NO se castea directo: segun la version del driver la misma columna llega como
             // Instant, Timestamp u OffsetDateTime. Mismo helper que el listado de viajes.
-            DateUtils.toOffsetDateTime(row.get(9)));
+            DateUtils.toOffsetDateTime(row.get(9)),
+            (Boolean) row.get(10));
     }
 
     /**
@@ -266,6 +270,7 @@ public class ServiceAssignmentRepository implements PanacheRepositoryBase<Servic
         String trailerPlate,
         String reason,
         Integer assignedBy,
-        OffsetDateTime assignedAt
+        OffsetDateTime assignedAt,
+        boolean driverNeedsReassignment
     ) {}
 }

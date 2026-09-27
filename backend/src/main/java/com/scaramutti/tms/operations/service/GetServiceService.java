@@ -101,6 +101,7 @@ public class GetServiceService {
             includePrices ? currency.code : null,
             serviceServiceMapper.toServiceDriverSummary(
                 resources.driverId(), resources.driverFullName()),
+            resources.driverNeedsReassignment(),
             serviceServiceMapper.toFleetUnitRef(
                 FleetUnitKind.TRACTOR, resources.tractorId(), resources.tractorPlate()),
             serviceServiceMapper.toFleetUnitRef(
