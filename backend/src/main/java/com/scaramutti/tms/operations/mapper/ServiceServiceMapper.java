@@ -77,6 +77,7 @@ public interface ServiceServiceMapper {
     @Mapping(target = "currencyCode",  source = "currencyCode")
     @Mapping(target = "status",        source = "service.status")
     @Mapping(target = "driver",        source = "driver")
+    @Mapping(target = "driverNeedsReassignment", source = "driverNeedsReassignment")
     @Mapping(target = "tractor",       source = "tractor")
     @Mapping(target = "trailer",       source = "trailer")
     @Mapping(target = "startDateTime", source = "service.startDateTime")
@@ -88,7 +89,7 @@ public interface ServiceServiceMapper {
     @Mapping(target = "updatedAt",     source = "service.updatedAt")
     ServiceDetailResponse toServiceDetailResponse(
         Service service, ServiceClientSummary client, ServiceCargoTypeSummary cargoType,
-        BigDecimal price, String currencyCode, ServiceDriverSummary driver,
+        BigDecimal price, String currencyCode, ServiceDriverSummary driver, boolean driverNeedsReassignment,
         FleetUnitRef tractor, FleetUnitRef trailer,
         List<ServiceAdditionalResourceResponse> additionalResources,
         List<ServiceEventResponse> events, ServiceUserSummary createdBy
@@ -104,6 +105,7 @@ public interface ServiceServiceMapper {
         return new ServiceAdditionalResourceResponse(
             row.id(),
             toServiceDriverSummary(row.driverId(), row.driverFullName()),
+            row.driverNeedsReassignment(),
             toFleetUnitRef(FleetUnitKind.TRACTOR, row.tractorId(), row.tractorPlate()),
             toFleetUnitRef(FleetUnitKind.TRAILER, row.trailerId(), row.trailerPlate()),
             row.reason(),
@@ -144,6 +146,7 @@ public interface ServiceServiceMapper {
             TripScope.valueOf(row.tripScope()),
             ServiceStatus.valueOf(row.status()),
             toServiceDriverSummary(row.driverId(), row.driverFullName()),
+            row.driverNeedsReassignment(),
             toFleetUnitRef(FleetUnitKind.TRACTOR, row.tractorId(), row.tractorPlate()),
             includePrices ? row.price() : null,
             includePrices ? row.currencyCode() : null,

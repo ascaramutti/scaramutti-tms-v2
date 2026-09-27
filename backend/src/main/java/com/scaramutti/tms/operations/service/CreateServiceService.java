@@ -93,6 +93,7 @@ public class CreateServiceService {
             // Un viaje recien creado nace pendiente de asignacion, o sea sin ningun recurso: no
             // hay nada que consultar. Los pone el endpoint que los asigna.
             null,
+            false,
             null,
             null,
             // Los refuerzos solo se suman con el viaje YA en ruta, asi que uno recien creado no

@@ -92,6 +92,17 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
     ) {}
 
     /**
+     * Expresion SQL, sobre los alias de quien consulta: hay ficha y su conductor YA NO es asignable
+     * (ficha apagada, trabajador dado de baja o cargo distinto de conductor). La alerta de los viajes
+     * la usa asi, en un solo lugar, para que el listado, el detalle y los refuerzos no diverjan.
+     * Concatena sus argumentos: solo se le pasan alias literales, nunca algo que venga del pedido.
+     */
+    static String notAssignableToday(String driver, String worker, String role) {
+        return "COALESCE(" + driver + ".id IS NOT NULL AND NOT (" + driver + ".is_active AND " + worker
+            + ".is_active AND " + role + ".name = '" + DRIVER_ROLE + "'), false)";
+    }
+
+    /**
      * Si la ficha es de un trabajador con cargo de conductor HOY, leido de su fila. Sin bloquear:
      * un cambio de cargo que confirme justo despues tiene el mismo efecto que asignar un instante
      * antes, y lo ya asignado no se revisa hacia atras.

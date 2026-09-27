@@ -1548,6 +1548,10 @@ export type ServiceResourceConflictProblem = Problem & {
 export type ServiceAdditionalResourceResponse = {
     id: number;
     driver?: DriverRef | null;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y el conductor de ESTE refuerzo ya no se puede asignar (mismos tres motivos que el del viaje). Siempre presente; false si el refuerzo no incluyó conductor.
+     */
+    driverNeedsReassignment: boolean;
     tractor?: FleetUnitRef | null;
     trailer?: FleetUnitRef | null;
     /**
@@ -1596,6 +1600,10 @@ export type ServiceDetailResponse = {
     currencyCode?: string;
     status: ServiceStatus;
     driver: DriverRef | null;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.
+     */
+    driverNeedsReassignment: boolean;
     tractor: FleetUnitRef | null;
     trailer: FleetUnitRef | null;
     /**
@@ -1751,6 +1759,10 @@ export type ServiceSummaryResponse = {
     tripScope: TripScope;
     status: ServiceStatus;
     driver: DriverRef | null;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.
+     */
+    driverNeedsReassignment: boolean;
     tractor: FleetUnitRef | null;
     /**
      * Ausente para el rol dispatcher

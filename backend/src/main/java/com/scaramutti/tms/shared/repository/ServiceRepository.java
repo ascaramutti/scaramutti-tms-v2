@@ -41,7 +41,8 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             + "s.status, s.price, cur.code AS currency_code, s.created_at, "
             + "c.id AS client_id, c.name AS client_name, c.ruc, c.phone, c.contact_name, "
             + "s.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
-            + "s.tractor_id, tra.plate AS tractor_plate "
+            + "s.tractor_id, tra.plate AS tractor_plate, "
+            + driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment "
             + fromAndWhere(query, params, ASSIGNED_RESOURCE_JOINS)
             + " ORDER BY s.created_at DESC, s.id DESC LIMIT :pageSize OFFSET :pageOffset";
 
@@ -74,8 +75,20 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             toInteger(row.get(15)),
             (String) row.get(16),
             toInteger(row.get(17)),
-            (String) row.get(18)
+            (String) row.get(18),
+            (Boolean) row.get(19)
         )).toList();
+    }
+
+    /**
+     * Expresion SQL de la alerta del viaje: esta pendiente de inicio o en ruta, y su conductor ya no
+     * es asignable. Los viajes pendientes de asignacion no tienen conductor, y los cerrados son
+     * historia: ninguno de los dos se reasigna.
+     */
+    static String driverNeedsReassignment(String service, String driver, String worker, String role) {
+        return "(" + service + ".status IN ('" + ServiceStatus.PENDING_START.name() + "', '"
+            + ServiceStatus.IN_PROGRESS.name() + "') AND "
+            + DriverRepository.notAssignableToday(driver, worker, role) + ")";
     }
 
     /**
@@ -89,13 +102,14 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
     private static final String ASSIGNED_RESOURCE_JOINS =
         "LEFT JOIN public.drivers d ON d.id = s.driver_id "
             + "LEFT JOIN public.workers w ON w.id = d.worker_id "
+            + "LEFT JOIN public.roles drole ON drole.id = w.role_id "
             + "LEFT JOIN public.tractors tra ON tra.id = s.tractor_id ";
 
     /** Total de servicios que matchean los filtros. Reusa el MISMO FROM+WHERE que la pagina. */
     public long countSearch(ListServicesQuery query) {
         Map<String, Object> params = new LinkedHashMap<>();
         // Sin las uniones de recursos: son externas y no cambian cuantas filas hay, asi que
-        // contarlas con ellas seria pagar tres uniones por un numero que no depende de ellas.
+        // contarlas con ellas seria pagar las uniones por un numero que no depende de ellas.
         Query nativeQuery = entityManager.createNativeQuery("SELECT COUNT(*) " + fromAndWhere(query, params, ""));
         params.forEach(nativeQuery::setParameter);
         return ((Number) nativeQuery.getSingleResult()).longValue();
@@ -180,7 +194,8 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         Integer driverId,
         String driverFullName,
         Integer tractorId,
-        String tractorPlate
+        String tractorPlate,
+        boolean driverNeedsReassignment
     ) {}
 
     /**
@@ -210,10 +225,12 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
     public ServiceAssignedResourcesRow findAssignedResources(long serviceId) {
         Query query = entityManager.createNativeQuery(
             "SELECT s.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
-                + "s.tractor_id, tra.plate AS tractor_plate, s.trailer_id, tri.plate AS trailer_plate "
+                + "s.tractor_id, tra.plate AS tractor_plate, s.trailer_id, tri.plate AS trailer_plate, "
+                + driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment "
                 + "FROM operaciones.services s "
                 + "LEFT JOIN public.drivers d ON d.id = s.driver_id "
                 + "LEFT JOIN public.workers w ON w.id = d.worker_id "
+                + "LEFT JOIN public.roles drole ON drole.id = w.role_id "
                 + "LEFT JOIN public.tractors tra ON tra.id = s.tractor_id "
                 + "LEFT JOIN public.trailers tri ON tri.id = s.trailer_id "
                 + "WHERE s.id = :serviceId", Tuple.class);
@@ -230,7 +247,8 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         return new ServiceAssignedResourcesRow(
             toInteger(row.get(0)), (String) row.get(1),
             toInteger(row.get(2)), (String) row.get(3),
-            toInteger(row.get(4)), (String) row.get(5));
+            toInteger(row.get(4)), (String) row.get(5),
+            (Boolean) row.get(6));
     }
 
     /**
@@ -243,10 +261,11 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         Integer tractorId,
         String tractorPlate,
         Integer trailerId,
-        String trailerPlate
+        String trailerPlate,
+        boolean driverNeedsReassignment
     ) {
         static final ServiceAssignedResourcesRow EMPTY =
-            new ServiceAssignedResourcesRow(null, null, null, null, null, null);
+            new ServiceAssignedResourcesRow(null, null, null, null, null, null, false);
     }
 
     /** Las columnas de id llegan como {@code Number} de ancho variable segun el driver. */

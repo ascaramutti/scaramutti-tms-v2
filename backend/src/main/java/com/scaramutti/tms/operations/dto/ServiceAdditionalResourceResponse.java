@@ -22,6 +22,11 @@ public record ServiceAdditionalResourceResponse(
     @Schema(nullable = true, description = "Conductor sumado; null si este refuerzo no incluyó ninguno")
     ServiceDriverSummary driver,
 
+    @Schema(description = "true si el viaje está pendiente de inicio o en ruta y el conductor de este refuerzo ya no se "
+        + "puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor). Siempre presente; "
+        + "false si el refuerzo no incluyó conductor")
+    boolean driverNeedsReassignment,
+
     @Schema(nullable = true, description = "Tracto sumado; null si este refuerzo no incluyó ninguno")
     FleetUnitRef tractor,
 
