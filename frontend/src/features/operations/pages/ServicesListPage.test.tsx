@@ -730,7 +730,7 @@ describe('ServicesListPage', () => {
 
   // ----- Alerta del conductor que ya no se puede asignar -----
   const RAZON =
-    'El conductor asignado ya no está habilitado: dado de baja, ficha apagada o cambió de cargo'
+    'dado de baja, ficha apagada o cambió de cargo'
 
   it('marca solo el viaje cuyo conductor hay que reasignar, junto al conductor', async () => {
     server.use(
@@ -747,9 +747,11 @@ describe('ServicesListPage', () => {
     expect(alerta.parentElement?.previousElementSibling).toHaveTextContent('Juan Pérez')
     // Sin depender del color: un ícono sin nombre propio (no le suma ruido al lector) y el texto
     expect(alerta.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
-    expect(alerta).toHaveTextContent(`Reasignar conductor. ${RAZON}`)
+    expect(alerta).toHaveTextContent(`Reasignar conductor: ${RAZON}`)
     // El porqué es solo para el lector: visible, ensancharía la columna en cada fila con alerta
     expect(within(alerta).getByText(new RegExp(RAZON))).toHaveClass('sr-only')
+    // Un solo texto oculto: partido en la pastilla (que es flex), el lector oye piezas sueltas
+    expect(alerta.querySelectorAll('.sr-only')).toHaveLength(1)
     // Y el color es el de advertencia de la casa
     expect(alerta).toHaveClass('bg-warning-soft-strong')
     // Decisión de diseño: la pastilla nunca se parte en dos líneas en la columna angosta
