@@ -42,7 +42,8 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             + "c.id AS client_id, c.name AS client_name, c.ruc, c.phone, c.contact_name, "
             + "s.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
             + "s.tractor_id, tra.plate AS tractor_plate, "
-            + driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment "
+            + driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment, "
+            + needsReassignment("s", "d", "w", "drole") + " AS needs_reassignment "
             + fromAndWhere(query, params, ASSIGNED_RESOURCE_JOINS)
             + " ORDER BY s.created_at DESC, s.id DESC LIMIT :pageSize OFFSET :pageOffset";
 
@@ -76,19 +77,37 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             (String) row.get(16),
             toInteger(row.get(17)),
             (String) row.get(18),
-            (Boolean) row.get(19)
+            (Boolean) row.get(19),
+            (Boolean) row.get(20)
         )).toList();
     }
 
     /**
-     * Expresion SQL de la alerta del viaje: esta pendiente de inicio o en ruta, y su conductor ya no
-     * es asignable. Los viajes pendientes de asignacion no tienen conductor, y los cerrados son
-     * historia: ninguno de los dos se reasigna.
+     * Expresion SQL de la alerta de UN conductor (el principal o el de un refuerzo, segun los alias):
+     * el viaje esta pendiente de inicio o en ruta y ese conductor ya no es asignable. Los viajes
+     * pendientes de asignacion no tienen conductor, y los cerrados son historia: no se reasignan.
      */
     static String driverNeedsReassignment(String service, String driver, String worker, String role) {
         return "(" + service + ".status IN ('" + ServiceStatus.PENDING_START.name() + "', '"
             + ServiceStatus.IN_PROGRESS.name() + "') AND "
             + DriverRepository.notAssignableToday(driver, worker, role) + ")";
+    }
+
+    /**
+     * La alerta del VIAJE: la del conductor principal o la de alguno de sus refuerzos, con la MISMA
+     * expresion sobre los alias de cada uno. Por subconsulta y no por union: un viaje tiene varios
+     * refuerzos y una union multiplicaria sus filas en el listado. Un refuerzo sin conductor no cuenta.
+     * El alias del viaje no puede ser ra, rd, rw ni rrole: la subconsulta los usa y la correlacion se
+     * resolveria contra ella.
+     */
+    static String needsReassignment(String service, String driver, String worker, String role) {
+        return "(" + driverNeedsReassignment(service, driver, worker, role)
+            + " OR EXISTS (SELECT 1 FROM operaciones.service_assignments ra "
+            + "JOIN public.drivers rd ON rd.id = ra.driver_id "
+            + "LEFT JOIN public.workers rw ON rw.id = rd.worker_id "
+            + "LEFT JOIN public.roles rrole ON rrole.id = rw.role_id "
+            + "WHERE ra.service_id = " + service + ".id AND "
+            + driverNeedsReassignment(service, "rd", "rw", "rrole") + "))";
     }
 
     /**
@@ -195,7 +214,8 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         String driverFullName,
         Integer tractorId,
         String tractorPlate,
-        boolean driverNeedsReassignment
+        boolean driverNeedsReassignment,
+        boolean needsReassignment
     ) {}
 
     /**
@@ -226,7 +246,8 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         Query query = entityManager.createNativeQuery(
             "SELECT s.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
                 + "s.tractor_id, tra.plate AS tractor_plate, s.trailer_id, tri.plate AS trailer_plate, "
-                + driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment "
+                + driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment, "
+                + needsReassignment("s", "d", "w", "drole") + " AS needs_reassignment "
                 + "FROM operaciones.services s "
                 + "LEFT JOIN public.drivers d ON d.id = s.driver_id "
                 + "LEFT JOIN public.workers w ON w.id = d.worker_id "
@@ -248,7 +269,7 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             toInteger(row.get(0)), (String) row.get(1),
             toInteger(row.get(2)), (String) row.get(3),
             toInteger(row.get(4)), (String) row.get(5),
-            (Boolean) row.get(6));
+            (Boolean) row.get(6), (Boolean) row.get(7));
     }
 
     /**
@@ -262,10 +283,11 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         String tractorPlate,
         Integer trailerId,
         String trailerPlate,
-        boolean driverNeedsReassignment
+        boolean driverNeedsReassignment,
+        boolean needsReassignment
     ) {
         static final ServiceAssignedResourcesRow EMPTY =
-            new ServiceAssignedResourcesRow(null, null, null, null, null, null, false);
+            new ServiceAssignedResourcesRow(null, null, null, null, null, null, false, false);
     }
 
     /** Las columnas de id llegan como {@code Number} de ancho variable segun el driver. */

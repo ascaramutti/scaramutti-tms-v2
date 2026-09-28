@@ -76,6 +76,7 @@ public interface ServiceServiceMapper {
     @Mapping(target = "price",         source = "price")
     @Mapping(target = "currencyCode",  source = "currencyCode")
     @Mapping(target = "status",        source = "service.status")
+    @Mapping(target = "needsReassignment", source = "needsReassignment")
     @Mapping(target = "driver",        source = "driver")
     @Mapping(target = "driverNeedsReassignment", source = "driverNeedsReassignment")
     @Mapping(target = "tractor",       source = "tractor")
@@ -89,7 +90,8 @@ public interface ServiceServiceMapper {
     @Mapping(target = "updatedAt",     source = "service.updatedAt")
     ServiceDetailResponse toServiceDetailResponse(
         Service service, ServiceClientSummary client, ServiceCargoTypeSummary cargoType,
-        BigDecimal price, String currencyCode, ServiceDriverSummary driver, boolean driverNeedsReassignment,
+        BigDecimal price, String currencyCode, boolean needsReassignment,
+        ServiceDriverSummary driver, boolean driverNeedsReassignment,
         FleetUnitRef tractor, FleetUnitRef trailer,
         List<ServiceAdditionalResourceResponse> additionalResources,
         List<ServiceEventResponse> events, ServiceUserSummary createdBy
@@ -145,6 +147,7 @@ public interface ServiceServiceMapper {
             row.tentativeDate(),
             TripScope.valueOf(row.tripScope()),
             ServiceStatus.valueOf(row.status()),
+            row.needsReassignment(),
             toServiceDriverSummary(row.driverId(), row.driverFullName()),
             row.driverNeedsReassignment(),
             toFleetUnitRef(FleetUnitKind.TRACTOR, row.tractorId(), row.tractorPlate()),

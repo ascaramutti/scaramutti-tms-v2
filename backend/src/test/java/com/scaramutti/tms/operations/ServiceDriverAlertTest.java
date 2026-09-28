@@ -30,9 +30,10 @@ import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * La alerta del viaje: pendiente de inicio o en ruta, y su conductor principal ya no es asignable
- * (trabajador dado de baja, ficha apagada o cargo distinto de conductor). Se deriva en cada lectura
- * y viaja igual en el listado y en el detalle; en el detalle, tambien por refuerzo.
+ * Las alertas de reasignacion de un viaje pendiente de inicio o en ruta: la del conductor principal
+ * (trabajador dado de baja, ficha apagada o cargo distinto de conductor), la de cada refuerzo (solo en
+ * el detalle) y la del viaje, que junta las dos. Se derivan en cada lectura; la del principal y la del
+ * viaje viajan igual en el listado y en el detalle.
  */
 @QuarkusTest
 class ServiceDriverAlertTest {
@@ -106,12 +107,17 @@ class ServiceDriverAlertTest {
 
     /** La fila del viaje en el listado, pidiendola por su origen y su estado (los eliminados, solo asi). */
     private boolean listedAlert(long id, String status) {
-        JsonPath page = given().header("Authorization", "Bearer " + adminToken)
+        return listed(id, status, "driverNeedsReassignment", adminToken);
+    }
+
+    private boolean listed(long id, String status, String field, String token) {
+        JsonPath page = given().header("Authorization", "Bearer " + token)
             .queryParam("q", origin(id)).queryParam("status", status)
             .when().get("/services").then().statusCode(200).extract().jsonPath();
+        // Por id y no por posicion: la busqueda por origen puede traer tambien otro viaje de la corrida
         List<Integer> ids = page.getList("content.id", Integer.class);
-        assertEquals(1, ids.size(), "el viaje sale una vez en su estado");
-        return page.getBoolean("content[0].driverNeedsReassignment");
+        assertEquals(1, ids.stream().filter(listedId -> listedId == id).count(), "el viaje sale una vez en su estado");
+        return page.getBoolean("content.find { it.id == " + id + " }." + field);
     }
 
     private String origin(long id) {
@@ -242,6 +248,121 @@ class ServiceDriverAlertTest {
             detail(id).getList("additionalResources.driverNeedsReassignment"));
     }
 
+    // ---------- La alerta del VIAJE: el principal o algun refuerzo ----------
+
+    /** El campo del viaje, en el detalle y en el listado, con las dos lecturas que se esperan iguales. */
+    private void assertTripAlert(boolean expected, long id, String status, String why) {
+        assertEquals(expected, detail(id).getBoolean("needsReassignment"), why + ", en el detalle");
+        assertEquals(expected, listed(id, status, "needsReassignment", adminToken), why + ", en el listado");
+    }
+
+    static Stream<Arguments> openStatusAndBadMotive() {
+        return Stream.of("PENDING_START", "IN_PROGRESS").flatMap(status ->
+            Stream.of("trabajador_de_baja", "ficha_apagada", "cargo_distinto", "escolta")
+                .map(motive -> Arguments.of(status, motive)));
+    }
+
+    /** Solo el principal: el viaje se marca igual que su conductor, sin refuerzos de por medio. */
+    @ParameterizedTest(name = "{0}, {1}")
+    @MethodSource("openStatusAndBadMotive")
+    void theTrip_isFlagged_byItsMainDriver(String status, String motive) {
+        long id = trip(status, driverWith(motive));
+
+        assertTripAlert(true, id, status, "principal no asignable");
+    }
+
+    /**
+     * Solo un refuerzo, con el principal sano: el viaje se marca aunque su conductor no. Es el caso
+     * que el listado no veia (la marca del principal sigue en false).
+     */
+    @ParameterizedTest(name = "{0}, {1}")
+    @MethodSource("openStatusAndBadMotive")
+    void theTrip_isFlagged_byOneReinforcementAlone(String status, String motive) {
+        long id = trip(status, driverWith("ninguno"));
+        operationsFixtures.seedAdditionalAssignment(id, driverWith("ninguno"), null, null, "ZTEST relevo sano");
+        operationsFixtures.seedAdditionalAssignment(id, driverWith(motive), null, null, "ZTEST relevo marcado");
+
+        assertTripAlert(true, id, status, "un refuerzo no asignable");
+        assertEquals(false, detail(id).getBoolean("driverNeedsReassignment"), "el principal sigue sano");
+        assertEquals(false, listedAlert(id, status), "el principal sigue sano en el listado");
+    }
+
+    @Test
+    void theTrip_isFlagged_whenBothTheMainDriverAndAReinforcementAreNot() {
+        long id = trip("IN_PROGRESS", driverWith("trabajador_de_baja"));
+        operationsFixtures.seedAdditionalAssignment(id, driverWith("ficha_apagada"), null, null, "ZTEST relevo");
+
+        assertTripAlert(true, id, "IN_PROGRESS", "los dos");
+    }
+
+    /** Todos sanos, y un refuerzo sin conductor (solo tracto), que no cuenta: el viaje no se marca. */
+    @Test
+    void theTrip_isNotFlagged_whenEveryDriverIsAssignable() {
+        long id = trip("IN_PROGRESS", driverWith("ninguno"));
+        operationsFixtures.seedAdditionalAssignment(id, driverWith("ninguno"), null, null, "ZTEST relevo sano");
+        operationsFixtures.seedAdditionalAssignment(id, null, operationsFixtures.seedTractor(), null, "ZTEST tracto");
+
+        assertTripAlert(false, id, "IN_PROGRESS", "todos sanos");
+    }
+
+    /** Pendiente de asignacion: sin recursos, presente y false (tambien en el 201 del alta). */
+    @Test
+    void aTripWithoutResources_isNotFlagged() {
+        long id = trip("PENDING_ASSIGNMENT", null);
+
+        assertTripAlert(false, id, "PENDING_ASSIGNMENT", "sin recursos");
+    }
+
+    /**
+     * Pendiente de asignacion con recursos puestos a mano (la API no llega ahi): el estado decide solo,
+     * y no se marca aunque el principal y un refuerzo ya no sean asignables.
+     */
+    @Test
+    void aTripPendingAssignment_isNotFlagged_evenWithResourcesThatAreNotAssignable() {
+        long id = trip("PENDING_ASSIGNMENT", driverWith("trabajador_de_baja"));
+        operationsFixtures.seedAdditionalAssignment(id, driverWith("ficha_apagada"), null, null, "ZTEST relevo");
+
+        assertTripAlert(false, id, "PENDING_ASSIGNMENT", "pendiente de asignacion");
+    }
+
+    /** Cerrado: historia, aunque el principal y un refuerzo ya no sean asignables. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"COMPLETED", "CANCELLED", "DELETED"})
+    void aClosedTrip_isNeverFlagged_evenWithAReinforcementThatIsNotAssignable(String status) {
+        long id = trip("IN_PROGRESS", driverWith("trabajador_de_baja"));
+        operationsFixtures.seedAdditionalAssignment(id, driverWith("ficha_apagada"), null, null, "ZTEST relevo");
+        operationsFixtures.forceServiceStatus(id, status);
+
+        assertTripAlert(false, id, status, "cerrado");
+    }
+
+    /**
+     * La subconsulta mira los refuerzos de SU viaje: un refuerzo no asignable de otro viaje no marca
+     * a este, y el viaje que si lo tiene sale marcado en la misma pagina.
+     */
+    @Test
+    void aReinforcementOfAnotherTrip_doesNotFlagThisOne() {
+        long healthy = trip("IN_PROGRESS", driverWith("ninguno"));
+        long other = trip("IN_PROGRESS", driverWith("ninguno"));
+        operationsFixtures.seedAdditionalAssignment(other, driverWith("trabajador_de_baja"), null, null, "ZTEST relevo");
+
+        assertTripAlert(false, healthy, "IN_PROGRESS", "el viaje sano");
+        assertTripAlert(true, other, "IN_PROGRESS", "el viaje con el refuerzo");
+    }
+
+    /** Llega igual a todos los roles que leen viajes, en el listado y en el detalle. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"dispatcher", "sales", "general_manager", "operations_manager"})
+    void theTripAlert_reachesTheRolesThatReadTrips(String role) {
+        long id = trip("IN_PROGRESS", driverWith("ninguno"));
+        operationsFixtures.seedAdditionalAssignment(id, driverWith("trabajador_de_baja"), null, null, "ZTEST relevo");
+        String token = TestAuth.fabricateAccessToken("ztest" + role, role);
+
+        assertEquals(true, given().header("Authorization", "Bearer " + token).when().get("/services/" + id)
+            .then().statusCode(200).extract().jsonPath().getBoolean("needsReassignment"), "en el detalle");
+        assertEquals(true, listed(id, "IN_PROGRESS", "needsReassignment", token), "en el listado");
+    }
+
     private long createService(String origin) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("clientId", clientId);
@@ -257,6 +378,7 @@ class ServiceDriverAlertTest {
             .body(payload).when().post("/services").then().statusCode(201).extract().jsonPath();
         // El alta es la unica salida que no se relee: nace pendiente de asignacion, sin conductor.
         assertEquals(false, created.getBoolean("driverNeedsReassignment"), "el 201 del alta");
+        assertEquals(false, created.getBoolean("needsReassignment"), "el 201 del alta, el viaje");
         return created.getLong("id");
     }
 }

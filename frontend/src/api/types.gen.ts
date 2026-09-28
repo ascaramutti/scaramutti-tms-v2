@@ -1606,6 +1606,10 @@ export type ServiceDetailResponse = {
      */
     currencyCode?: string;
     status: ServiceStatus;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y algún recurso asignado ya no se puede asignar: el conductor principal o el de algún refuerzo, por baja del trabajador, ficha apagada o cargo distinto de conductor (los vehículos no cuentan). Hay que reasignarlo; el detalle dice cuál. Se deriva en cada lectura, sin columna. Siempre presente; false en los viajes pendientes de asignación, completados, cancelados o eliminados.
+     */
+    needsReassignment: boolean;
     driver: DriverRef | null;
     /**
      * true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.
@@ -1765,6 +1769,10 @@ export type ServiceSummaryResponse = {
     tentativeDate: string;
     tripScope: TripScope;
     status: ServiceStatus;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y algún recurso asignado ya no se puede asignar: el conductor principal o el de algún refuerzo, por baja del trabajador, ficha apagada o cargo distinto de conductor (los vehículos no cuentan). Hay que reasignarlo; el detalle dice cuál. Se deriva en cada lectura, sin columna. Siempre presente; false en los viajes pendientes de asignación, completados, cancelados o eliminados.
+     */
+    needsReassignment: boolean;
     driver: DriverRef | null;
     /**
      * true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.

@@ -83,7 +83,7 @@ class GetServiceServiceTest {
         // feliz no: sin este doble, el NPE taparia lo que de verdad se esta midiendo.
         when(serviceRepository.findAssignedResources(1L)).thenReturn(
             new ServiceRepository.ServiceAssignedResourcesRow(
-                null, null, null, null, null, null, false));
+                null, null, null, null, null, null, false, false));
         when(userLookup.requireAllById(any())).thenAnswer(invocation -> {
             List<Integer> requested = invocation.getArgument(0);
             Map<Integer, UserResponse> found = new LinkedHashMap<>();

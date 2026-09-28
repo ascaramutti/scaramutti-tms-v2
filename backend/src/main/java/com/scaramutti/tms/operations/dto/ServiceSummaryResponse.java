@@ -46,6 +46,11 @@ public record ServiceSummaryResponse(
 
     ServiceStatus status,
 
+    @Schema(description = "true si el viaje está pendiente de inicio o en ruta y algún recurso asignado ya no se "
+        + "puede asignar: el conductor principal o el de algún refuerzo (los vehículos no cuentan). Hay que "
+        + "reasignarlo; el detalle dice cuál. Se deriva en cada lectura, sin columna. Siempre presente")
+    boolean needsReassignment,
+
     @Schema(nullable = true, description = "Conductor asignado; null mientras el viaje esté pendiente de asignación")
     ServiceDriverSummary driver,
 
