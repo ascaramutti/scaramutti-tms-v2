@@ -2,6 +2,11 @@ import type { ServiceSummaryResponse } from '../../../api'
 import { DataTable, type Column } from '../../../shared/ui/DataTable'
 import { formatCurrency, formatDateOnly } from '../../../shared/utils/formatters'
 import { TRIP_SCOPE_LABELS } from '../status/serviceStatusPresentation'
+import {
+  DRIVER_REASSIGNMENT_LABEL,
+  DRIVER_REASSIGNMENT_REASON,
+  DriverReassignmentBadge,
+} from './DriverReassignmentBadge'
 import { ServiceStatusBadge } from './ServiceStatusBadge'
 
 interface ServicesTableProps {
@@ -104,6 +109,7 @@ export function ServicesTable({
         row.driver || row.tractor ? (
           <div>
             <span className="block text-fg">{row.driver?.fullName ?? '—'}</span>
+            {row.driverNeedsReassignment && <DriverReassignmentBadge />}
             <span className="block text-xs text-fg-muted">{row.tractor?.plate ?? '—'}</span>
           </div>
         ) : (
@@ -159,7 +165,13 @@ export function ServicesTable({
         onRowClick={onRowClick}
         // Sin esto el nombre accesible de la fila es el texto de todas sus celdas
         // pegado, que es lo que oye quien navega con lector de pantalla.
-        rowLabel={(service) => `Ver el servicio ${service.code} de ${service.client.name}`}
+        // La alerta va también acá: el nombre de la fila tapa el texto de sus celdas.
+        rowLabel={(service) =>
+          `Ver el servicio ${service.code} de ${service.client.name}` +
+          (service.driverNeedsReassignment
+            ? ` (${DRIVER_REASSIGNMENT_LABEL}: ${DRIVER_REASSIGNMENT_REASON})`
+            : '')
+        }
         emptyTitle={hasActiveFilters ? 'No se encontraron servicios' : 'Aún no hay servicios'}
         emptyDescription={
         hasActiveFilters

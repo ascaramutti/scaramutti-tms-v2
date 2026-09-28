@@ -728,6 +728,63 @@ describe('ServicesListPage', () => {
     expect(await screen.findByText('Detalle del servicio 42')).toBeInTheDocument()
   })
 
+  // ----- Alerta del conductor que ya no se puede asignar -----
+  const RAZON =
+    'El conductor asignado ya no está habilitado: dado de baja, ficha apagada o cambió de cargo'
+
+  it('marca solo el viaje cuyo conductor hay que reasignar, junto al conductor', async () => {
+    server.use(
+      servicesPage([
+        fakeAssignedService({ driverNeedsReassignment: true }),
+        fakeAssignedService({ id: 44, code: 'SRV-0044', driver: { id: 5, fullName: 'Ana Ríos' } }),
+      ]),
+    )
+    renderServicios()
+    const conAlerta = rowOf(await screen.findByText('SRV-0043'))
+    const alerta = within(conAlerta).getByText('Reasignar conductor')
+    // En la celda del conductor, justo debajo de su nombre y no junto a la placa
+    expect(alerta.closest('td')).toBe(within(conAlerta).getByText('Juan Pérez').closest('td'))
+    expect(alerta.parentElement?.previousElementSibling).toHaveTextContent('Juan Pérez')
+    // Sin depender del color: un ícono sin nombre propio (no le suma ruido al lector) y el texto
+    expect(alerta.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(alerta).toHaveTextContent(`Reasignar conductor. ${RAZON}`)
+    // El porqué es solo para el lector: visible, ensancharía la columna en cada fila con alerta
+    expect(within(alerta).getByText(new RegExp(RAZON))).toHaveClass('sr-only')
+    // Y el color es el de advertencia de la casa
+    expect(alerta).toHaveClass('bg-warning-soft-strong')
+    // Decisión de diseño: la pastilla nunca se parte en dos líneas en la columna angosta
+    expect(alerta.parentElement).toHaveClass('whitespace-nowrap')
+
+    const sinAlerta = rowOf(screen.getByText('SRV-0044'))
+    expect(within(sinAlerta).queryByText('Reasignar conductor')).not.toBeInTheDocument()
+    expect(sinAlerta).toHaveAccessibleName('Ver el servicio SRV-0044 de IPH S.A.C.')
+  })
+
+  it('la fila con alerta la anuncia en su nombre, que tapa el texto de las celdas', async () => {
+    server.use(servicesPage([fakeAssignedService({ driverNeedsReassignment: true })]))
+    renderServicios()
+    const fila = rowOf(await screen.findByText('SRV-0043'))
+
+    expect(fila).toHaveAccessibleName(
+      `Ver el servicio SRV-0043 de IPH S.A.C. (Reasignar conductor: ${RAZON})`,
+    )
+  })
+
+  it('el despacho, que no ve precios, también ve la alerta', async () => {
+    server.use(
+      servicesPage([
+        fakeDispatcherServiceSummary({
+          status: 'PENDING_START',
+          driver: { id: 3, fullName: 'Juan Pérez' },
+          driverNeedsReassignment: true,
+        }),
+      ]),
+    )
+    renderServicios({ role: 'dispatcher' })
+    const fila = rowOf(await screen.findByText('SRV-0042'))
+    expect(within(fila).getByText('Reasignar conductor')).toBeInTheDocument()
+  })
+
   // ----- Accesibilidad -----
   it('presenta la pantalla con un único h1', async () => {
     server.use(servicesPage([fakeServiceSummary()]))
@@ -800,6 +857,13 @@ describe('ServicesListPage', () => {
     server.use(servicesPage([fakeAssignedService()]))
     const { container } = renderServicios()
     await screen.findByText('SRV-0043')
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('no tiene violaciones de accesibilidad con un viaje en alerta', async () => {
+    server.use(servicesPage([fakeAssignedService({ driverNeedsReassignment: true })]))
+    const { container } = renderServicios()
+    await screen.findByText('Reasignar conductor')
     expect(await axe(container)).toHaveNoViolations()
   })
 
