@@ -966,6 +966,22 @@ class ServiceReinforcementResourceTest {
         assertEquals(0, countAuditLogs(id, "ASSIGNMENT"));
     }
 
+    /** Igual que al asignar: la ficha encendida de un trabajador dado de baja es inactiva. */
+    @Test
+    void addResources_withAnActiveProfileWhoseWorkerLeft_returns400_COM001_andWritesNothing() {
+        long id = serviceInProgress();
+        int eventsBefore = countEvents(id);
+        int left = operationsFixtures.seedDriverWithInactiveWorker("ZTEST Baja", "Trabajador");
+
+        addResourcesExpecting(id, payload(left, null, null), 400)
+            .body("code", equalTo("COM-001"))
+            .body("detail", equalTo("El conductor indicado no existe o está inactivo"));
+
+        assertEquals(0, countAdditionalAssignments(id));
+        assertEquals(eventsBefore, countEvents(id));
+        assertEquals(0, countAuditLogs(id, "ASSIGNMENT"));
+    }
+
     /** El orden, igual que al asignar: el cargo del conductor se mira antes que el tracto. */
     @Test
     void addResources_theRoleOfTheProfileIsCheckedBeforeTheTractor() {

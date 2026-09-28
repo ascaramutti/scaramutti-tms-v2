@@ -1053,6 +1053,23 @@ class ServiceAssignmentResourceTest {
     }
 
     /**
+     * La ficha encendida de un trabajador dado de baja es inactiva para despacho: el mismo 400 que
+     * una ficha apagada, y el viaje queda como estaba.
+     */
+    @Test
+    void assign_withAnActiveProfileWhoseWorkerLeft_returns400_COM001_andTouchesNothing() {
+        long id = createService();
+        Map<String, Object> payload = assignmentPayload();
+        payload.put("driverId", operationsFixtures.seedDriverWithInactiveWorker("ZTEST Baja", "Trabajador"));
+
+        assignExpecting(id, payload, 400)
+            .body("code", equalTo("COM-001"))
+            .body("detail", equalTo("El conductor indicado no existe o está inactivo"));
+        assertEquals("PENDING_ASSIGNMENT", detailOf(id).getString("status"));
+        assertEquals(null, (Object) detailOf(id).get("driver"), "el viaje sigue sin conductor");
+    }
+
+    /**
      * El orden: una ficha apagada es el 400 de "no existe o esta inactivo" aunque ademas sea de otro
      * cargo; y el cargo se mira justo despues de la ficha, antes que el tracto.
      */

@@ -42,12 +42,13 @@ class DriverServiceTest {
 
     @Test
     void listDrivers_delegatesFilterAndMapsStatusToEnum() {
-        when(driverRepository.search(true)).thenReturn(List.of(
-            new DriverRow(7, "Juan Perez", "Q12345678", "A-IIIc", "987654321", "available", true)));
+        // Las dos banderas con valores distintos, en la fila y en el filtro: un cruce se ve
+        when(driverRepository.search(true, false)).thenReturn(List.of(
+            new DriverRow(7, "Juan Perez", "Q12345678", "A-IIIc", "987654321", "available", true, false)));
 
-        List<DriverResponse> result = driverService.listDrivers(new ListDriversQuery(true));
+        List<DriverResponse> result = driverService.listDrivers(new ListDriversQuery(true, false));
 
-        verify(driverRepository).search(true);
+        verify(driverRepository).search(true, false);
         assertEquals(1, result.size());
         DriverResponse r = result.get(0);
         assertEquals(7, r.id());
@@ -57,14 +58,15 @@ class DriverServiceTest {
         assertEquals("987654321", r.phone());
         assertEquals(FleetResourceStatus.AVAILABLE, r.status());
         assertEquals(true, r.isActive());
+        assertEquals(false, r.isAssignable());
     }
 
     @Test
     void listDrivers_rowWithoutCategoryAndPhoneMapsThemNull() {
-        when(driverRepository.search(null)).thenReturn(List.of(
-            new DriverRow(8, "Ana Quispe", "Q87654321", null, null, "maintenance", true)));
+        when(driverRepository.search(null, null)).thenReturn(List.of(
+            new DriverRow(8, "Ana Quispe", "Q87654321", null, null, "maintenance", true, true)));
 
-        DriverResponse r = driverService.listDrivers(new ListDriversQuery(null)).get(0);
+        DriverResponse r = driverService.listDrivers(new ListDriversQuery(null, null)).get(0);
 
         assertNull(r.licenseCategory());
         assertNull(r.phone());
@@ -77,17 +79,17 @@ class DriverServiceTest {
      */
     @Test
     void listDrivers_statusOutsideTheApiDomain_fails() {
-        when(driverRepository.search(null)).thenReturn(List.of(
-            new DriverRow(9, "Luis Diaz", "Q11112222", null, null, "de_vacaciones", true)));
+        when(driverRepository.search(null, null)).thenReturn(List.of(
+            new DriverRow(9, "Luis Diaz", "Q11112222", null, null, "de_vacaciones", true, true)));
 
         assertThrows(IllegalStateException.class,
-            () -> driverService.listDrivers(new ListDriversQuery(null)));
+            () -> driverService.listDrivers(new ListDriversQuery(null, null)));
     }
 
     @Test
     void listDrivers_emptyRepositoryResult_returnsEmptyList() {
-        when(driverRepository.search(false)).thenReturn(List.of());
+        when(driverRepository.search(false, null)).thenReturn(List.of());
 
-        assertEquals(0, driverService.listDrivers(new ListDriversQuery(false)).size());
+        assertEquals(0, driverService.listDrivers(new ListDriversQuery(false, null)).size());
     }
 }

@@ -9,7 +9,6 @@ import com.scaramutti.tms.operations.model.ServiceEventType;
 import com.scaramutti.tms.operations.model.ServiceResourceKind;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.service.cmd.AddServiceResourcesCommand;
-import com.scaramutti.tms.shared.entity.Driver;
 import com.scaramutti.tms.shared.entity.Service;
 import com.scaramutti.tms.shared.entity.ServiceAssignment;
 import com.scaramutti.tms.shared.entity.ServiceAuditLog;
@@ -182,9 +181,8 @@ public class AddServiceResourcesService {
     private AddedResources resolveResources(AddServiceResourcesCommand command) {
         String driverName = null;
         if (command.driverId() != null) {
-            Driver driver = driverRepository.findById(command.driverId());
-            serviceResourceConflicts.requireActiveResource(driver != null && Boolean.TRUE.equals(driver.isActive),
-                ServiceResourceKind.DRIVER);
+            serviceResourceConflicts.requireActiveResource(
+                driverRepository.isActiveToday(command.driverId()), ServiceResourceKind.DRIVER);
             serviceResourceConflicts.requireDriverRole(driverRepository.belongsToADriver(command.driverId()));
             driverName = driverRepository.findFullNameById(command.driverId());
         }

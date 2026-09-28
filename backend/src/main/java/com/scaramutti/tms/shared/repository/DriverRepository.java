@@ -46,21 +46,31 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
         return names.isEmpty() ? null : (String) names.get(0);
     }
 
-    public List<DriverRow> search(Boolean isActive) {
+    /**
+     * Solo fichas de conductor. {@code isActive} es la columna de la ficha, tal cual; {@code
+     * isAssignable}, la regla de hoy (la ficha de un trabajador dado de baja sale activa y no
+     * asignable). Cada filtro mira su propio valor.
+     */
+    public List<DriverRow> search(Boolean isActive, Boolean isAssignable) {
         String sql = "SELECT d.id, " + FULL_NAME_EXPRESSION + " AS full_name, "
-            + "d.license_number, d.category, w.phone, status.name AS status_name, d.is_active "
+            + "d.license_number, d.category, w.phone, status.name AS status_name, d.is_active, "
+            + assignableToday("d", "w", "role") + " AS is_assignable "
             + "FROM public.drivers d "
             + "JOIN public.workers w ON w.id = d.worker_id "
             + "JOIN public.resource_statuses status ON status.id = d.status_id "
             + "JOIN public.roles role ON role.id = w.role_id "
-            + "WHERE role.name = :driverRole "
+            + "WHERE " + isDriverRole("role") + " "
             + (isActive != null ? "AND d.is_active = :isActive " : "")
+            + (isAssignable != null
+                ? "AND " + assignableToday("d", "w", "role") + " = :isAssignable " : "")
             + "ORDER BY w.first_name ASC, w.last_name ASC";
 
         Query query = getEntityManager().createNativeQuery(sql, Tuple.class);
-        query.setParameter("driverRole", DRIVER_ROLE);
         if (isActive != null) {
             query.setParameter("isActive", isActive);
+        }
+        if (isAssignable != null) {
+            query.setParameter("isAssignable", isAssignable);
         }
 
         @SuppressWarnings("unchecked")
@@ -73,7 +83,8 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
                 (String) t.get(3),
                 (String) t.get(4),
                 (String) t.get(5),
-                (Boolean) t.get(6)))
+                (Boolean) t.get(6),
+                (Boolean) t.get(7)))
             .toList();
     }
 
@@ -88,18 +99,47 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
         String licenseCategory,
         String phone,
         String statusName,
-        Boolean isActive
+        Boolean isActive,
+        Boolean isAssignable
     ) {}
 
-    /**
-     * Expresion SQL, sobre los alias de quien consulta: hay ficha y su conductor YA NO es asignable
-     * (ficha apagada, trabajador dado de baja o cargo distinto de conductor). La alerta de los viajes
-     * la usa asi, en un solo lugar, para que el listado, el detalle y los refuerzos no diverjan.
-     * Concatena sus argumentos: solo se le pasan alias literales, nunca algo que venga del pedido.
+    /*
+     * La regla "conductor asignable hoy", en UN solo lugar: la usan el catalogo, la asignacion, el
+     * tablero y la alerta de los viajes. Son expresiones SQL sobre los alias de quien consulta, y
+     * concatenan sus argumentos: solo se les pasan alias literales, nunca algo que venga del pedido.
      */
+
+    /** Vigente hoy: la ficha encendida y su trabajador activo. */
+    static String activeToday(String driver, String worker) {
+        return "(" + driver + ".is_active AND " + worker + ".is_active)";
+    }
+
+    /** De cargo conductor. */
+    static String isDriverRole(String role) {
+        return "(" + role + ".name = '" + DRIVER_ROLE + "')";
+    }
+
+    /** Asignable hoy: vigente y de cargo conductor. */
+    static String assignableToday(String driver, String worker, String role) {
+        return "(" + activeToday(driver, worker) + " AND " + isDriverRole(role) + ")";
+    }
+
+    /** Hay ficha y ya NO es asignable (ficha apagada, trabajador de baja o cargo distinto). */
     static String notAssignableToday(String driver, String worker, String role) {
-        return "COALESCE(" + driver + ".id IS NOT NULL AND NOT (" + driver + ".is_active AND " + worker
-            + ".is_active AND " + role + ".name = '" + DRIVER_ROLE + "'), false)";
+        return "COALESCE(" + driver + ".id IS NOT NULL AND NOT " + assignableToday(driver, worker, role)
+            + ", false)";
+    }
+
+    /**
+     * Si la ficha existe y esta vigente hoy (encendida, con su trabajador activo). La asignacion la
+     * exige con el mismo 400 que a una ficha apagada: para despacho, un conductor de baja es inactivo.
+     */
+    public boolean isActiveToday(Integer driverId) {
+        return ((Number) getEntityManager().createNativeQuery(
+                "SELECT count(*) FROM public.drivers d JOIN public.workers w ON w.id = d.worker_id "
+                    + "WHERE d.id = :driverId AND " + activeToday("d", "w"))
+            .setParameter("driverId", driverId)
+            .getSingleResult()).longValue() > 0;
     }
 
     /**
@@ -111,8 +151,8 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
         return ((Number) getEntityManager().createNativeQuery(
                 "SELECT count(*) FROM public.drivers d JOIN public.workers w ON w.id = d.worker_id "
                     + "JOIN public.roles role ON role.id = w.role_id "
-                    + "WHERE d.id = :driverId AND role.name = :driverRole")
-            .setParameter("driverId", driverId).setParameter("driverRole", DRIVER_ROLE)
+                    + "WHERE d.id = :driverId AND " + isDriverRole("role"))
+            .setParameter("driverId", driverId)
             .getSingleResult()).longValue() > 0;
     }
 

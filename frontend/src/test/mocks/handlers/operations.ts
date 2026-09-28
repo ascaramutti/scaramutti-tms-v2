@@ -524,6 +524,7 @@ export function fakeDriver(overrides: Partial<DriverResponse> = {}): DriverRespo
     phone: '987654321',
     status: 'AVAILABLE',
     isActive: true,
+    isAssignable: true,
     ...overrides,
   }
 }

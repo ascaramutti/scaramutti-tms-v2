@@ -8,9 +8,11 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullSource;
@@ -64,10 +66,11 @@ class DriversResourceTest {
             .body("find { it.id == " + driver + " }.phone", equalTo("987654321"))
             .body("find { it.id == " + driver + " }.status", equalTo("AVAILABLE"))
             .body("find { it.id == " + driver + " }.isActive", equalTo(true))
+            .body("find { it.id == " + driver + " }.isAssignable", equalTo(true))
             .extract().jsonPath().getMap("find { it.id == " + driver + " }");
 
         assertEquals(
-            Set.of("id", "fullName", "licenseNumber", "licenseCategory", "phone", "status", "isActive"),
+            Set.of("id", "fullName", "licenseNumber", "licenseCategory", "phone", "status", "isActive", "isAssignable"),
             found.keySet());
     }
 
@@ -196,13 +199,59 @@ class DriversResourceTest {
             WarehouseTestData.STATUS_AVAILABLE, profileStaysActive);
         warehouseFixtures.setWorkerRole(fixtures.workerIdOfDriver(former), "operator");
 
-        for (String filter : new String[] {null, "true", "false"}) {
+        // isAssignable=false es el filtro que el ex conductor SI cumple: lo deja afuera solo el cargo
+        String[] filters = {null, "isActive=true", "isActive=false", "isAssignable=true", "isAssignable=false"};
+        for (String filter : filters) {
             var request = given().header("Authorization", "Bearer " + adminToken());
             if (filter != null) {
-                request = request.queryParam("isActive", filter);
+                request = request.queryParam(filter.split("=")[0], filter.split("=")[1]);
             }
             request.when().get("/drivers").then().statusCode(200).body("id", not(hasItem(former)));
         }
+    }
+
+    /**
+     * Las dos banderas, cada una con su valor y su filtro: isActive es la ficha, tal cual, y
+     * isAssignable, ficha encendida y trabajador activo. La ficha encendida de un trabajador dado de
+     * baja es la que las separa (activa y no asignable); ninguna puede tomar el valor de la otra.
+     */
+    @Test
+    void listDrivers_isActiveIsTheProfile_assignableIsProfileAndWorker() {
+        int healthy = fixtures.seedDriver("ZTEST Sano", "Conductor");
+        int off = fixtures.seedDriver("ZTEST Ficha", "Apagada", null, null, WarehouseTestData.STATUS_AVAILABLE, false);
+        int left = fixtures.seedDriverWithInactiveWorker("ZTEST Baja", "Conductor");
+        int both = fixtures.seedDriverWithInactiveWorker("ZTEST Baja", "Apagada");
+        fixtures.setDriverActive(both, false);
+
+        // id -> {isActive, isAssignable} en la fila
+        Map<Integer, List<Boolean>> expected = Map.of(
+            healthy, List.of(true, true), off, List.of(false, false),
+            left, List.of(true, false), both, List.of(false, false));
+        List<Map<String, Object>> rows = given().header("Authorization", "Bearer " + adminToken())
+            .when().get("/drivers").then().statusCode(200).extract().jsonPath().getList("$");
+        expected.forEach((id, flags) -> {
+            Map<String, Object> row = rows.stream().filter(r -> id.equals(r.get("id"))).findFirst().orElseThrow();
+            assertEquals(flags, List.of(row.get("isActive"), row.get("isAssignable")), "banderas de " + id);
+        });
+
+        // filtros -> quienes salen, de los cuatro sembrados
+        Map<String, Set<Integer>> byFilter = new LinkedHashMap<>();
+        byFilter.put("isActive=true", Set.of(healthy, left));
+        byFilter.put("isActive=false", Set.of(off, both));
+        byFilter.put("isAssignable=true", Set.of(healthy));
+        byFilter.put("isAssignable=false", Set.of(off, left, both));
+        byFilter.put("isActive=true&isAssignable=false", Set.of(left));
+        byFilter.forEach((filters, ids) -> {
+            var request = given().header("Authorization", "Bearer " + adminToken());
+            for (String filter : filters.split("&")) {
+                String[] pair = filter.split("=");
+                request = request.queryParam(pair[0], pair[1]);
+            }
+            List<Integer> found = request.when().get("/drivers").then().statusCode(200)
+                .extract().jsonPath().getList("id", Integer.class);
+            Set<Integer> seeded = Set.of(healthy, off, left, both);
+            assertEquals(ids, found.stream().filter(seeded::contains).collect(Collectors.toSet()), filters);
+        });
     }
 
     // ---------- roles ------------------------------------------------------------
