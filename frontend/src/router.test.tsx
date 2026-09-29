@@ -1,4 +1,11 @@
-import { CLIENTS_BASE, LOGIN_PATH, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
+import {
+  CLIENTS_BASE,
+  LOGIN_PATH,
+  OPERATIONS_BASE,
+  QUOTATIONS_BASE,
+  WAREHOUSE_BASE,
+  WORKERS_BASE,
+} from './shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
 import { RouterProvider, createMemoryRouter } from 'react-router-dom'
@@ -298,6 +305,33 @@ describe('router - URL viejas y la raíz del dominio', () => {
     const router = goTo('warehouse_keeper', '/')
     await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
   })
+  describe('padrón de trabajadores', () => {
+    it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+      '%s abre la búsqueda de trabajadores',
+      async (role) => {
+        renderRouteAs(role, WORKERS_BASE)
+        expect(
+          await screen.findByRole('heading', { level: 1, name: /^trabajadores$/i }),
+        ).toBeInTheDocument()
+      },
+    )
+
+    /** El nombre del módulo en el mensaje distingue esta guarda de la de otro módulo. */
+    it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso al escribir la URL de trabajadores',
+      async (role) => {
+        renderRouteAs(role, WORKERS_BASE)
+        expect(await screen.findByText(/sin acceso a trabajadores/i)).toBeInTheDocument()
+        expect(screen.queryByLabelText(/buscar trabajador/i)).not.toBeInTheDocument()
+      },
+    )
+
+    it('sin sesión la URL de trabajadores lleva al login', async () => {
+      const router = goTo(null, WORKERS_BASE)
+      await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+  })
+
   describe('maestro de clientes', () => {
     it.each(['admin', 'general_manager', 'operations_manager'] as const)(
       '%s abre la búsqueda de clientes',

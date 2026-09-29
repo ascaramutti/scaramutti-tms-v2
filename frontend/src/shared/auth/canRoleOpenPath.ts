@@ -1,5 +1,11 @@
 import type { UserRole } from '../../api'
-import { CLIENTS_BASE, OPERATIONS_BASE, QUOTATIONS_BASE, WAREHOUSE_BASE } from '../paths'
+import {
+  CLIENTS_BASE,
+  OPERATIONS_BASE,
+  QUOTATIONS_BASE,
+  WAREHOUSE_BASE,
+  WORKERS_BASE,
+} from '../paths'
 import { matchesPathPrefix } from '../layout/pathMatching'
 import {
   CLIENT_EDIT_ROLES,
@@ -7,6 +13,7 @@ import {
   QUOTATION_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
   WAREHOUSE_ROLES,
+  WORKER_MAINTENANCE_ROLES,
 } from './moduleRoles'
 
 /**
@@ -36,6 +43,7 @@ const POR_RUTA: ReadonlyArray<readonly [string, UserRole[]]> = [
   // enlace guardado a clientes aterrizaría en "Sin acceso", que es justo lo que
   // esta función existe para evitar.
   [CLIENTS_BASE, CLIENT_EDIT_ROLES],
+  [WORKERS_BASE, WORKER_MAINTENANCE_ROLES],
   [WAREHOUSE_BASE, WAREHOUSE_ROLES],
   [OPERATIONS_BASE, OPERATIONS_ROLES],
 ]
@@ -78,7 +86,7 @@ export function canRoleOpenPath(pathname: string, role: UserRole | undefined): b
   if (!role) return false
   if (!esRutaDeLaApp(pathname)) return false
   const regla = POR_RUTA.find(([patron]) => encaja(pathname, patron))
-  // Fuera de los tres módulos no hay lista que consultar: el login, la cuenta y
+  // Fuera de los módulos no hay lista que consultar: el login, la cuenta y
   // cualquier ruta que no exista las resuelve el router, que ya manda a cada rol
   // a donde corresponde. Decir que no acá mandaría a la principal una ruta que el
   // usuario sí podía abrir.

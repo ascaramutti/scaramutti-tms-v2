@@ -6,6 +6,7 @@ import {
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
   WAREHOUSE_BASE,
+  WORKERS_BASE,
 } from '../paths'
 
 describe('canRoleOpenPath', () => {
@@ -35,7 +36,7 @@ describe('canRoleOpenPath', () => {
     expect(canRoleOpenPath(`${WAREHOUSE_BASE}amiento`, 'dispatcher')).toBe(true)
   })
 
-  it('fuera de los tres módulos deja pasar: lo resuelve el router', () => {
+  it('fuera de los módulos deja pasar: lo resuelve el router', () => {
     // La cuenta la abre cualquiera con sesión, y una ruta inexistente la manda el
     // comodín a la principal del rol. Decir que no acá le sacaría al usuario un
     // destino que sí podía abrir.
@@ -126,6 +127,33 @@ describe('canRoleOpenPath', () => {
   /** Una ruta que empieza igual pero es otro segmento no hereda nada. */
   it('no confunde una ruta que solo comparte el comienzo', () => {
     expect(canRoleOpenPath(`${CLIENTS_BASE}X`, 'sales')).toBe(true)
+  })
+
+  /**
+   * El padrón de trabajadores. Igual que en clientes, las negativas detectan que
+   * falte la fila y las positivas que alguien la vacíe.
+   */
+  it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+    '%s abre el padrón de trabajadores',
+    (role) => {
+      expect(canRoleOpenPath(WORKERS_BASE, role)).toBe(true)
+    },
+  )
+
+  it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+    '%s no abre el padrón de trabajadores',
+    (role) => {
+      expect(canRoleOpenPath(WORKERS_BASE, role)).toBe(false)
+    },
+  )
+
+  it('una ruta debajo del padrón hereda su permiso', () => {
+    expect(canRoleOpenPath(`${WORKERS_BASE}/7`, 'finance_manager')).toBe(true)
+    expect(canRoleOpenPath(`${WORKERS_BASE}/7`, 'warehouse_keeper')).toBe(false)
+  })
+
+  it('no confunde con el padrón una ruta que solo comparte el comienzo', () => {
+    expect(canRoleOpenPath(`${WORKERS_BASE}X`, 'sales')).toBe(true)
   })
 
 })

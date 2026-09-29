@@ -9,6 +9,7 @@ import {
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
   WAREHOUSE_BASE,
+  WORKERS_BASE,
 } from './paths'
 
 /**
@@ -49,6 +50,7 @@ const VALORES = [
   CHANGE_PASSWORD_PATH,
   QUOTATIONS_BASE,
   CLIENTS_BASE,
+  WORKERS_BASE,
   WAREHOUSE_BASE,
   OPERATIONS_BASE,
 ].filter((valor) => valor !== '/')

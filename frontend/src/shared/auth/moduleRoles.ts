@@ -132,3 +132,16 @@ export const OPENING_BALANCE_REGISTER_ROLES: UserRole[] = ['admin']
  * módulo entero.
  */
 export const CLIENT_EDIT_ROLES: UserRole[] = ['admin', 'general_manager', 'operations_manager']
+
+/**
+ * Quién mantiene el padrón de trabajadores: gobierna el ítem del menú y las rutas
+ * del módulo. Espejo de `getWorker` y de las escrituras; más estrecha que
+ * `listWorkers` a propósito: el almacenero busca trabajadores desde sus
+ * formularios para elegir quién recibe un retiro, pero el padrón no le corresponde.
+ */
+export const WORKER_MAINTENANCE_ROLES: UserRole[] = [
+  'admin',
+  'general_manager',
+  'operations_manager',
+  'finance_manager',
+]

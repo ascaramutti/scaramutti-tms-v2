@@ -4,6 +4,7 @@ import {
   LOGIN_PATH,
   QUOTATIONS_BASE,
   WAREHOUSE_BASE,
+  WORKERS_BASE,
 } from './shared/paths'
 import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import { LandingRedirect } from './shared/auth/LandingRedirect'
@@ -15,6 +16,7 @@ import {
   QUOTATION_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
   WAREHOUSE_ROLES,
+  WORKER_MAINTENANCE_ROLES,
 } from './shared/auth/moduleRoles'
 import { OPERACIONES_LANDING } from './shared/auth/roleLanding'
 import { AppLayout } from './shared/layout/AppLayout'
@@ -26,6 +28,7 @@ import { CotizacionEditPage } from './features/quotations/pages/CotizacionEditPa
 import { ClientsSearchPage } from './features/clients/pages/ClientsSearchPage'
 import { ClientEditPage } from './features/clients/pages/ClientEditPage'
 import { ClientDetailPage } from './features/clients/pages/ClientDetailPage'
+import { WorkersSearchPage } from './features/workers/pages/WorkersSearchPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -137,6 +140,16 @@ export const routes: RouteObject[] = [
               <ClientEditPage />
             </ProtectedRoute>
           </RequireNumericId>
+        ),
+      },
+      // Módulo Trabajadores: el padrón, con lista de roles propia. Su ítem del
+      // menú vive en el grupo Administración, después de Clientes.
+      {
+        path: WORKERS_BASE,
+        element: (
+          <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+            <WorkersSearchPage />
+          </ProtectedRoute>
         ),
       },
       // Módulo Almacén, con su propia raíz. Hasta la mudanza de 2026-09 colgaba

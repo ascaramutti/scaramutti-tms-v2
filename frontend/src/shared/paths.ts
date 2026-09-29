@@ -35,6 +35,9 @@ export const QUOTATIONS_BASE = '/cotizaciones'
  */
 export const CLIENTS_BASE = '/clientes'
 
+/** Módulo Trabajadores: el padrón de personas de la empresa, con raíz propia como clientes. */
+export const WORKERS_BASE = '/trabajadores'
+
 /** Módulo Almacén. */
 export const WAREHOUSE_BASE = '/almacen'
 
