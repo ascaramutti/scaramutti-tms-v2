@@ -32,8 +32,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Las alertas de reasignacion de un viaje pendiente de inicio o en ruta: la del conductor principal
  * (trabajador dado de baja, ficha apagada o cargo distinto de conductor), la de cada refuerzo (solo en
- * el detalle) y la del viaje, que junta las dos. Se derivan en cada lectura; la del principal y la del
- * viaje viajan igual en el listado y en el detalle.
+ * el detalle) y la del viaje, que junta las dos. Se derivan en cada lectura; la del viaje viaja en el
+ * listado y en el detalle, y la del principal y las de los refuerzos, solo en el detalle.
  */
 @QuarkusTest
 class ServiceDriverAlertTest {
@@ -105,9 +105,12 @@ class ServiceDriverAlertTest {
             .then().statusCode(200).extract().jsonPath();
     }
 
-    /** La fila del viaje en el listado, pidiendola por su origen y su estado (los eliminados, solo asi). */
+    /**
+     * La alerta del viaje en el listado, pidiendo la fila por su origen y su estado (los eliminados,
+     * solo asi). Sin refuerzos, es la del conductor principal: el listado no trae la marca aparte.
+     */
     private boolean listedAlert(long id, String status) {
-        return listed(id, status, "driverNeedsReassignment", adminToken);
+        return listed(id, status, "needsReassignment", adminToken);
     }
 
     private boolean listed(long id, String status, String field, String token) {
@@ -117,6 +120,9 @@ class ServiceDriverAlertTest {
         // Por id y no por posicion: la busqueda por origen puede traer tambien otro viaje de la corrida
         List<Integer> ids = page.getList("content.id", Integer.class);
         assertEquals(1, ids.stream().filter(listedId -> listedId == id).count(), "el viaje sale una vez en su estado");
+        // La marca del conductor es del detalle: el listado no la trae, ni siquiera en false
+        Map<String, Object> row = page.getMap("content.find { it.id == " + id + " }");
+        assertEquals(false, row.containsKey("driverNeedsReassignment"), "el listado no trae la marca del conductor");
         return page.getBoolean("content.find { it.id == " + id + " }." + field);
     }
 
@@ -132,7 +138,7 @@ class ServiceDriverAlertTest {
 
     /**
      * Pendiente de inicio y en ruta: la alerta sale con cada motivo y no sale con un conductor sano,
-     * en el listado y en el detalle por igual.
+     * la del conductor en el detalle y la del viaje en el listado.
      */
     @ParameterizedTest(name = "{0}, {1}")
     @MethodSource("openStatusAndMotive")
@@ -192,10 +198,7 @@ class ServiceDriverAlertTest {
 
         assertEquals(true, given().header("Authorization", "Bearer " + token).when().get("/services/" + id)
             .then().statusCode(200).extract().jsonPath().getBoolean("driverNeedsReassignment"), "en el detalle");
-        assertEquals(true, given().header("Authorization", "Bearer " + token)
-            .queryParam("q", origin(id)).queryParam("status", "IN_PROGRESS")
-            .when().get("/services").then().statusCode(200).extract().jsonPath()
-            .getBoolean("content[0].driverNeedsReassignment"), "en el listado");
+        assertEquals(true, listed(id, "IN_PROGRESS", "needsReassignment", token), "en el listado, la del viaje");
     }
 
     /**
@@ -272,8 +275,8 @@ class ServiceDriverAlertTest {
     }
 
     /**
-     * Solo un refuerzo, con el principal sano: el viaje se marca aunque su conductor no. Es el caso
-     * que el listado no veia (la marca del principal sigue en false).
+     * Solo un refuerzo, con el principal sano: el viaje se marca aunque su conductor no (la marca del
+     * principal, en el detalle, sigue en false).
      */
     @ParameterizedTest(name = "{0}, {1}")
     @MethodSource("openStatusAndBadMotive")
@@ -284,7 +287,6 @@ class ServiceDriverAlertTest {
 
         assertTripAlert(true, id, status, "un refuerzo no asignable");
         assertEquals(false, detail(id).getBoolean("driverNeedsReassignment"), "el principal sigue sano");
-        assertEquals(false, listedAlert(id, status), "el principal sigue sano en el listado");
     }
 
     @Test

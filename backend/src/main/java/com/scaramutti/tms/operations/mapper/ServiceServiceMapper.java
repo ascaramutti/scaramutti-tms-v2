@@ -149,7 +149,6 @@ public interface ServiceServiceMapper {
             ServiceStatus.valueOf(row.status()),
             row.needsReassignment(),
             toServiceDriverSummary(row.driverId(), row.driverFullName()),
-            row.driverNeedsReassignment(),
             toFleetUnitRef(FleetUnitKind.TRACTOR, row.tractorId(), row.tractorPlate()),
             includePrices ? row.price() : null,
             includePrices ? row.currencyCode() : null,

@@ -737,7 +737,7 @@ describe('ServicesListPage', () => {
   it('marca con el ícono solo el viaje que requiere reasignación, antes del código', async () => {
     server.use(
       servicesPage([
-        fakeAssignedService({ driverNeedsReassignment: true }),
+        fakeAssignedService({ needsReassignment: true }),
         fakeAssignedService({ id: 44, code: 'SRV-0044', driver: { id: 5, fullName: 'Ana Ríos' } }),
       ]),
     )
@@ -760,20 +760,10 @@ describe('ServicesListPage', () => {
     expect(huecoDelIcono(sinAlerta).querySelector('svg')).toBeNull()
   })
 
-  it('marca el viaje aunque la alerta venga solo de un refuerzo', async () => {
-    // El listado no trae refuerzos: el viaje llega marcado y su conductor principal no
-    server.use(servicesPage([fakeAssignedService({ needsReassignment: true })]))
-    renderServicios()
-    const fila = rowOf(await screen.findByText('SRV-0043'))
-
-    expect(huecoDelIcono(fila).querySelector('svg')).not.toBeNull()
-    expect(fila).toHaveAccessibleName('Ver el servicio SRV-0043 de IPH S.A.C. (Requiere reasignación)')
-  })
-
   it('todas las filas reservan el hueco del ícono, así los códigos quedan alineados', async () => {
     server.use(
       servicesPage([
-        fakeAssignedService({ driverNeedsReassignment: true }),
+        fakeAssignedService({ needsReassignment: true }),
         fakeAssignedService({ id: 44, code: 'SRV-0044' }),
       ]),
     )
@@ -804,7 +794,7 @@ describe('ServicesListPage', () => {
   })
 
   it('la fila anuncia la alerta una sola vez, en su nombre', async () => {
-    server.use(servicesPage([fakeAssignedService({ driverNeedsReassignment: true })]))
+    server.use(servicesPage([fakeAssignedService({ needsReassignment: true })]))
     renderServicios()
     const fila = rowOf(await screen.findByText('SRV-0043'))
 
