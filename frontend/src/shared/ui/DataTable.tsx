@@ -10,7 +10,8 @@ import { Alert } from './Alert'
 export interface Column<T> {
   /** Clave única de la columna (no necesariamente un campo de `T`). */
   key: string
-  header: string
+  /** Texto del encabezado; admite marcado para alinearlo con lo que la celda antepone. */
+  header: ReactNode
   /** Render custom de la celda. Si se omite, muestra `row[key]` como string. */
   render?: (row: T) => ReactNode
   /** Alineación del contenido. Default `'left'`. */

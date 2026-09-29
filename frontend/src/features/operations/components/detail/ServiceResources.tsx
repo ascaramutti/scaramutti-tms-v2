@@ -69,13 +69,13 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
       >
         <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
           {/* La alerta va a la vista junto a quien señala, como en cada refuerzo: el nombre,
-              la pastilla y el porqué (en la lista, el porqué solo lo oye el lector). */}
+              la pastilla y el porqué. La lista solo marca el viaje; el detalle dice quién. */}
           <Field
             label="Conductor"
             value={
               <>
                 <p>{service.driver?.fullName ?? '—'}</p>
-                {service.driverNeedsReassignment && <DriverReassignmentBadge reasonVisible />}
+                {service.driverNeedsReassignment && <DriverReassignmentBadge />}
               </>
             }
           />
@@ -154,7 +154,7 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
                     </button>
                   )}
                 </div>
-                {resource.driverNeedsReassignment && <DriverReassignmentBadge reasonVisible />}
+                {resource.driverNeedsReassignment && <DriverReassignmentBadge />}
                 <p className="mt-0.5 text-sm text-fg-body">{resource.reason}</p>
                 <p className="mt-0.5 text-xs text-fg-muted">
                   {resource.assignedBy.fullName} · {formatDateTime(resource.assignedAt)}

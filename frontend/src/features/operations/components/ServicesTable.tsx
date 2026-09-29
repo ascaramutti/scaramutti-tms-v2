@@ -1,13 +1,20 @@
+import { TriangleAlert } from 'lucide-react'
 import type { ServiceSummaryResponse } from '../../../api'
 import { DataTable, type Column } from '../../../shared/ui/DataTable'
+import { cn } from '../../../shared/utils/cn'
 import { formatCurrency, formatDateOnly } from '../../../shared/utils/formatters'
 import { TRIP_SCOPE_LABELS } from '../status/serviceStatusPresentation'
-import {
-  DRIVER_REASSIGNMENT_LABEL,
-  DRIVER_REASSIGNMENT_REASON,
-  DriverReassignmentBadge,
-} from './DriverReassignmentBadge'
 import { ServiceStatusBadge } from './ServiceStatusBadge'
+
+/**
+ * La celda del código y su encabezado comparten el hueco del ícono y el espacio que lo separa: así
+ * el encabezado empieza donde empiezan los códigos, con una sola medida para los dos.
+ */
+const CODE_WITH_SLOT = 'inline-flex items-center gap-1.5'
+const ICON_SLOT = 'w-5 shrink-0'
+
+/** El nombre de la alerta del viaje; el detalle dice qué recurso y por qué. */
+const TRIP_REASSIGNMENT_LABEL = 'Requiere reasignación'
 
 interface ServicesTableProps {
   data: ServiceSummaryResponse[]
@@ -73,8 +80,24 @@ export function ServicesTable({
   const columns: Column<ServiceSummaryResponse>[] = [
     {
       key: 'code',
-      header: 'Código',
-      render: (row) => <span className="font-semibold text-accent-hover">{row.code}</span>,
+      header: (
+        <span className={CODE_WITH_SLOT}>
+          <span className={ICON_SLOT} aria-hidden="true" />
+          Código
+        </span>
+      ),
+      render: (row) => (
+        <span className={CODE_WITH_SLOT}>
+          {/* El hueco del ícono va en todas las filas, así los códigos quedan alineados. El ícono
+              no tiene nombre propio: la fila ya lo anuncia en el suyo, que tapa el de sus celdas. */}
+          <span className={cn(ICON_SLOT, 'inline-flex h-5 items-center justify-center')}>
+            {row.needsReassignment && (
+              <TriangleAlert className="h-5 w-5 text-warning" aria-hidden="true" />
+            )}
+          </span>
+          <span className="font-semibold text-accent-hover">{row.code}</span>
+        </span>
+      ),
     },
     {
       key: 'client',
@@ -109,7 +132,6 @@ export function ServicesTable({
         row.driver || row.tractor ? (
           <div>
             <span className="block text-fg">{row.driver?.fullName ?? '—'}</span>
-            {row.driverNeedsReassignment && <DriverReassignmentBadge />}
             <span className="block text-xs text-fg-muted">{row.tractor?.plate ?? '—'}</span>
           </div>
         ) : (
@@ -165,12 +187,10 @@ export function ServicesTable({
         onRowClick={onRowClick}
         // Sin esto el nombre accesible de la fila es el texto de todas sus celdas
         // pegado, que es lo que oye quien navega con lector de pantalla.
-        // La alerta va también acá: el nombre de la fila tapa el texto de sus celdas.
+        // La alerta del viaje va acá, una sola vez: el nombre de la fila tapa el texto de sus celdas.
         rowLabel={(service) =>
           `Ver el servicio ${service.code} de ${service.client.name}` +
-          (service.driverNeedsReassignment
-            ? ` (${DRIVER_REASSIGNMENT_LABEL}: ${DRIVER_REASSIGNMENT_REASON})`
-            : '')
+          (service.needsReassignment ? ` (${TRIP_REASSIGNMENT_LABEL})` : '')
         }
         emptyTitle={hasActiveFilters ? 'No se encontraron servicios' : 'Aún no hay servicios'}
         emptyDescription={
