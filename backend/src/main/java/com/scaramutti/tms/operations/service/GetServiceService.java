@@ -99,6 +99,7 @@ public class GetServiceService {
             serviceServiceMapper.toServiceCargoTypeSummary(requireCargoType(service)),
             includePrices ? service.price : null,
             includePrices ? currency.code : null,
+            resources.needsReassignment(),
             serviceServiceMapper.toServiceDriverSummary(
                 resources.driverId(), resources.driverFullName()),
             resources.driverNeedsReassignment(),

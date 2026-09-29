@@ -91,7 +91,8 @@ public class CreateServiceService {
             service.price,
             currency.code,
             // Un viaje recien creado nace pendiente de asignacion, o sea sin ningun recurso: no
-            // hay nada que consultar. Los pone el endpoint que los asigna.
+            // hay nada que consultar ni que reasignar. Los pone el endpoint que los asigna.
+            false,
             null,
             false,
             null,
