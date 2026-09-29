@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
+import { HIDDEN_FROM_VIEW, NAMED_IMAGE } from '../../../test/visibility'
 import { ServiceDetailPage } from './ServiceDetailPage'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
@@ -558,7 +559,7 @@ describe('ServiceDetailPage', () => {
   // ----- Conductor que ya no se puede asignar -----
   const RAZON =
     'Dado de baja, ficha apagada o cambió de cargo'
-  // Cuántas veces está el porqué, sin importar la mayúscula: la copia oculta va en minúscula
+  // Cuántas veces está el porqué, sin importar la mayúscula: una copia oculta puede ir en minúscula
   const vecesQueDice = (nodo: HTMLElement) =>
     (nodo.textContent ?? '').toLowerCase().split(RAZON.toLowerCase()).length - 1
   const conAlerta = (overrides: Partial<ServiceDetailResponse> = {}) =>
@@ -589,15 +590,19 @@ describe('ServiceDetailPage', () => {
     expect(pastilla.parentElement?.previousElementSibling).toBe(nombre)
     expect(pastilla.parentElement?.nextElementSibling).toBe(razon)
     expect(pastilla.parentElement).toHaveClass('whitespace-nowrap')
-    // Donde el porqué se ve, la pastilla no lleva texto oculto (ni siquiera un separador suelto)
+    // La pastilla no lleva texto oculto (ni siquiera un separador suelto): el porqué ya se ve
     expect(pastilla.querySelector('.sr-only')).toBeNull()
+    // Sin depender del color: tono de advertencia, e ícono sin nombre propio junto al texto
+    expect(pastilla).toHaveClass('bg-warning-soft-strong')
+    expect(pastilla.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(pastilla.querySelectorAll(NAMED_IMAGE)).toHaveLength(0)
     // A la vista y para el lector. toBeVisible ve el atributo hidden y el estilo en línea;
     // como el test no carga CSS, las clases que ocultan se miran aparte.
     for (const nodo of [pastilla, razon]) {
       expect(nodo).toBeVisible()
-      expect(nodo.closest('.sr-only, .hidden, .invisible, [class*=":hidden"], [aria-hidden="true"]')).toBeNull()
+      expect(nodo.closest(`${HIDDEN_FROM_VIEW}, [aria-hidden="true"]`)).toBeNull()
     }
-    // El porqué en el tono de advertencia, y una sola vez (sin la copia oculta de la lista)
+    // El porqué en el tono de advertencia, y una sola vez
     expect(razon).toHaveClass('text-warning-fg')
     expect(vecesQueDice(campo)).toBe(1)
     // Sin un recuadro aparte que no señale a nadie
@@ -677,9 +682,9 @@ describe('ServiceDetailPage', () => {
     // El porqué a la vista junto al refuerzo, sin el recuadro del viaje que lo explique
     const razon = within(refuerzos[0]).getByText(RAZON)
     expect(razon).toBeVisible()
-    expect(razon.closest('.sr-only, .hidden, .invisible, [class*=":hidden"], [aria-hidden="true"]')).toBeNull()
+    expect(razon.closest(`${HIDDEN_FROM_VIEW}, [aria-hidden="true"]`)).toBeNull()
     expect(razon).toHaveClass('text-warning-fg')
-    // Y una sola vez: una copia oculta además de la visible el lector la anuncia dos veces
+    // Y una sola vez: una copia oculta además de la visible el lector la anunciaría dos veces
     expect(vecesQueDice(refuerzos[0])).toBe(1)
     expect(within(refuerzos[1]).queryByText('Reasignar conductor')).not.toBeInTheDocument()
     expect(within(refuerzos[1]).queryByText(RAZON)).not.toBeInTheDocument()
@@ -714,7 +719,7 @@ describe('ServiceDetailPage', () => {
 
     expect(within(conductorDe()).getByText(RAZON)).toBeInTheDocument()
     expect(within(cardOf('Refuerzos')).getByText('Reasignar conductor')).toBeInTheDocument()
-    // Y el porqué del refuerzo a la vista, no la copia oculta de la lista
+    // Y el porqué del refuerzo a la vista
     expect(within(cardOf('Refuerzos')).getByText(RAZON)).toBeInTheDocument()
   })
 
