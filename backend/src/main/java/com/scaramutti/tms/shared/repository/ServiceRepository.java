@@ -42,7 +42,6 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             + "c.id AS client_id, c.name AS client_name, c.ruc, c.phone, c.contact_name, "
             + "s.driver_id, " + WorkerRepository.fullNameExpression("w") + " AS driver_name, "
             + "s.tractor_id, tra.plate AS tractor_plate, "
-            + driverNeedsReassignment("s", "d", "w", "drole") + " AS driver_needs_reassignment, "
             + needsReassignment("s", "d", "w", "drole") + " AS needs_reassignment "
             + fromAndWhere(query, params, ASSIGNED_RESOURCE_JOINS)
             + " ORDER BY s.created_at DESC, s.id DESC LIMIT :pageSize OFFSET :pageOffset";
@@ -77,8 +76,7 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
             (String) row.get(16),
             toInteger(row.get(17)),
             (String) row.get(18),
-            (Boolean) row.get(19),
-            (Boolean) row.get(20)
+            (Boolean) row.get(19)
         )).toList();
     }
 
@@ -214,7 +212,6 @@ public class ServiceRepository implements PanacheRepositoryBase<Service, Long> {
         String driverFullName,
         Integer tractorId,
         String tractorPlate,
-        boolean driverNeedsReassignment,
         boolean needsReassignment
     ) {}
 

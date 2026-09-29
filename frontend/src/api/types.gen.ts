@@ -1774,10 +1774,6 @@ export type ServiceSummaryResponse = {
      */
     needsReassignment: boolean;
     driver: DriverRef | null;
-    /**
-     * true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.
-     */
-    driverNeedsReassignment: boolean;
     tractor: FleetUnitRef | null;
     /**
      * Ausente para el rol dispatcher

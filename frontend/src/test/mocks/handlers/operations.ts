@@ -96,19 +96,15 @@ export function fakeServiceSummary(
     status: 'PENDING_ASSIGNMENT',
     needsReassignment: false,
     driver: null,
-    driverNeedsReassignment: false,
     tractor: null,
     price: 5800,
     currencyCode: 'PEN',
     createdAt: '2026-07-03T02:00:00Z',
     ...overrides,
   }
-  // Como el backend: el viaje se marca si se marca su conductor. La marca solo por un refuerzo
-  // (que el listado no trae) se pide explícita, con needsReassignment en los overrides.
-  if (overrides.needsReassignment === undefined) {
-    service.needsReassignment = service.driverNeedsReassignment
-  }
-  assertTripAlertIsPossible(service, [service], false)
+  // El listado solo trae la marca del viaje, así que se pide explícita en los overrides. Sin las de
+  // cada conductor no hay nada contra qué cruzarla: se valida solo el estado.
+  assertTripAlertIsPossible(service, [], false)
   return service
 }
 

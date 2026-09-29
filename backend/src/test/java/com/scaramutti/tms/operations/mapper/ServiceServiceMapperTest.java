@@ -34,8 +34,7 @@ class ServiceServiceMapperTest {
             LocalDate.of(2026, 8, 20), "PROVINCIA", "PENDING_ASSIGNMENT",
             new BigDecimal("5800.00"), "PEN", OffsetDateTime.parse("2026-08-02T10:00:00Z"),
             7, "IPH SAC", "20123456789", "987654321", "Maria Rojas",
-            // Las dos alertas con valores distintos: un cruce entre ellas se ve
-            4, "Juan Pérez Huamán", 9, "ABC123", false, true
+            4, "Juan Pérez Huamán", 9, "ABC123", true
         );
     }
 
@@ -82,7 +81,6 @@ class ServiceServiceMapperTest {
         assertEquals(9, response.tractor().id());
         assertEquals("ABC123", response.tractor().plate());
         assertEquals(true, response.needsReassignment());
-        assertEquals(false, response.driverNeedsReassignment());
     }
 
     /**
@@ -95,12 +93,13 @@ class ServiceServiceMapperTest {
             1L, "SRV-0001", "Lima", "Ica", LocalDate.of(2026, 1, 1), "LOCAL", "PENDING_ASSIGNMENT",
             BigDecimal.ONE, "USD", OffsetDateTime.parse("2026-01-01T00:00:00Z"),
             1, "Cliente", "20000000001", null, null,
-            null, null, null, null, false, false);
+            null, null, null, null, false);
 
         ServiceSummaryResponse response = mapper.toServiceSummaryResponse(unassigned, true);
 
         assertNull(response.driver());
         assertNull(response.tractor());
+        assertEquals(false, response.needsReassignment());
     }
 
     /** El estado y el ámbito llegan como texto de la columna y salen como enum. */
@@ -110,7 +109,7 @@ class ServiceServiceMapperTest {
             1L, "SRV-0001", "Lima", "Ica", LocalDate.of(2026, 1, 1), "LOCAL", "DELETED",
             BigDecimal.ONE, "USD", OffsetDateTime.parse("2026-01-01T00:00:00Z"),
             1, "Cliente", "20000000001", null, null,
-            null, null, null, null, false, false);
+            null, null, null, null, false);
 
         ServiceSummaryResponse response = mapper.toServiceSummaryResponse(deleted, true);
 

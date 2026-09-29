@@ -5321,7 +5321,7 @@ components:
         `driver` y `tractor` son null mientras el viaje esté pendiente de asignación: la
         fila los trae desde que existe el endpoint que los asigna. La carreta no está acá
         (es opcional y la tabla no la muestra); vive en el detalle.
-      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, needsReassignment, driver, driverNeedsReassignment, tractor, createdAt]
+      required: [id, code, client, origin, destination, tentativeDate, tripScope, status, needsReassignment, driver, tractor, createdAt]
       properties:
         id:            { type: integer, format: int64 }
         code:          { type: string, example: 'SRV-0042' }
@@ -5333,7 +5333,6 @@ components:
         status:        { $ref: '#/components/schemas/ServiceStatus' }
         needsReassignment: { type: boolean, description: 'true si el viaje está pendiente de inicio o en ruta y algún recurso asignado ya no se puede asignar: el conductor principal o el de algún refuerzo, por baja del trabajador, ficha apagada o cargo distinto de conductor (los vehículos no cuentan). Hay que reasignarlo; el detalle dice cuál. Se deriva en cada lectura, sin columna. Siempre presente; false en los viajes pendientes de asignación, completados, cancelados o eliminados.' }
         driver:        { oneOf: [{ $ref: '#/components/schemas/DriverRef' }], type: ['object', 'null'] }
-        driverNeedsReassignment: { type: boolean, description: 'true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.' }
         tractor:       { oneOf: [{ $ref: '#/components/schemas/FleetUnitRef' }], type: ['object', 'null'] }
         price:         { type: number, format: double, description: 'Ausente para el rol dispatcher' }
         currencyCode:  { type: string, pattern: '^[A-Z]{3}$', description: 'Ausente para el rol dispatcher' }
