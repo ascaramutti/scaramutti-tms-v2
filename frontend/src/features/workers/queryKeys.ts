@@ -14,4 +14,5 @@ export const workerKeys = {
   all: ['workers'] as const,
   searches: () => [...workerKeys.all, 'search'] as const,
   search: (params: WorkerSearchParams) => [...workerKeys.searches(), params] as const,
+  detail: (id: number) => [...workerKeys.all, 'detail', id] as const,
 }

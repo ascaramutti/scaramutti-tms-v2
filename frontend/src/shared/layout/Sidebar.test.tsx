@@ -492,7 +492,7 @@ describe('Sidebar - padrón de trabajadores', () => {
     expect(screen.getByRole('link', { name: /^clientes$/i })).not.toHaveAttribute('aria-current')
   })
 
-  /** Sin matcher propio, el resaltado por prefijo cubre la ficha que llega después. */
+  /** Sin matcher propio, el resaltado por prefijo cubre la ficha del trabajador. */
   it('debajo de la búsqueda, Trabajadores sigue marcado', async () => {
     renderSidebarAs('admin', `${WORKERS_BASE}/7`)
     await esperarLaSesion('admin')

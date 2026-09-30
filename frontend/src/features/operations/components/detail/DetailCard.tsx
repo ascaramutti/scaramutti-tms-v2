@@ -8,8 +8,9 @@ import { Card } from '../../../../shared/ui/Card'
  * era la misma copia en cada archivo, que es de donde salen las fichas que se van
  * pareciendo cada vez menos.
  *
- * El mismo patrón ya vive copiado a mano en las pantallas de detalle de almacén.
- * Unificarlo es mudar esto a `shared/ui/`, y eso va en su propio cambio.
+ * El mismo patrón ya vive copiado a mano en las pantallas de detalle de almacén, y la
+ * ficha del trabajador lo importa de acá. Unificarlo es mudar esto a `shared/ui/`, y eso
+ * va en su propio cambio.
  */
 
 interface DetailCardProps {

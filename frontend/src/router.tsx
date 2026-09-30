@@ -29,6 +29,7 @@ import { ClientsSearchPage } from './features/clients/pages/ClientsSearchPage'
 import { ClientEditPage } from './features/clients/pages/ClientEditPage'
 import { ClientDetailPage } from './features/clients/pages/ClientDetailPage'
 import { WorkersSearchPage } from './features/workers/pages/WorkersSearchPage'
+import { WorkerDetailPage } from './features/workers/pages/WorkerDetailPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -150,6 +151,16 @@ export const routes: RouteObject[] = [
           <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
             <WorkersSearchPage />
           </ProtectedRoute>
+        ),
+      },
+      {
+        path: `${WORKERS_BASE}/:id`,
+        element: (
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+              <WorkerDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
         ),
       },
       // Módulo Almacén, con su propia raíz. Hasta la mudanza de 2026-09 colgaba
