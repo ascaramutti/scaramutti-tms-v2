@@ -212,11 +212,11 @@ class WorkerDetailResourceTest {
     }
 
     /**
-     * Las filas anteriores a este modulo no saben quien las cargo, y eso viaja como nulo y
-     * no como un usuario inventado.
+     * Una fila sin autor (sin admin al migrar, o el primer trabajador de una base vacia)
+     * viaja como nulo y no como un usuario inventado por la lectura.
      */
     @Test
-    void get_workerLoadedBeforeThisUnit_travelsWithoutAuthors() {
+    void get_workerWithoutAuthors_travelsWithNullAuthors() {
         int id = fixtures.seedWorker("ZTESTB021", "Hugo", "Medina", "operator", true);
 
         given().header("Authorization", "Bearer " + adminToken())

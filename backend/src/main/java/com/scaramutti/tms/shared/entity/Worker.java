@@ -71,9 +71,9 @@ public class Worker {
      * a usuario a trabajador con dos cargas ansiosas de por medio. Mismo molde que las
      * cotizaciones.
      *
-     * <p>Los dos son nulos en las filas anteriores a esta unidad: se migraron por SQL del
-     * sistema anterior y nadie sabe quien las cargo; escribir ahi un usuario seria un
-     * hecho falso en una columna de auditoria.
+     * <p>Las filas anteriores a esta unidad las cargo el usuario admin y quedan firmadas por
+     * el en {@code createdBy} (nulo si no habia admin al migrar); {@code updatedBy} queda nulo
+     * hasta su primera edicion, baja o reactivacion desde la aplicacion.
      */
     @Column(name = "created_by")
     public Integer createdBy;
