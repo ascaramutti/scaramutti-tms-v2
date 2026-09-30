@@ -1146,8 +1146,11 @@ export type WorkerUpdateRequest = WorkerRequest & {
  * Ficha completa de un trabajador. `role` es su rol (la misma fila que
  * lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
  * `public.users` para él (el usuario lo administra el módulo de
- * usuarios). `createdBy` y `updatedBy` son nulos en los trabajadores
- * cargados antes de que existiera esta unidad. Instantes en UTC
+ * usuarios). En los trabajadores cargados antes de que existiera esta
+ * unidad, `createdBy` es el usuario `admin`, que los cargó (nulo si no
+ * había admin al migrar, o en un trabajador creado por SQL antes que el
+ * primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
+ * o reactivación desde la aplicación. Instantes en UTC
  * (`createdAt`, `updatedAt`); `hireDate` es día calendario.
  *
  */

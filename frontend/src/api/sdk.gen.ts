@@ -1017,8 +1017,10 @@ export const createWorker = <ThrowOnError extends boolean = false>(options: Opti
  * si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
  * de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
  * usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
- * última vez (`createdBy` y `updatedBy` son nulos en las filas anteriores
- * a esta unidad: nadie sabe quién las cargó).
+ * última vez. En las filas anteriores a esta unidad, `createdBy` es el
+ * usuario `admin`, que las cargó (nulo si no había admin al migrar), y
+ * `updatedBy` es nulo hasta su primera edición, baja o reactivación
+ * desde la aplicación.
  *
  * Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
  * (el detalle expone documento y teléfono, que el combobox no muestra).

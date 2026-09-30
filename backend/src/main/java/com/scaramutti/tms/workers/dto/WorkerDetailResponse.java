@@ -15,8 +15,9 @@ import java.time.OffsetDateTime;
  * un trabajador apaga su usuario pero no lo borra, y la pantalla necesita saber que la cuenta
  * sigue ahi.
  *
- * <p>{@code createdBy} y {@code updatedBy} son nulos en las filas anteriores a este modulo:
- * se migraron por SQL del sistema anterior y nadie sabe quien las cargo.
+ * <p>En las filas anteriores a este modulo, {@code createdBy} es el usuario admin, que las cargo
+ * (nulo si no habia admin al migrar), y {@code updatedBy} es nulo hasta su primera edicion, baja
+ * o reactivacion desde la aplicacion.
  */
 public record WorkerDetailResponse(
     @Schema(example = "8") Integer id,
