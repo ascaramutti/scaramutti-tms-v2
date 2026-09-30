@@ -5,6 +5,7 @@ import {
   QUOTATIONS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
+  workerDetailPath,
 } from './shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -13,6 +14,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
 import userEvent from '@testing-library/user-event'
 import { fakeClient } from './test/mocks/handlers/clients'
+import { fakeWorker, workersSearchPage } from './test/mocks/handlers/shared-catalogs'
+import { fakeWorkerDetail, getWorkerCapture, getWorkerOk } from './test/mocks/handlers/workers'
 import { routes } from './router'
 import { AuthProvider } from './shared/auth/AuthContext'
 import { ThemeProvider } from './shared/ui/theme/ThemeContext'
@@ -329,6 +332,71 @@ describe('router - URL viejas y la raíz del dominio', () => {
     it('sin sesión la URL de trabajadores lleva al login', async () => {
       const router = goTo(null, WORKERS_BASE)
       await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+
+    it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+      '%s abre la ficha de un trabajador',
+      async (role) => {
+        server.use(getWorkerOk(fakeWorkerDetail({ id: 7 })))
+        renderRouteAs(role, workerDetailPath(7))
+        expect(await screen.findByRole('heading', { level: 1, name: 'Ana Torres Ruiz' })).toBeInTheDocument()
+      },
+    )
+
+    /** Sin llamada al backend: la guarda corta antes de pedir la ficha. */
+    it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso en la ficha, sin pedirla',
+      async (role) => {
+        const sink: { ids?: number[] } = {}
+        server.use(getWorkerCapture(sink))
+        renderRouteAs(role, workerDetailPath(7))
+        expect(await screen.findByText(/sin acceso a trabajadores/i)).toBeInTheDocument()
+        expect(sink.ids).toEqual([])
+      },
+    )
+
+    /** Con el almacenero: si la guarda de rol fuera primero, vería "Sin acceso" y no su aterrizaje. */
+    it.each(['0', '-3', '1e2', 'abc'])(
+      'el id %s de la ficha desvía al aterrizaje antes de evaluar permisos',
+      async (id) => {
+        const sink: { ids?: number[] } = {}
+        server.use(getWorkerCapture(sink))
+        const router = goTo('warehouse_keeper', `${WORKERS_BASE}/${id}`)
+        await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
+        expect(screen.queryByText(/sin acceso/i)).not.toBeInTheDocument()
+        expect(sink.ids).toEqual([])
+      },
+    )
+
+    it('sin sesión la ficha lleva al login', async () => {
+      const router = goTo(null, workerDetailPath(7))
+      await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+
+    /** La fila y el endpoint difieren a propósito: la ficha tiene que salir del endpoint. */
+    it('desde la búsqueda, la fila lleva a la ficha con los datos del endpoint', async () => {
+      const user = userEvent.setup()
+      server.use(
+        workersSearchPage([fakeWorker({ id: 7, fullName: 'Ana Torres Ruiz', position: 'Despachadora' })]),
+        getWorkerOk(fakeWorkerDetail({ id: 7 })),
+      )
+      const router = goTo('admin', WORKERS_BASE)
+
+      await user.type(await screen.findByLabelText(/buscar trabajador/i), 'ana')
+      await user.click(await screen.findByRole('button', { name: /^ver la ficha de ana torres ruiz/i }))
+
+      await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(7)))
+      expect(await screen.findByRole('heading', { level: 1, name: 'Ana Torres Ruiz' })).toBeInTheDocument()
+      expect(screen.queryByText('Despachadora')).not.toBeInTheDocument()
+    })
+
+    it('en la ficha, Trabajadores queda marcado en el menú', async () => {
+      server.use(getWorkerOk(fakeWorkerDetail({ id: 7 })))
+      renderRouteAs('admin', workerDetailPath(7))
+
+      await screen.findByRole('heading', { level: 1, name: 'Ana Torres Ruiz' })
+      expect(screen.getByRole('link', { name: /^trabajadores$/i })).toHaveAttribute('aria-current', 'page')
+      expect(screen.getByRole('link', { name: /^clientes$/i })).not.toHaveAttribute('aria-current')
     })
   })
 

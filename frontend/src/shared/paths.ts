@@ -56,3 +56,7 @@ export function quotationDetailPath(id: number | string): string {
 export function warehouseProductPath(id: number | string): string {
   return `${WAREHOUSE_BASE}/productos/${id}`
 }
+
+export function workerDetailPath(id: number | string): string {
+  return `${WORKERS_BASE}/${id}`
+}

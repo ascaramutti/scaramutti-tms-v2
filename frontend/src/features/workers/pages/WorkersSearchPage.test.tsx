@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { createMemoryRouter, RouterProvider, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { SEARCH_DEBOUNCE_MS, WorkersSearchPage } from './WorkersSearchPage'
-import { WORKERS_BASE } from '../../../shared/paths'
+import { WORKERS_BASE, workerDetailPath } from '../../../shared/paths'
 import { server } from '../../../test/mocks/server'
 import {
   fakeWorker,
@@ -25,15 +25,26 @@ const LUIS = fakeWorker({ id: 12, fullName: 'Luis Quispe Mamani', position: 'Cho
 const EVA = fakeWorker({ id: 21, fullName: 'Eva Torres Paz', position: 'Almacenera' })
 const ROSA = fakeWorker({ id: 15, fullName: 'Rosa Vega Solís', position: 'Ayudante', isActive: false })
 
+function FichaDePrueba() {
+  const { id } = useParams()
+  return <p>Ficha {id}</p>
+}
+
 function renderPage() {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const router = createMemoryRouter(
+    [
+      { path: WORKERS_BASE, element: <WorkersSearchPage /> },
+      { path: `${WORKERS_BASE}/:id`, element: <FichaDePrueba /> },
+    ],
+    { initialEntries: [WORKERS_BASE] },
+  )
+  const vista = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[WORKERS_BASE]}>
-        <WorkersSearchPage />
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   )
+  return { ...vista, router }
 }
 
 async function esperarElRebote() {
@@ -344,8 +355,69 @@ describe('WorkersSearchPage', () => {
       expect(within(filaDe('Rosa Vega Solís')).getAllByRole('cell')[1]).toHaveTextContent('—')
     })
 
-    /** El padrón es de consulta hasta que exista la ficha: una fila que navega llevaría a una ruta vacía. */
-    it('las filas no navegan', async () => {
+    it.each([
+      ['Ana Torres Ruiz', 7],
+      ['Luis Quispe Mamani', 12],
+    ])('el clic en la fila de %s abre su ficha', async (nombre, id) => {
+      const user = userEvent.setup()
+      server.use(workersSearchPage([ANA, LUIS]))
+      const { router } = renderPage()
+
+      await user.type(campo(), 'tor')
+      await user.click(await screen.findByRole('button', { name: new RegExp(`^ver la ficha de ${nombre}`, 'i') }))
+
+      expect(router.state.location.pathname).toBe(workerDetailPath(id))
+    })
+
+    it.each(['{Enter}', ' '])('la fila se abre con el teclado (%j)', async (tecla) => {
+      const user = userEvent.setup()
+      server.use(workersSearchPage([ANA, LUIS]))
+      const { router } = renderPage()
+
+      await user.type(campo(), 'tor')
+      const fila = await screen.findByRole('button', { name: /^ver la ficha de ana torres ruiz/i })
+      fila.focus()
+      await user.keyboard(tecla)
+
+      expect(router.state.location.pathname).toBe(workerDetailPath(7))
+    })
+
+    it('la fila llega con el tabulador desde el buscador', async () => {
+      const user = userEvent.setup()
+      server.use(workersSearchPage([ANA]))
+      renderPage()
+
+      await user.type(campo(), 'ana')
+      const fila = await screen.findByRole('button', { name: /^ver la ficha de ana torres ruiz/i })
+      await user.tab()
+      await user.tab()
+
+      expect(fila).toHaveFocus()
+    })
+
+    /** El nombre de la fila tapa sus celdas: lleva cargo y estado para distinguir homónimos. */
+    it('la fila se anuncia con nombre, cargo y estado', async () => {
+      const user = userEvent.setup()
+      server.use(workersSearchPage([ANA, LUIS]))
+      renderPage()
+
+      await user.type(campo(), 'tor')
+
+      expect(await screen.findByRole('button', { name: 'Ver la ficha de Ana Torres Ruiz, Despachadora, activo' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Ver la ficha de Luis Quispe Mamani, Chofer, inactivo' })).toBeInTheDocument()
+    })
+
+    it('sin cargo, la fila se anuncia sin él', async () => {
+      const user = userEvent.setup()
+      server.use(workersSearchPage([fakeWorker({ id: 3, fullName: 'Rosa Vega Solís', position: null })]))
+      renderPage()
+
+      await user.type(campo(), 'ros')
+
+      expect(await screen.findByRole('button', { name: 'Ver la ficha de Rosa Vega Solís, activo' })).toBeInTheDocument()
+    })
+
+    it('con resultados tampoco ofrece un alta', async () => {
       const user = userEvent.setup()
       server.use(workersSearchPage([ANA]))
       renderPage()
@@ -353,10 +425,10 @@ describe('WorkersSearchPage', () => {
       await user.type(campo(), 'ana')
       await screen.findByText('Ana Torres Ruiz')
 
-      const fila = filaDe('Ana Torres Ruiz')
-      expect(fila).not.toHaveAttribute('role', 'button')
-      expect(fila).not.toHaveAttribute('tabindex')
-      expect(within(fila).queryByRole('link')).not.toBeInTheDocument()
+      // Los únicos botones son las filas, y no hay enlaces: ningún alta se cuela, se llame como se llame.
+      const otros = screen.getAllByRole('button').filter((b) => !/^Ver la ficha de /.test(b.getAttribute('aria-label') ?? ''))
+      expect(otros).toEqual([])
+      expect(screen.queryByRole('link')).not.toBeInTheDocument()
     })
 
     it('no ofrece dar de alta un trabajador', async () => {

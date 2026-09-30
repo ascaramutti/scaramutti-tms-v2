@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteObject } from 'react-router-dom'
 import { routes } from '../router'
+import { workerDetailPath } from './paths'
 
 /**
  * El contrato de URL de la aplicación, escrito a mano.
@@ -26,6 +27,7 @@ const RUTAS = [
   '/clientes/:id',
   '/clientes/:id/editar',
   '/trabajadores',
+  '/trabajadores/:id',
   '/almacen',
   '/almacen/entradas/nueva',
   '/almacen/entradas',
@@ -64,5 +66,11 @@ describe('las URL de la aplicación', () => {
     // Sin esto, una tabla que perdiera todo su árbol anidado pasaría el test de
     // arriba con una lista vacía y nadie se enteraría.
     expect(aplanar(routes).length).toBeGreaterThan(routes.length)
+  })
+
+  /** El literal solo puede vivir en este archivo: la guarda de valores únicos lo prohíbe en los demás. */
+  it('la ficha de un trabajador cuelga de su raíz', () => {
+    expect(workerDetailPath(7)).toBe('/trabajadores/7')
+    expect(workerDetailPath('7')).toBe('/trabajadores/7')
   })
 })

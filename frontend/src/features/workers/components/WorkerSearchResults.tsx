@@ -1,4 +1,6 @@
+import { useNavigate } from 'react-router-dom'
 import type { WorkerResponse } from '../../../api'
+import { workerDetailPath } from '../../../shared/paths'
 import { DataTable, type Column } from '../../../shared/ui/DataTable'
 import { WorkerStatusBadge } from './WorkerStatusBadge'
 
@@ -23,10 +25,16 @@ const COLUMNS: Column<WorkerResponse>[] = [
   },
 ]
 
+// El nombre accesible de la fila tapa sus celdas: lleva cargo y estado para que dos
+// homónimos no suenen iguales.
+function rowLabel(worker: WorkerResponse): string {
+  const cargo = worker.position ? `, ${worker.position}` : ''
+  return `Ver la ficha de ${worker.fullName}${cargo}, ${worker.isActive ? 'activo' : 'inactivo'}`
+}
+
 /**
  * Resultados del padrón. La respuesta no pagina, así que la tabla va en una sola
- * página. Las filas todavía no navegan: la ficha del trabajador llega con su
- * propia pantalla, y una fila que lleve a "no encontrado" es peor que ninguna.
+ * página. Cada fila abre la ficha de ese trabajador.
  */
 export function WorkerSearchResults({
   workers,
@@ -37,6 +45,7 @@ export function WorkerSearchResults({
   errorMessage,
   onRetry,
 }: WorkerSearchResultsProps) {
+  const navigate = useNavigate()
   return (
     <DataTable
       columns={COLUMNS}
@@ -57,6 +66,8 @@ export function WorkerSearchResults({
       emptyTitle="No encontramos trabajadores con ese texto"
       emptyDescription="Revisa la escritura o prueba con el número de documento."
       caption="Trabajadores encontrados"
+      onRowClick={(worker) => navigate(workerDetailPath(worker.id))}
+      rowLabel={rowLabel}
     />
   )
 }

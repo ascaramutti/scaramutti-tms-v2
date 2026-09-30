@@ -29,4 +29,11 @@ describe('workerKeys', () => {
     expect(activos).not.toEqual(todos)
     expect(inactivos).not.toEqual(todos)
   })
+
+  /** Cuelga de la raíz y no de las búsquedas: invalidar la raíz la alcanza, invalidar búsquedas no. */
+  it('el detalle cuelga de la raíz y distingue por id', () => {
+    expect(workerKeys.detail(42)).toEqual(['workers', 'detail', 42])
+    expect(workerKeys.detail(42).slice(0, 2)).not.toEqual(workerKeys.searches())
+    expect(workerKeys.detail(7)).not.toEqual(workerKeys.detail(12))
+  })
 })
