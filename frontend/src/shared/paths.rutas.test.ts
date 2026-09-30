@@ -25,6 +25,7 @@ const RUTAS = [
   '/clientes',
   '/clientes/:id',
   '/clientes/:id/editar',
+  '/trabajadores',
   '/almacen',
   '/almacen/entradas/nueva',
   '/almacen/entradas',

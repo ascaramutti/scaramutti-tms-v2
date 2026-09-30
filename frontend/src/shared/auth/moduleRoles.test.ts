@@ -6,6 +6,7 @@ import {
   SERVICES_REPORT_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
   WAREHOUSE_ROLES,
+  WORKER_MAINTENANCE_ROLES,
 } from './moduleRoles'
 import {
   ALL_ROLES,
@@ -114,5 +115,18 @@ describe('SERVICE_OPERATE_ROLES', () => {
     // Dos reglas distintas que hoy ni siquiera coinciden: registrar deja afuera al
     // despacho y operar deja afuera a ventas.
     expect(SERVICE_OPERATE_ROLES).not.toBe(SERVICE_PRICE_WRITE_ROLES)
+  })
+})
+
+describe('WORKER_MAINTENANCE_ROLES', () => {
+  it('son los cuatro que mantienen el padrón', () => {
+    // Escritos a mano: el almacenero busca trabajadores desde sus formularios,
+    // pero el padrón no le corresponde.
+    expect([...WORKER_MAINTENANCE_ROLES].sort()).toEqual([
+      'admin',
+      'finance_manager',
+      'general_manager',
+      'operations_manager',
+    ])
   })
 })

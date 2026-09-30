@@ -4,6 +4,7 @@ import {
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
   WAREHOUSE_BASE,
+  WORKERS_BASE,
 } from '../../shared/paths'
 import {
   ArrowDownToLine,
@@ -12,6 +13,7 @@ import {
   ClipboardList,
   FileBarChart2,
   FileText,
+  IdCard,
   KeyRound,
   Route,
   Truck,
@@ -29,6 +31,7 @@ import {
   QUOTATION_ROLES,
   SERVICES_REPORT_ROLES,
   WAREHOUSE_ROLES,
+  WORKER_MAINTENANCE_ROLES,
 } from '../auth/moduleRoles'
 import type { UserRole } from '../../api'
 
@@ -139,10 +142,11 @@ const MENU: MenuGroup[] = [
     ],
   },
   {
-    // El maestro de clientes es transversal: lo consultan cotizaciones y
-    // operaciones, así que no cuelga de ninguno de los dos. Acá va a vivir
-    // también el maestro de usuarios cuando exista. Distinto de "Administrar
-    // cuenta", que es lo personal de quien está usando el sistema.
+    // Los maestros transversales no cuelgan de ningún módulo: a los clientes los
+    // consultan cotizaciones y operaciones, y a los trabajadores, almacén (y
+    // operaciones, por sus conductores). Acá va a vivir también el maestro de
+    // usuarios cuando exista. Distinto de "Administrar cuenta", que es lo
+    // personal de quien está usando el sistema.
     label: 'Administración',
     items: [
       {
@@ -150,6 +154,12 @@ const MENU: MenuGroup[] = [
         label: 'Clientes',
         to: CLIENTS_BASE,
         allowedRoles: CLIENT_EDIT_ROLES,
+      },
+      {
+        icon: IdCard,
+        label: 'Trabajadores',
+        to: WORKERS_BASE,
+        allowedRoles: WORKER_MAINTENANCE_ROLES,
       },
     ],
   },

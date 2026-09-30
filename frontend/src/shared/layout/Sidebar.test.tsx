@@ -4,9 +4,10 @@ import {
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
   WAREHOUSE_BASE,
+  WORKERS_BASE,
 } from '../../shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { http, HttpResponse } from 'msw'
@@ -230,7 +231,7 @@ describe('Sidebar - módulo Almacén', () => {
       await waitFor(() => {
         expect(screen.getByText(`Usuario ${role}`)).toBeInTheDocument()
       })
-      // Los roles de almacén trabajan solo en su módulo.
+      // Los roles de almacén no operan viajes.
       // Por texto y no por rol: si el item perdiera su destino se renderiza
       // como <span> deshabilitado, y una búsqueda por rol de enlace lo daría
       // por ausente estando visible en pantalla.
@@ -418,5 +419,95 @@ describe('Sidebar - maestro de clientes', () => {
     expect(screen.getByText(/^comercial$/i)).toBeInTheDocument()
     // Y "Administrar cuenta", que es lo personal, sigue visible para todos.
     expect(screen.getByText(/administrar cuenta/i)).toBeInTheDocument()
+  })
+})
+
+describe('Sidebar - padrón de trabajadores', () => {
+  beforeEach(() => {
+    tokenStorage.clear()
+  })
+
+  async function esperarLaSesion(role: UserRole) {
+    await waitFor(() => {
+      expect(screen.getByText(new RegExp(`usuario ${role}`, 'i'))).toBeInTheDocument()
+    })
+  }
+
+  it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+    '%s ve Trabajadores como enlace a la búsqueda',
+    async (role) => {
+      renderSidebarAs(role)
+      await esperarLaSesion(role)
+      expect(screen.getByRole('link', { name: /^trabajadores$/i })).toHaveAttribute(
+        'href',
+        WORKERS_BASE,
+      )
+    },
+  )
+
+  it.each(['warehouse_keeper', 'sales', 'dispatcher'] as const)(
+    '%s no ve Trabajadores',
+    async (role) => {
+      renderSidebarAs(role)
+      await esperarLaSesion(role)
+      expect(screen.queryByText('Trabajadores')).not.toBeInTheDocument()
+    },
+  )
+
+  /**
+   * Se afirma la lista entera del grupo y no solo el ítem: finanzas no ve
+   * Clientes, así que Trabajadores es lo único que le abre Administración.
+   */
+  it('finance_manager ve Administración solo con Trabajadores', async () => {
+    renderSidebarAs('finance_manager')
+    await esperarLaSesion('finance_manager')
+
+    const grupo = screen.getByRole('list', { name: /^administración$/i })
+    const enlaces = within(grupo).getAllByRole('link').map((enlace) => enlace.textContent)
+    expect(enlaces).toEqual(['Trabajadores'])
+  })
+
+  it('warehouse_keeper no ve el grupo Administración', async () => {
+    renderSidebarAs('warehouse_keeper')
+    await esperarLaSesion('warehouse_keeper')
+    expect(screen.queryByText(/^administración$/i)).not.toBeInTheDocument()
+  })
+
+  it('Trabajadores va después de Clientes, en el mismo grupo', async () => {
+    renderSidebarAs('admin')
+    await esperarLaSesion('admin')
+
+    const grupo = screen.getByRole('list', { name: /^administración$/i })
+    const enlaces = within(grupo).getAllByRole('link').map((enlace) => enlace.textContent)
+    expect(enlaces).toEqual(['Clientes', 'Trabajadores'])
+  })
+
+  it('estando en la búsqueda, Trabajadores queda marcado como la página actual', async () => {
+    renderSidebarAs('admin', WORKERS_BASE)
+    await esperarLaSesion('admin')
+    expect(screen.getByRole('link', { name: /^trabajadores$/i })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+    expect(screen.getByRole('link', { name: /^clientes$/i })).not.toHaveAttribute('aria-current')
+  })
+
+  /** Sin matcher propio, el resaltado por prefijo cubre la ficha que llega después. */
+  it('debajo de la búsqueda, Trabajadores sigue marcado', async () => {
+    renderSidebarAs('admin', `${WORKERS_BASE}/7`)
+    await esperarLaSesion('admin')
+    expect(screen.getByRole('link', { name: /^trabajadores$/i })).toHaveAttribute(
+      'aria-current',
+      'page',
+    )
+  })
+
+  /** Clientes ya usa el ícono de personas: dos ítems iguales no se distinguen de un vistazo. */
+  it('Trabajadores lleva su propio ícono y no el de Clientes', async () => {
+    renderSidebarAs('admin')
+    await esperarLaSesion('admin')
+    const enlace = screen.getByRole('link', { name: /^trabajadores$/i })
+    expect(enlace.querySelector('svg.lucide-id-card')).not.toBeNull()
+    expect(enlace.querySelector('svg.lucide-users')).toBeNull()
   })
 })

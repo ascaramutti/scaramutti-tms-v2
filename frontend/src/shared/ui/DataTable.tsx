@@ -30,8 +30,10 @@ interface DataTableProps<T> {
   total: number
   totalPages: number
   onPageChange: (page: number) => void
-  /** Carga inicial (sin data previa). Muestra spinner en lugar de la tabla. */
+  /** Nada que mostrar todavía (carga inicial o vacío heredado de otra búsqueda). Muestra spinner en lugar de la tabla. */
   isLoading?: boolean
+  /** Lo que el lector de pantalla dice del spinner; por omisión, "Cargando". */
+  loadingLabel?: string
   /** Refetch en curso con data previa (paginar/filtrar). Atenúa la tabla. */
   isFetching?: boolean
   isError?: boolean
@@ -73,6 +75,7 @@ export function DataTable<T>({
   totalPages,
   onPageChange,
   isLoading,
+  loadingLabel = 'Cargando',
   isFetching,
   isError,
   errorMessage,
@@ -87,7 +90,7 @@ export function DataTable<T>({
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando" className="text-accent" />
+        <Spinner size={28} label={loadingLabel} className="text-accent" />
       </div>
     )
   }

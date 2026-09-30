@@ -36,8 +36,8 @@ type Landing =
   | typeof ALMACEN_LANDING
   | typeof OPERACIONES_LANDING
 
-// Los roles del módulo Almacén trabajan solo ahí, y el despachador solo en
-// operaciones: cada uno aterriza en su módulo y no en cotizaciones.
+// Los roles del módulo Almacén aterrizan ahí, y el despachador en operaciones:
+// cada uno entra por su módulo de trabajo y no por cotizaciones.
 const ROLE_LANDING: Record<UserRole, Landing> = {
   admin: COTIZACIONES_LANDING,
   sales: COTIZACIONES_LANDING,
