@@ -3,7 +3,8 @@ import { cn } from '../utils/cn'
 import { FIELD_ERROR, FIELD_LABEL, fieldClasses } from './fieldClasses'
 
 export interface SelectOption {
-  value: number
+  /** Número (un id) o texto (un nombre de sistema o un valor de enum). */
+  value: number | string
   label: string
 }
 
@@ -22,9 +23,9 @@ interface SelectFieldProps<T extends FieldValues> {
 }
 
 /**
- * Select numérico integrado con react-hook-form (Controller). El valor se
- * normaliza a `number` (o `null` si se elige la opción vacía). Mismo lenguaje
- * visual que `TextField` (label + error + focus ring azul).
+ * Select integrado con react-hook-form (Controller). Devuelve el valor de la
+ * opción con su tipo (número o texto), o `null` con la opción vacía. Mismo
+ * lenguaje visual que `TextField` (label + error + focus ring azul).
  */
 export function SelectField<T extends FieldValues>({
   id,
@@ -49,9 +50,12 @@ export function SelectField<T extends FieldValues>({
           <select
             id={id}
             disabled={disabled}
+            ref={field.ref}
             value={field.value ?? ''}
             onChange={(event) =>
-              field.onChange(event.target.value === '' ? null : Number(event.target.value))
+              field.onChange(
+                options.find((option) => String(option.value) === event.target.value)?.value ?? null,
+              )
             }
             onBlur={field.onBlur}
             aria-invalid={!!error}

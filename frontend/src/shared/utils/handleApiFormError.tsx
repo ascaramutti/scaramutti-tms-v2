@@ -12,6 +12,8 @@ interface HandleApiFormErrorOptions<F extends string> {
   codeFieldMap?: Record<string, F>
   /** Whitelist de fields que el form acepta en Problem.errors[]. Los que no estén se ignoran (con fallback a toast). */
   allowedFields?: readonly F[]
+  /** Texto propio por Problem.code, en lugar de `problem.detail` (en el campo o en el toast). */
+  codeMessages?: Record<string, string>
 }
 
 /**
@@ -19,16 +21,16 @@ interface HandleApiFormErrorOptions<F extends string> {
  *
  * Flujo:
  * 1. Si no es AxiosError → toast genérico (red caída, error inesperado del cliente).
- * 2. Si `problem.code` matchea `codeFieldMap` → asigna `problem.detail` al field (independiente del status).
+ * 2. Si `problem.code` matchea `codeFieldMap` → asigna al field el texto de `codeMessages` o, sin él, `problem.detail`.
  * 3. Si `status === 400` y hay `problem.errors[]` → asigna cada error a su field (filtrando por `allowedFields`).
- * 4. Si hay `problem.detail` → toast con ese mensaje (cubre 401/403/409/etc).
+ * 4. Si hay texto de `codeMessages` o `problem.detail` → toast con ese mensaje (cubre 401/403/409/etc).
  * 5. Fallback final → toast con `fallbackMessage`.
  */
 export function handleApiFormError<F extends string>(
   error: unknown,
   options: HandleApiFormErrorOptions<F>,
 ): void {
-  const { setError, fallbackMessage, codeFieldMap, allowedFields } = options
+  const { setError, fallbackMessage, codeFieldMap, allowedFields, codeMessages } = options
 
   if (!isAxiosError(error)) {
     toast.error('Error inesperado. Intenta de nuevo.', {
@@ -39,11 +41,12 @@ export function handleApiFormError<F extends string>(
 
   const problem = error.response?.data as Problem | undefined
   const status = error.response?.status
+  const ownMessage = problem?.code ? codeMessages?.[problem.code] : undefined
 
   if (problem?.code && codeFieldMap?.[problem.code]) {
     setError(codeFieldMap[problem.code], {
       type: 'backend',
-      message: problem.detail ?? 'Error de validación',
+      message: ownMessage ?? problem.detail ?? 'Error de validación',
     })
     return
   }
@@ -63,8 +66,9 @@ export function handleApiFormError<F extends string>(
     return
   }
 
-  if (problem?.detail) {
-    toast.error(problem.detail)
+  const message = ownMessage ?? problem?.detail
+  if (message) {
+    toast.error(message)
     return
   }
 

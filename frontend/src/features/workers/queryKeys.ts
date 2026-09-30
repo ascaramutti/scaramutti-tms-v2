@@ -15,4 +15,8 @@ export const workerKeys = {
   searches: () => [...workerKeys.all, 'search'] as const,
   search: (params: WorkerSearchParams) => [...workerKeys.searches(), params] as const,
   detail: (id: number) => [...workerKeys.all, 'detail', id] as const,
+  roles: () => [...workerKeys.all, 'roles'] as const,
+  documentTypes: () => [...workerKeys.all, 'document-types'] as const,
+  /** Clave de la mutación del alta, para que la página sepa si hay un envío en vuelo. */
+  create: () => [...workerKeys.all, 'create'] as const,
 }

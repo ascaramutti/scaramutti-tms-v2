@@ -1,5 +1,11 @@
 import { delay, http, HttpResponse } from 'msw'
-import type { WorkerDetailResponse, WorkerDriverProfileResponse } from '../../../api'
+import type {
+  DocumentTypeResponse,
+  RoleResponse,
+  WorkerDetailResponse,
+  WorkerDriverProfileResponse,
+  WorkerRequest,
+} from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -56,12 +62,185 @@ function problema(code: string, status: number, detail: string) {
   )
 }
 
-/** Default: la ficha del id pedido. */
+// ----- Catálogos del alta -----
+
+function role(
+  name: string,
+  description: string,
+  level: number,
+  driverProfile: RoleResponse['driverProfile'] = 'NONE',
+  canLogin = level > 1 || name === 'warehouse_keeper',
+): RoleResponse {
+  return { name, description, level, canLogin, driverProfile }
+}
+
+/** El organigrama, en el orden del backend: nivel de mayor a menor y, dentro del nivel, por id. */
+export const ROLES: RoleResponse[] = [
+  role('admin', 'Administrador del Sistema', 4),
+  role('general_manager', 'Gerente General', 3),
+  role('operations_manager', 'Gerente de Operaciones', 3),
+  role('finance_manager', 'Jefe de Finanzas', 2),
+  role('sales', 'Ejecutivo de Ventas', 2),
+  role('dispatcher', 'Coordinador de Operaciones', 2),
+  role('warehouse_keeper', 'Encargado de Almacén', 1),
+  role('driver', 'Conductor', 1, 'REQUIRED'),
+  role('escort', 'Escolta', 1, 'REQUIRED'),
+  role('assistant', 'Ayudante', 1, 'OPTIONAL'),
+  role('operator', 'Operador', 1),
+]
+
+export const DNI: DocumentTypeResponse = { id: 1, code: 'DNI', name: 'DNI', maxLength: 8, validationPattern: '\\d{8}' }
+export const CE: DocumentTypeResponse = {
+  id: 3,
+  code: 'CE',
+  name: 'Carné de extranjería',
+  maxLength: 12,
+  validationPattern: null,
+}
+
+/** Default: la ficha del id pedido, los dos catálogos y un alta que devuelve el id 57. */
 export const workersHandlers = [
   http.get(`${API}/workers/:id`, ({ params }) =>
     HttpResponse.json(fakeWorkerDetail({ id: Number(params.id) })),
   ),
+  http.get(`${API}/roles`, () => HttpResponse.json(ROLES)),
+  http.get(`${API}/document-types`, () => HttpResponse.json([DNI, CE])),
+  http.post(`${API}/workers`, () => HttpResponse.json(fakeWorkerDetail({ id: 57, hasUser: false }), { status: 201 })),
 ]
+
+export function listRolesOk(roles: RoleResponse[]) {
+  return http.get(`${API}/roles`, () => HttpResponse.json(roles))
+}
+
+export function listRolesError(status = 500) {
+  return http.get(`${API}/roles`, () => problema('COM-500', status, 'Error interno del servidor'))
+}
+
+export function listRolesSlow(ms: number) {
+  return http.get(`${API}/roles`, async () => {
+    await delay(ms)
+    return HttpResponse.json(ROLES)
+  })
+}
+
+/** Responde cada pedido con la siguiente lista de cargos (la última se repite) y los cuenta. */
+export function listRolesSequence(respuestas: RoleResponse[][], sink: { calls?: number }) {
+  sink.calls = 0
+  return http.get(`${API}/roles`, () => {
+    const i = Math.min(sink.calls ?? 0, respuestas.length - 1)
+    sink.calls = (sink.calls ?? 0) + 1
+    return HttpResponse.json(respuestas[i])
+  })
+}
+
+/** Un error de catálogo que cuenta los pedidos: distingue "no reintentó" de "reintentó". */
+export function listRolesFailing(status: number, sink: { calls?: number }) {
+  sink.calls = 0
+  return http.get(`${API}/roles`, () => {
+    sink.calls = (sink.calls ?? 0) + 1
+    return problema(status === 403 ? 'COM-003' : 'COM-500', status, 'Error del catálogo')
+  })
+}
+
+/** Cuenta los pedidos a los dos catálogos sin cambiar la respuesta por defecto. */
+export function catalogsCounting(sink: { roles?: number; documentTypes?: number }) {
+  sink.roles = 0
+  sink.documentTypes = 0
+  return [
+    http.get(`${API}/roles`, () => {
+      sink.roles = (sink.roles ?? 0) + 1
+      return HttpResponse.json(ROLES)
+    }),
+    http.get(`${API}/document-types`, () => {
+      sink.documentTypes = (sink.documentTypes ?? 0) + 1
+      return HttpResponse.json([DNI, CE])
+    }),
+  ]
+}
+
+/** Responde cada envío con el siguiente error de la lista; agotada, el alta. Guarda cada cuerpo. */
+export function createWorkerErrorsInSequence(codes: [string, number][], sink: { bodies?: WorkerRequest[] }) {
+  sink.bodies = []
+  return http.post(`${API}/workers`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), (await request.json()) as WorkerRequest]
+    const next = codes[sink.bodies.length - 1]
+    return next
+      ? problema(next[0], next[1], 'detail del backend')
+      : HttpResponse.json(fakeWorkerDetail({ id: 57, hasUser: false }), { status: 201 })
+  })
+}
+
+/** Un error del catálogo de tipos que cuenta los pedidos. */
+export function listDocumentTypesFailing(status: number, sink: { calls?: number }) {
+  sink.calls = 0
+  return http.get(`${API}/document-types`, () => {
+    sink.calls = (sink.calls ?? 0) + 1
+    return problema(status === 403 ? 'COM-003' : 'COM-500', status, 'Error del catálogo')
+  })
+}
+
+/** El primer envío responde el error dado; los siguientes, el alta. Guarda cada cuerpo. */
+export function createWorkerFailingOnce(code: string, status: number, sink: { bodies?: WorkerRequest[] }) {
+  sink.bodies = []
+  return http.post(`${API}/workers`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), (await request.json()) as WorkerRequest]
+    return sink.bodies.length === 1
+      ? problema(code, status, 'detail del backend')
+      : HttpResponse.json(fakeWorkerDetail({ id: 57, hasUser: false }), { status: 201 })
+  })
+}
+
+export function listDocumentTypesOk(types: DocumentTypeResponse[]) {
+  return http.get(`${API}/document-types`, () => HttpResponse.json(types))
+}
+
+export function listDocumentTypesError(status = 500) {
+  return http.get(`${API}/document-types`, () => problema('COM-500', status, 'Error interno del servidor'))
+}
+
+/** Responde cada pedido con la siguiente lista (la última se repite) y los cuenta. */
+export function listDocumentTypesSequence(respuestas: DocumentTypeResponse[][], sink: { calls?: number }) {
+  sink.calls = 0
+  return http.get(`${API}/document-types`, () => {
+    const i = Math.min(sink.calls ?? 0, respuestas.length - 1)
+    sink.calls = (sink.calls ?? 0) + 1
+    return HttpResponse.json(respuestas[i])
+  })
+}
+
+/** Guarda el cuerpo del alta y cuenta los envíos. */
+export function createWorkerCapture(
+  sink: { body?: WorkerRequest; calls?: number },
+  response: WorkerDetailResponse = fakeWorkerDetail({ id: 57, hasUser: false }),
+  ms = 0,
+) {
+  sink.calls = 0
+  return http.post(`${API}/workers`, async ({ request }) => {
+    sink.body = (await request.json()) as WorkerRequest
+    sink.calls = (sink.calls ?? 0) + 1
+    if (ms) await delay(ms)
+    return HttpResponse.json(response, { status: 201 })
+  })
+}
+
+/** Un error del alta con el detail real del backend: el test espera el texto propio. */
+export function createWorkerProblem(code: string, status: number, detail: string) {
+  return http.post(`${API}/workers`, () => problema(code, status, detail))
+}
+
+/** 400 de forma, con errores por campo. */
+export function createWorkerValidation(errors: { field: string; message: string }[]) {
+  return http.post(`${API}/workers`, () =>
+    HttpResponse.json(
+      { type: 'urn:tms:error:com-001', title: 'Bad Request', status: 400, code: 'COM-001', detail: 'Datos invalidos', errors },
+      { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+export function createWorkerNetworkError() {
+  return http.post(`${API}/workers`, () => HttpResponse.error())
+}
 
 // ----- Overrides para server.use(...) -----
 

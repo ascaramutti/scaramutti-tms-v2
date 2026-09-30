@@ -46,6 +46,7 @@ export function DateField<T extends FieldValues>({
             type="date"
             min={min}
             max={max}
+            ref={field.ref}
             disabled={disabled}
             value={field.value ?? ''}
             onChange={field.onChange}

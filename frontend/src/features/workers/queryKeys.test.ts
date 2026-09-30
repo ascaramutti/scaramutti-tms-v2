@@ -36,4 +36,10 @@ describe('workerKeys', () => {
     expect(workerKeys.detail(42).slice(0, 2)).not.toEqual(workerKeys.searches())
     expect(workerKeys.detail(7)).not.toEqual(workerKeys.detail(12))
   })
+
+  /** Cuelgan de la raíz: el alta los marca viejos sin pedirlos (cambian solo por migración). */
+  it('los catálogos del formulario cuelgan de la raíz', () => {
+    expect(workerKeys.roles()).toEqual(['workers', 'roles'])
+    expect(workerKeys.documentTypes()).toEqual(['workers', 'document-types'])
+  })
 })
