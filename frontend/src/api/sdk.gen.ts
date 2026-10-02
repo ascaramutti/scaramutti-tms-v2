@@ -955,6 +955,7 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * Normalización: `firstName`, `lastName`, `documentNumber`,
  * `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
  * bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
+ * `firstName` y `lastName` pasan además a NFC antes de validarse.
  *
  * Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
  * WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;

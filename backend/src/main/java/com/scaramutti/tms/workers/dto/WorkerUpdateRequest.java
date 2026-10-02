@@ -31,8 +31,8 @@ import java.time.LocalDate;
  * que es como se impide que el cuerpo los mueva. Mismo criterio que el alta.
  */
 public record WorkerUpdateRequest(
-    @NotBlank @Size(max = 100) String firstName,
-    @NotBlank @Size(max = 100) String lastName,
+    @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String firstName,
+    @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String lastName,
     @NotNull Integer documentTypeId,
     @NotBlank @Size(max = 20) String documentNumber,
     @Pattern(regexp = "^\\d{9}$") String phone,
@@ -43,4 +43,9 @@ public record WorkerUpdateRequest(
 ) {
     /** El piso del motivo, medido en el servicio por lo que explica el javadoc de arriba. */
     public static final int MIN_REASON_LENGTH = 10;
+
+    public WorkerUpdateRequest {
+        firstName = PersonNames.toNfc(firstName);
+        lastName = PersonNames.toNfc(lastName);
+    }
 }

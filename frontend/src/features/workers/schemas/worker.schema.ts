@@ -49,12 +49,23 @@ export function sendsDriver(values: Pick<WorkerFormValues, 'hasLicense'>, profil
 }
 
 /**
- * Nombre y apellido: letras, espacios, apóstrofo y guion. El backend todavía no la exige (llega en
- * el cambio siguiente); por ahora es una guarda del cliente. Se miden y viajan en NFC: una tilde
- * pegada como letra más marca entra, y lo guardado queda en una sola forma.
+ * Nombre y apellido: al menos una letra latina, más espacios, apóstrofo y guion, la misma regla que
+ * exige el backend. Letra latina es letra de script latino: quedan afuera los números romanos, los
+ * rellenos invisibles y las letras de otros alfabetos que se parecen a las nuestras. Se miden y
+ * viajan en NFC: una tilde pegada como letra más marca entra; una marca que NFC no compone, no.
  */
-const PERSON_NAME = /^[\p{L}' -]+$/u
+export const PERSON_NAME = /^[' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|[' -])*$/u
 const PERSON_NAME_MESSAGE = 'Solo letras, espacios, apóstrofo o guion.'
+
+/**
+ * Como en el backend: pasado este largo no se normaliza, porque reordenar miles de marcas cuesta
+ * tiempo cuadrático, y el tope de 100 lo rechaza igual. Componer junta a lo sumo cuatro caracteres.
+ */
+const MAX_NORMALIZED_LENGTH = 400
+
+function toNfc(value: string): string {
+  return value.length > MAX_NORMALIZED_LENGTH ? value : value.normalize('NFC')
+}
 
 /**
  * El patrón del tipo se aplica al número entero, en modo Unicode como lo lee Java. Lo que
@@ -77,17 +88,21 @@ export function buildWorkerFormSchema({ documentTypes, roles, today = todayInLim
       firstName: z
         .string()
         .trim()
-        .normalize('NFC')
+        .overwrite(toNfc)
         .min(1, 'Indica el nombre.')
         .max(WORKER_NAME_MAX_LENGTH, 'Máximo 100 caracteres.')
-        .regex(PERSON_NAME, PERSON_NAME_MESSAGE),
+        // Pasado el tope la regla no se mide: sobre un texto gigante desbordaría la pila. Sin cortar
+        // la validación, para que el resto del formulario siga avisando en la misma vuelta.
+        .refine((value) => value.length > WORKER_NAME_MAX_LENGTH || PERSON_NAME.test(value), PERSON_NAME_MESSAGE),
       lastName: z
         .string()
         .trim()
-        .normalize('NFC')
+        .overwrite(toNfc)
         .min(1, 'Indica el apellido.')
         .max(WORKER_NAME_MAX_LENGTH, 'Máximo 100 caracteres.')
-        .regex(PERSON_NAME, PERSON_NAME_MESSAGE),
+        // Pasado el tope la regla no se mide: sobre un texto gigante desbordaría la pila. Sin cortar
+        // la validación, para que el resto del formulario siga avisando en la misma vuelta.
+        .refine((value) => value.length > WORKER_NAME_MAX_LENGTH || PERSON_NAME.test(value), PERSON_NAME_MESSAGE),
       documentTypeId: z
         .number()
         .int()

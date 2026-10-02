@@ -25,10 +25,10 @@ import java.time.LocalDate;
  * quien lo creo, cuando se modifico y quien. No estan aca, y por eso no hay nada que ignorar.
  */
 public record WorkerRequest(
-    @NotBlank @Size(max = 100)
+    @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
     @Schema(example = "Juan") String firstName,
 
-    @NotBlank @Size(max = 100)
+    @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
     @Schema(example = "Pérez Huamán") String lastName,
 
     @NotNull
@@ -48,4 +48,9 @@ public record WorkerRequest(
 
     @Valid
     @Schema(nullable = true) WorkerDriverProfileRequest driver
-) {}
+) {
+    public WorkerRequest {
+        firstName = PersonNames.toNfc(firstName);
+        lastName = PersonNames.toNfc(lastName);
+    }
+}

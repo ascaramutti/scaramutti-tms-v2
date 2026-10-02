@@ -1105,6 +1105,11 @@ export type WorkerDriverProfileResponse = {
  * como enum: la lista vive en la base). `hireDate` es un día calendario
  * (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
  * nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
+ * `firstName` y `lastName`: al menos una letra latina (letra de script
+ * latino según la versión de Unicode del backend, 15.0), más espacios,
+ * apóstrofo y guion; se pasan a NFC antes de
+ * validarse (pasados 400 caracteres no se normalizan: se rechazan por
+ * largo tal como llegan) y se guardan recortados.
  *
  */
 export type WorkerRequest = {
