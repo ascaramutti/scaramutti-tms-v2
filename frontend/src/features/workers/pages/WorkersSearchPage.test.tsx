@@ -417,7 +417,16 @@ describe('WorkersSearchPage', () => {
       expect(await screen.findByRole('button', { name: 'Ver la ficha de Rosa Vega Solís, activo' })).toBeInTheDocument()
     })
 
-    it('con resultados tampoco ofrece un alta', async () => {
+    /** Desde que abre, antes de buscar: el alta no depende de encontrar a nadie. */
+    it('ofrece "Nuevo trabajador" desde que abre, hacia el alta', () => {
+      renderPage()
+
+      const enlace = screen.getByRole('link', { name: 'Nuevo trabajador' })
+      expect(enlace).toHaveAttribute('href', `${WORKERS_BASE}/nuevo`)
+      expect(enlace.closest('header')).not.toBeNull()
+    })
+
+    it('con resultados, el alta es el único enlace y las filas los únicos botones', async () => {
       const user = userEvent.setup()
       server.use(workersSearchPage([ANA]))
       renderPage()
@@ -425,13 +434,12 @@ describe('WorkersSearchPage', () => {
       await user.type(campo(), 'ana')
       await screen.findByText('Ana Torres Ruiz')
 
-      // Los únicos botones son las filas, y no hay enlaces: ningún alta se cuela, se llame como se llame.
       const otros = screen.getAllByRole('button').filter((b) => !/^Ver la ficha de /.test(b.getAttribute('aria-label') ?? ''))
       expect(otros).toEqual([])
-      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('link').map((enlace) => enlace.textContent)).toEqual(['Nuevo trabajador'])
     })
 
-    it('no ofrece dar de alta un trabajador', async () => {
+    it('sin coincidencias, el vacío no suma botones ni enlaces propios', async () => {
       const user = userEvent.setup()
       server.use(workersSearchPage([]))
       renderPage()
@@ -439,9 +447,8 @@ describe('WorkersSearchPage', () => {
       await user.type(campo(), 'zzz')
       await screen.findByText('No encontramos trabajadores con ese texto')
 
-      // Ningún botón ni enlace, se llame como se llame: el alta llega con su propia pantalla.
       expect(screen.queryByRole('button')).not.toBeInTheDocument()
-      expect(screen.queryByRole('link')).not.toBeInTheDocument()
+      expect(screen.getAllByRole('link').map((enlace) => enlace.textContent)).toEqual(['Nuevo trabajador'])
     })
 
     it('muestra el estado de carga mientras busca', async () => {

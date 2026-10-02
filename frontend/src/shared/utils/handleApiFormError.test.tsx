@@ -183,4 +183,36 @@ describe('handleApiFormError', () => {
       'No se pudo iniciar sesión. Verifica tu conexión e intenta de nuevo.',
     )
   })
+
+  describe('codeMessages', () => {
+    it('el texto propio reemplaza al detail en el campo', () => {
+      const setError = vi.fn()
+      handleApiFormError(makeAxiosError(409, { code: 'X-1', detail: 'detail del backend' }), {
+        setError,
+        fallbackMessage: 'fallback',
+        codeFieldMap: { 'X-1': 'campo' },
+        codeMessages: { 'X-1': 'Texto propio.' },
+      })
+      expect(setError).toHaveBeenCalledWith('campo', { type: 'backend', message: 'Texto propio.' })
+    })
+
+    it('el texto propio reemplaza al detail en el aviso', () => {
+      handleApiFormError(makeAxiosError(403, { code: 'X-2', detail: 'detail del backend' }), {
+        setError: vi.fn(),
+        fallbackMessage: 'fallback',
+        codeMessages: { 'X-2': 'Aviso propio.' },
+      })
+      expect(mockToastError).toHaveBeenCalledWith('Aviso propio.')
+    })
+
+    /** Un código sin texto propio sigue mostrando el detail, como antes. */
+    it('sin texto propio para el código, sigue el detail', () => {
+      handleApiFormError(makeAxiosError(403, { code: 'X-3', detail: 'detail del backend' }), {
+        setError: vi.fn(),
+        fallbackMessage: 'fallback',
+        codeMessages: { 'X-2': 'Aviso propio.' },
+      })
+      expect(mockToastError).toHaveBeenCalledWith('detail del backend')
+    })
+  })
 })

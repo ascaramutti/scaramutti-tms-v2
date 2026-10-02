@@ -30,6 +30,7 @@ import { ClientEditPage } from './features/clients/pages/ClientEditPage'
 import { ClientDetailPage } from './features/clients/pages/ClientDetailPage'
 import { WorkersSearchPage } from './features/workers/pages/WorkersSearchPage'
 import { WorkerDetailPage } from './features/workers/pages/WorkerDetailPage'
+import { WorkerCreatePage } from './features/workers/pages/WorkerCreatePage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -150,6 +151,15 @@ export const routes: RouteObject[] = [
         element: (
           <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
             <WorkersSearchPage />
+          </ProtectedRoute>
+        ),
+      },
+      // Antes que la ficha por legibilidad: el router prioriza el segmento literal igual.
+      {
+        path: `${WORKERS_BASE}/nuevo`,
+        element: (
+          <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+            <WorkerCreatePage />
           </ProtectedRoute>
         ),
       },

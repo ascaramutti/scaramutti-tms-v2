@@ -16,6 +16,7 @@ import userEvent from '@testing-library/user-event'
 import { fakeClient } from './test/mocks/handlers/clients'
 import { fakeWorker, workersSearchPage } from './test/mocks/handlers/shared-catalogs'
 import { fakeWorkerDetail, getWorkerCapture, getWorkerOk } from './test/mocks/handlers/workers'
+import { fakeDriverProfile, ROLES } from './test/mocks/handlers/workers'
 import { routes } from './router'
 import { AuthProvider } from './shared/auth/AuthContext'
 import { ThemeProvider } from './shared/ui/theme/ThemeContext'
@@ -388,6 +389,88 @@ describe('router - URL viejas y la raíz del dominio', () => {
       await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(7)))
       expect(await screen.findByRole('heading', { level: 1, name: 'Ana Torres Ruiz' })).toBeInTheDocument()
       expect(screen.queryByText('Despachadora')).not.toBeInTheDocument()
+    })
+
+    it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+      '%s abre el alta',
+      async (role) => {
+        renderRouteAs(role, `${WORKERS_BASE}/nuevo`)
+        expect(await screen.findByRole('heading', { level: 1, name: 'Nuevo trabajador' })).toBeInTheDocument()
+      },
+    )
+
+    /** La guarda corta antes de pedir los catálogos del formulario. */
+    it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso en el alta, sin pedir catálogos',
+      async (role) => {
+        const pedidos: string[] = []
+        server.use(
+          http.get(`${API}/roles`, () => {
+            pedidos.push('roles')
+            return HttpResponse.json(ROLES)
+          }),
+          http.get(`${API}/document-types`, () => {
+            pedidos.push('document-types')
+            return HttpResponse.json([])
+          }),
+        )
+        renderRouteAs(role, `${WORKERS_BASE}/nuevo`)
+        expect(await screen.findByText(/sin acceso a trabajadores/i)).toBeInTheDocument()
+        expect(pedidos).toEqual([])
+      },
+    )
+
+    it('sin sesión el alta lleva al login', async () => {
+      const router = goTo(null, `${WORKERS_BASE}/nuevo`)
+      await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+
+    /** "nuevo" es la ruta literal, no un id que caiga en la ficha. */
+    it('"nuevo" no se toma como el id de una ficha', async () => {
+      const sink: { ids?: number[] } = {}
+      server.use(getWorkerCapture(sink))
+      renderRouteAs('admin', `${WORKERS_BASE}/nuevo`)
+      await screen.findByRole('heading', { level: 1, name: 'Nuevo trabajador' })
+      expect(sink.ids).toEqual([])
+    })
+
+    it('desde la búsqueda, "Nuevo trabajador" abre el alta', async () => {
+      const user = userEvent.setup()
+      const router = goTo('finance_manager', WORKERS_BASE)
+      await user.click(await screen.findByRole('link', { name: 'Nuevo trabajador' }))
+      await waitFor(() => expect(router.state.location.pathname).toBe(`${WORKERS_BASE}/nuevo`))
+      expect(await screen.findByRole('heading', { level: 1, name: 'Nuevo trabajador' })).toBeInTheDocument()
+    })
+
+    it('un alta termina en la ficha real del creado', async () => {
+      const user = userEvent.setup()
+      const creado = fakeWorkerDetail({
+        id: 57,
+        hasUser: false,
+        role: { name: 'driver', description: 'Conductor', level: 1, canLogin: false, driverProfile: 'REQUIRED' },
+        driver: fakeDriverProfile(),
+      })
+      server.use(
+        http.post(`${API}/workers`, () => HttpResponse.json(creado, { status: 201 })),
+        getWorkerOk(creado),
+      )
+      const router = goTo('admin', `${WORKERS_BASE}/nuevo`)
+      await user.type(await screen.findByLabelText('Nombre'), 'Ana')
+      await user.type(screen.getByLabelText('Apellido'), 'Torres Ruiz')
+      await user.type(screen.getByLabelText('Número de documento'), '45678912')
+      await user.selectOptions(screen.getByLabelText('Cargo'), 'Conductor')
+      await user.type(screen.getByLabelText('N.° de licencia'), 'Q12345678')
+      await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(57)))
+      expect(await screen.findByRole('heading', { level: 1, name: 'Ana Torres Ruiz' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { level: 2, name: 'Licencia de conducir' })).toBeInTheDocument()
+    })
+
+    it('en el alta, Trabajadores queda marcado en el menú', async () => {
+      renderRouteAs('admin', `${WORKERS_BASE}/nuevo`)
+      await screen.findByRole('heading', { level: 1, name: 'Nuevo trabajador' })
+      expect(screen.getByRole('link', { name: /^trabajadores$/i })).toHaveAttribute('aria-current', 'page')
     })
 
     it('en la ficha, Trabajadores queda marcado en el menú', async () => {

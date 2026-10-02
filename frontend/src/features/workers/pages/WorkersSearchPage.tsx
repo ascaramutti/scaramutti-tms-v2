@@ -1,5 +1,10 @@
+import { Link } from 'react-router-dom'
+import { UserPlus } from 'lucide-react'
 import { useState } from 'react'
 import { PageHeader } from '../../../shared/ui/PageHeader'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
+import { WORKERS_BASE } from '../../../shared/paths'
+import { cn } from '../../../shared/utils/cn'
 import { useDebouncedValue } from '../../../shared/hooks/useDebouncedValue'
 import { getApiErrorMessage } from '../../../shared/utils/getApiErrorMessage'
 import { WorkerSearchBar } from '../components/WorkerSearchBar'
@@ -59,6 +64,12 @@ export function WorkersSearchPage() {
         title="Trabajadores"
         description="Busca por nombre, apellido o documento para ver quién está en el padrón."
         divider
+        action={
+          <Link to={`${WORKERS_BASE}/nuevo`} className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
+            Nuevo trabajador
+          </Link>
+        }
       />
 
       <WorkerSearchBar

@@ -150,6 +150,8 @@ describe('canRoleOpenPath', () => {
   it('una ruta debajo del padrón hereda su permiso', () => {
     expect(canRoleOpenPath(`${WORKERS_BASE}/7`, 'finance_manager')).toBe(true)
     expect(canRoleOpenPath(`${WORKERS_BASE}/7`, 'warehouse_keeper')).toBe(false)
+    expect(canRoleOpenPath(`${WORKERS_BASE}/nuevo`, 'finance_manager')).toBe(true)
+    expect(canRoleOpenPath(`${WORKERS_BASE}/nuevo`, 'warehouse_keeper')).toBe(false)
   })
 
   it('no confunde con el padrón una ruta que solo comparte el comienzo', () => {

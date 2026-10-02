@@ -299,8 +299,8 @@ describe('ServiceCreatePage', () => {
     await screen.findByLabelText('Fecha tentativa')
     await user.click(screen.getByRole('button', { name: /registrar servicio/i }))
 
-    // Este select está escrito a mano (el compartido normaliza a número y el ámbito
-    // es texto), así que su error necesita el mismo trato que el de los demás campos:
+    // Este select está escrito a mano (desde antes de que el compartido aceptara
+    // texto), así que su error necesita el mismo trato que el de los demás campos:
     // anunciado al aparecer y leído al enfocar el control.
     const error = await screen.findByText('Elige el ámbito del viaje')
     expect(error).toHaveAttribute('role', 'alert')

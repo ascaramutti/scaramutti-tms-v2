@@ -239,9 +239,9 @@ export function ServiceForm({ onCreated, onCancel }: ServiceFormProps) {
             >
               Ámbito del viaje
             </label>
-            {/* Dos opciones fijas del contrato, sin catálogo detrás. No usa el
-                `SelectField` compartido porque aquel normaliza el valor a número y
-                el ámbito es un enum de texto. */}
+            {/* Dos opciones fijas del contrato, sin catálogo detrás. Escrito a mano
+                desde antes de que el `SelectField` compartido aceptara valores de
+                texto. */}
             <Controller
               name="tripScope"
               control={control}
