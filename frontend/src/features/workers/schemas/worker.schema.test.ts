@@ -1,6 +1,14 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CE, DNI, ROLES } from '../../../test/mocks/handlers/workers'
-import { buildWorkerFormSchema, toWorkerRequest, workerCreateDefaults, type WorkerFormValues } from './worker.schema'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  buildWorkerFormSchema,
+  PERSON_NAME,
+  toWorkerRequest,
+  workerCreateDefaults,
+  type WorkerFormValues,
+} from './worker.schema'
 
 const HOY = '2026-08-24'
 const schema = buildWorkerFormSchema({ documentTypes: [DNI, CE], roles: ROLES, today: () => HOY })
@@ -16,14 +24,20 @@ function valores(cambios: Partial<WorkerFormValues> = {}): WorkerFormValues {
   }
 }
 
-/** Los mensajes por campo, como los ve el formulario. */
+/** Los mensajes por campo, como los ve el formulario: el primero de cada campo. */
 function errores(cambios: Partial<WorkerFormValues> = {}) {
   const resultado = schema.safeParse(valores(cambios))
   if (resultado.success) return {}
-  return Object.fromEntries(resultado.error.issues.map((issue) => [issue.path.join('.'), issue.message]))
+  const porCampo: Record<string, string> = {}
+  for (const issue of resultado.error.issues) porCampo[issue.path.join('.')] ??= issue.message
+  return porCampo
 }
 
 describe('buildWorkerFormSchema', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('acepta un alta bien formada sin licencia', () => {
     expect(errores()).toEqual({})
   })
@@ -50,7 +64,7 @@ describe('buildWorkerFormSchema', () => {
     expect(conJavaSolo.safeParse(valores({ documentNumber: '456789123' })).success).toBe(false)
   })
 
-  it.each([['María José'], ["D'Angelo"], ['Pérez-Gómez'], ['Ñuñez Müller'], ['Šimić'], ['Łukasz']])(
+  it.each([['María José'], ["D'Angelo"], ['Pérez-Gómez'], ['Ñuñez Müller'], ['Šimić'], ['Łukasz'], ['Mª José'], ["'t Hooft"]])(
     'nombre y apellido aceptan "%s"',
     (valor) => {
       expect(errores({ firstName: valor, lastName: valor })).toEqual({})
@@ -66,7 +80,22 @@ describe('buildWorkerFormSchema', () => {
     expect(resultado.data?.lastName).toBe('Jos\u00e9')
   })
 
-  it.each([['6564565'], ['Juan2'], ['Ana@'], ['2Juan'], ['@Ana'], ['J. Pérez']])('nombre y apellido rechazan "%s"', (valor) => {
+  it.each([
+    ['6564565'],
+    ['Juan2'],
+    ['Ana@'],
+    ['2Juan'],
+    ['@Ana'],
+    ['J. Pérez'],
+    ["'"],
+    ['-'],
+    ['\u3164'],
+    ['Ju\u0430n'],
+    ['\u{1D409}uan'],
+    ['\u2160'],
+    ['Juan \u2161'],
+    ['Pe\u0303g\u0303a'],
+  ])('nombre y apellido rechazan "%s"', (valor) => {
     expect(errores({ firstName: valor, lastName: valor })).toEqual({
       firstName: 'Solo letras, espacios, apóstrofo o guion.',
       lastName: 'Solo letras, espacios, apóstrofo o guion.',
@@ -77,6 +106,83 @@ describe('buildWorkerFormSchema', () => {
     expect(errores({ firstName: 'A'.repeat(100), lastName: 'B'.repeat(100) })).toEqual({})
     expect(errores({ firstName: 'A'.repeat(101) }).firstName).toBe('Máximo 100 caracteres.')
     expect(errores({ lastName: 'B'.repeat(101) }).lastName).toBe('Máximo 100 caracteres.')
+  })
+
+  /**
+   * Un texto gigante pegado avisa el largo sin medir la regla: sobre millones de caracteres desbordaría
+   * la pila (en este Node, entre 4M y 9M). Si un motor aguanta más, este caso deja de ver la guarda;
+   * el de 100 caracteres de abajo fija su borde.
+   */
+  it('un nombre gigante avisa el largo sin lanzar', () => {
+    const gigante = 'a'.repeat(9_000_000)
+
+    expect(errores({ firstName: gigante, lastName: gigante })).toEqual({
+      firstName: 'Máximo 100 caracteres.',
+      lastName: 'Máximo 100 caracteres.',
+    })
+  })
+
+  it('con 100 caracteres justos la regla se mide', () => {
+    expect(errores({ firstName: 'A'.repeat(99) + '1', lastName: 'B'.repeat(99) + '1' })).toEqual({
+      firstName: 'Solo letras, espacios, apóstrofo o guion.',
+      lastName: 'Solo letras, espacios, apóstrofo o guion.',
+    })
+  })
+
+  it('un nombre gigante no apaga las demás validaciones', () => {
+    expect(errores({ firstName: 'a'.repeat(9_000_000), documentNumber: '4567891' })).toEqual({
+      firstName: 'Máximo 100 caracteres.',
+      documentNumber: 'El número no tiene el formato de DNI.',
+    })
+  })
+
+  /** Como en el backend: reordenar miles de marcas cuesta tiempo cuadrático, así que pasado 400 no se normaliza. */
+  it('pasado 400 caracteres no se normaliza, y con 400 sí', () => {
+    const normalize = vi.spyOn(String.prototype, 'normalize')
+    const normalizados = () => normalize.mock.contexts.map(String)
+    const conCuatrocientos = 'a' + '\u0301'.repeat(399)
+    const conCuatrocientosUno = 'a' + '\u0301'.repeat(400)
+
+    errores({ firstName: conCuatrocientos, lastName: conCuatrocientosUno })
+    expect(normalizados()).toContain(conCuatrocientos)
+    expect(normalizados()).not.toContain(conCuatrocientosUno)
+  })
+
+  /** Cien letras latinas de tres caracteres cada una (la composición latina más larga) caben en el tope. */
+  it('cien letras descompuestas en tres caracteres se normalizan y entran', () => {
+    const cien = 'u\u0308\u0301'.repeat(100)
+    expect(cien).toHaveLength(300)
+    expect(errores({ firstName: cien, lastName: cien })).toEqual({})
+  })
+
+  /** Los mismos casos que mide el backend contra su regla: así las dos quedan atadas al contrato. */
+  it('los casos comunes entran o quedan afuera como en el backend', () => {
+    const cases = JSON.parse(
+      readFileSync(join(import.meta.dirname, '../../../../../backend/src/test/resources/workers/person-names.json'), 'utf8'),
+    ) as { accepted: string[]; rejected: string[] }
+
+    for (const value of cases.accepted) expect(PERSON_NAME.test(value.normalize('NFC')), value).toBe(true)
+    for (const value of cases.rejected) expect(PERSON_NAME.test(value.normalize('NFC')), value).toBe(false)
+  })
+
+  /** La regla corre antes que el tope: con clases que se solapan, un texto largo que falla tardaría. */
+  it('la regla de nombre rechaza un texto largo en tiempo lineal', () => {
+    const start = performance.now()
+    expect(PERSON_NAME.test('a'.repeat(200_000) + '1')).toBe(false)
+    expect(performance.now() - start).toBeLessThan(2_000)
+  })
+
+  /** El backend aplica la misma regla: el contrato publica este patrón para los dos campos. */
+  it('la regla de nombre es la que publica el contrato', () => {
+    const spec = readFileSync(
+      join(import.meta.dirname, '../../../../../backend/src/main/resources/META-INF/openapi.yaml'),
+      'utf8',
+    )
+    const worker = spec.slice(spec.indexOf('    WorkerRequest:'))
+    const patterns = [...worker.matchAll(/^ {8}(firstName|lastName): .*pattern: '((?:[^']|'')*)'/gm)].slice(0, 2)
+
+    expect(patterns.map((match) => match[1])).toEqual(['firstName', 'lastName'])
+    for (const match of patterns) expect(match[2].replaceAll("''", "'")).toBe(PERSON_NAME.source)
   })
 
   it('el tope de 100 se mide ya normalizado', () => {

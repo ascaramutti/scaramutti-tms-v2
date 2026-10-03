@@ -84,7 +84,8 @@ class WorkerEditOrderedLockTest {
     private String actorBody(String seededRole, String suffix, String newRole) {
         return """
             {"firstName":"Actor","lastName":"%s","documentTypeId":%d,"documentNumber":"ZTESTA%s",
-             "role":"%s","hireDate":"2024-03-01"}""".formatted(seededRole, documentTypeId(), suffix, newRole);
+             "role":"%s","hireDate":"2024-03-01"}""".formatted(
+                seededRole.replace('_', ' '), documentTypeId(), suffix, newRole);
     }
 
     private String edit(String token, int workerId, String body) {

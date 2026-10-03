@@ -517,6 +517,110 @@ class WorkerCreateResourceTest {
             documentTypeId(), documentNumber, override);
     }
 
+    // ---------- la regla del nombre ------------------------------------------------
+
+    private String bodyNamed(String firstName, String lastName, String documentNumber) {
+        return String.format("""
+            {"firstName":"%s","lastName":"%s","documentTypeId":%d,"documentNumber":"%s",
+             "role":"operator","hireDate":"2024-03-01"}""",
+            firstName, lastName, documentTypeId(), documentNumber);
+    }
+
+    @ParameterizedTest(name = "{0} -> 201")
+    @ValueSource(strings = {"María José", "D'Angelo", "Pérez-Gómez", "Ñuñez Müller", "Šimić", "Łukasz", "Mª José", "'t Hooft"})
+    void create_acceptsLettersSpacesApostropheAndHyphenInNames(String name) {
+        post(adminToken()).body(bodyNamed(name, name, "ZTESTC160"))
+        .when().post("/workers")
+        .then().statusCode(201)
+            .body("firstName", equalTo(name))
+            .body("lastName", equalTo(name));
+    }
+
+    @ParameterizedTest(name = "{0} = {1} -> 400 COM-001")
+    @CsvSource({
+        "firstName, 6564565", "firstName, Juan2", "firstName, Ana@", "firstName, Ana_",
+        "firstName, Ana.",    "firstName, <b>",   "firstName, \u0301Ana",
+        "lastName,  6564565", "lastName,  Juan2", "lastName,  Ana@", "lastName,  Ana_",
+        "lastName,  Ana.",    "lastName,  <b>",   "lastName,  \u0301Ana",
+        "firstName, \u3164",  "firstName, Ju\u0430n", "firstName, \uD835\uDC09uan",
+        "firstName, \u2160",  "firstName, Pe\u0303g\u0303a",
+        "lastName,  \u3164",  "lastName,  Ju\u0430n", "lastName,  \uD835\uDC09uan",
+        "lastName,  \u2160",  "lastName,  Pe\u0303g\u0303a",
+        "firstName, Juan \u2161", "lastName,  Juan \u2161",
+    })
+    void create_withANameOutsideTheRule_returns400_COM001(String field, String value) {
+        String firstName = field.equals("firstName") ? value : "Juan";
+        String lastName = field.equals("lastName") ? value : "Pérez";
+        post(adminToken()).body(bodyNamed(firstName, lastName, "ZTESTC161"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem(field))
+            .body("errors.message", hasItem("Solo letras, espacios, apóstrofo o guion."));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC161"));
+    }
+
+    /** Sin ninguna letra no es un nombre, aunque cada signo por separado este permitido. */
+    @ParameterizedTest(name = "[{0}] -> 400 COM-001")
+    @ValueSource(strings = {"'", "-", "' - '"})
+    void create_aNameWithoutALetter_returns400_COM001(String name) {
+        post(adminToken()).body(bodyNamed(name, "Pérez", "ZTESTC166"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("firstName"));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC166"));
+    }
+
+    /** El tab no es el espacio que la regla permite. Va escapado: crudo rompería el JSON del cuerpo. */
+    @Test
+    void create_aNameWithATab_returns400_COM001() {
+        post(adminToken()).body(bodyNamed("Juan\\tCarlos", "Pérez", "ZTESTC164"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("firstName"));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC164"));
+    }
+
+    /** NFC y no NFKC: una ligadura es una letra y se guarda tal cual, sin plegarla a dos. */
+    @Test
+    void create_aLigature_isStoredAsItCame() {
+        int id = post(adminToken()).body(bodyNamed("Sera\ufb01n", "Pérez", "ZTESTC165"))
+            .when().post("/workers")
+            .then().statusCode(201)
+            .extract().path("id");
+
+        assertEquals("Sera\ufb01n", fixtures.workerRowOf(id).firstName());
+    }
+
+    /** Un nombre de miles de marcas combinantes se rechaza por largo. El tope de NFC lo fija PersonNamesTest. */
+    @Test
+    void create_aNameOfThousandsOfCombiningMarks_returns400_COM001() {
+        String marks = "a" + "\u0301\u0316".repeat(40_000);
+        post(adminToken()).body(bodyNamed(marks, "Pérez", "ZTESTC163"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("firstName"));
+    }
+
+    /** Una tilde que llega como letra mas marca combinante entra, y se guarda en NFC. */
+    @Test
+    void create_aNameWithACombiningAccent_isValidatedAndStoredInNfc() {
+        int id = post(adminToken()).body(bodyNamed("Jose\u0301", "Pe\u0301rez", "ZTESTC162"))
+            .when().post("/workers")
+            .then().statusCode(201)
+                .body("firstName", equalTo("Jos\u00e9"))
+            .extract().path("id");
+
+        assertEquals("Jos\u00e9", fixtures.workerRowOf(id).firstName());
+        assertEquals("P\u00e9rez", fixtures.workerRowOf(id).lastName());
+    }
+
     // ---------- validaciones de negocio -------------------------------------------
 
     @Test

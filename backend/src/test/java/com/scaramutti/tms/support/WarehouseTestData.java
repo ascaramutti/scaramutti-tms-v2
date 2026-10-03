@@ -784,10 +784,11 @@ public class WarehouseTestData {
     /**
      * El actor completo. La edicion lo necesita porque hay reglas sobre el trabajador DE LA
      * SESION (nadie se cambia su propio cargo), y sin el id del trabajador esos casos no se
-     * pueden escribir.
+     * pueden escribir. El apellido es el cargo con espacios: con guion bajo no pasaria la regla
+     * del nombre al reenviar la ficha.
      */
     public ActorSeed seedActor(String roleName, String suffix) {
-        int workerId = seedWorker("ZTESTA" + suffix, "Actor", roleName, roleName, true);
+        int workerId = seedWorker("ZTESTA" + suffix, "Actor", roleName.replace('_', ' '), roleName, true);
         return new ActorSeed(seedUserFor(workerId, "ztestuser" + suffix, roleName), workerId);
     }
 

@@ -707,7 +707,7 @@ class WorkerUpdateResourceTest {
         fixtures.setWorkerHireDate(actor.workerId(), LocalDate.of(2024, 3, 1));
 
         put(fabricateTokenForUser(actor.userId(), "ztestuser92", "general_manager"))
-            .body(body("Actor", "general_manager", "ZTESTA92", null, "finance_manager", "2024-03-01", null, null))
+            .body(body("Actor", "general manager", "ZTESTA92", null, "finance_manager", "2024-03-01", null, null))
         .when().put("/workers/" + actor.workerId())
         .then().statusCode(403).body("code", equalTo("WRK-006"));
     }
@@ -1237,6 +1237,95 @@ class WorkerUpdateResourceTest {
         put(adminToken()).body(body("Juan", "Pérez", "ZTESTE098", null, "operator", "2024-03-01", null, null))
         .when().put("/workers/" + id)
         .then().statusCode(400).body("code", equalTo("WRK-009"));
+    }
+
+    // ---------- la regla del nombre ------------------------------------------------
+
+    @ParameterizedTest(name = "{0} -> 200")
+    @ValueSource(strings = {"María José", "D'Angelo", "Pérez-Gómez", "Ñuñez Müller", "Šimić", "Łukasz", "Mª José", "'t Hooft"})
+    void update_acceptsLettersSpacesApostropheAndHyphenInNames(String name) {
+        int id = seedWorker("ZTESTE190", "operator");
+
+        put(adminToken()).body(body(name, name, "ZTESTE190", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(200)
+            .body("firstName", equalTo(name))
+            .body("lastName", equalTo(name));
+    }
+
+    @ParameterizedTest(name = "{0} = [{1}] -> 400 COM-001")
+    @CsvSource({
+        "firstName, 6564565", "firstName, Juan2", "firstName, Ana@", "firstName, Ana_",
+        "firstName, Ana.",    "firstName, <b>",   "firstName, \u0301Ana",
+        "lastName,  6564565", "lastName,  Juan2", "lastName,  Ana@", "lastName,  Ana_",
+        "lastName,  Ana.",    "lastName,  <b>",   "lastName,  \u0301Ana",
+        "firstName, \u3164",  "firstName, Ju\u0430n", "firstName, \uD835\uDC09uan",
+        "firstName, \u2160",  "firstName, Pe\u0303g\u0303a",
+        "lastName,  \u3164",  "lastName,  Ju\u0430n", "lastName,  \uD835\uDC09uan",
+        "lastName,  \u2160",  "lastName,  Pe\u0303g\u0303a",
+        "firstName, Juan \u2161", "lastName,  Juan \u2161",
+    })
+    void update_withANameOutsideTheRule_returns400_COM001_andKeepsTheRow(String field, String value) {
+        int id = seedWorker("ZTESTE191", "operator");
+        String firstName = field.equals("firstName") ? value : "Juan";
+        String lastName = field.equals("lastName") ? value : "Pérez";
+
+        put(adminToken()).body(body(firstName, lastName, "ZTESTE191", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem(field))
+            .body("errors.message", hasItem("Solo letras, espacios, apóstrofo o guion."));
+
+        assertEquals("Juan", fixtures.workerRowOf(id).firstName());
+        assertEquals("Pérez", fixtures.workerRowOf(id).lastName());
+    }
+
+    /** Sin ninguna letra no es un nombre, aunque cada signo por separado este permitido. */
+    @ParameterizedTest(name = "[{0}] -> 400 COM-001")
+    @ValueSource(strings = {"'", "-", "' - '"})
+    void update_aNameWithoutALetter_returns400_COM001(String name) {
+        int id = seedWorker("ZTESTE194", "operator");
+
+        put(adminToken()).body(body(name, "Pérez", "ZTESTE194", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem("firstName"));
+
+        assertEquals("Juan", fixtures.workerRowOf(id).firstName());
+    }
+
+    /** El blanco lo frenan @NotBlank y la regla, que exige una letra; el nulo, solo @NotBlank. */
+    @ParameterizedTest(name = "{0} en blanco -> 400 COM-001")
+    @ValueSource(strings = {"firstName", "lastName"})
+    void update_withABlankName_returns400_COM001(String field) {
+        int id = seedWorker("ZTESTE193", "operator");
+        String firstName = field.equals("firstName") ? "   " : "Juan";
+        String lastName = field.equals("lastName") ? "   " : "Pérez";
+
+        put(adminToken()).body(body(firstName, lastName, "ZTESTE193", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", hasItem(field));
+
+        assertEquals("Juan", fixtures.workerRowOf(id).firstName());
+        assertEquals("Pérez", fixtures.workerRowOf(id).lastName());
+    }
+
+    /** Una tilde que llega como letra mas marca combinante entra, y se guarda en NFC. */
+    @Test
+    void update_aNameWithACombiningAccent_isValidatedAndStoredInNfc() {
+        int id = seedWorker("ZTESTE192", "operator");
+
+        put(adminToken()).body(body("Jose\u0301", "Pe\u0301rez", "ZTESTE192", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(200)
+            .body("firstName", equalTo("Jos\u00e9"));
+
+        assertEquals("Jos\u00e9", fixtures.workerRowOf(id).firstName());
+        assertEquals("P\u00e9rez", fixtures.workerRowOf(id).lastName());
     }
 
     // ---------- el cuerpo nuevo no perdio anotaciones ----------

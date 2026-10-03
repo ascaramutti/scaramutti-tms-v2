@@ -1,0 +1,34 @@
+{
+  "_": "Casos comunes de la regla de nombre: los lee el test del backend contra PersonNames.PATTERN y el del formulario contra el patron que publica el contrato. Los signos van en cualquier posicion, asi que '-Ana' entra.",
+  "accepted": [
+    "Mar\u00eda Jos\u00e9",
+    "D'Angelo",
+    "P\u00e9rez-G\u00f3mez",
+    "\u00d1u\u00f1ez M\u00fcller",
+    "\u0160imi\u0107",
+    "\u0141ukasz",
+    "M\u00aa Jos\u00e9",
+    "'t Hooft",
+    "Jose\u0301",
+    "-Ana"
+  ],
+  "rejected": [
+    "6564565",
+    "Juan2",
+    "Ana@",
+    "Ana_",
+    "Ana.",
+    "<b>",
+    "'",
+    "-",
+    "' - '",
+    "\u3164",
+    "Ju\u0430n",
+    "\ud835\udc09uan",
+    "\u2160",
+    "Juan \u2161",
+    "Pe\u0303g\u0303a",
+    "\u0301Ana",
+    "Juan\tCarlos"
+  ]
+}

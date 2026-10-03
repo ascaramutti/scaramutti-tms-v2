@@ -1291,6 +1291,7 @@ paths:
         Normalización: `firstName`, `lastName`, `documentNumber`,
         `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
         bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
+        `firstName` y `lastName` pasan además a NFC antes de validarse.
 
         Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
         WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;
@@ -4714,10 +4715,15 @@ components:
         como enum: la lista vive en la base). `hireDate` es un día calendario
         (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
         nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
+        `firstName` y `lastName`: al menos una letra latina (letra de script
+        latino según la versión de Unicode del backend, 15.0), más espacios,
+        apóstrofo y guion; se pasan a NFC antes de
+        validarse (pasados 400 caracteres no se normalizan: se rechazan por
+        largo tal como llegan) y se guardan recortados.
       required: [firstName, lastName, documentTypeId, documentNumber, role, hireDate]
       properties:
-        firstName:      { type: string, minLength: 1, maxLength: 100, example: 'Juan' }
-        lastName:       { type: string, minLength: 1, maxLength: 100, example: 'Pérez Huamán' }
+        firstName:      { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Juan' }
+        lastName:       { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez Huamán' }
         documentTypeId: { type: integer, format: int32, example: 1 }
         documentNumber: { type: string, minLength: 1, maxLength: 20, example: '45678912' }
         phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }
