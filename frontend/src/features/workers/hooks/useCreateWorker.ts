@@ -1,14 +1,9 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { createWorker, type WorkerDetailResponse, type WorkerRequest } from '../../../api'
-import { operationsKeys } from '../../operations/queryKeys'
-import { warehouseKeys } from '../../warehouse/queryKeys'
 import { workerKeys } from '../queryKeys'
+import { refreshAfterWorkerSaved } from './refreshAfterWorkerSaved'
 
-/**
- * El alta de un trabajador. Al guardar, lo nuevo tiene que verse en el padrón y en los
- * dos combobox que lo ofrecen (quién recibe un retiro y los conductores de un viaje).
- * Los catálogos cuelgan de la raíz del padrón: se marcan viejos sin pedirlos otra vez.
- */
+/** El alta de un trabajador. */
 export function useCreateWorker() {
   const queryClient = useQueryClient()
   return useMutation<WorkerDetailResponse, unknown, WorkerRequest>({
@@ -20,14 +15,6 @@ export function useCreateWorker() {
       }
       return data
     },
-    onSuccess: async (created) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: workerKeys.all, refetchType: 'none' }),
-        queryClient.invalidateQueries({ queryKey: warehouseKeys.workerSearches() }),
-        queryClient.invalidateQueries({ queryKey: operationsKeys.drivers() }),
-      ])
-      // Después de invalidar: la ficha abre con lo que devolvió el alta, sin spinner.
-      queryClient.setQueryData(workerKeys.detail(created.id), created)
-    },
+    onSuccess: (created) => refreshAfterWorkerSaved(queryClient, created),
   })
 }

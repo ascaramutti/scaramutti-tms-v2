@@ -5,6 +5,7 @@ import type {
   WorkerDetailResponse,
   WorkerDriverProfileResponse,
   WorkerRequest,
+  WorkerUpdateRequest,
 } from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
@@ -293,4 +294,47 @@ export function getWorkerError(status = 500, sink?: { ids?: number[] }) {
 /** Un 200 sin cuerpo: el hook no tiene qué mostrar. */
 export function getWorkerEmpty() {
   return http.get(`${API}/workers/:id`, () => new HttpResponse(null, { status: 200 }))
+}
+
+// ----- Edición (`PUT /workers/{id}`) -----
+
+/** Guarda el id y el cuerpo de cada envío; responde la ficha dada o la del cuerpo. */
+export function updateWorkerCapture(
+  sink: { ids?: number[]; bodies?: WorkerUpdateRequest[] },
+  response?: WorkerDetailResponse,
+  ms = 0,
+) {
+  sink.ids = []
+  sink.bodies = []
+  return http.put(`${API}/workers/:id`, async ({ params, request }) => {
+    const body = (await request.json()) as WorkerUpdateRequest
+    sink.ids = [...(sink.ids ?? []), Number(params.id)]
+    sink.bodies = [...(sink.bodies ?? []), body]
+    if (ms) await delay(ms)
+    return HttpResponse.json(
+      response ?? fakeWorkerDetail({ id: Number(params.id), firstName: body.firstName, lastName: body.lastName }),
+    )
+  })
+}
+
+export function updateWorkerProblem(code: string, status: number, detail = 'detail del backend') {
+  return http.put(`${API}/workers/:id`, () => problema(code, status, detail))
+}
+
+export function updateWorkerValidation(errors: { field: string; message: string }[]) {
+  return http.put(`${API}/workers/:id`, () =>
+    HttpResponse.json(
+      { type: 'urn:tms:error:com-001', title: 'Bad Request', status: 400, code: 'COM-001', detail: 'Datos invalidos', errors },
+      { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+    ),
+  )
+}
+
+/** Un 200 sin cuerpo al guardar: el hook no tiene qué devolver. */
+export function updateWorkerEmpty() {
+  return http.put(`${API}/workers/:id`, () => new HttpResponse(null, { status: 200 }))
+}
+
+export function updateWorkerNetworkError() {
+  return http.put(`${API}/workers/:id`, () => HttpResponse.error())
 }

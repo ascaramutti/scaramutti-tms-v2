@@ -6,6 +6,7 @@ import {
   WAREHOUSE_BASE,
   WORKERS_BASE,
   workerDetailPath,
+  workerEditPath,
 } from './shared/paths'
 import { describe, expect, it, beforeEach } from 'vitest'
 import { render, screen, waitFor } from '@testing-library/react'
@@ -465,6 +466,52 @@ describe('router - URL viejas y la raíz del dominio', () => {
       await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(57)))
       expect(await screen.findByRole('heading', { level: 1, name: 'Ana Torres Ruiz' })).toBeInTheDocument()
       expect(screen.getByRole('heading', { level: 2, name: 'Licencia de conducir' })).toBeInTheDocument()
+    })
+
+    const OPERADOR = { name: 'operator', description: 'Operador', level: 1, canLogin: false, driverProfile: 'NONE' } as const
+
+    it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+      '%s abre la edición',
+      async (role) => {
+        server.use(getWorkerOk(fakeWorkerDetail({ id: 7, role: OPERADOR })))
+        renderRouteAs(role, workerEditPath(7))
+        expect(await screen.findByRole('heading', { level: 1, name: 'Editar trabajador' })).toBeInTheDocument()
+      },
+    )
+
+    it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso en la edición, sin pedir al trabajador',
+      async (role) => {
+        const sink: { ids?: number[] } = {}
+        server.use(getWorkerCapture(sink))
+        renderRouteAs(role, workerEditPath(7))
+        expect(await screen.findByText(/sin acceso a trabajadores/i)).toBeInTheDocument()
+        expect(sink.ids).toEqual([])
+      },
+    )
+
+    it('sin sesión la edición lleva al login', async () => {
+      const router = goTo(null, workerEditPath(7))
+      await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+
+    /** Como en clientes: solo un rol sin acceso distingue "desvió antes" de "mostró sin acceso". */
+    it.each(['0', '-3', '1e2', 'abc'])(
+      'el id %s de la edición desvía al aterrizaje del rol antes de evaluar permisos',
+      async (id) => {
+        const router = goTo('warehouse_keeper', `${WORKERS_BASE}/${id}/editar`)
+        await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
+        expect(screen.queryByText(/sin acceso/i)).not.toBeInTheDocument()
+      },
+    )
+
+    it('desde la ficha, "Editar" abre la edición del mismo trabajador', async () => {
+      const user = userEvent.setup()
+      server.use(getWorkerOk(fakeWorkerDetail({ id: 7, role: OPERADOR })))
+      const router = goTo('general_manager', workerDetailPath(7))
+      await user.click(await screen.findByRole('link', { name: 'Editar' }))
+      await waitFor(() => expect(router.state.location.pathname).toBe(workerEditPath(7)))
+      expect(await screen.findByRole('heading', { level: 1, name: 'Editar trabajador' })).toBeInTheDocument()
     })
 
     it('en el alta, Trabajadores queda marcado en el menú', async () => {

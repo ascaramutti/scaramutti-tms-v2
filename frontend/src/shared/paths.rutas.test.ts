@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteObject } from 'react-router-dom'
 import { routes } from '../router'
-import { workerDetailPath } from './paths'
+import { workerDetailPath, workerEditPath } from './paths'
 
 /**
  * El contrato de URL de la aplicación, escrito a mano.
@@ -29,6 +29,7 @@ const RUTAS = [
   '/trabajadores',
   '/trabajadores/nuevo',
   '/trabajadores/:id',
+  '/trabajadores/:id/editar',
   '/almacen',
   '/almacen/entradas/nueva',
   '/almacen/entradas',
@@ -73,5 +74,9 @@ describe('las URL de la aplicación', () => {
   it('la ficha de un trabajador cuelga de su raíz', () => {
     expect(workerDetailPath(7)).toBe('/trabajadores/7')
     expect(workerDetailPath('7')).toBe('/trabajadores/7')
+  })
+
+  it('la edición de un trabajador cuelga de su ficha', () => {
+    expect(workerEditPath(7)).toBe('/trabajadores/7/editar')
   })
 })

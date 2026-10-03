@@ -14,3 +14,8 @@ export function sessionRankLevel(role: string | undefined, roles: readonly RoleR
 export function assignableRoles(roles: readonly RoleResponse[], level: number): RoleResponse[] {
   return roles.filter((role) => role.level < level)
 }
+
+/** La sesión gestiona a un trabajador si su cargo es de nivel estrictamente menor; el admin, siempre. */
+export function canManageWorker(workerRoleLevel: number, sessionLevel: number): boolean {
+  return workerRoleLevel < sessionLevel
+}

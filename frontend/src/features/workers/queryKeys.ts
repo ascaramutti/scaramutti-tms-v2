@@ -19,4 +19,6 @@ export const workerKeys = {
   documentTypes: () => [...workerKeys.all, 'document-types'] as const,
   /** Clave de la mutación del alta, para que la página sepa si hay un envío en vuelo. */
   create: () => [...workerKeys.all, 'create'] as const,
+  /** Clave de la mutación de la edición, por la misma razón. */
+  update: (id: number) => [...workerKeys.all, 'update', id] as const,
 }

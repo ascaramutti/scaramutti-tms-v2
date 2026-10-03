@@ -4,8 +4,8 @@ import { isForbiddenError, isNotFoundError } from '../../../shared/utils/getApiE
 import { workerKeys } from '../queryKeys'
 
 /**
- * Un trabajador por id, para su ficha. No sube el tiempo de frescura heredado:
- * la edición va a vivir en esta misma pantalla. Y no reintenta el 404 ni el 403, que
+ * Un trabajador por id, para su ficha y su edición. No sube el tiempo de frescura heredado:
+ * la edición tiene que abrir con lo último guardado. Y no reintenta el 404 ni el 403, que
  * son definitivos: los trabajadores no se borran y el rol no cambia al repetir.
  */
 export function useWorker(id: number) {

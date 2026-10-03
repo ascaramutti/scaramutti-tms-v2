@@ -595,6 +595,8 @@ describe('WorkerCreatePage', () => {
       expect(opcionesDeCargo()).toEqual([])
       expect(screen.getByRole('status')).toHaveTextContent('No hay cargos que puedas asignar con tu rol.')
       expect(screen.getByRole('button', { name: 'Guardar' })).toBeDisabled()
+      // Deshabilitado tiene que verse apagado, como en la edición.
+      expect(screen.getByRole('button', { name: 'Guardar' }).className).toContain('disabled:bg-accent-disabled')
     })
   })
 

@@ -1,12 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { CE, DNI, ROLES } from '../../../test/mocks/handlers/workers'
+import { CE, DNI, ROLES, fakeDriverProfile, fakeWorkerDetail } from '../../../test/mocks/handlers/workers'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   buildWorkerFormSchema,
   PERSON_NAME,
   toWorkerRequest,
+  documentNumberChanged,
+  toWorkerUpdateRequest,
   workerCreateDefaults,
+  workerEditDefaults,
   type WorkerFormValues,
 } from './worker.schema'
 
@@ -106,6 +109,11 @@ describe('buildWorkerFormSchema', () => {
     expect(errores({ firstName: 'A'.repeat(100), lastName: 'B'.repeat(100) })).toEqual({})
     expect(errores({ firstName: 'A'.repeat(101) }).firstName).toBe('Máximo 100 caracteres.')
     expect(errores({ lastName: 'B'.repeat(101) }).lastName).toBe('Máximo 100 caracteres.')
+  })
+
+  /** El formulario recorta antes de medir: cien letras con espacios alrededor entran. */
+  it('nombre y apellido se miden ya recortados', () => {
+    expect(errores({ firstName: ' ' + 'A'.repeat(100) + ' ', lastName: ' ' + 'B'.repeat(100) + ' ' })).toEqual({})
   })
 
   /**
@@ -339,5 +347,81 @@ describe('toWorkerRequest', () => {
     const conTexto = { licenseNumber: 'Q1', licenseCategory: '', status: 'AVAILABLE' } as const
     expect(toWorkerRequest(valores({ role: 'assistant', hasLicense: false, driver: conTexto }), ROLES)).not.toHaveProperty('driver')
     expect(toWorkerRequest(valores({ role: 'assistant', hasLicense: true, driver: conTexto }), ROLES).driver).toBeDefined()
+  })
+})
+
+describe('la edición', () => {
+  const ORIGINAL = { documentNumber: '45678912', hireDate: '2099-01-01' }
+  const edicion = buildWorkerFormSchema({ documentTypes: [DNI, CE], roles: ROLES, today: () => HOY, original: ORIGINAL })
+
+  function erroresEdicion(cambios: Partial<WorkerFormValues> = {}) {
+    const resultado = edicion.safeParse(valores({ hireDate: ORIGINAL.hireDate, ...cambios }))
+    if (resultado.success) return {}
+    const porCampo: Record<string, string> = {}
+    for (const issue of resultado.error.issues) porCampo[issue.path.join('.')] ??= issue.message
+    return porCampo
+  }
+
+  it('el motivo se pide solo si el número, recortado, difiere del guardado', () => {
+    expect(documentNumberChanged(' 45678912 ', ORIGINAL)).toBe(false)
+    expect(documentNumberChanged('45678913', ORIGINAL)).toBe(true)
+    expect(documentNumberChanged('45678913', undefined)).toBe(false)
+  })
+
+  it('con el número cambiado, el motivo va de 10 a 500 caracteres, recortado como viaja', () => {
+    const motivo = 'Indica el motivo del cambio, de al menos 10 caracteres.'
+    expect(erroresEdicion({ documentNumber: '45678913', reason: '  123456789  ' }).reason).toBe(motivo)
+    expect(erroresEdicion({ documentNumber: '45678913', reason: '1234567890' })).toEqual({})
+    expect(erroresEdicion({ documentNumber: '45678913', reason: 'a'.repeat(500) })).toEqual({})
+    expect(erroresEdicion({ documentNumber: '45678913', reason: 'a'.repeat(501) }).reason).toBe('Máximo 500 caracteres.')
+    expect(erroresEdicion({ documentNumber: '45678913', reason: ' ' + 'a'.repeat(500) + ' ' })).toEqual({})
+    expect(erroresEdicion({ reason: '' })).toEqual({})
+  })
+
+  it('respeta la fecha de ingreso guardada aunque sea futura, pero no otra futura', () => {
+    expect(erroresEdicion()).toEqual({})
+    expect(erroresEdicion({ hireDate: '2099-01-02' }).hireDate).toBe('La fecha de ingreso no puede ser futura.')
+  })
+
+  it('abre con lo guardado; la casilla, marcada solo con la licencia activa', () => {
+    const activo = fakeWorkerDetail({ phone: null, driver: fakeDriverProfile({ licenseCategory: null, status: 'MAINTENANCE' }) })
+    expect(workerEditDefaults(activo)).toEqual({
+      firstName: activo.firstName,
+      lastName: activo.lastName,
+      documentTypeId: activo.documentType.id,
+      documentNumber: activo.documentNumber,
+      phone: '',
+      role: activo.role.name,
+      hireDate: activo.hireDate,
+      hasLicense: true,
+      driver: { licenseNumber: 'Q12345678', licenseCategory: '', status: 'AVAILABLE' },
+      reason: '',
+    })
+    expect(workerEditDefaults(fakeWorkerDetail({ driver: fakeDriverProfile({ isActive: false }) })).hasLicense).toBe(false)
+    expect(workerEditDefaults(fakeWorkerDetail({ driver: null })).driver).toEqual({
+      licenseNumber: '',
+      licenseCategory: '',
+      status: 'AVAILABLE',
+    })
+  })
+
+  /** Así una edición no pisa la disponibilidad que puso un viaje mientras estaba abierta. */
+  it('la disponibilidad no viaja en la edición, ni con la licencia ni sin ella', () => {
+    const conLicencia = valores({ role: 'driver', driver: { licenseNumber: 'Q1', licenseCategory: '', status: 'MAINTENANCE' } })
+    const driver = toWorkerUpdateRequest(conLicencia, ROLES, ORIGINAL).driver
+    expect(driver).toEqual({ licenseNumber: 'Q1', licenseCategory: null })
+    expect(driver).not.toHaveProperty('status')
+    expect(toWorkerUpdateRequest(valores(), ROLES, ORIGINAL)).not.toHaveProperty('driver')
+  })
+
+  it('el número guardado con espacios se compara tal cual, como en el backend', () => {
+    expect(documentNumberChanged(' 45678912 ', { documentNumber: ' 45678912 ' })).toBe(true)
+    expect(documentNumberChanged('45678912', { documentNumber: '45678912' })).toBe(false)
+  })
+
+  it('el cuerpo lleva el motivo recortado solo si cambió el número', () => {
+    const cambiado = toWorkerUpdateRequest(valores({ documentNumber: '45678913', reason: '  un motivo  ' }), ROLES, ORIGINAL)
+    expect(cambiado.reason).toBe('un motivo')
+    expect(toWorkerUpdateRequest(valores({ documentNumber: '45678912', reason: 'un motivo' }), ROLES, ORIGINAL).reason).toBeNull()
   })
 })
