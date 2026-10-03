@@ -4,7 +4,7 @@ import type { WorkerFormValues } from './schemas/worker.schema'
 
 type WorkerField = FieldPath<WorkerFormValues>
 
-interface WorkerApiError {
+export interface WorkerApiError {
   /** Sin campo, el texto sale como aviso y el formulario queda como estaba. */
   field?: WorkerField
   message: string
