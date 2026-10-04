@@ -4,7 +4,9 @@ import type {
   DriverProfileMode,
   FleetResourceStatus,
   RoleResponse,
+  WorkerDetailResponse,
   WorkerRequest,
+  WorkerUpdateRequest,
 } from '../../../api'
 import { todayInLima } from '../../../shared/utils/limaDate'
 import { trimToNull } from '../../../shared/utils/trimToNull'
@@ -13,6 +15,9 @@ import { trimToNull } from '../../../shared/utils/trimToNull'
 export const WORKER_NAME_MAX_LENGTH = 100
 export const DOCUMENT_NUMBER_MAX_LENGTH = 20
 export const LICENSE_MAX_LENGTH = 20
+/** El motivo se pide al cambiar el número de documento; viaja recortado y así lo mide el backend. */
+export const REASON_MIN_LENGTH = 10
+export const REASON_MAX_LENGTH = 500
 
 export interface WorkerFormValues {
   firstName: string
@@ -27,6 +32,8 @@ export interface WorkerFormValues {
   /** Solo pesa con un cargo de licencia opcional. */
   hasLicense: boolean
   driver: { licenseNumber: string; licenseCategory: string; status: FleetResourceStatus }
+  /** Solo en la edición, y solo pesa si el número de documento cambió. */
+  reason: string
 }
 
 export interface WorkerFormContext {
@@ -34,6 +41,16 @@ export interface WorkerFormContext {
   roles: readonly RoleResponse[]
   /** Hoy en Lima; inyectable para medir el borde en los tests. */
   today?: () => string
+  /** En la edición, lo guardado: decide si se pide motivo y qué fecha de ingreso se respeta. */
+  original?: Pick<WorkerFormValues, 'documentNumber' | 'hireDate'>
+}
+
+/** El motivo se pide si el número, ya recortado, difiere del guardado tal cual: así lo mide el backend. */
+export function documentNumberChanged(
+  documentNumber: string,
+  original: Pick<WorkerFormValues, 'documentNumber'> | undefined,
+): boolean {
+  return original !== undefined && documentNumber.trim() !== original.documentNumber
 }
 
 export function driverProfileOf(
@@ -81,7 +98,7 @@ function compilePattern(pattern: string | null | undefined): RegExp | null {
   }
 }
 
-export function buildWorkerFormSchema({ documentTypes, roles, today = todayInLima }: WorkerFormContext) {
+export function buildWorkerFormSchema({ documentTypes, roles, today = todayInLima, original }: WorkerFormContext) {
   const patterns = new Map(documentTypes.map((type) => [type.id, compilePattern(type.validationPattern)]))
   return z
     .object({
@@ -126,15 +143,25 @@ export function buildWorkerFormSchema({ documentTypes, roles, today = todayInLim
       hireDate: z
         .string()
         .regex(/^\d{4}-\d{2}-\d{2}$/, 'Indica la fecha de ingreso.')
-        .refine((value) => value <= today(), 'La fecha de ingreso no puede ser futura.'),
+        // La edición respeta la fecha guardada aunque sea futura: el backend las admite.
+        .refine((value) => value <= today() || value === original?.hireDate, 'La fecha de ingreso no puede ser futura.'),
       hasLicense: z.boolean(),
       driver: z.object({
         licenseNumber: z.string(),
         licenseCategory: z.string(),
         status: z.enum(['AVAILABLE', 'MAINTENANCE', 'NOT_AVAILABLE']),
       }),
+      reason: z.string(),
     })
     .superRefine((values, ctx) => {
+      if (documentNumberChanged(values.documentNumber, original)) {
+        const reason = values.reason.trim()
+        if (reason.length < REASON_MIN_LENGTH) {
+          ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Indica el motivo del cambio, de al menos 10 caracteres.' })
+        } else if (reason.length > REASON_MAX_LENGTH) {
+          ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Máximo 500 caracteres.' })
+        }
+      }
       const type = documentTypes.find((candidate) => candidate.id === values.documentTypeId)
       const number = values.documentNumber.trim()
       if (type && number) {
@@ -181,6 +208,30 @@ export function workerCreateDefaults(
     hasLicense: false,
     // El alta siempre la crea disponible (decisión del dueño): no se elige.
     driver: { licenseNumber: '', licenseCategory: '', status: 'AVAILABLE' },
+    reason: '',
+  }
+}
+
+/**
+ * La edición abre con lo guardado, licencia incluida aunque esté apagada: si el cargo la lleva,
+ * aparece precargada. La casilla de un cargo opcional nace marcada solo con la licencia activa.
+ */
+export function workerEditDefaults(worker: WorkerDetailResponse): WorkerFormValues {
+  return {
+    firstName: worker.firstName,
+    lastName: worker.lastName,
+    documentTypeId: worker.documentType.id,
+    documentNumber: worker.documentNumber,
+    phone: worker.phone ?? '',
+    role: worker.role.name,
+    hireDate: worker.hireDate,
+    hasLicense: worker.driver?.isActive ?? false,
+    driver: {
+      licenseNumber: worker.driver?.licenseNumber ?? '',
+      licenseCategory: worker.driver?.licenseCategory ?? '',
+      status: 'AVAILABLE',
+    },
+    reason: '',
   }
 }
 
@@ -203,4 +254,26 @@ export function toWorkerRequest(values: WorkerFormValues, roles: readonly RoleRe
     }
   }
   return request
+}
+
+function withoutStatus({ licenseNumber, licenseCategory }: NonNullable<WorkerRequest['driver']>) {
+  return { licenseNumber, licenseCategory }
+}
+
+/**
+ * El cuerpo de la edición: es un reemplazo, así que viaja todo; el motivo, solo si cambió el
+ * número. La disponibilidad no: ausente, el backend conserva la guardada (y una licencia que nace
+ * acá queda disponible), así una edición no pisa la que puso un viaje mientras estaba abierta.
+ */
+export function toWorkerUpdateRequest(
+  values: WorkerFormValues,
+  roles: readonly RoleResponse[],
+  original: Pick<WorkerFormValues, 'documentNumber'>,
+): WorkerUpdateRequest {
+  const { driver, ...request } = toWorkerRequest(values, roles)
+  return {
+    ...request,
+    ...(driver && { driver: withoutStatus(driver) }),
+    reason: documentNumberChanged(values.documentNumber, original) ? values.reason.trim() : null,
+  }
 }

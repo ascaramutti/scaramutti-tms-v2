@@ -15,8 +15,8 @@ interface WorkerFormFieldsProps {
 }
 
 /**
- * Los datos del trabajador, en el orden de la ficha. La edición reusará este grupo;
- * lo propio de cada pantalla vive en su contenedor.
+ * Los datos del trabajador, en el orden de la ficha. El alta y la edición comparten este
+ * grupo; lo propio de cada pantalla vive en su contenedor.
  */
 export function WorkerFormFields({ documentTypes, roleOptions, disabled }: WorkerFormFieldsProps) {
   const {

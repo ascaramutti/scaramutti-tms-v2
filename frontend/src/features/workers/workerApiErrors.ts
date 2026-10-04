@@ -14,7 +14,7 @@ export interface WorkerApiError {
 
 /**
  * Textos propios por código, en lugar del detail del backend (va sin tildes y no
- * siempre tutea). La edición sumará los suyos sobre este mapa.
+ * siempre tutea). La edición suma los suyos sobre este mapa.
  */
 export const WORKER_CREATE_ERRORS: Record<string, WorkerApiError> = {
   'WRK-002': { field: 'documentNumber', message: 'Ya existe un trabajador con este documento.' },
@@ -36,6 +36,18 @@ export const WORKER_CREATE_ERRORS: Record<string, WorkerApiError> = {
   'WRK-013': { message: 'Otra operación estaba en curso y no se pudo guardar. Intenta de nuevo.' },
 }
 
+/**
+ * La edición: el nivel ya no lo marca el cargo elegido (el desplegable no ofrece los de arriba)
+ * sino el trabajador mismo, así que va como aviso. El 404 no está: lo resuelve la página.
+ */
+export const WORKER_UPDATE_ERRORS: Record<string, WorkerApiError> = {
+  ...WORKER_CREATE_ERRORS,
+  'WRK-006': { message: 'No puedes modificar a un trabajador de tu nivel o superior.' },
+  'WRK-009': { field: 'reason', message: 'Indica el motivo del cambio, de al menos 10 caracteres.' },
+  'WRK-011': { field: 'role', message: 'Este cargo no inicia sesión y el trabajador tiene usuario. Elige otro.' },
+  'WRK-012': { field: 'role', message: 'No puedes cambiar tu propio cargo.' },
+}
+
 /** Los campos que el backend puede nombrar en un 400 de forma, en el orden del formulario. */
 const WORKER_FIELDS: readonly WorkerField[] = [
   'firstName',
@@ -45,6 +57,7 @@ const WORKER_FIELDS: readonly WorkerField[] = [
   'role',
   'hireDate',
   'phone',
+  'reason',
   'driver.licenseNumber',
   'driver.licenseCategory',
 ]

@@ -60,3 +60,7 @@ export function warehouseProductPath(id: number | string): string {
 export function workerDetailPath(id: number | string): string {
   return `${WORKERS_BASE}/${id}`
 }
+
+export function workerEditPath(id: number | string): string {
+  return `${WORKERS_BASE}/${id}/editar`
+}

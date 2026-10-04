@@ -1,27 +1,31 @@
 import type { ReactNode } from 'react'
-import { UserX } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { Pencil, UserX } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { Button } from '../../../shared/ui/Button'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { Spinner } from '../../../shared/ui/Spinner'
-import { WORKERS_BASE } from '../../../shared/paths'
+import { WORKERS_BASE, workerEditPath } from '../../../shared/paths'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { WorkerAuditFooter } from '../components/WorkerAuditFooter'
 import { WorkerDetailCard } from '../components/WorkerDetailCard'
 import { WorkerDriverCard } from '../components/WorkerDriverCard'
+import { useSessionRankLevel } from '../hooks/useSessionRankLevel'
 import { useWorker } from '../hooks/useWorker'
+import { canManageWorker } from '../rank'
 
 /**
- * Ficha de un trabajador, de solo lectura. Sale del endpoint del detalle y no de
- * la fila de la búsqueda, que trae menos datos. Un 404 es un id que nunca existió:
- * los trabajadores no se borran.
+ * Ficha de un trabajador. Sale del endpoint del detalle y no de la fila de la búsqueda,
+ * que trae menos datos. Un 404 es un id que nunca existió: los trabajadores no se borran.
+ * Se edita en su propia pantalla, y solo si el cargo es de nivel menor al de la sesión.
  */
 export function WorkerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data, isLoading, isError, error, refetch } = useWorker(Number(id))
+  const { level } = useSessionRankLevel()
 
   if (isLoading) {
     return (
@@ -67,7 +71,20 @@ export function WorkerDetailPage() {
 
   return (
     <Shell>
-      <PageHeader title={`${data.firstName} ${data.lastName}`} description={data.role.description} divider />
+      <PageHeader
+        title={`${data.firstName} ${data.lastName}`}
+        description={data.role.description}
+        divider
+        action={
+          // Solo sobre cargos de nivel menor al de la sesión; el admin, siempre. Un inactivo también se edita.
+          level !== undefined && canManageWorker(data.role.level, level) ? (
+            <Link to={workerEditPath(data.id)} className={buttonClasses({ variant: 'secondary' })}>
+              <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
+              Editar
+            </Link>
+          ) : undefined
+        }
+      />
       <WorkerDetailCard worker={data} />
       {data.driver && <WorkerDriverCard driver={data.driver} />}
       <WorkerAuditFooter

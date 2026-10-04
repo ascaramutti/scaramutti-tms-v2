@@ -31,6 +31,7 @@ import { ClientDetailPage } from './features/clients/pages/ClientDetailPage'
 import { WorkersSearchPage } from './features/workers/pages/WorkersSearchPage'
 import { WorkerDetailPage } from './features/workers/pages/WorkerDetailPage'
 import { WorkerCreatePage } from './features/workers/pages/WorkerCreatePage'
+import { WorkerEditPage } from './features/workers/pages/WorkerEditPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -169,6 +170,16 @@ export const routes: RouteObject[] = [
           <RequireNumericId>
             <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
               <WorkerDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
+        ),
+      },
+      {
+        path: `${WORKERS_BASE}/:id/editar`,
+        element: (
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+              <WorkerEditPage />
             </ProtectedRoute>
           </RequireNumericId>
         ),

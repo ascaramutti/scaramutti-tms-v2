@@ -14,7 +14,7 @@ interface WorkerDriverSectionProps {
 /**
  * La licencia de conducir, según lo que pide el cargo. Solo se oculta: lo escrito
  * sigue en el formulario si se vuelve a un cargo que la lleva. La disponibilidad no
- * se elige en el alta; la edición decide la suya.
+ * se elige: el alta la crea disponible y la edición conserva la guardada.
  */
 export function WorkerDriverSection({ profile, disabled }: WorkerDriverSectionProps) {
   const {

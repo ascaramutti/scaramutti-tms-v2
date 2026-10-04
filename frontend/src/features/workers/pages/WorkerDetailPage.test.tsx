@@ -5,9 +5,13 @@ import { createMemoryRouter, RouterProvider } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
 import { WorkerDetailPage } from './WorkerDetailPage'
-import { WORKERS_BASE, workerDetailPath } from '../../../shared/paths'
+import { WORKERS_BASE, workerDetailPath, workerEditPath } from '../../../shared/paths'
 import { server } from '../../../test/mocks/server'
-import type { WorkerDetailResponse } from '../../../api'
+import { AuthProvider } from '../../../shared/auth/AuthContext'
+import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
+import { tokenStorage } from '../../../shared/auth/tokenStorage'
+import type { UserRole, WorkerDetailResponse } from '../../../api'
+import { workerKeys } from '../queryKeys'
 import {
   fakeDriverProfile,
   fakeWorkerDetail,
@@ -19,12 +23,22 @@ import {
   getWorkerNotFoundWithoutBody,
   getWorkerOk,
   getWorkerSlow,
+  listRolesSlow,
 } from '../../../test/mocks/handlers/workers'
 
 /** El id de la URL (42) no es el del fixture (1): un id escrito fijo no pasaría. */
-function renderPage(id = 42) {
+function renderPage(id = 42, role: UserRole = 'operations_manager') {
   // Sin espera entre intentos: el hook decide si reintenta, y los tests cuentan los pedidos.
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } })
+  tokenStorage.setTokens('fake-access', 'fake-refresh')
+  queryClient.setQueryData(currentUserQueryKey, {
+    id: 1,
+    username: `user-${role}`,
+    fullName: `Usuario ${role}`,
+    position: 'Cargo de prueba',
+    role,
+    isActive: true,
+  })
   const router = createMemoryRouter(
     [
       { path: `${WORKERS_BASE}/:id`, element: <WorkerDetailPage /> },
@@ -34,7 +48,9 @@ function renderPage(id = 42) {
   )
   const vista = render(
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </QueryClientProvider>,
   )
   return { router, queryClient, container: vista.container }
@@ -361,12 +377,62 @@ describe('WorkerDetailPage', () => {
     expect(screen.getByRole('link', { name: /volver a trabajadores/i })).toHaveAttribute('href', WORKERS_BASE)
   })
 
-  /** Se afirma el conjunto entero: cualquier botón que se cuele, se llame como se llame. */
-  it('es de solo lectura', async () => {
-    await renderWorker(fakeWorkerDetail({ driver: fakeDriverProfile() }))
+  /**
+   * Sobre un cargo de su nivel, la ficha es de solo lectura. Se afirma el conjunto entero, cualquier
+   * botón que se cuele, y recién con los cargos cargados: sin ellos Editar faltaría por otra razón.
+   */
+  it('sobre un cargo de su nivel es de solo lectura', async () => {
+    server.use(getWorkerOk(fakeWorkerDetail({ driver: fakeDriverProfile() })))
+    const { queryClient } = renderPage()
+    await screen.findByRole('heading', { level: 1 })
+    await waitFor(() => expect(queryClient.getQueryState(workerKeys.roles())?.status).toBe('success'))
 
     expect(screen.queryAllByRole('button')).toEqual([])
     expect(screen.getAllByRole('link').map((enlace) => enlace.textContent)).toEqual(['Volver a trabajadores'])
+  })
+
+  describe('editar', () => {
+    const OPERADOR = { name: 'operator', description: 'Operador', level: 1, canLogin: false, driverProfile: 'NONE' } as const
+    const ADMIN = { name: 'admin', description: 'Administrador', level: 4, canLogin: true, driverProfile: 'NONE' } as const
+
+    /** Espera también los cargos: sin ellos no hay nivel y Editar no se mostraría por otra razón. */
+    async function abrirComo(worker: WorkerDetailResponse, role: UserRole) {
+      server.use(getWorkerOk(worker))
+      const { queryClient } = renderPage(42, role)
+      await screen.findByRole('heading', { level: 1 })
+      await waitFor(() => expect(queryClient.getQueryState(workerKeys.roles())?.status).toBe('success'))
+    }
+
+    it('sobre un cargo de nivel menor ofrece Editar, hacia la edición de este trabajador', async () => {
+      await abrirComo(fakeWorkerDetail({ id: 42, role: OPERADOR }), 'operations_manager')
+      expect(await screen.findByRole('link', { name: 'Editar' })).toHaveAttribute('href', workerEditPath(42))
+    })
+
+    /** Sin los cargos no hay nivel: mientras llegan, Editar no se ofrece de más. */
+    it('mientras llegan los cargos no ofrece Editar', async () => {
+      server.use(getWorkerOk(fakeWorkerDetail({ id: 42 })), listRolesSlow(300))
+      renderPage(42, 'operations_manager')
+      await screen.findByRole('heading', { level: 1 })
+      expect(screen.queryByRole('link', { name: 'Editar' })).not.toBeInTheDocument()
+    })
+
+    it('un inactivo también ofrece Editar', async () => {
+      await abrirComo(fakeWorkerDetail({ id: 42, role: OPERADOR, isActive: false }), 'finance_manager')
+      expect(await screen.findByRole('link', { name: 'Editar' })).toBeInTheDocument()
+    })
+
+    it('el admin lo ve siempre, también sobre otro admin', async () => {
+      await abrirComo(fakeWorkerDetail({ id: 42, role: ADMIN }), 'admin')
+      expect(await screen.findByRole('link', { name: 'Editar' })).toBeInTheDocument()
+    })
+
+    it.each([['operations_manager'], ['finance_manager']] as const)(
+      '%s no lo ve sobre un cargo de su nivel o mayor',
+      async (role) => {
+        await abrirComo(fakeWorkerDetail({ id: 42 }), role)
+        expect(screen.queryByRole('link', { name: 'Editar' })).not.toBeInTheDocument()
+      },
+    )
   })
 
   describe('errores', () => {
