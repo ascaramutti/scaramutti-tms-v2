@@ -15,6 +15,6 @@ export function useCreateWorker() {
       }
       return data
     },
-    onSuccess: (created) => refreshAfterWorkerSaved(queryClient, created),
+    onSuccess: (created) => refreshAfterWorkerSaved(queryClient, created, { mayBeAssigned: false }),
   })
 }
