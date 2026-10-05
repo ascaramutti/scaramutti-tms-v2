@@ -22,19 +22,9 @@ interface QuotationStatusActionsProps {
   onStatusError?: (error: unknown) => void
 }
 
-// `success` es la única forma de relleno que no es ni la de acción principal ni la
-// destructiva: se usa solo acá. El tono NO se nombra en este comentario, y el motivo es
-// caro: la versión anterior de estas líneas citaba un grep con el nombre entero de la
-// clase, Tailwind escanea los comentarios, y cuando el barrido convirtió este botón el
-// comentario quedó siendo lo único que mantenía viva esa regla en el CSS publicado. El
-// grep decía "devuelve un archivo, este", y era cierto solo porque el comentario se
-// contaba a sí mismo. Lo encontró el smoke de staging, no la revisión. Queda
-// escrita a mano, sin variante propia en `Button`, hasta que un segundo uso justifique
-// el rol. Las otras dos sí salen del componente compartido.
 const VARIANT_BUTTON: Record<StatusActionVariant, string> = {
   primary: buttonClasses({ variant: 'primary' }),
-  success:
-    'inline-flex items-center rounded-lg bg-transition px-4 py-2 text-sm font-medium text-on-solid shadow-sm hover:bg-transition-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-canvas',
+  success: buttonClasses({ variant: 'success' }),
   danger: buttonClasses({ variant: 'danger' }),
 }
 
