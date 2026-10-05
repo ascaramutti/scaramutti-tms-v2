@@ -220,9 +220,9 @@ export function DataTable<T>({
             <span className="text-sm text-fg-body">
               Mostrando {from}–{to} de {total}
             </span>
-            {/* Las dos flechas NO usan `Button`, y no es un olvido: son una cuarta forma.
+            {/* Las dos flechas NO usan `Button`, y no es un olvido: son una forma más.
                 No tienen relleno ni anillo de foco, y su señal de deshabilitado es
-                `disabled:opacity-40`; ninguna de las tres variantes las reproduce, y
+                `disabled:opacity-40`; ninguna de las variantes las reproduce, y
                 pasarlas a `secondary` les agregaría borde y fondo. Entran el día que exista
                 una variante sin relleno, que es cuando `size="icon"` tendrá su primer uso. */}
             <div className="flex gap-1">

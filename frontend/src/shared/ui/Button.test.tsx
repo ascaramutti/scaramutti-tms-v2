@@ -35,6 +35,10 @@ const ESPERADAS = {
   danger:
     'inline-flex items-center rounded-lg bg-danger px-4 py-2 text-sm font-medium text-on-solid ' +
     'shadow-sm hover:bg-danger-hover focus:outline-none focus:ring-2 focus:ring-danger focus:ring-offset-2 focus:ring-offset-surface',
+  // El literal que el botón de aceptar de cotizaciones escribía a mano, tal cual.
+  success:
+    'inline-flex items-center rounded-lg bg-transition px-4 py-2 text-sm font-medium text-on-solid ' +
+    'shadow-sm hover:bg-transition-hover focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-canvas',
 } as const
 
 const clases = (el: HTMLElement) => new Set(el.className.split(/\s+/).filter(Boolean))
@@ -86,13 +90,13 @@ describe('Button · las clases son las de las constantes que reemplaza', () => {
     expect(c.has('bg-accent')).toBe(false)
   })
 
-  it.each(['primary', 'secondary', 'danger'] as const)(
+  it.each(['primary', 'secondary', 'danger', 'success'] as const)(
     'la variante %s toma sus colores de tokens y de ninguna paleta de Tailwind',
     (variante) => {
       // Se afirma por lista CERRADA de tokens, no por lista de paletas prohibidas: con la
       // segunda, una paleta que la enumeración no conociera (Tailwind trae veintidós y la
       // lista vieja nombraba siete) pasaba con el título intacto. Medido antes de cambiarlo.
-      // Los tokens, en cambio, son once y están todos en `index.css`.
+      // Los tokens, en cambio, son trece y están todos en `index.css`.
       //
       // Los nombres de las clases de ejemplo NO se escriben acá: Tailwind escanea los
       // comentarios, y nombrar una utilidad que el código no usa la publica en el CSS. Pasó
@@ -103,7 +107,7 @@ describe('Button · las clases son las de las constantes que reemplaza', () => {
       // su token, así que ya no queda ningún color suelto ahí.
       const TOKENS = [
         'accent', 'accent-hover', 'accent-soft', 'danger', 'danger-hover', 'focus',
-        'fg-body', 'on-solid', 'surface', 'surface-subtle', 'border-strong',
+        'fg-body', 'on-solid', 'surface', 'surface-subtle', 'border-strong', 'transition', 'transition-hover',
       ]
       const CON_COLOR = /^(?:[a-z-]+:)*(bg|text|border|ring|from|to|via|divide|outline|decoration|shadow)-(.+)$/
       render(<Button variant={variante}>Anular</Button>)
@@ -141,6 +145,7 @@ describe('buttonClasses · la cadena suelta no puede divergir del componente', (
     ['primary', 'md'],
     ['secondary', 'md'],
     ['danger', 'md'],
+    ['success', 'md'],
     ['secondary', 'icon'],
   ] as const)('%s/%s da exactamente lo que el componente pone en el DOM', (variant, size) => {
     const { unmount } = render(<Button variant={variant} size={size} aria-label="x" />)
@@ -186,8 +191,8 @@ describe('buttonClasses · la cadena suelta, contra el literal', () => {
   it.each(['primary', 'secondary', 'danger'] as const)(
     'sin argumento de tamaño, la variante %s da las clases de `md`',
     (variante) => {
-      // Los seis lugares que consumen `buttonClasses` directo (los cuatro enlaces con pinta
-      // de botón y las dos entradas del mapa de cotizaciones) omiten el tamaño, así que el
+      // Los lugares que consumen `buttonClasses` directo (los enlaces con pinta de botón y
+      // las tres entradas del mapa de cotizaciones) omiten el tamaño, así que el
       // valor por omisión es carga real. Sin este caso, cambiarlo a `icon` deja en verde a
       // los cuatro archivos que los renderizan: medido, sobrevivía.
       expect(new Set(buttonClasses({ variant: variante }).split(/\s+/))).toEqual(
