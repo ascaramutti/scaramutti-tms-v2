@@ -590,14 +590,18 @@ describe('WorkerDetailPage', () => {
       else expect(aviso).not.toBeInTheDocument()
     })
 
-    it('Desactivar va en el tono de baja', async () => {
+    it('Desactivar va con el relleno de peligro, como rechazar una cotización', async () => {
       await abrirComo(trabajador())
-      expect(screen.getByRole('button', { name: 'Desactivar' }).className).toContain('text-danger-fg')
+      const desactivar = screen.getByRole('button', { name: 'Desactivar' })
+      expect(desactivar.className).toContain('bg-danger')
+      expect(desactivar.className).not.toContain('bg-transition')
     })
 
-    it('Reactivar no va en el tono de baja', async () => {
+    it('Reactivar va con el relleno de éxito, como aceptar una cotización', async () => {
       await abrirComo(trabajador({ isActive: false }))
-      expect(screen.getByRole('button', { name: 'Reactivar' }).className).not.toContain('text-danger-fg')
+      const reactivar = screen.getByRole('button', { name: 'Reactivar' })
+      expect(reactivar.className).toContain('bg-transition')
+      expect(reactivar.className).not.toContain('bg-danger')
     })
 
     it('confirmar la baja la envía una vez y la ficha muestra el estado nuevo', async () => {
@@ -679,13 +683,14 @@ describe('WorkerDetailPage', () => {
       expect(within(dialogo()).getByRole('button', { name: 'Desactivar' }).className).toContain('bg-danger')
     })
 
-    it('la reactivación confirma con el botón principal', async () => {
+    it('la reactivación confirma con el relleno de éxito, el mismo del botón que la abre', async () => {
       const user = userEvent.setup()
       await abrirComo(trabajador({ isActive: false }))
       await abrirDialogo(user, 'Reactivar')
       const confirmar = within(dialogo()).getByRole('button', { name: 'Reactivar' })
-      expect(confirmar.className).toContain('bg-accent')
+      expect(confirmar.className).toContain('bg-transition')
       expect(confirmar.className).not.toContain('bg-danger')
+      expect(confirmar.className).not.toContain('bg-accent')
     })
 
     /**
