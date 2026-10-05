@@ -1,4 +1,5 @@
 import type { FieldPath, UseFormSetError } from 'react-hook-form'
+import { getApiErrorMessage } from '../../shared/utils/getApiErrorMessage'
 import { handleApiFormError } from '../../shared/utils/handleApiFormError'
 import type { WorkerFormValues } from './schemas/worker.schema'
 
@@ -48,6 +49,24 @@ export const WORKER_UPDATE_ERRORS: Record<string, WorkerApiError> = {
   'WRK-012': { field: 'role', message: 'No puedes cambiar tu propio cargo.' },
 }
 
+/** El cambio de estado no tiene formulario: cada código es un aviso en el diálogo. El 404 lo resuelve la página. */
+const WORKER_STATUS_ERRORS: Record<string, string> = {
+  'COM-003': WORKER_UPDATE_ERRORS['COM-003'].message,
+  'WRK-006': WORKER_UPDATE_ERRORS['WRK-006'].message,
+  'WRK-010': 'No puedes desactivarte a ti mismo.',
+  'WRK-013': 'Otra operación estaba en curso y no se pudo cambiar el estado. Intenta de nuevo.',
+}
+
+/** El aviso de un cambio de estado fallido: el texto propio del código o, sin él, el del backend. */
+export function workerStatusErrorMessage(error: unknown): string {
+  const code = problemCodeOf(error)
+  return (code && WORKER_STATUS_ERRORS[code]) || getApiErrorMessage(error, 'No se pudo cambiar el estado. Intenta de nuevo.')
+}
+
+function problemCodeOf(error: unknown): string | undefined {
+  return (error as { response?: { data?: { code?: string } } })?.response?.data?.code
+}
+
 /** Los campos que el backend puede nombrar en un 400 de forma, en el orden del formulario. */
 const WORKER_FIELDS: readonly WorkerField[] = [
   'firstName',
@@ -81,7 +100,7 @@ export function applyWorkerApiError(
     fallbackMessage: string
   },
 ) {
-  const code = (error as { response?: { data?: { code?: string } } })?.response?.data?.code
+  const code = problemCodeOf(error)
   const known = code ? errors[code] : undefined
   if (known?.reload) reload(known.reload)
   const codeFieldMap: Record<string, WorkerField> = {}

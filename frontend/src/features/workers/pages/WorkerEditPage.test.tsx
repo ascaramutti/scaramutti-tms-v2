@@ -80,6 +80,8 @@ function renderPage(worker: WorkerDetailResponse | null, role: UserRole = 'gener
   })
   queryClient.setQueryData(workerKeys.search({ q: 'juan', isActive: true }), [])
   queryClient.setQueryData(operationsKeys.drivers(), [])
+  queryClient.setQueryData(operationsKeys.serviceList({ page: 0 }), [])
+  queryClient.setQueryData(operationsKeys.serviceDetail(9), {})
   if (worker) server.use(getWorkerOk(worker))
   const router = createMemoryRouter(
     [
@@ -718,7 +720,7 @@ describe('WorkerEditPage', () => {
   })
 
   describe('al guardar', () => {
-    it('vuelve a la ficha con lo devuelto y refresca el padrón y los conductores', async () => {
+    it('vuelve a la ficha con lo devuelto y refresca el padrón, los conductores y los viajes', async () => {
       const user = userEvent.setup()
       const devuelto = trabajador({ lastName: 'Quispe', updatedAt: '2026-10-03T15:00:00Z' })
       const sink: { ids?: number[]; bodies?: WorkerUpdateRequest[] } = {}
@@ -732,6 +734,9 @@ describe('WorkerEditPage', () => {
       expect(queryClient.getQueryData(workerKeys.detail(ID))).toEqual(devuelto)
       expect(queryClient.getQueryState(workerKeys.search({ q: 'juan', isActive: true }))?.isInvalidated).toBe(true)
       expect(queryClient.getQueryState(operationsKeys.drivers())?.isInvalidated).toBe(true)
+      // Ya pudo estar asignado: su nombre o su licencia se ven en la lista y el detalle de sus viajes.
+      expect(queryClient.getQueryState(operationsKeys.serviceList({ page: 0 }))?.isInvalidated).toBe(true)
+      expect(queryClient.getQueryState(operationsKeys.serviceDetail(9))?.isInvalidated).toBe(true)
     })
 
     it('mientras guarda, Cancelar y Volver quedan deshabilitados', async () => {

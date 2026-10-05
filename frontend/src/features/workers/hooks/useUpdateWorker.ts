@@ -15,6 +15,6 @@ export function useUpdateWorker(id: number) {
       }
       return data
     },
-    onSuccess: (updated) => refreshAfterWorkerSaved(queryClient, updated),
+    onSuccess: (updated) => refreshAfterWorkerSaved(queryClient, updated, { mayBeAssigned: true }),
   })
 }

@@ -338,3 +338,44 @@ export function updateWorkerEmpty() {
 export function updateWorkerNetworkError() {
   return http.put(`${API}/workers/:id`, () => HttpResponse.error())
 }
+
+// ----- Estado (`POST /workers/{id}/deactivate` y `/reactivate`) -----
+
+type StatusAction = 'deactivate' | 'reactivate'
+
+/** Guarda el id de cada envío; responde la ficha dada o una con el estado nuevo. */
+export function changeWorkerStatusCapture(
+  action: StatusAction,
+  sink: { ids?: number[] },
+  response?: WorkerDetailResponse,
+  ms = 0,
+) {
+  sink.ids = []
+  return http.post(`${API}/workers/:id/${action}`, async ({ params }) => {
+    sink.ids = [...(sink.ids ?? []), Number(params.id)]
+    if (ms) await delay(ms)
+    return HttpResponse.json(response ?? fakeWorkerDetail({ id: Number(params.id), isActive: action === 'reactivate' }))
+  })
+}
+
+export function changeWorkerStatusProblem(
+  action: StatusAction,
+  code: string,
+  status: number,
+  detail = 'detail del backend',
+  ms = 0,
+) {
+  return http.post(`${API}/workers/:id/${action}`, async () => {
+    if (ms) await delay(ms)
+    return problema(code, status, detail)
+  })
+}
+
+export function changeWorkerStatusNetworkError(action: StatusAction) {
+  return http.post(`${API}/workers/:id/${action}`, () => HttpResponse.error())
+}
+
+/** Un 200 sin cuerpo: el hook no tiene qué devolver. */
+export function changeWorkerStatusEmpty(action: StatusAction) {
+  return http.post(`${API}/workers/:id/${action}`, () => new HttpResponse(null, { status: 200 }))
+}

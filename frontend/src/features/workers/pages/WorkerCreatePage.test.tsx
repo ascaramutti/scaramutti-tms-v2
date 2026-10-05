@@ -61,6 +61,9 @@ function renderPage({ role = 'operations_manager' as UserRole, position }: { rol
   queryClient.setQueryData(warehouseKeys.workerSearch('ros'), [])
   queryClient.setQueryData(operationsKeys.drivers(), [])
   queryClient.setQueryData([...warehouseKeys.all, 'stock'], [])
+  queryClient.setQueryData(operationsKeys.serviceList({ page: 0 }), [])
+  queryClient.setQueryData(operationsKeys.serviceDetail(9), {})
+  queryClient.setQueryData(operationsKeys.serviceStats(), {})
   const router = createMemoryRouter(
     [
       { path: NUEVO, element: <WorkerCreatePage /> },
@@ -979,6 +982,10 @@ describe('WorkerCreatePage', () => {
       expect(invalidada(queryClient, warehouseKeys.workerSearch('ros'))).toBe(true)
       expect(invalidada(queryClient, operationsKeys.drivers())).toBe(true)
       expect(invalidada(queryClient, [...warehouseKeys.all, 'stock'])).toBe(false)
+      // Un trabajador nuevo no está asignado a ningún viaje.
+      expect(invalidada(queryClient, operationsKeys.serviceList({ page: 0 }))).toBe(false)
+      expect(invalidada(queryClient, operationsKeys.serviceDetail(9))).toBe(false)
+      expect(invalidada(queryClient, operationsKeys.serviceStats())).toBe(false)
       // La ficha del creado queda sembrada y fresca: abre sin pedirla.
       expect(queryClient.getQueryData(workerKeys.detail(57))).toMatchObject({ id: 57 })
       expect(invalidada(queryClient, workerKeys.detail(57))).toBe(false)
