@@ -18,9 +18,6 @@ import { useSessionRankLevel } from '../hooks/useSessionRankLevel'
 import { useWorker } from '../hooks/useWorker'
 import { canManageWorker } from '../rank'
 
-/** El tono de baja de "Anular" en las fichas de almacén, sobre el botón secundario. */
-const DEACTIVATE_TONE = 'border-danger-border-strong text-danger-fg hover:bg-danger-soft focus:ring-danger'
-
 /**
  * Ficha de un trabajador. Sale del endpoint del detalle y no de la fila de la búsqueda,
  * que trae menos datos. Un 404 es un id que nunca existió: los trabajadores no se borran.
@@ -90,11 +87,8 @@ export function WorkerDetailPage() {
                 <Pencil className="mr-2 h-4 w-4" aria-hidden="true" />
                 Editar
               </Link>
-              <Button
-                variant="secondary"
-                onClick={() => setChangingStatus(true)}
-                className={data.isActive ? DEACTIVATE_TONE : undefined}
-              >
+              {/* Con el relleno de rechazar y aceptar una cotización: la baja en peligro, la vuelta en éxito. */}
+              <Button variant={data.isActive ? 'danger' : 'success'} onClick={() => setChangingStatus(true)}>
                 <Power className="mr-2 h-4 w-4" aria-hidden="true" />
                 {data.isActive ? 'Desactivar' : 'Reactivar'}
               </Button>
