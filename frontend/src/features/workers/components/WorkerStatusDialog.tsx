@@ -75,7 +75,7 @@ export function WorkerStatusDialog({ worker, onClose, onNotFound }: WorkerStatus
           </Button>
           <Button
             ref={confirmButton}
-            variant={action === 'deactivate' ? 'danger' : 'primary'}
+            variant={action === 'deactivate' ? 'danger' : 'success'}
             onClick={confirm}
             disabled={changeStatus.isPending}
             className={DISABLED}
