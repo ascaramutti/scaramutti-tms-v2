@@ -167,6 +167,14 @@ public enum OperationsError implements ApiError {
      */
     REINFORCEMENT_NOT_FOUND("OPS-010", 404, "Resource not found",
         "El refuerzo indicado no existe en este servicio"),
+
+    /**
+     * La ficha elegida como conductor existe y esta activa, pero su trabajador no es conductor
+     * (un escolta o un ayudante con licencia tambien tienen ficha). Decision del dueno: en los
+     * servicios solo se asignan conductores. Lo ya asignado no se revisa hacia atras.
+     */
+    DRIVER_NOT_A_DRIVER("OPS-011", 400, "Bad Request",
+        "La ficha indicada no es de un conductor"),
     ;
 
     private final String code;

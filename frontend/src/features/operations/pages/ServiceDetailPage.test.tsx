@@ -6,6 +6,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
+import { HIDDEN_FROM_VIEW, NAMED_IMAGE } from '../../../test/visibility'
 import { ServiceDetailPage } from './ServiceDetailPage'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
@@ -15,6 +16,7 @@ import { fakeUser } from '../../../test/mocks/handlers/auth'
 import { server } from '../../../test/mocks/server'
 import { SERVICE_STATUS_PRESENTATION } from '../status/serviceStatusPresentation'
 import {
+  fakeAdditionalResource,
   fakeServiceDetail,
   fakeServiceEvent,
   serviceDetailError,
@@ -467,6 +469,7 @@ describe('ServiceDetailPage', () => {
             {
               id: 5,
               driver: { id: 8, fullName: 'Ana Ríos' },
+              driverNeedsReassignment: false,
               tractor: { kind: 'TRACTOR', id: 4, plate: 'XYZ-987' },
               trailer: null,
               reason: 'Relevo por descanso reglamentario del conductor principal',
@@ -504,6 +507,7 @@ describe('ServiceDetailPage', () => {
             {
               id: 7,
               driver: { id: 8, fullName: 'Ana Ríos' },
+              driverNeedsReassignment: false,
               tractor: { kind: 'TRACTOR', id: 4, plate: 'XYZ987' },
               trailer: { kind: 'TRAILER', id: 5, plate: 'QWE456' },
               reason: 'Cambio de unidad por desperfecto en ruta',
@@ -534,6 +538,7 @@ describe('ServiceDetailPage', () => {
             {
               id: 6,
               driver: null,
+              driverNeedsReassignment: false,
               tractor: null,
               trailer: null,
               reason: 'Pedido sin recursos, que el servidor no debería producir',
@@ -549,6 +554,181 @@ describe('ServiceDetailPage', () => {
 
     const card = cardOf('Refuerzos')
     expect(within(card).getByText('—')).toBeInTheDocument()
+  })
+
+  // ----- Conductor que ya no se puede asignar -----
+  const RAZON =
+    'Dado de baja, ficha apagada o cambió de cargo'
+  // Cuántas veces está el porqué, sin importar la mayúscula: una copia oculta puede ir en minúscula
+  const vecesQueDice = (nodo: HTMLElement) =>
+    (nodo.textContent ?? '').toLowerCase().split(RAZON.toLowerCase()).length - 1
+  const conAlerta = (overrides: Partial<ServiceDetailResponse> = {}) =>
+    fakeServiceDetail({
+      status: 'PENDING_START',
+      driver: { id: 3, fullName: 'Juan Pérez' },
+      tractor: { kind: 'TRACTOR', id: 9, plate: 'ABC-123' },
+      driverNeedsReassignment: true,
+      ...overrides,
+    })
+
+  // El valor del campo Conductor de la ficha de recursos
+  const conductorDe = () =>
+    within(cardOf('Recursos asignados')).getByText('Conductor').parentElement?.querySelector(
+      'dd',
+    ) as HTMLElement
+
+  it('explica a la vista por qué hay que reasignar al conductor, junto a su nombre', async () => {
+    server.use(serviceDetailOk(conAlerta()))
+    renderDetail()
+    await screen.findByText('SRV-0077')
+
+    // En el campo del conductor, como en cada refuerzo: el nombre, la pastilla y el porqué
+    const campo = conductorDe()
+    const nombre = within(campo).getByText('Juan Pérez')
+    const pastilla = within(campo).getByText('Reasignar conductor')
+    const razon = within(campo).getByText(RAZON)
+    expect(pastilla.parentElement?.previousElementSibling).toBe(nombre)
+    expect(pastilla.parentElement?.nextElementSibling).toBe(razon)
+    expect(pastilla.parentElement).toHaveClass('whitespace-nowrap')
+    // La pastilla no lleva texto oculto (ni siquiera un separador suelto): el porqué ya se ve
+    expect(pastilla.querySelector('.sr-only')).toBeNull()
+    // Sin depender del color: tono de advertencia, e ícono sin nombre propio junto al texto
+    expect(pastilla).toHaveClass('bg-warning-soft-strong')
+    expect(pastilla.querySelector('svg')).toHaveAttribute('aria-hidden', 'true')
+    expect(pastilla.querySelectorAll(NAMED_IMAGE)).toHaveLength(0)
+    // A la vista y para el lector. toBeVisible ve el atributo hidden y el estilo en línea;
+    // como el test no carga CSS, las clases que ocultan se miran aparte.
+    for (const nodo of [pastilla, razon]) {
+      expect(nodo).toBeVisible()
+      expect(nodo.closest(`${HIDDEN_FROM_VIEW}, [aria-hidden="true"]`)).toBeNull()
+    }
+    // El porqué en el tono de advertencia, y una sola vez
+    expect(razon).toHaveClass('text-warning-fg')
+    expect(vecesQueDice(campo)).toBe(1)
+    // Sin un recuadro aparte que no señale a nadie
+    expect(within(cardOf('Recursos asignados')).queryByRole('status')).not.toBeInTheDocument()
+  })
+
+  it('sin la marca, la ficha de recursos no cambia', async () => {
+    server.use(serviceDetailOk(conAlerta({ driverNeedsReassignment: false })))
+    renderDetail()
+    await screen.findByText('SRV-0077')
+
+    expect(await fieldValue('Conductor')).toBe('Juan Pérez')
+    expect(screen.queryByText('Reasignar conductor')).not.toBeInTheDocument()
+  })
+
+  it('un viaje completado, que llega sin la marca, no muestra la alerta', async () => {
+    server.use(
+      serviceDetailOk(
+        conAlerta({
+          status: 'COMPLETED',
+          driverNeedsReassignment: false,
+          startDateTime: '2026-08-25T13:00:00Z',
+          endDateTime: '2026-08-26T13:00:00Z',
+        }),
+      ),
+    )
+    renderDetail()
+    await screen.findByText('SRV-0077')
+
+    expect(screen.queryByText('Reasignar conductor')).not.toBeInTheDocument()
+    expect(screen.queryByText(RAZON)).not.toBeInTheDocument()
+  })
+
+  it('marca el refuerzo también en un viaje pendiente de inicio (reabierto)', async () => {
+    server.use(
+      serviceDetailOk(
+        conAlerta({
+          status: 'PENDING_START',
+          driverNeedsReassignment: false,
+          additionalResources: [fakeAdditionalResource({ driverNeedsReassignment: true })],
+        }),
+      ),
+    )
+    renderDetail()
+    await screen.findByText('SRV-0077')
+
+    const refuerzo = within(cardOf('Refuerzos')).getByRole('listitem')
+    expect(within(refuerzo).getByText('Reasignar conductor')).toBeInTheDocument()
+    expect(within(refuerzo).getByText(RAZON)).toBeInTheDocument()
+  })
+
+  it('marca solo el refuerzo cuyo conductor hay que reasignar', async () => {
+    server.use(
+      serviceDetailOk(
+        conAlerta({
+          status: 'IN_PROGRESS',
+          driverNeedsReassignment: false,
+          additionalResources: [
+            fakeAdditionalResource({ id: 51, driverNeedsReassignment: true }),
+            fakeAdditionalResource({
+              id: 52,
+              driver: { id: 9, fullName: 'Luis Quispe' },
+              tractor: null,
+            }),
+          ],
+        }),
+      ),
+    )
+    renderDetail()
+    await screen.findByText('SRV-0077')
+
+    const refuerzos = within(cardOf('Refuerzos')).getAllByRole('listitem')
+    const pastilla = within(refuerzos[0]).getByText('Reasignar conductor')
+    // Debajo de los recursos del refuerzo, y sin partirse como en la lista
+    expect(pastilla.parentElement?.previousElementSibling).toHaveTextContent('Ana Ríos Chávez')
+    expect(pastilla.parentElement).toHaveClass('whitespace-nowrap')
+    // El porqué a la vista junto al refuerzo, sin el recuadro del viaje que lo explique
+    const razon = within(refuerzos[0]).getByText(RAZON)
+    expect(razon).toBeVisible()
+    expect(razon.closest(`${HIDDEN_FROM_VIEW}, [aria-hidden="true"]`)).toBeNull()
+    expect(razon).toHaveClass('text-warning-fg')
+    // Y una sola vez: una copia oculta además de la visible el lector la anunciaría dos veces
+    expect(vecesQueDice(refuerzos[0])).toBe(1)
+    expect(within(refuerzos[1]).queryByText('Reasignar conductor')).not.toBeInTheDocument()
+    expect(within(refuerzos[1]).queryByText(RAZON)).not.toBeInTheDocument()
+    // La marca de un refuerzo no es la del viaje: el conductor principal sigue sin alerta
+    expect(within(conductorDe()).queryByText('Reasignar conductor')).not.toBeInTheDocument()
+  })
+
+  it('la marca del viaje no se contagia a sus refuerzos', async () => {
+    server.use(
+      serviceDetailOk(
+        conAlerta({ status: 'IN_PROGRESS', additionalResources: [fakeAdditionalResource()] }),
+      ),
+    )
+    renderDetail()
+    await screen.findByText('SRV-0077')
+
+    expect(within(conductorDe()).getByText('Reasignar conductor')).toBeInTheDocument()
+    expect(within(cardOf('Refuerzos')).queryByText('Reasignar conductor')).not.toBeInTheDocument()
+  })
+
+  it('ventas, que ve el viaje sin operarlo, también ve la alerta y su porqué', async () => {
+    server.use(
+      serviceDetailOk(
+        conAlerta({
+          status: 'IN_PROGRESS',
+          additionalResources: [fakeAdditionalResource({ driverNeedsReassignment: true })],
+        }),
+      ),
+    )
+    renderDetail({ role: 'sales' })
+    await screen.findByText('SRV-0077')
+
+    expect(within(conductorDe()).getByText(RAZON)).toBeInTheDocument()
+    expect(within(cardOf('Refuerzos')).getByText('Reasignar conductor')).toBeInTheDocument()
+    // Y el porqué del refuerzo a la vista
+    expect(within(cardOf('Refuerzos')).getByText(RAZON)).toBeInTheDocument()
+  })
+
+  it('el despacho también ve la alerta y su porqué', async () => {
+    server.use(serviceDetailOk(conAlerta()))
+    renderDetail({ role: 'dispatcher' })
+    await screen.findByText('SRV-0077')
+
+    expect(within(conductorDe()).getByText(RAZON)).toBeVisible()
   })
 
   // ----- La bitácora, dentro de la pantalla -----
@@ -641,6 +821,21 @@ describe('ServiceDetailPage', () => {
 
     await userEvent.click(screen.getByRole('link', { name: /Volver a servicios/ }))
     expect(await screen.findByText('Listado de servicios')).toBeInTheDocument()
+  })
+
+  it('no tiene violaciones de accesibilidad con la alerta y un refuerzo marcado', async () => {
+    server.use(
+      serviceDetailOk(
+        conAlerta({
+          status: 'IN_PROGRESS',
+          additionalResources: [fakeAdditionalResource({ driverNeedsReassignment: true })],
+        }),
+      ),
+    )
+    const { container } = renderDetail()
+    await screen.findByText('SRV-0077')
+
+    expect(await axe(container)).toHaveNoViolations()
   })
 
   it('no tiene violaciones de accesibilidad', async () => {

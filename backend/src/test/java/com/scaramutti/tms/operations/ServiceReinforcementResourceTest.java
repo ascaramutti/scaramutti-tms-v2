@@ -486,15 +486,15 @@ class ServiceReinforcementResourceTest {
     @Test
     void addResources_signsTheTraceWithTheAddingUser() {
         long id = serviceInProgress();
-        // lcampos y NO cscaramutti: el sembrador de dev garantiza admin, lcampos e inactivo, y
+        // sales y NO cscaramutti: el sembrador de dev garantiza admin, sales e inactivo, y
         // nada mas. cscaramutti existe en la base de desarrollo porque la comparte con el sistema
         // anterior, asi que el caso pasaba local y reventaba en la CI virgen — y el rojo salia del
         // ARMADO ("usuario sembrado no encontrado"), que no se lee como un problema del endpoint.
         // El rol se fabrica en el token; lo unico que el caso necesita es un usuario REAL distinto
         // del que creo el viaje, porque assigned_by tiene clave foranea.
-        int dispatcherId = fixtures.userId("lcampos");
+        int dispatcherId = fixtures.userId("sales");
         String dispatcherToken =
-            TestAuth.fabricateTokenForUser(dispatcherId, "lcampos", "dispatcher");
+            TestAuth.fabricateTokenForUser(dispatcherId, "sales", "dispatcher");
 
         given()
             .header("Authorization", "Bearer " + dispatcherToken)
@@ -504,7 +504,7 @@ class ServiceReinforcementResourceTest {
             .post("/services/" + id + "/resources")
         .then()
             .statusCode(200)
-            .body("additionalResources[0].assignedBy.username", equalTo("lcampos"));
+            .body("additionalResources[0].assignedBy.username", equalTo("sales"));
 
         assertEquals(dispatcherId, assignmentColumn(id, "assigned_by"));
         assertEquals(dispatcherId, auditChangedBy(id));
@@ -555,7 +555,7 @@ class ServiceReinforcementResourceTest {
         addResources(id, body);   // lo escribe admin, que ve importes
 
         String dispatcherToken = TestAuth.fabricateTokenForUser(
-            fixtures.userId("lcampos"), "lcampos", "dispatcher");
+            fixtures.userId("sales"), "sales", "dispatcher");
         JsonPath asDispatcher = given()
             .header("Authorization", "Bearer " + dispatcherToken)
         .when()
@@ -944,6 +944,53 @@ class ServiceReinforcementResourceTest {
         Map<String, Object> forced = payload(driverId, null, null);
         forced.put("force", true);
         addResources(id, forced).body("additionalResources.size()", equalTo(1));
+    }
+
+    /**
+     * Un refuerzo tambien ELIGE conductor, asi que rige lo mismo que al asignar: la ficha del escolta
+     * o del ayudante con licencia no entra, y no queda fila de refuerzo, ni bitacora ni auditoria.
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"escort", "assistant"})
+    void addResources_withAProfileOfAnotherRole_returns400_OPS011_andWritesNothing(String role) {
+        long id = serviceInProgress();
+        int eventsBefore = countEvents(id);
+        int other = operationsFixtures.seedDriverOfRole("ZTEST Otro", "Cargo", role, true);
+
+        addResourcesExpecting(id, payload(other, null, null), 400)
+            .body("code", equalTo("OPS-011"))
+            .body("detail", equalTo("La ficha indicada no es de un conductor"));
+
+        assertEquals(0, countAdditionalAssignments(id));
+        assertEquals(eventsBefore, countEvents(id));
+        assertEquals(0, countAuditLogs(id, "ASSIGNMENT"));
+    }
+
+    /** Igual que al asignar: la ficha encendida de un trabajador dado de baja es inactiva. */
+    @Test
+    void addResources_withAnActiveProfileWhoseWorkerLeft_returns400_COM001_andWritesNothing() {
+        long id = serviceInProgress();
+        int eventsBefore = countEvents(id);
+        int left = operationsFixtures.seedDriverWithInactiveWorker("ZTEST Baja", "Trabajador");
+
+        addResourcesExpecting(id, payload(left, null, null), 400)
+            .body("code", equalTo("COM-001"))
+            .body("detail", equalTo("El conductor indicado no existe o está inactivo"));
+
+        assertEquals(0, countAdditionalAssignments(id));
+        assertEquals(eventsBefore, countEvents(id));
+        assertEquals(0, countAuditLogs(id, "ASSIGNMENT"));
+    }
+
+    /** El orden, igual que al asignar: el cargo del conductor se mira antes que el tracto. */
+    @Test
+    void addResources_theRoleOfTheProfileIsCheckedBeforeTheTractor() {
+        long id = serviceInProgress();
+        int escort = operationsFixtures.seedDriverOfRole("ZTEST Esc", "Activo", "escort", true);
+        int inactiveTractor = operationsFixtures.seedTractor(false, WarehouseTestData.STATUS_AVAILABLE);
+
+        addResourcesExpecting(id, payload(escort, inactiveTractor, null), 400).body("code", equalTo("OPS-011"));
+        assertEquals(0, countAdditionalAssignments(id));
     }
 
     @Test

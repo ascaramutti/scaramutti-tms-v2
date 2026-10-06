@@ -5,6 +5,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes, useParams } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { axe } from 'vitest-axe'
+import { HIDDEN_FROM_VIEW, NAMED_IMAGE } from '../../../test/visibility'
 import { ServicesListPage } from './ServicesListPage'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
@@ -728,6 +729,99 @@ describe('ServicesListPage', () => {
     expect(await screen.findByText('Detalle del servicio 42')).toBeInTheDocument()
   })
 
+  // ----- Alerta del viaje: algo de este viaje hay que reasignar -----
+  /** El hueco del ícono, que va en todas las filas antes del código. */
+  const huecoDelIcono = (fila: HTMLElement) =>
+    within(fila).getByText(/^SRV-/).previousElementSibling as HTMLElement
+
+  it('marca con el ícono solo el viaje que requiere reasignación, antes del código', async () => {
+    server.use(
+      servicesPage([
+        fakeAssignedService({ needsReassignment: true }),
+        fakeAssignedService({ id: 44, code: 'SRV-0044', driver: { id: 5, fullName: 'Ana Ríos' } }),
+      ]),
+    )
+    renderServicios()
+    const conAlerta = rowOf(await screen.findByText('SRV-0043'))
+    const icono = huecoDelIcono(conAlerta).querySelector('svg')
+    // Solo el ícono, sin texto, en el tono de advertencia, del tamaño de su hueco y a la vista
+    expect(icono).not.toBeNull()
+    expect(icono).toHaveClass('text-warning', 'h-5', 'w-5')
+    expect(icono?.getAttribute('class')).not.toMatch(/\b(size|scale|max-[wh]|min-[wh])-/)
+    expect(icono).toBeVisible()
+    expect((icono as Element).closest(HIDDEN_FROM_VIEW)).toBeNull()
+    // Sin nombre propio (lo dice la fila): lo que esto cuida es que nadie le ponga uno
+    expect(icono).toHaveAttribute('aria-hidden', 'true')
+    expect(huecoDelIcono(conAlerta)).toHaveTextContent('')
+    // La pastilla del conductor ya no va en la lista: el detalle dice qué recurso es
+    expect(within(conAlerta).queryByText('Reasignar conductor')).not.toBeInTheDocument()
+
+    const sinAlerta = rowOf(screen.getByText('SRV-0044'))
+    expect(huecoDelIcono(sinAlerta).querySelector('svg')).toBeNull()
+  })
+
+  it('todas las filas reservan el hueco del ícono, así los códigos quedan alineados', async () => {
+    server.use(
+      servicesPage([
+        fakeAssignedService({ needsReassignment: true }),
+        fakeAssignedService({ id: 44, code: 'SRV-0044' }),
+      ]),
+    )
+    renderServicios()
+    await screen.findByText('SRV-0043')
+
+    for (const code of ['SRV-0043', 'SRV-0044']) {
+      // El mismo hueco de ancho fijo y dibujado, con o sin ícono (el test no carga CSS: se miran
+      // las clases)
+      const hueco = huecoDelIcono(rowOf(screen.getByText(code)))
+      expect(hueco).toHaveClass('h-5', 'w-5', 'shrink-0')
+      expect(hueco.closest(HIDDEN_FROM_VIEW)).toBeNull()
+    }
+  })
+
+  it('el encabezado Código empieza donde empiezan los códigos', async () => {
+    server.use(servicesPage([fakeAssignedService({ needsReassignment: true })]))
+    renderServicios()
+    const hueco = huecoDelIcono(rowOf(await screen.findByText('SRV-0043')))
+    const encabezado = screen.getByRole('columnheader', { name: 'Código' })
+    // El mismo hueco y el mismo espacio que la celda antepone al código (el test no carga CSS)
+    const huecoDelEncabezado = encabezado.querySelector('[aria-hidden="true"]') as HTMLElement
+    // Exacto: una clase de más (por ejemplo, una que lo esconda) correría el texto
+    expect(huecoDelEncabezado.className).toBe('w-5 shrink-0')
+    expect(hueco).toHaveClass('w-5', 'shrink-0')
+    expect(huecoDelEncabezado.nextSibling?.textContent).toBe('Código')
+    expect(huecoDelEncabezado.parentElement?.className).toBe(hueco.parentElement?.className)
+  })
+
+  it('la fila anuncia la alerta una sola vez, en su nombre', async () => {
+    server.use(servicesPage([fakeAssignedService({ needsReassignment: true })]))
+    renderServicios()
+    const fila = rowOf(await screen.findByText('SRV-0043'))
+
+    expect(fila).toHaveAccessibleName('Ver el servicio SRV-0043 de IPH S.A.C. (Requiere reasignación)')
+    // Ninguna celda la repite: ni texto oculto ni un nombre en el ícono
+    expect(fila.querySelector('.sr-only')).toBeNull()
+    expect(fila.querySelectorAll(NAMED_IMAGE)).toHaveLength(0)
+    expect(within(fila).queryByText(/reasigna/i)).not.toBeInTheDocument()
+  })
+
+  it.each(['dispatcher', 'sales'] as const)('el rol %s también ve el ícono', async (role) => {
+    // Cada rol con la fila que le manda el backend: al despacho, sin precio
+    const fake = role === 'dispatcher' ? fakeDispatcherServiceSummary : fakeServiceSummary
+    server.use(
+      servicesPage([
+        fake({
+          status: 'PENDING_START',
+          driver: { id: 3, fullName: 'Juan Pérez' },
+          needsReassignment: true,
+        }),
+      ]),
+    )
+    renderServicios({ role })
+    const fila = rowOf(await screen.findByText('SRV-0042'))
+    expect(huecoDelIcono(fila).querySelector('svg')).not.toBeNull()
+  })
+
   // ----- Accesibilidad -----
   it('presenta la pantalla con un único h1', async () => {
     server.use(servicesPage([fakeServiceSummary()]))
@@ -800,6 +894,15 @@ describe('ServicesListPage', () => {
     server.use(servicesPage([fakeAssignedService()]))
     const { container } = renderServicios()
     await screen.findByText('SRV-0043')
+    expect(await axe(container)).toHaveNoViolations()
+  })
+
+  it('no tiene violaciones de accesibilidad con un viaje en alerta', async () => {
+    server.use(servicesPage([fakeAssignedService({ needsReassignment: true })]))
+    const { container } = renderServicios()
+    const fila = rowOf(await screen.findByText('SRV-0043'))
+    expect(fila).toHaveAccessibleName(/Requiere reasignación/)
+    expect(huecoDelIcono(fila).querySelector('svg')).not.toBeNull()
     expect(await axe(container)).toHaveNoViolations()
   })
 

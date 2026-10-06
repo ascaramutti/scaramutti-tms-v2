@@ -11,14 +11,14 @@ import type { ButtonSize, ButtonVariant } from './buttonClasses'
  * solo si el tipo lo declara; con `ButtonHTMLAttributes` el `ref` no compila.
  */
 interface ButtonProps extends ComponentPropsWithRef<'button'> {
-  /** Peso de la acción. Tres, medidas contra los usos reales. */
+  /** Peso de la acción. Cuatro, medidas contra los usos reales. */
   variant?: ButtonVariant
   /**
    * `icon` es el botón cuadrado de solo ícono; el resto es `md`. **Todavía sin llamador en
    * el producto**: se pidió por el paginado de `DataTable`, y al medirlo resultó ser una
-   * cuarta forma (sin relleno, sin borde y sin anillo de foco, con su propia opacidad de
-   * deshabilitado) que ninguna de las tres variantes reproduce; las clases exactas están en
-   * `DataTable.tsx`. Combinado con cualquiera de las tres variantes de hoy, `icon` les
+   * forma más (sin relleno, sin borde y sin anillo de foco, con su propia opacidad de
+   * deshabilitado) que ninguna de las variantes reproduce; las clases exactas están en
+   * `DataTable.tsx`. Combinado con cualquiera de las variantes de hoy, `icon` les
    * agregaría relleno, borde y anillo: NO puede servir a ese caso tal como está. Su primer
    * uso llega el día que exista una variante sin relleno.
    */

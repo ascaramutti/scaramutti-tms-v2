@@ -75,7 +75,7 @@ export type UserRef = {
     username: string;
     fullName: string;
     /**
-     * Cargo del trabajador (ej: Ejecutiva de Ventas)
+     * Cargo: el nombre visible del rol del trabajador
      */
     position?: string | null;
 };
@@ -968,7 +968,7 @@ export type PageOfWarehousePurchaseInvoiceSummary = PageMeta & {
 };
 
 /**
- * Trabajador de public.workers (catalogo compartido con v1, read-only desde v2).
+ * Trabajador de public.workers; es la forma del LISTADO, la que alimenta los combobox.
  */
 export type WorkerResponse = {
     id: number;
@@ -1029,7 +1029,152 @@ export type DriverResponse = DriverRef & {
     licenseCategory?: string | null;
     phone?: string | null;
     status: FleetResourceStatus;
+    /**
+     * La ficha está encendida.
+     */
     isActive: boolean;
+    /**
+     * Se puede asignar hoy: la ficha encendida y su trabajador activo.
+     */
+    isAssignable: boolean;
+};
+
+/**
+ * Si el rol lleva ficha de conductor: `REQUIRED` (obligatoria),
+ * `OPTIONAL` (solo si viene la licencia) o `NONE` (la ficha se rechaza),
+ * segun la columna `roles.driver_profile`. Que rol cae en cual no se
+ * enumera acá, por el mismo motivo que el nivel: este documento se sirve
+ * sin sesión, y eso es lo que `GET /roles` restringe.
+ *
+ */
+export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
+
+/**
+ * Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
+ * nombre de sistema (el que llevan `users.role` y el token de sesión, y
+ * el que se manda en `role` del request); `description` es el nombre
+ * visible del cargo: es el `position` de todo objeto de usuario embebido
+ * (sesión, cotizaciones, almacén, operaciones y el detalle de un
+ * trabajador) y el `receivedBy` de un retiro; `level` es el nivel del organigrama, de 4 a 1; `canLogin` dice
+ * si el rol puede tener usuario. La tabla completa de nivel por rol no se
+ * enumera en ningún contrato: este documento se sirve sin sesión, y el nivel
+ * de cada cargo es justamente lo que `GET /roles` restringe a los cuatro
+ * roles del padrón.
+ *
+ */
+export type RoleResponse = {
+    name: string;
+    description: string;
+    level: number;
+    canLogin: boolean;
+    driverProfile: DriverProfileMode;
+};
+
+/**
+ * Tipo de documento de identidad (`public.document_types`). `maxLength` y
+ * `validationPattern` (expresión regular completa, nula si el tipo no
+ * define patrón) son los que el backend aplica al número en el alta (`WRK-004`).
+ *
+ */
+export type DocumentTypeResponse = {
+    id: number;
+    code: string;
+    name: string;
+    maxLength: number;
+    validationPattern?: string | null;
+};
+
+/**
+ * La fila de `public.drivers` del trabajador. `id` es el que guardan las
+ * asignaciones de operaciones. `isActive` en `false` significa ficha
+ * apagada (el rol dejó de llevarla o el trabajador está inactivo): no
+ * aparece en el combobox de conductores y no se borra nunca.
+ *
+ */
+export type WorkerDriverProfileResponse = {
+    id: number;
+    licenseNumber: string;
+    licenseCategory?: string | null;
+    status: FleetResourceStatus;
+    isActive: boolean;
+};
+
+/**
+ * Alta de un trabajador. `role` es el `name` de `GET /roles` (un valor
+ * que no sea un rol activo → `400 WRK-005`; se valida en el servicio, no
+ * como enum: la lista vive en la base). `hireDate` es un día calendario
+ * (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
+ * nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
+ * `firstName` y `lastName`: al menos una letra latina (letra de script
+ * latino según la versión de Unicode del backend, 15.0), más espacios,
+ * apóstrofo y guion; se pasan a NFC antes de
+ * validarse (pasados 400 caracteres no se normalizan: se rechazan por
+ * largo tal como llegan) y se guardan recortados.
+ *
+ */
+export type WorkerRequest = {
+    firstName: string;
+    lastName: string;
+    documentTypeId: number;
+    documentNumber: string;
+    phone?: string | null;
+    role: string;
+    hireDate: string;
+    driver?: WorkerDriverProfileRequest | null;
+};
+
+/**
+ * Ficha de conductor que viaja dentro del trabajador. `status` ausente
+ * significa cosas distintas según la operación: en el alta `AVAILABLE`, en
+ * la edición conserva el que está guardado.
+ *
+ */
+export type WorkerDriverProfileRequest = {
+    licenseNumber: string;
+    licenseCategory?: string | null;
+    status?: FleetResourceStatus | null;
+};
+
+/**
+ * Edición: los mismos campos del alta más `reason`. El mínimo de `reason`
+ * NO se declara acá a propósito: es condicional (obligatorio solo cuando
+ * `documentNumber` cambia) y lo mide el servidor, que es lo único que
+ * permite devolver `WRK-009` en vez de un error de forma y no exigirlo
+ * donde el contrato dice que es libre.
+ *
+ */
+export type WorkerUpdateRequest = WorkerRequest & {
+    reason?: string | null;
+};
+
+/**
+ * Ficha completa de un trabajador. `role` es su rol (la misma fila que
+ * lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
+ * `public.users` para él (el usuario lo administra el módulo de
+ * usuarios). En los trabajadores cargados antes de que existiera esta
+ * unidad, `createdBy` es el usuario `admin`, que los cargó (nulo si no
+ * había admin al migrar, o en un trabajador creado por SQL antes que el
+ * primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
+ * o reactivación desde la aplicación. Instantes en UTC
+ * (`createdAt`, `updatedAt`); `hireDate` es día calendario.
+ *
+ */
+export type WorkerDetailResponse = {
+    id: number;
+    firstName: string;
+    lastName: string;
+    documentType: DocumentTypeResponse;
+    documentNumber: string;
+    phone?: string | null;
+    role: RoleResponse;
+    hireDate: string;
+    isActive: boolean;
+    createdAt: string;
+    createdBy?: UserRef | null;
+    updatedAt: string;
+    updatedBy?: UserRef | null;
+    driver?: WorkerDriverProfileResponse | null;
+    hasUser: boolean;
 };
 
 /**
@@ -1418,6 +1563,10 @@ export type ServiceResourceConflictProblem = Problem & {
 export type ServiceAdditionalResourceResponse = {
     id: number;
     driver?: DriverRef | null;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y el conductor de ESTE refuerzo ya no se puede asignar (mismos tres motivos que el del viaje). Siempre presente; false si el refuerzo no incluyó conductor.
+     */
+    driverNeedsReassignment: boolean;
     tractor?: FleetUnitRef | null;
     trailer?: FleetUnitRef | null;
     /**
@@ -1465,7 +1614,15 @@ export type ServiceDetailResponse = {
      */
     currencyCode?: string;
     status: ServiceStatus;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y algún recurso asignado ya no se puede asignar: el conductor principal o el de algún refuerzo, por baja del trabajador, ficha apagada o cargo distinto de conductor (los vehículos no cuentan). Hay que reasignarlo; el detalle dice cuál. Se deriva en cada lectura, sin columna. Siempre presente; false en los viajes pendientes de asignación, completados, cancelados o eliminados.
+     */
+    needsReassignment: boolean;
     driver: DriverRef | null;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar (trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. Se deriva en cada lectura, sin columna. Siempre presente; false si el viaje no tiene conductor, y en los viajes pendientes de asignación, completados, cancelados o eliminados.
+     */
+    driverNeedsReassignment: boolean;
     tractor: FleetUnitRef | null;
     trailer: FleetUnitRef | null;
     /**
@@ -1573,7 +1730,7 @@ export type ServiceStatsResponse = {
      */
     completedThisWeek: number;
     /**
-     * Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan.
+     * Conductores PRINCIPALES distintos en viajes en ruta, sobre el padrón de conductores de alta. Los refuerzos no cuentan. Arriba y abajo, solo fichas encendidas de trabajadores activos con cargo `driver`: el escolta, el ayudante con licencia y el trabajador dado de baja no cuentan.
      */
     driversOnRoad: {
         active: number;
@@ -1620,6 +1777,10 @@ export type ServiceSummaryResponse = {
     tentativeDate: string;
     tripScope: TripScope;
     status: ServiceStatus;
+    /**
+     * true si el viaje está pendiente de inicio o en ruta y algún recurso asignado ya no se puede asignar: el conductor principal o el de algún refuerzo, por baja del trabajador, ficha apagada o cargo distinto de conductor (los vehículos no cuentan). Hay que reasignarlo; el detalle dice cuál. Se deriva en cada lectura, sin columna. Siempre presente; false en los viajes pendientes de asignación, completados, cancelados o eliminados.
+     */
+    needsReassignment: boolean;
     driver: DriverRef | null;
     tractor: FleetUnitRef | null;
     /**
@@ -2033,6 +2194,80 @@ export type CreateClientResponses = {
 };
 
 export type CreateClientResponse = CreateClientResponses[keyof CreateClientResponses];
+
+export type GetClientData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/clients/{id}';
+};
+
+export type GetClientErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetClientError = GetClientErrors[keyof GetClientErrors];
+
+export type GetClientResponses = {
+    /**
+     * OK
+     */
+    200: ClientResponse;
+};
+
+export type GetClientResponse = GetClientResponses[keyof GetClientResponses];
+
+export type UpdateClientData = {
+    body: ClientRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/clients/{id}';
+};
+
+export type UpdateClientErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type UpdateClientError = UpdateClientErrors[keyof UpdateClientErrors];
+
+export type UpdateClientResponses = {
+    /**
+     * Actualizado
+     */
+    200: ClientResponse;
+};
+
+export type UpdateClientResponse = UpdateClientResponses[keyof UpdateClientResponses];
 
 export type ListQuotationsData = {
     body?: never;
@@ -3373,12 +3608,70 @@ export type GetWarehouseReportResponses = {
 
 export type GetWarehouseReportResponse = GetWarehouseReportResponses[keyof GetWarehouseReportResponses];
 
+export type ListRolesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/roles';
+};
+
+export type ListRolesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListRolesError = ListRolesErrors[keyof ListRolesErrors];
+
+export type ListRolesResponses = {
+    /**
+     * Roles activos, del nivel 4 al 1
+     */
+    200: Array<RoleResponse>;
+};
+
+export type ListRolesResponse = ListRolesResponses[keyof ListRolesResponses];
+
+export type ListDocumentTypesData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/document-types';
+};
+
+export type ListDocumentTypesErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListDocumentTypesError = ListDocumentTypesErrors[keyof ListDocumentTypesErrors];
+
+export type ListDocumentTypesResponses = {
+    /**
+     * Tipos de documento activos
+     */
+    200: Array<DocumentTypeResponse>;
+};
+
+export type ListDocumentTypesResponse = ListDocumentTypesResponses[keyof ListDocumentTypesResponses];
+
 export type ListWorkersData = {
     body?: never;
     path?: never;
     query?: {
         /**
-         * Búsqueda libre. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         * Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
          */
         q?: string;
         isActive?: boolean;
@@ -3411,6 +3704,199 @@ export type ListWorkersResponses = {
 };
 
 export type ListWorkersResponse = ListWorkersResponses[keyof ListWorkersResponses];
+
+export type CreateWorkerData = {
+    body: WorkerRequest;
+    path?: never;
+    query?: never;
+    url: '/workers';
+};
+
+export type CreateWorkerErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type CreateWorkerError = CreateWorkerErrors[keyof CreateWorkerErrors];
+
+export type CreateWorkerResponses = {
+    /**
+     * Creado
+     */
+    201: WorkerDetailResponse;
+};
+
+export type CreateWorkerResponse = CreateWorkerResponses[keyof CreateWorkerResponses];
+
+export type GetWorkerData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}';
+};
+
+export type GetWorkerErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetWorkerError = GetWorkerErrors[keyof GetWorkerErrors];
+
+export type GetWorkerResponses = {
+    /**
+     * OK
+     */
+    200: WorkerDetailResponse;
+};
+
+export type GetWorkerResponse = GetWorkerResponses[keyof GetWorkerResponses];
+
+export type UpdateWorkerData = {
+    body: WorkerUpdateRequest;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}';
+};
+
+export type UpdateWorkerErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type UpdateWorkerError = UpdateWorkerErrors[keyof UpdateWorkerErrors];
+
+export type UpdateWorkerResponses = {
+    /**
+     * Actualizado
+     */
+    200: WorkerDetailResponse;
+};
+
+export type UpdateWorkerResponse = UpdateWorkerResponses[keyof UpdateWorkerResponses];
+
+export type DeactivateWorkerData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}/deactivate';
+};
+
+export type DeactivateWorkerErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type DeactivateWorkerError = DeactivateWorkerErrors[keyof DeactivateWorkerErrors];
+
+export type DeactivateWorkerResponses = {
+    /**
+     * Trabajador con el estado resultante
+     */
+    200: WorkerDetailResponse;
+};
+
+export type DeactivateWorkerResponse = DeactivateWorkerResponses[keyof DeactivateWorkerResponses];
+
+export type ReactivateWorkerData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/workers/{id}/reactivate';
+};
+
+export type ReactivateWorkerErrors = {
+    /**
+     * Token de acceso ausente, expirado o inválido
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type ReactivateWorkerError = ReactivateWorkerErrors[keyof ReactivateWorkerErrors];
+
+export type ReactivateWorkerResponses = {
+    /**
+     * Trabajador con el estado resultante
+     */
+    200: WorkerDetailResponse;
+};
+
+export type ReactivateWorkerResponse = ReactivateWorkerResponses[keyof ReactivateWorkerResponses];
 
 export type ListFleetUnitsData = {
     body?: never;
@@ -3452,7 +3938,14 @@ export type ListDriversData = {
     body?: never;
     path?: never;
     query?: {
+        /**
+         * Solo fichas encendidas (true) o apagadas (false).
+         */
         isActive?: boolean;
+        /**
+         * Solo conductores que se pueden asignar hoy (true) o que no (false).
+         */
+        isAssignable?: boolean;
     };
     url: '/drivers';
 };

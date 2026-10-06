@@ -7,10 +7,16 @@ import java.util.Locale;
  * conductores (GET /drivers), por eso vive en {@code sharedcatalogs/model/} y no bajo el
  * paquete de uno de los dos.
  *
- * <p>En la BD es el catalogo {@code public.resource_statuses} (tabla de v1, con CRUD nominal
- * que nadie usa: sus tres filas son fijas desde el arranque). Para la API es un dominio
- * CERRADO en mayusculas, como el resto de los enums: el puente entre ambos es el NOMBRE del
- * catalogo, no su id, que difiere entre ambientes.
+ * <p>En la BD es el catalogo {@code public.resource_statuses}, que nadie escribe desde la
+ * aplicacion. Para la API es un dominio CERRADO en mayusculas, como el resto de los enums: el
+ * puente entre ambos es el NOMBRE del catalogo, no su id, que difiere entre ambientes.
+ *
+ * <p>Ojo con contar sus filas y con suponer como estan escritas: produccion tiene tres, en
+ * minuscula y con descripcion; desarrollo tiene seis, tres en MAYUSCULA con descripcion y tres
+ * en minuscula sin ella. Ninguna migracion ni el sembrador crean ninguna. La traduccion de
+ * abajo no nota la diferencia porque pasa a mayusculas antes de comparar; quien tiene que
+ * ELEGIR una fila, como el alta de una ficha de conductor, resuelve sin distinguir caja y se
+ * queda con la de menor id.
  */
 public enum FleetResourceStatus {
 

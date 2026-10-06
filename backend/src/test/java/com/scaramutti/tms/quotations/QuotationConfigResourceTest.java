@@ -158,8 +158,8 @@ class QuotationConfigResourceTest {
 
     @Test
     void get_withSalesRole_returns200() {
-        // lcampos esta seeded como sales en DevDataSeeder.
-        String token = login("lcampos", "Sales1234");
+        // sales esta seeded como sales en DevDataSeeder.
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

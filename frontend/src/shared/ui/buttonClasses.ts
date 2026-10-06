@@ -1,6 +1,6 @@
 import { cn } from '../utils/cn'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'danger'
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'success'
 export type ButtonSize = 'md' | 'icon'
 
 const BASE = 'inline-flex items-center rounded-lg focus:outline-none focus:ring-2'
@@ -17,6 +17,10 @@ const VARIANTES: Record<ButtonVariant, string> = {
     'border border-border-strong bg-surface text-fg-body hover:bg-surface-subtle focus:ring-focus',
   danger:
     'bg-danger text-on-solid shadow-sm hover:bg-danger-hover focus:ring-danger focus:ring-offset-2 focus:ring-offset-surface',
+  // La transición que da algo por bueno (aceptar una cotización). Su anillo se separa sobre el
+  // lienzo y no sobre la tarjeta: sus botones viven en el encabezado de la página.
+  success:
+    'bg-transition text-on-solid shadow-sm hover:bg-transition-hover focus:ring-focus focus:ring-offset-2 focus:ring-offset-canvas',
 }
 
 /**
@@ -29,7 +33,7 @@ const VARIANTES: Record<ButtonVariant, string> = {
  * Existe porque algunos de los usos que este componente reemplaza NO son botones: hay
  * enlaces de navegación (que conservan su rol y su href; convertirlos en `<button>` sería
  * un defecto de accesibilidad) y hay mapas de variantes que aplican la cadena con una
- * plantilla. Todos usan estas mismas tres variantes, así que la cadena se expone en vez de
+ * plantilla. Todos usan estas mismas variantes, así que la cadena se expone en vez de
  * duplicarse: una sola fuente de verdad, y el componente la consume por dentro. La prueba
  * fija que las dos no puedan divergir, con una fila por variante.
  */

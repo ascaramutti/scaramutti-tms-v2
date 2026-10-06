@@ -7,6 +7,7 @@ import { operationsHandlers } from './handlers/operations'
 import { quotationsHandlers } from './handlers/quotations'
 import { sharedCatalogsHandlers } from './handlers/shared-catalogs'
 import { warehouseHandlers } from './handlers/warehouse'
+import { workersHandlers } from './handlers/workers'
 
 // Default handlers (happy path) por feature.
 // Los tests individuales pueden overridear con `server.use(...)`.
@@ -21,4 +22,5 @@ export const handlers: HttpHandler[] = [
   ...warehouseHandlers,
   ...operationsHandlers,
   ...sharedCatalogsHandlers,
+  ...workersHandlers,
 ]

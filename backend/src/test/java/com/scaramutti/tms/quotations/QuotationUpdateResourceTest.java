@@ -105,7 +105,7 @@ class QuotationUpdateResourceTest {
 
     private String loginSales() {
         return given().contentType(ContentType.JSON)
-            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+            .body("{\"username\":\"sales\",\"password\":\"Sales1234\"}")
         .when().post("/auth/login")
         .then().statusCode(200).extract().jsonPath().getString("token");
     }
@@ -448,7 +448,7 @@ class QuotationUpdateResourceTest {
         String createdAt0 = detail.jsonPath().getString("createdAt");
         String etag = detail.header("ETag");
 
-        // editar con SALES (lcampos) → updatedBy cambia, createdBy se preserva
+        // editar con SALES (sales) → updatedBy cambia, createdBy se preserva
         String salesToken = loginSales();
         given().header("Authorization", "Bearer " + salesToken).header("If-Match", etag)
             .contentType(ContentType.JSON).body(transporteBody("ZTEST_PRES", 20, "1000.00"))
@@ -457,7 +457,7 @@ class QuotationUpdateResourceTest {
             .body("code", equalTo(code0))                    // code inmutable
             .body("status", equalTo("DRAFT"))                // status preservado
             .body("createdBy.username", equalTo("admin"))    // createdBy original
-            .body("updatedBy.username", equalTo("lcampos"))  // updatedBy = editor
+            .body("updatedBy.username", equalTo("sales"))  // updatedBy = editor
             .body("createdAt", equalTo(createdAt0));         // createdAt inmutable
     }
 

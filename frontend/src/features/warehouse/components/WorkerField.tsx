@@ -29,7 +29,7 @@ function toOption(worker: WorkerResponse): ComboboxOption {
 /**
  * Selección de trabajador ("quién recibe") con búsqueda async (minLength 3,
  * multi-palabra). NO ofrece crear al vuelo (RN-WH9): los trabajadores se dan de
- * alta en operaciones, no desde almacén. Componente controlado: el consumidor
+ * alta desde el mantenimiento del padrón, no desde almacén. Componente controlado: el consumidor
  * administra el `receivedByWorkerId`.
  */
 export function WorkerField({

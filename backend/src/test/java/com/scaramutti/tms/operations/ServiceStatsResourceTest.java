@@ -343,6 +343,25 @@ class ServiceStatsResourceTest {
     }
 
     /**
+     * Solo cuentan las fichas de conductor, arriba y abajo: el escolta y el ayudante con licencia
+     * tambien tienen ficha. Un viaje antiguo que quedo con el escolta como principal no lo pone en
+     * ruta, y contarlo solo arriba volveria al "N de M" imposible que el repositorio evita.
+     */
+    @Test
+    void profilesOfAnotherRole_countNeitherInTheTotalNorOnTheRoad() {
+        JsonPath base = stats();
+
+        int escort = operationsFixtures.seedDriverOfRole("ZTEST Stats", "Escolta", "escort", true);
+        operationsFixtures.seedDriverOfRole("ZTEST Stats", "Ayudante", "assistant", true);
+        seedInStatus(ServiceStatus.IN_PROGRESS, escort, seedTractor());
+        seedInStatus(ServiceStatus.IN_PROGRESS, seedDriver(), seedTractor());   // gemelo
+
+        JsonPath after = stats();
+        assertEquals(base.getInt("driversOnRoad.total") + 1, after.getInt("driversOnRoad.total"));
+        assertEquals(base.getInt("driversOnRoad.active") + 1, after.getInt("driversOnRoad.active"));
+    }
+
+    /**
      * Y separa "no cuento refuerzos" de "cuento el principal y de paso el refuerzo se coló": acá el
      * viaje NO tiene principal, así que un JOIN de más se vería como un +1 imposible.
      */
@@ -437,28 +456,22 @@ class ServiceStatsResourceTest {
     }
 
     /**
-     * El conductor cuyo TRABAJADOR está de baja cuenta en las dos mitades, igual que cualquier otro.
-     *
-     * <p>Son dos banderas distintas y solo una manda: el padrón mira {@code drivers.is_active} y no
-     * {@code workers.is_active}, exactamente como el buscador que decide a quién se puede asignar.
-     * La población es real —cuando alguien se va, el sistema anterior lo da de baja como trabajador
-     * sin garantía de bajar también su fila de conductor— y la mejora tentadora ("no contemos
-     * ex-empleados") rompería dos cosas: el padrón mostraría menos gente que la lista de
-     * asignables, y si ese conductor está en ruta se perdería también arriba.
-     *
-     * <p>Sin este caso esa mejora no rompe NADA: hasta acá toda la suite sembraba el trabajador de
-     * alta, así que la bandera se cancelaba en la resta del delta.
+     * El conductor cuyo TRABAJADOR está de baja no cuenta arriba ni abajo, aunque su ficha siga
+     * encendida: el padrón es el de los asignables hoy, la misma regla del buscador de conductores.
+     * El gemelo sano, en ruta, fija que el caso no pasa porque el viaje se perdió.
      */
     @Test
-    void aDriverWhoseWorkerIsDeactivated_countsInBothHalves() {
+    void aDriverWhoseWorkerIsDeactivated_countsInNeitherHalf() {
         JsonPath base = stats();
 
         int exEmployeeDriverId = operationsFixtures.seedDriverWithInactiveWorker("ZTEST ExEmpleado", "EnRuta");
         seedInStatus(ServiceStatus.IN_PROGRESS, exEmployeeDriverId, seedTractor());
+        seedInStatus(ServiceStatus.IN_PROGRESS, seedDriver(), seedTractor());
 
         JsonPath after = stats();
         assertEquals(base.getInt("driversOnRoad.total") + 1, after.getInt("driversOnRoad.total"));
         assertEquals(base.getInt("driversOnRoad.active") + 1, after.getInt("driversOnRoad.active"));
+        assertEquals(base.getInt("inProgress") + 2, after.getInt("inProgress"));
     }
 
     // ---------- unitsOnRoad: las tres exclusiones de flota ------------------------

@@ -4,12 +4,15 @@ import com.scaramutti.tms.clients.dto.ClientResponse;
 import com.scaramutti.tms.clients.mapper.ClientServiceMapper;
 import com.scaramutti.tms.clients.service.cmd.CreateClientCommand;
 import com.scaramutti.tms.clients.service.cmd.ListClientsQuery;
+import com.scaramutti.tms.clients.service.cmd.UpdateClientCommand;
 import com.scaramutti.tms.shared.dto.PageResponse;
 import com.scaramutti.tms.shared.entity.Client;
 import com.scaramutti.tms.shared.exception.ApiException;
 import com.scaramutti.tms.shared.repository.ClientRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -371,5 +374,305 @@ class ClientServiceTest {
         assertFalse(response.first());
         assertTrue(response.last());
         assertTrue(response.empty());
+    }
+
+    // ================= findById =================================================
+    // Ya estaba en produccion (lo usa el loader de cotizaciones) y no tenia ningun
+    // test unitario. GET /clients/{id} lo expone directo, asi que entra ahora.
+
+    private UpdateClientCommand sampleUpdateCommand() {
+        return new UpdateClientCommand("ACME CORP", "20123456789", "987654321", "Juan Pérez");
+    }
+
+    @Test
+    void findById_existingClient_returnsMappedResponse() {
+        Client entity = new Client();
+        ClientResponse expected = new ClientResponse(
+            7, "ACME CORP", "20123456789", null, null, true, OffsetDateTime.now());
+        when(clientRepository.findById(7)).thenReturn(entity);
+        when(clientServiceMapper.toClientResponse(entity)).thenReturn(expected);
+
+        assertSame(expected, clientService.findById(7));
+    }
+
+    @Test
+    void findById_missingClient_throwsCLI003() {
+        when(clientRepository.findById(999)).thenReturn(null);
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.findById(999));
+
+        assertEquals("CLI-003", ex.code());
+        assertEquals(404, ex.status());
+        verify(clientServiceMapper, never()).toClientResponse(any());
+    }
+
+    /** No filtra por isActive: la regla vale para el GET y para el loader de cotizaciones. */
+    @Test
+    void findById_inactiveClient_returnsResponseWithoutFilteringByIsActive() {
+        Client entity = new Client();
+        entity.isActive = false;
+        ClientResponse expected = new ClientResponse(
+            7, "ACME CORP", "20123456789", null, null, false, OffsetDateTime.now());
+        when(clientRepository.findById(7)).thenReturn(entity);
+        when(clientServiceMapper.toClientResponse(entity)).thenReturn(expected);
+
+        assertSame(expected, clientService.findById(7));
+    }
+
+    // ================= updateClient =============================================
+
+    @Test
+    void updateClient_withValidCommand_appliesChangesAndFlushes() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        Client entity = new Client();
+        ClientResponse expected = new ClientResponse(
+            7, command.name(), command.ruc(), command.phone(), command.contactName(),
+            true, OffsetDateTime.now());
+
+        when(clientRepository.findById(7)).thenReturn(entity);
+        when(clientRepository.existsByRucExcludingId(command.ruc(), 7)).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(command.name(), 7)).thenReturn(false);
+        when(clientServiceMapper.toClientResponse(entity)).thenReturn(expected);
+
+        assertSame(expected, clientService.updateClient(7, command));
+
+        verify(clientServiceMapper).applyUpdate(entity, command);
+        verify(clientRepository).flush();
+        verify(clientRepository, never()).persist(any(Client.class));
+    }
+
+    @Test
+    void updateClient_missingClient_throwsCLI003_beforeAnyDuplicateCheck() {
+        when(clientRepository.findById(999)).thenReturn(null);
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> clientService.updateClient(999, sampleUpdateCommand()));
+
+        assertEquals("CLI-003", ex.code());
+        verify(clientRepository, never()).existsByRucExcludingId(anyString(), any());
+        verify(clientRepository, never()).existsByNameExcludingId(anyString(), any());
+        verify(clientRepository, never()).flush();
+    }
+
+    /**
+     * Fija el MECANISMO que el diseno eligio: la exclusion va en la consulta y con el id del
+     * cliente editado. El caso de recurso ya mata el mutante "no excluir"; este ata que lo
+     * excluido sea el id correcto y no otro ni null.
+     */
+    @Test
+    void updateClient_excludesOwnIdInBothUniquenessChecks() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        Client entity = new Client();
+        when(clientRepository.findById(7)).thenReturn(entity);
+        when(clientRepository.existsByRucExcludingId(command.ruc(), 7)).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(command.name(), 7)).thenReturn(false);
+
+        clientService.updateClient(7, command);
+
+        verify(clientRepository).existsByRucExcludingId(command.ruc(), 7);
+        verify(clientRepository).existsByNameExcludingId(command.name(), 7);
+        verify(clientRepository, never()).existsByRuc(anyString());
+        verify(clientRepository, never()).existsByName(anyString());
+    }
+
+    @Test
+    void updateClient_whenRucBelongsToAnother_throwsCLI001_andDoesNotFlush() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(command.ruc(), 7)).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.updateClient(7, command));
+
+        assertEquals("CLI-001", ex.code());
+        assertEquals(409, ex.status());
+        verify(clientRepository, never()).flush();
+        verify(clientServiceMapper, never()).applyUpdate(any(), any());
+    }
+
+    @Test
+    void updateClient_whenNameBelongsToAnother_throwsCLI002_andDoesNotFlush() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(command.ruc(), 7)).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(command.name(), 7)).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.updateClient(7, command));
+
+        assertEquals("CLI-002", ex.code());
+        verify(clientRepository, never()).flush();
+        verify(clientServiceMapper, never()).applyUpdate(any(), any());
+    }
+
+    /** Con los dos en conflicto gana el RUC, y el de la razon social ni se consulta. */
+    @Test
+    void updateClient_checksRucBeforeName_failsFastOnRucConflict() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(command.ruc(), 7)).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.updateClient(7, command));
+
+        assertEquals("CLI-001", ex.code());
+        verify(clientRepository, never()).existsByNameExcludingId(anyString(), any());
+    }
+
+    /**
+     * Defensa en profundidad: por REST el `@NotBlank` contesta antes con el mismo 400, asi que
+     * este guard SOLO se puede medir desde aca.
+     */
+    @Test
+    void updateClient_withNullName_throwsCOM001() {
+        when(clientRepository.findById(7)).thenReturn(new Client());
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.updateClient(
+            7, new UpdateClientCommand(null, "20123456789", null, null)));
+
+        assertEquals("COM-001", ex.code());
+        verify(clientRepository, never()).flush();
+        // Y falla ANTES de los chequeos de unicidad. Sin estas dos, intercambiar el orden deja
+        // todo verde: por HTTP no se nota porque el borde contesta antes, pero un caller que
+        // arma el command a mano con el nombre nulo y el RUC de otro veria un 409 en vez de
+        // este 400, que es el orden que el contrato declara al reves.
+        verify(clientRepository, never()).existsByRucExcludingId(anyString(), any());
+        verify(clientRepository, never()).existsByNameExcludingId(anyString(), any());
+    }
+
+    @Test
+    void updateClient_withEmptyName_throwsCOM001() {
+        when(clientRepository.findById(7)).thenReturn(new Client());
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.updateClient(
+            7, new UpdateClientCommand("", "20123456789", null, null)));
+
+        assertEquals("COM-001", ex.code());
+        verify(clientRepository, never()).flush();
+    }
+
+    // ----- La carrera entre dos ediciones: no es provocable por HTTP -----------
+
+    @Test
+    void updateClient_whenFlushViolatesRucUnique_translatesToCLI001() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(anyString(), any())).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(anyString(), any())).thenReturn(false);
+        doThrow(new jakarta.persistence.PersistenceException(
+            new org.hibernate.exception.ConstraintViolationException(
+                "Postgres UNIQUE violation",
+                new java.sql.SQLException("violates unique constraint \"clients_ruc_key\""),
+                "clients_ruc_key")))
+            .when(clientRepository).flush();
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.updateClient(7, command));
+
+        assertEquals("CLI-001", ex.code());
+    }
+
+    @Test
+    void updateClient_whenFlushViolatesNameUnique_translatesToCLI002() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(anyString(), any())).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(anyString(), any())).thenReturn(false);
+        doThrow(new jakarta.persistence.PersistenceException(
+            new org.hibernate.exception.ConstraintViolationException(
+                "Postgres UNIQUE violation",
+                new java.sql.SQLException("violates unique constraint \"clients_name_key\""),
+                "clients_name_key")))
+            .when(clientRepository).flush();
+
+        ApiException ex = assertThrows(ApiException.class, () -> clientService.updateClient(7, command));
+
+        assertEquals("CLI-002", ex.code());
+    }
+
+    // ----- Las ramas defensivas del catch que el PR extrajo y ahora COMPARTEN alta y edicion.
+    // Sin estos casos, romperlas deja la suite entera en verde: lo midio una revision, mutando
+    // el `return ex` a `return null` (NPE -> 500 sin Problem, en el alta Y en la edicion).
+
+    /** Una excepcion de persistencia que NO envuelve una violacion de restriccion se propaga. */
+    @Test
+    void updateClient_whenFlushFailsWithoutConstraintViolation_rethrowsOriginal() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(anyString(), any())).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(anyString(), any())).thenReturn(false);
+        jakarta.persistence.PersistenceException original =
+            new jakarta.persistence.PersistenceException("se cayo la conexion");
+        doThrow(original).when(clientRepository).flush();
+
+        jakarta.persistence.PersistenceException lanzada = assertThrows(
+            jakarta.persistence.PersistenceException.class,
+            () -> clientService.updateClient(7, command));
+
+        assertSame(original, lanzada);
+    }
+
+    /** Una violacion de restriccion SIN nombre de constraint tampoco se traduce: se propaga. */
+    @Test
+    void updateClient_whenConstraintNameIsNull_rethrowsOriginal() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(anyString(), any())).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(anyString(), any())).thenReturn(false);
+        jakarta.persistence.PersistenceException original =
+            new jakarta.persistence.PersistenceException(
+                new org.hibernate.exception.ConstraintViolationException(
+                    "sin nombre", new java.sql.SQLException("violacion"), null));
+        doThrow(original).when(clientRepository).flush();
+
+        jakarta.persistence.PersistenceException lanzada = assertThrows(
+            jakarta.persistence.PersistenceException.class,
+            () -> clientService.updateClient(7, command));
+
+        assertSame(original, lanzada);
+    }
+
+    /**
+     * Una violacion de OTRA entidad no puede salir como error de cliente.
+     *
+     * <p>El flush descarga el contexto de persistencia entero, asi que puede aflorar aca la
+     * restriccion de otra tabla. Los dos nombres elegidos son reales del esquema y son
+     * exactamente los que una comparacion por substring traduciria mal: con
+     * {@code contains("ruc")}, el RUC duplicado de un proveedor saldria como "ya existe un
+     * cliente con ese RUC"; con {@code contains("name")}, el usuario duplicado saldria como
+     * razon social repetida.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"suppliers_ruc_key", "users_username_key"})
+    void updateClient_whenFlushViolatesAnotherEntitysConstraint_rethrowsOriginal(String restriccion) {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(anyString(), any())).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(anyString(), any())).thenReturn(false);
+        jakarta.persistence.PersistenceException original =
+            new jakarta.persistence.PersistenceException(
+                new org.hibernate.exception.ConstraintViolationException(
+                    "violacion ajena", new java.sql.SQLException("duplicate key"), restriccion));
+        doThrow(original).when(clientRepository).flush();
+
+        jakarta.persistence.PersistenceException lanzada = assertThrows(
+            jakarta.persistence.PersistenceException.class,
+            () -> clientService.updateClient(7, command));
+
+        assertSame(original, lanzada);
+    }
+
+    /** La rama "constraint desconocido" del catch extraido: se propaga sin enmascarar. */
+    @Test
+    void updateClient_whenFlushViolatesUnknownConstraint_rethrowsOriginal() {
+        UpdateClientCommand command = sampleUpdateCommand();
+        when(clientRepository.findById(7)).thenReturn(new Client());
+        when(clientRepository.existsByRucExcludingId(anyString(), any())).thenReturn(false);
+        when(clientRepository.existsByNameExcludingId(anyString(), any())).thenReturn(false);
+        doThrow(new jakarta.persistence.PersistenceException(
+            new org.hibernate.exception.ConstraintViolationException(
+                "Otra restriccion",
+                new java.sql.SQLException("violates unique constraint \"clients_pkey\""),
+                "clients_pkey")))
+            .when(clientRepository).flush();
+
+        assertThrows(jakarta.persistence.PersistenceException.class,
+            () -> clientService.updateClient(7, command));
     }
 }

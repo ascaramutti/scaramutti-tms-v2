@@ -187,4 +187,22 @@ class ServiceRowLockTest {
 
         assertEquals(1, rowLock.requireUsableLockTimeout());
     }
+
+    /**
+     * La configuracion de PRODUCCION de este modulo, leida del archivo: el perfil de test sube la
+     * espera del pool para los tests concurrentes de trabajadores, y esa holgura no puede tapar un
+     * tope de operaciones que en produccion no entraria en los 5s del pool.
+     */
+    @Test
+    void theProductionConfiguration_passesTheGuardAgainstTheProductionPool() throws Exception {
+        java.util.Properties config = new java.util.Properties();
+        try (java.io.InputStream file = ServiceRowLockTest.class.getResourceAsStream("/application.properties")) {
+            config.load(file);
+        }
+        ServiceRowLock rowLock = new ServiceRowLock();
+        rowLock.lockTimeoutSeconds = Integer.parseInt(config.getProperty("app.operations.edit-lock-timeout-seconds"));
+        rowLock.poolAcquisitionTimeout = java.time.Duration.parse(
+            "PT" + config.getProperty("quarkus.datasource.jdbc.acquisition-timeout").toUpperCase());
+        assertEquals(rowLock.lockTimeoutSeconds, rowLock.requireUsableLockTimeout());
+    }
 }

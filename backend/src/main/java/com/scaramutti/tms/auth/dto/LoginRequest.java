@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Size;
 import org.eclipse.microprofile.openapi.annotations.media.Schema;
 
 public record LoginRequest(
-    @Schema(description = "Nombre de usuario (alfanumerico, puntos, guiones, guion bajo)", example = "lcampos")
+    @Schema(description = "Nombre de usuario (alfanumerico, puntos, guiones, guion bajo)", example = "sales")
     @NotBlank
     @Size(min = 3, max = 50)
     @Pattern(regexp = "^[a-zA-Z0-9._-]+$",

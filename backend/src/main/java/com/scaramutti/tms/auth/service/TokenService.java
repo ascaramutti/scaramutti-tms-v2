@@ -42,7 +42,7 @@ public class TokenService {
             .upn(user.username)
             .groups(Set.of(user.role.name))
             .claim(CLAIM_FULL_NAME, user.worker.fullName())
-            .claim(CLAIM_POSITION, user.worker.position)
+            .claim(CLAIM_POSITION, user.worker.role.description)
             .claim(CLAIM_TYPE, TokenType.ACCESS.claimValue())
             .issuedAt(now)
             .expiresAt(expiresAt)

@@ -9,6 +9,80 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.8.0] - 2026-10-06
+
+El mantenimiento de trabajadores completo, del backend a las pantallas; el maestro de clientes con
+pantallas propias; la alerta de reasignación de viajes; y las dependencias al día: PRs #214 a #255.
+Dos migraciones, V010 y V011. El contrato suma nueve operaciones, el filtro `isAssignable` de
+conductores y la marca `needsReassignment` de los viajes; contra 2.7.1 no retira ningún campo.
+
+### Added
+
+- Padrón de trabajadores en el grupo Administración del menú, para el admin, las dos gerencias y
+  finanzas: búsqueda por nombre, apellido o documento con filtro de estado (#242),
+  ficha con licencia de conducir y autoría (#244), alta (#245), edición con motivo obligatorio al
+  cambiar el número de documento (#248), y desactivar y reactivar desde la ficha con una
+  confirmación que dice qué arrastra la baja: usuario, licencia y viajes pendientes (#249, #251).
+  Cada acción se ofrece solo sobre cargos de nivel menor al de la sesión; el admin, siempre.
+- Endpoints del padrón: `GET /workers/{id}`, `POST /workers`, `PUT /workers/{id}`,
+  `POST /workers/{id}/deactivate` y `POST /workers/{id}/reactivate`, con los errores `WRK-001` a
+  `WRK-013`, y los catálogos `GET /roles` y `GET /document-types` (#222, #223, #224, #226). La
+  baja apaga en la misma transacción la ficha de conductor y la cuenta del sistema; la
+  reactivación enciende la ficha si el cargo la lleva y nunca la cuenta. Cada cambio deja su fila
+  de auditoría.
+- Maestro de clientes con pantallas de búsqueda, ficha y edición (#219) y sus endpoints
+  `GET /clients/{id}` y `PUT /clients/{id}` (#217).
+- Alerta de reasignación de viajes: el listado y el detalle traen `needsReassignment`, verdadera
+  cuando un viaje pendiente de inicio o en ruta tiene un conductor, principal o de refuerzo, que ya
+  no se puede asignar (#239); el detalle trae además `driverNeedsReassignment` en el conductor
+  principal y en cada refuerzo (#232). La lista marca esos viajes con un ícono de advertencia
+  (#240) y el detalle dice cuál conductor y por qué (#238).
+- `GET /drivers` suma el campo y el filtro `isAssignable`: ficha encendida, trabajador activo y
+  cargo de conductor. El selector de operaciones ofrece solo esos (#233).
+- Migraciones V010 y V011. V010 pasa el cargo del trabajador a ser su rol, con nivel, si inicia
+  sesión y si lleva ficha de conductor, y suma cuatro roles que no inician sesión, la fecha de
+  ingreso, la autoría y la tabla de auditoría de trabajadores, y fija el nombre visible de los
+  roles existentes. La columna vieja del cargo queda sin lectores para que la versión anterior
+  pueda volver. Aborta con la lista de cargos que no tengan equivalente en vez de inventarles uno.
+  V011 firma con el usuario `admin` a los trabajadores cargados antes de la auditoría; sin ese
+  usuario no hace nada (#222, #243).
+
+### Changed
+
+- `GET /drivers` devuelve solo fichas de trabajadores con cargo de conductor, con o sin filtro de
+  vigencia; el escolta y el ayudante con licencia ya no aparecen. La asignación de recursos y el
+  refuerzo rechazan otro cargo con el código nuevo `400 OPS-011`, y la ficha de un trabajador dado
+  de baja con el mismo 400 que una ficha apagada. El tablero cuenta a los conductores con ese
+  criterio (#231, #233).
+- La búsqueda de `GET /workers` mira también el número de documento, solo para los cuatro roles
+  que mantienen el padrón; para almacén sigue siendo por nombre y apellido (#222).
+- Nombre y apellido de un trabajador aceptan al menos una letra latina, más espacios, apóstrofo y
+  guion; lo demás responde `400 COM-001` en el campo. Se guardan normalizados a NFC (#246).
+- El cargo que muestran la firma del PDF de cotización, el pie del menú y la sesión sale del rol
+  del trabajador, con el nombre fijo de cada rol, y no del texto libre que tenía cada uno: el cargo
+  de ventas pasa de "Encargado de ventas" a "Ejecutivo de Ventas" (#222).
+- El ítem Clientes del menú pasa al grupo Administración y ventas deja de verlo (#219).
+- Parámetro nuevo `app.workers.edit-lock-timeout-ms` (380 ms): el backend no arranca si las once
+  esperas de una edición no entran bajo la espera del pool de conexiones (#224, #230).
+- El backend pasa de Quarkus 3.33.3.2 a 3.33.4, con Hibernate ORM de 7.2.19 a 7.2.25, y Mockito
+  de 5.23 a 5.24 (#252). El frontend pasa React de 19.2.8 a 19.3.0, vitest de 3.2.4 a 5.0.3 (pide
+  Node 22) y jest-dom de 6.9.1 a 7.0.1, más las menores y parches agrupados (#214, #216, #218,
+  #227, #253).
+
+### Security
+
+- Toda escritura del padrón relee a quien actúa en la misma transacción: cuenta activa, uno de los
+  cuatro roles de escritura y su trabajador activo; si falta algo, `403 COM-003`. Un token con un
+  rol viejo, o de alguien dado de baja, ya no escribe aunque siga vigente (#228). Las escrituras
+  toman la fila de quien actúa: dos administradores que se bajan el cargo o se desactivan entre sí
+  a la vez ya no pueden dejar la empresa sin administradores; una espera agotada sale como
+  `409 WRK-013` (#229, #230).
+- Quarkus 3.33.4 trae arreglos de seguridad, entre ellos el de Hibernate ORM y el de inyección de
+  plantillas en Qute; la plantilla del PDF de cotizaciones no usa lo que se retira (#252).
+- Se cierran todas las alertas de Dependabot del frontend, todas de herramientas de desarrollo:
+  las de vitest y vite, incluida la única crítica (#218), la de esbuild (#227) y las de los
+  paquetes transitivos (#254). `npm audit` quedó en cero al cerrar #254.
+
 ## [2.7.1] - 2026-09-12
 
 La zona del negocio en todos los relojes: PRs #208 a #211. El "hoy" de los formularios y el año

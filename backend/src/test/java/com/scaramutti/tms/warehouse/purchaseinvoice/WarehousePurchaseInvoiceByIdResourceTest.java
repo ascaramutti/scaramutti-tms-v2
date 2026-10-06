@@ -175,7 +175,7 @@ class WarehousePurchaseInvoiceByIdResourceTest {
 
     @Test
     void get_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token)
         .when().get("/warehouse/purchase-invoices/1")
         .then().statusCode(403).body("code", equalTo("COM-003"));
@@ -594,7 +594,7 @@ class WarehousePurchaseInvoiceByIdResourceTest {
 
     @Test
     void update_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"").contentType(ContentType.JSON)
             .body(updateBody("ZTEST-Y", fixtures.currencyId("USD"), itemJson(1, "1", "1.00"), "Rol no autorizado"))
         .when().put("/warehouse/purchase-invoices/1")
@@ -785,7 +785,7 @@ class WarehousePurchaseInvoiceByIdResourceTest {
 
     @Test
     void cancel_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token).header("If-Match", "\"x\"").contentType(ContentType.JSON)
             .body("{\"reason\":\"Rol no autorizado a anular\"}")
         .when().post("/warehouse/purchase-invoices/1/cancel")

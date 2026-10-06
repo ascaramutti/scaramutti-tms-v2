@@ -781,7 +781,7 @@ class QuotationResourceTest {
     void create_withSalesRole_returns201() {
         String token = given()
             .contentType(ContentType.JSON)
-            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+            .body("{\"username\":\"sales\",\"password\":\"Sales1234\"}")
         .when()
             .post("/auth/login")
         .then()
@@ -1252,14 +1252,14 @@ class QuotationResourceTest {
 
     @Test
     void get_withSalesRole_returns200() {
-        // lcampos esta seeded como sales en DevDataSeeder.
+        // sales esta seeded como sales en DevDataSeeder.
         String adminToken = loginAdmin();
         long id = createQuotationAndReturnId(adminToken,
             transporteBody("ZTEST_LIMA", "ZTEST_AREQUIPA", ST_SCB, "1000.00"));
 
         String salesToken = given()
             .contentType(ContentType.JSON)
-            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+            .body("{\"username\":\"sales\",\"password\":\"Sales1234\"}")
         .when()
             .post("/auth/login")
         .then()
@@ -1854,7 +1854,7 @@ class QuotationResourceTest {
     void list_withSalesRole_returns200() {
         String salesToken = given()
             .contentType(ContentType.JSON)
-            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+            .body("{\"username\":\"sales\",\"password\":\"Sales1234\"}")
         .when()
             .post("/auth/login")
         .then()

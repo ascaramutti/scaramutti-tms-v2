@@ -278,26 +278,48 @@ public class OperationsTestData {
      */
     public int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
             String statusName, boolean isActive) {
-        return seedDriver(firstName, lastName, phone, licenseCategory, statusName, isActive, true);
+        return seedDriver(firstName, lastName, phone, licenseCategory, statusName, isActive, true, "driver");
     }
 
     /**
      * Variante que ademas DA DE BAJA al trabajador detras del conductor.
      *
-     * <p>Existe porque son dos banderas distintas y solo una manda: el padron mira
-     * {@code drivers.is_active} y NO {@code workers.is_active}, igual que el buscador que decide a
-     * quien se puede asignar. Cuando un empleado se va, el sistema anterior lo da de baja como
-     * TRABAJADOR sin garantia de bajar tambien su fila de conductor, asi que la poblacion existe.
+     * <p>Existe porque son dos banderas distintas y las dos mandan: la ficha queda encendida y aun
+     * asi el conductor no es asignable hoy. Cuando un empleado se va, el sistema anterior lo da de
+     * baja como TRABAJADOR sin garantia de bajar tambien su fila de conductor.
      */
     public int seedDriverWithInactiveWorker(String firstName, String lastName) {
-        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false);
+        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false, "driver");
+    }
+
+    /** La ficha de un trabajador de OTRO cargo que tambien la lleva: el escolta o el ayudante. */
+    public int seedDriverOfRole(String firstName, String lastName, String roleName, boolean isActive) {
+        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, isActive, true,
+            roleName);
+    }
+
+    /** Apaga o enciende una ficha SEMBRADA por esta corrida; cualquier otra no se toca. */
+    public void setDriverActive(int driverId, boolean isActive) {
+        if (!seededDriverIds.contains(driverId)) {
+            throw new IllegalArgumentException("setDriverActive solo toca fichas sembradas por el test: " + driverId);
+        }
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE public.drivers SET is_active = ?1 WHERE id = ?2")
+            .setParameter(1, isActive).setParameter(2, driverId).executeUpdate());
+    }
+
+    /** El trabajador detras de una ficha, para moverle el cargo por fuera como lo haria la base. */
+    public int workerIdOfDriver(int driverId) {
+        return QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
+                "SELECT worker_id FROM public.drivers WHERE id = ?1")
+            .setParameter(1, driverId).getSingleResult()).intValue());
     }
 
     private int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
-            String statusName, boolean isActive, boolean workerIsActive) {
+            String statusName, boolean isActive, boolean workerIsActive, String roleName) {
         long n = SEQ.incrementAndGet();
         int workerId = warehouseFixtures.seedWorker(
-            "ZTESTD" + n, firstName, lastName, "Conductor", workerIsActive);
+            "ZTESTD" + n, firstName, lastName, roleName, workerIsActive);
         if (phone != null) {
             QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
                 "UPDATE public.workers SET phone = ?1 WHERE id = ?2")

@@ -44,7 +44,7 @@ const WIZARD_STEPS: StepperStep[] = [
 
 /**
  * Botón de contorno rojo: destructivo pero secundario, una forma que no es ninguna de las
- * tres variantes de `Button`. No es única: hay cuatro botones así en cuatro archivos, y
+ * variantes de `Button`. No es única: hay cuatro botones así en cuatro archivos, y
  * entre ellos conviven tres formas distintas, que difieren en el paso del borde rojo, en el
  * espaciado, en el relleno del hover y en si el anillo aparece al hacer clic o solo al
  * llegar con el tabulador. Unificarlas es un cambio de aspecto, no una mudanza, así que no

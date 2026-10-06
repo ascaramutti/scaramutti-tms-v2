@@ -22,7 +22,7 @@ public class DriverService {
 
     public List<DriverResponse> listDrivers(ListDriversQuery query) {
         return driverServiceMapper.toDriverResponseList(
-            driverRepository.search(query.isActive())
+            driverRepository.search(query.isActive(), query.isAssignable())
         );
     }
 }

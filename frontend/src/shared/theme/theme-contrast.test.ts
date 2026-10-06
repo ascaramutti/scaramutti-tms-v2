@@ -115,7 +115,8 @@ const PAIRS: Pair[] = [
   { fg: 'warning-border-strong', bg: 'surface', min: AA_NON_TEXT, what: 'el borde punteado de la tarjeta de componente integral, y el relleno del botón de forzar contra su propio borde' },
   { fg: 'warning-border-strong', bg: 'warning-soft', min: AA_NON_TEXT, what: 'el borde del botón de forzar contra el banner ámbar que lo contiene: su otro lado, y el que faltaba. Contra su PROPIO relleno con el mouse encima da 2.87, que no se mide acá porque el límite que 1.4.11 pide ver es el de afuera, contra lo que lo rodea' },
   { fg: 'danger-border-strong', bg: 'canvas', min: AA_NON_TEXT, what: 'el borde del botón de anular, que va sobre el fondo de página' },
-  { fg: 'warning', bg: 'surface', min: AA_TEXT, what: 'aviso de campo sobre tarjeta' },
+  { fg: 'warning', bg: 'surface', min: AA_TEXT, what: 'aviso de campo sobre tarjeta; y el ícono de viaje a reasignar en la fila del listado' },
+  { fg: 'warning', bg: 'surface-subtle', min: AA_NON_TEXT, what: 'el ícono de viaje a reasignar en la fila del listado con el mouse encima o con el foco' },
   { fg: 'warning', bg: 'warning-soft', min: AA_TEXT, what: 'pastilla de aviso de Badge, y el valor del tile de stock bajo con el filtro activo' },
   { fg: 'warning', bg: 'warning-soft-strong', min: AA_TEXT, what: 'texto del chip que quita el filtro de stock bajo' },
   { fg: 'warning', bg: 'warning-soft-hover', min: AA_TEXT, what: 'ese mismo chip con el mouse encima' },
@@ -815,6 +816,7 @@ describe('tokens del tema', () => {
       'warning-fg/warning-soft',
       'warning-fg/warning-soft-strong',
       'warning/surface',
+      'warning/surface-subtle',
       'warning/warning-soft',
       'warning/warning-soft-hover',
       'warning/warning-soft-strong',
@@ -900,7 +902,7 @@ describe('los umbrales son los de la norma', () => {
     expect(sueltos.map(key)).toEqual([])
   })
 
-  it('solo el foco y los bordes de control se miden como elemento no textual', () => {
+  it('solo el foco, los bordes de control y el ícono de viaje a reasignar se miden como elemento no textual', () => {
     const noTextuales = PAIRS.filter((pair) => pair.min === AA_NON_TEXT).map(key).sort()
     expect(noTextuales).toEqual(
       [
@@ -921,6 +923,7 @@ describe('los umbrales son los de la norma', () => {
       'surface-subtle/surface',
       'warning-border-strong/surface',
       'warning-border-strong/warning-soft',
+      'warning/surface-subtle',
     ].sort(),
     )
   })

@@ -253,7 +253,7 @@ class ConditionsResourceTest {
     void list_isAccessibleBySalesRole() {
         // Confirma que el endpoint no discrimina por rol, solo exige autenticación
         // (catálogo de lectura abierta a autenticados, como payment-terms/currencies).
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
 
         given()
             .header("Authorization", "Bearer " + token)

@@ -1,13 +1,22 @@
-import { CHANGE_PASSWORD_PATH, LOGIN_PATH, QUOTATIONS_BASE, WAREHOUSE_BASE } from './shared/paths'
+import {
+  CHANGE_PASSWORD_PATH,
+  CLIENTS_BASE,
+  LOGIN_PATH,
+  QUOTATIONS_BASE,
+  WAREHOUSE_BASE,
+  WORKERS_BASE,
+} from './shared/paths'
 import { createBrowserRouter, type RouteObject } from 'react-router-dom'
 import { LandingRedirect } from './shared/auth/LandingRedirect'
 import { ProtectedRoute } from './shared/auth/ProtectedRoute'
 import { RequireNumericId } from './shared/auth/RequireNumericId'
 import {
+  CLIENT_EDIT_ROLES,
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
   WAREHOUSE_ROLES,
+  WORKER_MAINTENANCE_ROLES,
 } from './shared/auth/moduleRoles'
 import { OPERACIONES_LANDING } from './shared/auth/roleLanding'
 import { AppLayout } from './shared/layout/AppLayout'
@@ -16,6 +25,13 @@ import { ChangePasswordPage } from './features/auth/components/ChangePasswordPag
 import { CotizacionesListPage } from './features/quotations/pages/CotizacionesListPage'
 import { CotizacionDetailPage } from './features/quotations/pages/CotizacionDetailPage'
 import { CotizacionEditPage } from './features/quotations/pages/CotizacionEditPage'
+import { ClientsSearchPage } from './features/clients/pages/ClientsSearchPage'
+import { ClientEditPage } from './features/clients/pages/ClientEditPage'
+import { ClientDetailPage } from './features/clients/pages/ClientDetailPage'
+import { WorkersSearchPage } from './features/workers/pages/WorkersSearchPage'
+import { WorkerDetailPage } from './features/workers/pages/WorkerDetailPage'
+import { WorkerCreatePage } from './features/workers/pages/WorkerCreatePage'
+import { WorkerEditPage } from './features/workers/pages/WorkerEditPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -91,6 +107,79 @@ export const routes: RouteObject[] = [
           <RequireNumericId>
             <ProtectedRoute allowedRoles={QUOTATION_ROLES} moduleName="Cotizaciones">
               <CotizacionDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
+        ),
+      },
+      // Módulo Clientes: el maestro que cotizaciones y operaciones consultan, con
+      // lista de roles propia, porque quien cotiza no necesariamente corrige
+      // clientes. Su ítem del menú vive en el grupo Administración.
+      {
+        path: CLIENTS_BASE,
+        element: (
+          <ProtectedRoute allowedRoles={CLIENT_EDIT_ROLES} moduleName="Clientes">
+            <ClientsSearchPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: `${CLIENTS_BASE}/:id`,
+        element: (
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={CLIENT_EDIT_ROLES} moduleName="Clientes">
+              <ClientDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
+        ),
+      },
+      {
+        path: `${CLIENTS_BASE}/:id/editar`,
+        element: (
+          // La validación del id va ANTES de la guarda de rol: un id inválido cae
+          // al aterrizaje del rol y no a "Sin acceso", que sería un error de
+          // permisos donde lo que hay es una URL mal escrita.
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={CLIENT_EDIT_ROLES} moduleName="Clientes">
+              <ClientEditPage />
+            </ProtectedRoute>
+          </RequireNumericId>
+        ),
+      },
+      // Módulo Trabajadores: el padrón, con lista de roles propia. Su ítem del
+      // menú vive en el grupo Administración, después de Clientes.
+      {
+        path: WORKERS_BASE,
+        element: (
+          <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+            <WorkersSearchPage />
+          </ProtectedRoute>
+        ),
+      },
+      // Antes que la ficha por legibilidad: el router prioriza el segmento literal igual.
+      {
+        path: `${WORKERS_BASE}/nuevo`,
+        element: (
+          <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+            <WorkerCreatePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: `${WORKERS_BASE}/:id`,
+        element: (
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+              <WorkerDetailPage />
+            </ProtectedRoute>
+          </RequireNumericId>
+        ),
+      },
+      {
+        path: `${WORKERS_BASE}/:id/editar`,
+        element: (
+          <RequireNumericId>
+            <ProtectedRoute allowedRoles={WORKER_MAINTENANCE_ROLES} moduleName="Trabajadores">
+              <WorkerEditPage />
             </ProtectedRoute>
           </RequireNumericId>
         ),

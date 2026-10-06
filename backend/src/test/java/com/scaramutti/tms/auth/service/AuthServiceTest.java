@@ -69,17 +69,20 @@ class AuthServiceTest {
         worker.id = 10;
         worker.firstName = "Valeria";
         worker.lastName = "Torres";
-        worker.position = "Ejecutiva de Ventas";
+        Role workerRole = new Role();
+        workerRole.name = "sales";
+        workerRole.description = "Ejecutivo de Ventas";
+        worker.role = workerRole;
 
         user = new User();
         user.id = 100;
-        user.username = "lcampos";
+        user.username = "sales";
         user.passwordHash = "hashed-password";
         user.worker = worker;
         user.role = role;
         user.isActive = true;
 
-        userResponse = new UserResponse(100, "lcampos", "Valeria Torres", "Ejecutiva de Ventas", "sales", true);
+        userResponse = new UserResponse(100, "sales", "Valeria Torres", "Ejecutivo de Ventas", "sales", true);
         accessToken = new AccessToken("access.jwt.token", Instant.now().plusSeconds(3600), 3600L);
         loginResponse = new LoginResponse(
             "access.jwt.token", "refresh.jwt.token",
@@ -91,13 +94,13 @@ class AuthServiceTest {
 
     @Test
     void login_withValidCredentials_returnsLoginResponse() {
-        when(userRepository.findByUsername("lcampos")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername("sales")).thenReturn(Optional.of(user));
         when(passwordService.matches("plain-password", "hashed-password")).thenReturn(true);
         when(tokenService.createAccessToken(user)).thenReturn(accessToken);
         when(tokenService.createRefreshToken(user)).thenReturn("refresh.jwt.token");
         when(authServiceMapper.toLoginResponse(user, accessToken, "refresh.jwt.token")).thenReturn(loginResponse);
 
-        LoginResponse result = authService.login(new LoginCommand("lcampos", "plain-password"));
+        LoginResponse result = authService.login(new LoginCommand("sales", "plain-password"));
 
         assertSame(loginResponse, result);
         verify(passwordService, never()).runDummyVerify();
@@ -119,11 +122,11 @@ class AuthServiceTest {
 
     @Test
     void login_withWrongPassword_throwsInvalidCredentials() {
-        when(userRepository.findByUsername("lcampos")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername("sales")).thenReturn(Optional.of(user));
         when(passwordService.matches("wrong-password", "hashed-password")).thenReturn(false);
 
         ApiException ex = assertThrows(ApiException.class,
-            () -> authService.login(new LoginCommand("lcampos", "wrong-password")));
+            () -> authService.login(new LoginCommand("sales", "wrong-password")));
 
         assertEquals(AuthError.INVALID_CREDENTIALS.code(), ex.code());
         verify(tokenService, never()).createAccessToken(eq(user));
@@ -132,11 +135,11 @@ class AuthServiceTest {
     @Test
     void login_withInactiveUser_throwsUserInactive() {
         user.isActive = false;
-        when(userRepository.findByUsername("lcampos")).thenReturn(Optional.of(user));
+        when(userRepository.findByUsername("sales")).thenReturn(Optional.of(user));
         when(passwordService.matches("plain-password", "hashed-password")).thenReturn(true);
 
         ApiException ex = assertThrows(ApiException.class,
-            () -> authService.login(new LoginCommand("lcampos", "plain-password")));
+            () -> authService.login(new LoginCommand("sales", "plain-password")));
 
         assertEquals(AuthError.USER_INACTIVE.code(), ex.code());
         verify(tokenService, never()).createAccessToken(eq(user));

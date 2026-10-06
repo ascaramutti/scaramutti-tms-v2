@@ -3,6 +3,7 @@ package com.scaramutti.tms.clients.mapper;
 import com.scaramutti.tms.clients.dto.ClientRequest;
 import com.scaramutti.tms.clients.service.cmd.CreateClientCommand;
 import com.scaramutti.tms.clients.service.cmd.ListClientsQuery;
+import com.scaramutti.tms.clients.service.cmd.UpdateClientCommand;
 import com.scaramutti.tms.shared.util.StringUtils;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -29,10 +30,10 @@ import org.mapstruct.NullValueMappingStrategy;
  * el target con defaults en vez de devolver null.
  *  - `toListClientsQuery`: critico — caso `GET /clients` sin query-params manda
  *    q + isActive ambos null y es happy path valido.
- *  - `toCreateClientCommand`: cambia `null → null` por `null → Command(null,null,
- *    null,null)`. Inalcanzable en el flujo REST real (`@Valid` rechaza body null
- *    antes), y el guard `validatePostTrim` del service atrapa el name=null
- *    devolviendo COM-001 si pasase. Defense-in-depth intacta.
+ *  - `toCreateClientCommand` y `toUpdateClientCommand`: cambian `null → null` por
+ *    `null → Command(null,null,null,null)`. Inalcanzable en el flujo REST real
+ *    (`@Valid` rechaza body null antes), y el guard `validatePostTrim` del service
+ *    atrapa el name=null devolviendo COM-001 si pasase. Defense-in-depth intacta.
  */
 @Mapper(
     componentModel = MappingConstants.ComponentModel.CDI,
@@ -44,6 +45,15 @@ public interface ClientResourceMapper {
     @Mapping(target = "name",        source = "name",        qualifiedByName = "trimUpperOrNull")
     @Mapping(target = "contactName", source = "contactName", qualifiedByName = "trimToNull")
     CreateClientCommand toCreateClientCommand(ClientRequest clientRequest);
+
+    /**
+     * Edicion: MISMAS dos reglas de normalizacion que el alta, a proposito. Que
+     * el alta y la edicion normalicen distinto haria que guardar un cliente sin
+     * tocar nada le cambiara los datos.
+     */
+    @Mapping(target = "name",        source = "name",        qualifiedByName = "trimUpperOrNull")
+    @Mapping(target = "contactName", source = "contactName", qualifiedByName = "trimToNull")
+    UpdateClientCommand toUpdateClientCommand(ClientRequest clientRequest);
 
     @Mapping(target = "q", source = "q", qualifiedByName = "trimUpperOrNull")
     ListClientsQuery toListClientsQuery(String q, Boolean isActive, int page, int size);

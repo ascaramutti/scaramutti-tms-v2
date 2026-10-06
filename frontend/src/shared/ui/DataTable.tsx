@@ -10,7 +10,8 @@ import { Alert } from './Alert'
 export interface Column<T> {
   /** Clave única de la columna (no necesariamente un campo de `T`). */
   key: string
-  header: string
+  /** Texto del encabezado; admite marcado para alinearlo con lo que la celda antepone. */
+  header: ReactNode
   /** Render custom de la celda. Si se omite, muestra `row[key]` como string. */
   render?: (row: T) => ReactNode
   /** Alineación del contenido. Default `'left'`. */
@@ -29,8 +30,10 @@ interface DataTableProps<T> {
   total: number
   totalPages: number
   onPageChange: (page: number) => void
-  /** Carga inicial (sin data previa). Muestra spinner en lugar de la tabla. */
+  /** Nada que mostrar todavía (carga inicial o vacío heredado de otra búsqueda). Muestra spinner en lugar de la tabla. */
   isLoading?: boolean
+  /** Lo que el lector de pantalla dice del spinner; por omisión, "Cargando". */
+  loadingLabel?: string
   /** Refetch en curso con data previa (paginar/filtrar). Atenúa la tabla. */
   isFetching?: boolean
   isError?: boolean
@@ -72,6 +75,7 @@ export function DataTable<T>({
   totalPages,
   onPageChange,
   isLoading,
+  loadingLabel = 'Cargando',
   isFetching,
   isError,
   errorMessage,
@@ -86,7 +90,7 @@ export function DataTable<T>({
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner size={28} label="Cargando" className="text-accent" />
+        <Spinner size={28} label={loadingLabel} className="text-accent" />
       </div>
     )
   }
@@ -216,9 +220,9 @@ export function DataTable<T>({
             <span className="text-sm text-fg-body">
               Mostrando {from}–{to} de {total}
             </span>
-            {/* Las dos flechas NO usan `Button`, y no es un olvido: son una cuarta forma.
+            {/* Las dos flechas NO usan `Button`, y no es un olvido: son una forma más.
                 No tienen relleno ni anillo de foco, y su señal de deshabilitado es
-                `disabled:opacity-40`; ninguna de las tres variantes las reproduce, y
+                `disabled:opacity-40`; ninguna de las variantes las reproduce, y
                 pasarlas a `secondary` les agregaría borde y fondo. Entran el día que exista
                 una variante sin relleno, que es cuando `size="icon"` tendrá su primer uso. */}
             <div className="flex gap-1">

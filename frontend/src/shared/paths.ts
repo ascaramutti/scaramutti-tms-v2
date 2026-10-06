@@ -28,6 +28,16 @@ export const CHANGE_PASSWORD_PATH = `${ACCOUNT_BASE}/cambiar-contrasena`
  */
 export const QUOTATIONS_BASE = '/cotizaciones'
 
+/**
+ * Módulo Clientes. Raíz propia y no un hijo de cotizaciones: el maestro de
+ * clientes lo consultan cotizaciones y operaciones, y quién lo edita no es quién
+ * cotiza.
+ */
+export const CLIENTS_BASE = '/clientes'
+
+/** Módulo Trabajadores: el padrón de personas de la empresa, con raíz propia como clientes. */
+export const WORKERS_BASE = '/trabajadores'
+
 /** Módulo Almacén. */
 export const WAREHOUSE_BASE = '/almacen'
 
@@ -45,4 +55,12 @@ export function quotationDetailPath(id: number | string): string {
 
 export function warehouseProductPath(id: number | string): string {
   return `${WAREHOUSE_BASE}/productos/${id}`
+}
+
+export function workerDetailPath(id: number | string): string {
+  return `${WORKERS_BASE}/${id}`
+}
+
+export function workerEditPath(id: number | string): string {
+  return `${WORKERS_BASE}/${id}/editar`
 }

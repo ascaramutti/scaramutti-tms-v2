@@ -8,6 +8,7 @@ import { AssignResourcesModal } from '../resources/AssignResourcesModal'
 import { RemoveResourceDialog } from '../resources/RemoveResourceDialog'
 import { DetailCard, Field } from './DetailCard'
 import { Button } from '../../../../shared/ui/Button'
+import { DriverReassignmentBadge } from '../DriverReassignmentBadge'
 
 interface ServiceResourcesProps {
   service: ServiceDetailResponse
@@ -67,7 +68,17 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
         }
       >
         <dl className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Field label="Conductor" value={service.driver?.fullName ?? '—'} />
+          {/* La alerta va a la vista junto a quien señala, como en cada refuerzo: el nombre,
+              la pastilla y el porqué. La lista solo marca el viaje; el detalle dice quién. */}
+          <Field
+            label="Conductor"
+            value={
+              <>
+                <p>{service.driver?.fullName ?? '—'}</p>
+                {service.driverNeedsReassignment && <DriverReassignmentBadge />}
+              </>
+            }
+          />
           <Field label="Tracto" value={service.tractor?.plate ?? '—'} />
           <Field label="Carreta" value={service.trailer?.plate ?? '—'} />
         </dl>
@@ -143,6 +154,7 @@ export function ServiceResources({ service, canOperate }: ServiceResourcesProps)
                     </button>
                   )}
                 </div>
+                {resource.driverNeedsReassignment && <DriverReassignmentBadge />}
                 <p className="mt-0.5 text-sm text-fg-body">{resource.reason}</p>
                 <p className="mt-0.5 text-xs text-fg-muted">
                   {resource.assignedBy.fullName} · {formatDateTime(resource.assignedAt)}

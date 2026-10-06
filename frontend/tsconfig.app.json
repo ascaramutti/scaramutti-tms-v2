@@ -4,7 +4,11 @@
     "target": "es2023",
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
-    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom"],
+    // "node" se declara desde el salto a Vitest 5: hasta la 3 los tipos de Node
+    // entraban de arrastre por `vitest/globals`, y la 4 los sacó de la entrada
+    // principal. Los usa código propio (`process.env` en el compilador de tema y en
+    // la paleta), no solo los tests, y `@types/node` ya era dependencia del proyecto.
+    "types": ["vite/client", "vitest/globals", "@testing-library/jest-dom", "node"],
     "skipLibCheck": true,
 
     /* Bundler mode */

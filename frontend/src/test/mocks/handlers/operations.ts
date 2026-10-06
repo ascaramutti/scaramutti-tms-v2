@@ -50,6 +50,31 @@ function problemResponse(status: number, problem: Partial<Problem> = {}) {
 }
 
 /**
+ * Un fake no puede armar una alerta que el backend no produce. Falla al armarlo si hay una marca
+ * sin conductor, un conductor marcado con el viaje sin marcar, el viaje marcado fuera de pendiente de
+ * inicio y en ruta, o (en el detalle, que trae todas las marcas) el viaje marcado sin ninguna.
+ */
+function assertTripAlertIsPossible(
+  service: { status: string; needsReassignment: boolean },
+  drivers: { driver?: unknown; driverNeedsReassignment: boolean }[],
+  seesEveryMark: boolean,
+) {
+  if (drivers.some((d) => d.driverNeedsReassignment && d.driver == null)) {
+    throw new Error('fake imposible: una marca sin conductor')
+  }
+  const anyDriverMarked = drivers.some((d) => d.driverNeedsReassignment)
+  if (anyDriverMarked && !service.needsReassignment) {
+    throw new Error('fake imposible: un conductor marcado con el viaje sin marcar')
+  }
+  if (seesEveryMark && service.needsReassignment && !anyDriverMarked) {
+    throw new Error('fake imposible: el viaje marcado sin ningún conductor marcado')
+  }
+  if (service.needsReassignment && !['PENDING_START', 'IN_PROGRESS'].includes(service.status)) {
+    throw new Error(`fake imposible: viaje marcado en ${service.status}`)
+  }
+}
+
+/**
  * Fixture base de un servicio sin recursos asignados.
  *
  * `createdAt` cae a propósito en la ventana en que UTC ya cambió de día y Lima
@@ -60,7 +85,7 @@ function problemResponse(status: number, problem: Partial<Problem> = {}) {
 export function fakeServiceSummary(
   overrides: Partial<ServiceSummaryResponse> = {},
 ): ServiceSummaryResponse {
-  return {
+  const service: ServiceSummaryResponse = {
     id: 42,
     code: 'SRV-0042',
     client: { id: 12, name: 'IPH S.A.C.', ruc: '20123456789' },
@@ -69,6 +94,7 @@ export function fakeServiceSummary(
     tentativeDate: '2026-07-10',
     tripScope: 'PROVINCIA',
     status: 'PENDING_ASSIGNMENT',
+    needsReassignment: false,
     driver: null,
     tractor: null,
     price: 5800,
@@ -76,6 +102,10 @@ export function fakeServiceSummary(
     createdAt: '2026-07-03T02:00:00Z',
     ...overrides,
   }
+  // El listado solo trae la marca del viaje, así que se pide explícita en los overrides. Sin las de
+  // cada conductor no hay nada contra qué cruzarla: se valida solo el estado.
+  assertTripAlertIsPossible(service, [], false)
+  return service
 }
 
 /** Servicio en ruta, con conductor y tracto asignados. */
@@ -280,7 +310,7 @@ export function fakeServiceEvent(
 export function fakeServiceDetail(
   overrides: Partial<ServiceDetailResponse> = {},
 ): ServiceDetailResponse {
-  return {
+  const service: ServiceDetailResponse = {
     id: 77,
     code: 'SRV-0077',
     client: { id: 12, name: 'IPH S.A.C.', ruc: '20123456789' },
@@ -297,7 +327,9 @@ export function fakeServiceDetail(
     price: 5800,
     currencyCode: 'PEN',
     status: 'PENDING_ASSIGNMENT',
+    needsReassignment: false,
     driver: null,
+    driverNeedsReassignment: false,
     tractor: null,
     trailer: null,
     startDateTime: null,
@@ -316,6 +348,15 @@ export function fakeServiceDetail(
     updatedAt: '2026-08-26T13:20:00.39289Z',
     ...overrides,
   }
+  // Como el backend: el viaje se marca si se marca su conductor o alguno de sus refuerzos.
+  const anyDriverMarked =
+    service.driverNeedsReassignment ||
+    service.additionalResources.some((resource) => resource.driverNeedsReassignment)
+  if (overrides.needsReassignment === undefined) {
+    service.needsReassignment = anyDriverMarked
+  }
+  assertTripAlertIsPossible(service, [service, ...service.additionalResources], true)
+  return service
 }
 
 /**
@@ -500,6 +541,7 @@ export function fakeAdditionalResource(
   return {
     id: 51,
     driver: { id: 8, fullName: 'Ana Ríos Chávez' },
+    driverNeedsReassignment: false,
     tractor: { kind: 'TRACTOR', id: 11, plate: 'V1B-911' },
     trailer: null,
     // Ni 10 ni 500 caracteres: son los dos literales de los mensajes de validación, y
@@ -521,6 +563,7 @@ export function fakeDriver(overrides: Partial<DriverResponse> = {}): DriverRespo
     phone: '987654321',
     status: 'AVAILABLE',
     isActive: true,
+    isAssignable: true,
     ...overrides,
   }
 }

@@ -1,4 +1,4 @@
-import { http, HttpResponse } from 'msw'
+import { delay, http, HttpResponse } from 'msw'
 import type { FleetUnitResponse, Problem, WorkerResponse } from '../../../api'
 import type { ProductsCaptureSink } from './warehouse'
 
@@ -79,6 +79,27 @@ export function workersSearchCapture(
 /** Responde un error en la búsqueda de trabajadores. */
 export function workersSearchError(status: number, problem: Partial<Problem> = {}) {
   return http.get(`${API}/workers`, () => problemResponse(status, problem))
+}
+
+/** Responde la búsqueda de trabajadores con demora, para ver el estado de carga. */
+export function workersSearchSlow(content: WorkerResponse[], ms: number) {
+  return http.get(`${API}/workers`, async () => {
+    await delay(ms)
+    return HttpResponse.json(content)
+  })
+}
+
+/**
+ * Filtra por `isActive` como el backend: sin el parámetro devuelve todos. Así
+ * cada filtro de la pantalla se ve en lo que muestra, no solo en lo que pide.
+ */
+export function workersSearchByStatus(content: WorkerResponse[]) {
+  return http.get(`${API}/workers`, ({ request }) => {
+    const isActive = new URL(request.url).searchParams.get('isActive')
+    const filtered =
+      isActive === null ? content : content.filter((worker) => String(worker.isActive) === isActive)
+    return HttpResponse.json(filtered)
+  })
 }
 
 /** Responde el listado de unidades de flota con la lista dada. */

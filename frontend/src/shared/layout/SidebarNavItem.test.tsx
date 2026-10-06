@@ -1,3 +1,4 @@
+import { CLIENTS_BASE } from '../paths'
 import { QUOTATIONS_BASE, WAREHOUSE_BASE } from '../../shared/paths'
 import { describe, expect, it } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -50,14 +51,14 @@ describe('SidebarNavItem', () => {
 
   it('marca activo en las rutas hijas (prefijo por segmento)', () => {
     renderItem(
-      <SidebarNavItem icon={FileText} label="Clientes" to="/clientes" />,
-      '/clientes/123',
+      <SidebarNavItem icon={FileText} label="Clientes" to={CLIENTS_BASE} />,
+      `${CLIENTS_BASE}/123`,
     )
     expect(screen.getByRole('link', { name: /clientes/i })).toHaveAttribute('aria-current', 'page')
   })
 
   it('el prefijo respeta el borde de segmento (/clientesX no es /clientes)', () => {
-    renderItem(<SidebarNavItem icon={FileText} label="Clientes" to="/clientes" />, '/clientesX')
+    renderItem(<SidebarNavItem icon={FileText} label="Clientes" to={CLIENTS_BASE} />, `${CLIENTS_BASE}X`)
     expect(screen.getByRole('link', { name: /clientes/i })).not.toHaveAttribute('aria-current')
   })
 

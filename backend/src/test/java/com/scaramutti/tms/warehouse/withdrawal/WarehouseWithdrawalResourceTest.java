@@ -349,7 +349,7 @@ class WarehouseWithdrawalResourceTest {
 
     @Test
     void create_withSalesRole_returns403_COM003() {
-        String token = login("lcampos", "Sales1234");
+        String token = login("sales", "Sales1234");
         given().header("Authorization", "Bearer " + token).contentType(ContentType.JSON)
             .body("{\"productId\":1,\"quantity\":1,\"receivedByWorkerId\":1}")
         .when().post("/warehouse/withdrawals").then().statusCode(403).body("code", equalTo("COM-003"));

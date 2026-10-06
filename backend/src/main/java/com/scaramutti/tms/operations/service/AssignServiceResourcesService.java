@@ -9,7 +9,6 @@ import com.scaramutti.tms.operations.model.ServiceEventType;
 import com.scaramutti.tms.operations.model.ServiceResourceKind;
 import com.scaramutti.tms.operations.model.ServiceStatus;
 import com.scaramutti.tms.operations.service.cmd.AssignServiceResourcesCommand;
-import com.scaramutti.tms.shared.entity.Driver;
 import com.scaramutti.tms.shared.entity.Service;
 import com.scaramutti.tms.shared.entity.ServiceAuditLog;
 import com.scaramutti.tms.shared.entity.ServiceEvent;
@@ -161,9 +160,9 @@ public class AssignServiceResourcesService {
      * de baja, que es lo mismo que hace el alta con el cliente, el tipo de carga y la moneda.
      */
     private AssignedResources resolveResources(AssignServiceResourcesCommand command) {
-        Driver driver = driverRepository.findById(command.driverId());
-        serviceResourceConflicts.requireActiveResource(driver != null && Boolean.TRUE.equals(driver.isActive),
-            ServiceResourceKind.DRIVER);
+        serviceResourceConflicts.requireActiveResource(
+            driverRepository.isActiveToday(command.driverId()), ServiceResourceKind.DRIVER);
+        serviceResourceConflicts.requireDriverRole(driverRepository.belongsToADriver(command.driverId()));
         String driverName = driverRepository.findFullNameById(command.driverId());
 
         Tractor tractor = tractorRepository.findById(command.tractorId());

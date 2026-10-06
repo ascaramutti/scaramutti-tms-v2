@@ -217,10 +217,10 @@ class ServicesResourceTest {
     @Test
     void create_sameClientAndRouteByAnotherUser_returns201() {
         createService(validPayload());
-        int salesUserId = fixtures.userId("lcampos");
+        int salesUserId = fixtures.userId("sales");
 
         given()
-            .header("Authorization", "Bearer " + TestAuth.fabricateTokenForUser(salesUserId, "lcampos", "sales"))
+            .header("Authorization", "Bearer " + TestAuth.fabricateTokenForUser(salesUserId, "sales", "sales"))
             .contentType(ContentType.JSON)
             .body(validPayload())
         .when()
@@ -534,17 +534,17 @@ class ServicesResourceTest {
 
     @Test
     void create_asSales_returns201() {
-        int salesUserId = fixtures.userId("lcampos");
+        int salesUserId = fixtures.userId("sales");
 
         given()
-            .header("Authorization", "Bearer " + TestAuth.fabricateTokenForUser(salesUserId, "lcampos", "sales"))
+            .header("Authorization", "Bearer " + TestAuth.fabricateTokenForUser(salesUserId, "sales", "sales"))
             .contentType(ContentType.JSON)
             .body(validPayload())
         .when()
             .post("/services")
         .then()
             .statusCode(201)
-            .body("createdBy.username", equalTo("lcampos"));
+            .body("createdBy.username", equalTo("sales"));
     }
 
     @Test

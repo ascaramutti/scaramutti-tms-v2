@@ -65,8 +65,18 @@ public record ServiceDetailResponse(
 
     ServiceStatus status,
 
+    @Schema(description = "true si el viaje está pendiente de inicio o en ruta y algún recurso asignado ya no se "
+        + "puede asignar: el conductor principal o el de algún refuerzo (los vehículos no cuentan). Hay que "
+        + "reasignarlo; el detalle dice cuál. Se deriva en cada lectura, sin columna. Siempre presente")
+    boolean needsReassignment,
+
     @Schema(nullable = true, description = "Conductor asignado; null mientras el viaje esté pendiente de asignación")
     ServiceDriverSummary driver,
+
+    @Schema(description = "true si el viaje está pendiente de inicio o en ruta y su conductor ya no se puede asignar "
+        + "(trabajador dado de baja, ficha apagada o cargo distinto de conductor): hay que reasignarlo. "
+        + "Siempre presente; false si el viaje no tiene conductor")
+    boolean driverNeedsReassignment,
 
     @Schema(nullable = true, description = "Tracto asignado; null mientras el viaje esté pendiente de asignación")
     FleetUnitRef tractor,

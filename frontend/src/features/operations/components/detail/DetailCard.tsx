@@ -8,8 +8,9 @@ import { Card } from '../../../../shared/ui/Card'
  * era la misma copia en cada archivo, que es de donde salen las fichas que se van
  * pareciendo cada vez menos.
  *
- * El mismo patrón ya vive copiado a mano en las pantallas de detalle de almacén.
- * Unificarlo es mudar esto a `shared/ui/`, y eso va en su propio cambio.
+ * El mismo patrón ya vive copiado a mano en las pantallas de detalle de almacén, y la
+ * ficha del trabajador lo importa de acá. Unificarlo es mudar esto a `shared/ui/`, y eso
+ * va en su propio cambio.
  */
 
 interface DetailCardProps {
@@ -44,7 +45,8 @@ export function DetailCard({ title, headingId, action, children }: DetailCardPro
 }
 
 /**
- * Un dato de la ficha: su rótulo y su valor. El valor ausente llega como guion.
+ * Un dato de la ficha: su rótulo y su valor. El valor ausente llega como guion. El valor
+ * puede traer marcado propio, como la alerta del conductor debajo de su nombre.
  *
  * `className` es para el ancho dentro de la grilla (`col-span-*`). Va acá y no en
  * un `div` que lo envuelva porque un `<dl>` solo admite `dt`, `dd` y `div` como
@@ -57,7 +59,8 @@ export function Field({
   className,
 }: {
   label: string
-  value: string
+  // Marcado sí, pero nunca null, undefined ni booleano: sin un valor, el que llama pone el guion
+  value: Exclude<ReactNode, null | undefined | boolean>
   className?: string
 }) {
   return (

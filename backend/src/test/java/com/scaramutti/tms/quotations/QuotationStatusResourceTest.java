@@ -91,7 +91,7 @@ class QuotationStatusResourceTest {
 
     private String loginSales() {
         return given().contentType(ContentType.JSON)
-            .body("{\"username\":\"lcampos\",\"password\":\"Sales1234\"}")
+            .body("{\"username\":\"sales\",\"password\":\"Sales1234\"}")
         .when().post("/auth/login")
         .then().statusCode(200).extract().jsonPath().getString("token");
     }

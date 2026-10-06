@@ -9,7 +9,7 @@ import org.eclipse.microprofile.openapi.annotations.media.Schema;
  * asociado: la tabla de conductores solo tiene la licencia.
  *
  * <p>Record PLANO (no anida {@code DriverRef}): el contrato lo modela con {@code allOf}
- * (DriverRef + licencia/telefono/disponibilidad/isActive), que aplana los campos.
+ * (DriverRef + licencia/telefono/disponibilidad/isActive/isAssignable), que aplana los campos.
  * {@code status} NUNCA es null aca (a diferencia de las escoltas en /fleet-units): un
  * conductor siempre tiene disponibilidad, la columna es obligatoria.
  */
@@ -20,5 +20,6 @@ public record DriverResponse(
     @Schema(example = "A-IIIc", nullable = true) String licenseCategory,
     @Schema(example = "987654321", nullable = true) String phone,
     FleetResourceStatus status,
-    Boolean isActive
+    Boolean isActive,
+    Boolean isAssignable
 ) {}

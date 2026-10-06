@@ -96,15 +96,16 @@ describe('AssignResourcesModal · catálogos', () => {
     expect(sink.calls?.map((call) => call.get('kind')).sort()).toEqual(['TRACTOR', 'TRAILER'])
   })
 
-  it('pide solo los conductores vigentes', async () => {
+  it('pide solo los conductores asignables hoy', async () => {
     const sink: ServicesCaptureSink = {}
     server.use(fleetUnitsByKind(FLEET), driversCapture(sink))
     renderModal()
 
     await waitFor(() => expect(sink.calls).toHaveLength(1))
     // Se mide sobre la consulta y no sobre la lista: un padrón que ya viniera sin
-    // bajas se vería igual en pantalla aunque el filtro no se mandara.
-    expect(sink.params?.get('isActive')).toBe('true')
+    // bajas se vería igual en pantalla aunque el filtro no se mandara. La consulta
+    // entera: un isActive=false sumado dejaría el selector vacío.
+    expect(Object.fromEntries(sink.params ?? [])).toEqual({ isAssignable: 'true' })
   })
 
   it('el campo de tracto no ofrece carretas, y el de carreta no ofrece tractos', async () => {

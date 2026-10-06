@@ -7,7 +7,7 @@ import org.mapstruct.NullValueMappingStrategy;
 
 /**
  * Mapper de la capa REST del listado de conductores. Solo agrupa el filtro en el Query (llega
- * tipado por JAX-RS). {@code RETURN_DEFAULT} es obligatorio: el param es opcional y sin filtro
+ * tipado por JAX-RS). {@code RETURN_DEFAULT} es obligatorio: los params son opcionales y sin filtro
  * llega null; sin esta estrategia MapStruct devolveria el Query null y el service reventaria
  * (gotcha conocido del proyecto con params opcionales).
  */
@@ -17,5 +17,5 @@ import org.mapstruct.NullValueMappingStrategy;
 )
 public interface DriverResourceMapper {
 
-    ListDriversQuery toListDriversQuery(Boolean isActive);
+    ListDriversQuery toListDriversQuery(Boolean isActive, Boolean isAssignable);
 }

@@ -149,7 +149,7 @@ class ServiceReportRepositoryTest {
                 // y un id literal revienta sobre una base reconstruida con una violacion que no
                 // nombra la causa. El INSERT ya deja el estado, asi que no hace falta forzarlo.
                 //
-                // "admin" y NO "cscaramutti": el sembrador de dev garantiza admin, lcampos e
+                // "admin" y NO "cscaramutti": el sembrador de dev garantiza admin, sales e
                 // inactivo, y nada mas. cscaramutti solo existe en la base de desarrollo porque se
                 // comparte con el sistema anterior, asi que el caso pasaria local y reventaria en la
                 // CI virgen, con un rojo del ARMADO que no se lee como un problema del endpoint.

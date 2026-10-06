@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses } from './types.gen';
+import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, CreateWorkerData, CreateWorkerErrors, CreateWorkerResponses, DeactivateWorkerData, DeactivateWorkerErrors, DeactivateWorkerResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, ReactivateWorkerData, ReactivateWorkerErrors, ReactivateWorkerResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses, UpdateWorkerData, UpdateWorkerErrors, UpdateWorkerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -169,6 +169,81 @@ export const createClient = <ThrowOnError extends boolean = false>(options: Opti
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/clients',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Obtener cliente por ID
+ *
+ * Devuelve el cliente con ese `id`, esté activo o inactivo: la edición
+ * corrige datos y un cliente inactivo también puede leerse. Sin roles:
+ * cualquier sesión puede leerlo (misma exposición que `listClients`).
+ *
+ * `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
+ * existe (incluidos `0` y negativos) → `CLI-003` con cuerpo `Problem`;
+ * `id` que NO encaja (porque no es numérico, como `abc`, o porque se pasa
+ * de rango, como `99999999999999`) → `404` sin cuerpo, porque el conversor
+ * de parámetros falla antes de llegar al recurso.
+ *
+ */
+export const getClient = <ThrowOnError extends boolean = false>(options: Options<GetClientData, ThrowOnError>): RequestResult<GetClientResponses, GetClientErrors, ThrowOnError> => (options.client ?? client).get<GetClientResponses, GetClientErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/clients/{id}',
+    ...options
+});
+
+/**
+ * Actualizar cliente
+ *
+ * Reemplaza los cuatro datos editables del cliente (`name`, `ruc`,
+ * `phone`, `contactName`) con las mismas validaciones y la misma
+ * normalización que el alta: `name` se guarda en mayúsculas y sin espacios
+ * en los bordes; `contactName` sin espacios en los bordes y `""` se guarda
+ * como nulo; `ruc` y `phone` tal como llegan. `isActive` y `createdAt` no
+ * cambian: no viajan en el cuerpo y el servidor los conserva.
+ *
+ * El cambio del `name` y del `ruc` se refleja en las cotizaciones y los
+ * servicios YA EMITIDOS de ese cliente: esos documentos resuelven el
+ * nombre y el RUC por el `id` del cliente y no guardan una copia propia,
+ * así que un dato corregido hoy también sale en un documento emitido
+ * antes, reimpresión incluida.
+ *
+ * Unicidad contra los demás: el RUC o la razón social (ya normalizada) de
+ * OTRO cliente → `409` (`CLI-001` para el RUC, `CLI-002` para la razón
+ * social). Guardar un cliente con su propio RUC y su propia razón social,
+ * sin cambios, es `200`. La carrera entre dos ediciones que dejarían el
+ * mismo RUC o la misma razón social en dos clientes la resuelven las
+ * restricciones únicas de la base y también sale como `409`.
+ *
+ * Sin control de edición simultánea (`If-Match`): gana la última
+ * escritura (decisión del dueño, 2026-09-14). Con una excepción medida:
+ * una edición que no cambia ningún campo no emite escritura, así que no
+ * desplaza lo que otra edición haya guardado en el medio.
+ *
+ * Orden de evaluación: `401` → `403` (`COM-003`, rol fuera de la lista)
+ * → `400` (`COM-001`: cuerpo vacío, `null` o campo inválido) → `404`
+ * (`CLI-003`) → `409`. El `404` del `id` que no encaja en un entero de 32
+ * bits se intercala entre el `403` y el `400`: lo produce el conversor de
+ * parámetros, que corre después de la sesión y del rol pero antes de leer
+ * el cuerpo, y responde sin cuerpo. Medido: sin sesión ese mismo camino da
+ * `401`, y con un rol fuera de la lista da `403`.
+ *
+ * Un `name` de solo espacios es `400` (`COM-001`) aunque cumpla el
+ * `minLength: 1` del esquema: lo rechaza la validación del cuerpo, antes
+ * de buscar al cliente. Un `phone` de `""` también es `400`, porque no
+ * cumple el patrón de nueve dígitos: para dejar a un cliente sin teléfono
+ * se omite el campo o se manda `null`.
+ *
+ */
+export const updateClient = <ThrowOnError extends boolean = false>(options: Options<UpdateClientData, ThrowOnError>): RequestResult<UpdateClientResponses, UpdateClientErrors, ThrowOnError> => (options.client ?? client).put<UpdateClientResponses, UpdateClientErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/clients/{id}',
     ...options,
     headers: {
         'Content-Type': 'application/json',
@@ -800,20 +875,357 @@ export const getWarehouseReport = <ThrowOnError extends boolean = false>(options
 });
 
 /**
- * Listar trabajadores (combobox "quien recibe" del retiro)
+ * Listar los roles (la jerarquía única de cargos, con nivel y modalidad de ficha)
  *
- * Catalogo compartido `public.workers` (solo lectura desde v2; el ABM sigue
- * en v1). Solo busqueda rapida, SIN creacion al vuelo (RN-WH9: trabajadores
- * y unidades de flota nunca se crean desde almacen). Sin paginar (plantilla
- * chica). `q` es multi-palabra case-insensitive (>= 3 caracteres): cada
- * palabra debe matchear en el nombre O el apellido (RN-WH14); para no
- * filtrar, OMITIR el parametro.
+ * Las filas activas de `public.roles`, en el orden del organigrama
+ * (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
+ * que viaja en `role` del request y en `users.role`), nombre visible
+ * (`description`, el cargo que muestran el pie del menú y el PDF),
+ * nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
+ * de conductor. El mismo catálogo para todos los roles: el cliente
+ * esconde los de nivel igual o mayor al del rol de la sesión (para
+ * `admin` ofrece todos); la autoridad es el `403 WRK-006` de las
+ * escrituras. Sin texto libre ni alta al vuelo: un rol nuevo entra por
+ * migración. El módulo de usuarios lo reutiliza filtrando `canLogin`.
+ *
+ */
+export const listRoles = <ThrowOnError extends boolean = false>(options?: Options<ListRolesData, ThrowOnError>): RequestResult<ListRolesResponses, ListRolesErrors, ThrowOnError> => (options?.client ?? client).get<ListRolesResponses, ListRolesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/roles',
+    ...options
+});
+
+/**
+ * Listar tipos de documento vigentes
+ *
+ * Catálogo `public.document_types`, solo los activos, ordenados por `id`
+ * (el orden de carga del catálogo). Cada uno trae el largo máximo y el
+ * patrón de validación (nulo si no tiene) para que el formulario limite el
+ * número antes de enviarlo; la autoridad es el backend, que los aplica en el alta (`WRK-003`
+ * y `WRK-004`). Sin paginar: el catálogo es chico. Roles: los cuatro que mantienen el
+ * padrón.
+ *
+ */
+export const listDocumentTypes = <ThrowOnError extends boolean = false>(options?: Options<ListDocumentTypesData, ThrowOnError>): RequestResult<ListDocumentTypesResponses, ListDocumentTypesErrors, ThrowOnError> => (options?.client ?? client).get<ListDocumentTypesResponses, ListDocumentTypesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/document-types',
+    ...options
+});
+
+/**
+ * Listar trabajadores (combobox "quien recibe" del retiro y busqueda del padron)
+ *
+ * Catalogo compartido `public.workers`. Solo busqueda rapida, SIN creacion
+ * al vuelo (trabajadores y unidades de flota nunca se crean desde almacen).
+ * Sin paginar (plantilla chica). `q` es multi-palabra case-insensitive
+ * (>= 3 caracteres): cada palabra debe matchear en el nombre o el apellido
+ * y, solo para los cuatro roles que mantienen el padron, tambien en el
+ * numero de documento; para el encargado de almacen la busqueda sigue
+ * siendo por nombre y apellido, porque ese numero no viaja en esta
+ * respuesta. Para no filtrar, OMITIR el parametro. Operaciones NO lo
+ * consume: para asignar un viaje necesita conductores (`GET /drivers`), no
+ * la planilla completa.
+ * El detalle completo de un trabajador es `GET /workers/{id}`.
  *
  */
 export const listWorkers = <ThrowOnError extends boolean = false>(options?: Options<ListWorkersData, ThrowOnError>): RequestResult<ListWorkersResponses, ListWorkersErrors, ThrowOnError> => (options?.client ?? client).get<ListWorkersResponses, ListWorkersErrors, ThrowOnError>({
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/workers',
+    ...options
+});
+
+/**
+ * Dar de alta un trabajador (con su ficha de conductor si el rol la lleva)
+ *
+ * Crea la fila en `public.workers` apuntando al rol del cuerpo (`role`:
+ * el `name` de `GET /roles`) y, según la modalidad de ficha de ese rol,
+ * la fila en `public.drivers`, en la MISMA transacción: si la ficha falla,
+ * no queda el trabajador. Según la modalidad del cargo (`driverProfile` de
+ * `GET /roles`): `REQUIRED` sin `driver` → `400 WRK-008`; `NONE` con
+ * `driver` → `400 WRK-008`; `OPTIONAL`, la ficha se crea solo si viene.
+ * Qué cargo cae en cuál no se enumera acá, por el mismo motivo que el
+ * nivel. `driver.status` ausente → `AVAILABLE`. Solo la ficha del cargo
+ * `driver` sale por `GET /drivers` (que leen además `dispatcher` y `sales`):
+ * la del escolta y la del ayudante con licencia existen, pero no se ofrecen
+ * ni se asignan como conductor en los viajes.
+ *
+ * Normalización: `firstName`, `lastName`, `documentNumber`,
+ * `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
+ * bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
+ * `firstName` y `lastName` pasan además a NFC antes de validarse.
+ *
+ * Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
+ * WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;
+ * número más largo que `maxLength` del tipo o que no cumple su
+ * `validationPattern` completo (cuando lo tiene) → `400 WRK-004`; número
+ * de documento de OTRO trabajador, sea cual sea el tipo → `409 WRK-002`;
+ * licencia de OTRA ficha → `409 WRK-007`. La carrera entre dos altas la
+ * resuelven las restricciones únicas de la base y también sale como
+ * `409`.
+ *
+ * Concurrencia: toma la fila del trabajador de la sesión antes de validar,
+ * para que una baja simultánea de quien da el alta no se cuele. Si otra
+ * operación la retiene, o la espera por un número de documento o de
+ * licencia que otra escritura todavía no confirmó pasa el tope → `409
+ * WRK-013`, transitorio; no entra en la cadena de abajo. Si esa otra
+ * escritura confirma dentro del tope, sale el duplicado (`409 WRK-002`
+ * o `409 WRK-007`).
+ *
+ * Organigrama (RN-09): el nivel del rol del cuerpo tiene que ser
+ * estrictamente menor al nivel del rol de la sesión (el de `users.role`,
+ * leído de la base) → si no, `403 WRK-006`. `admin` está exento.
+ * `hireDate` futura se acepta: el backend no la rechaza a propósito, para
+ * permitir correcciones a mano; la guarda es del formulario. Deja una fila
+ * de auditoría `CREATED`. `isActive`, `createdAt`, `createdBy`,
+ * `updatedAt` y `updatedBy` los pone el servidor y el cuerpo no los mueve;
+ * `hasUser` sale en `false` (el usuario lo crea el módulo de usuarios,
+ * con el rol del trabajador).
+ *
+ * Orden de evaluación: `401` → `403 COM-003` → `400 COM-001` (cuerpo
+ * vacío, nulo o campo inválido, incluida la ficha) → `400 WRK-005` →
+ * `403 WRK-006` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `409
+ * WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no puede escribir
+ * (no existe, su cuenta está apagada, su rol actual en la base no es uno de
+ * los cuatro de escritura, o su trabajador fue dado de baja) sale como `403
+ * COM-003` en el escalón del organigrama: el token vale hasta que vence y su
+ * rol puede ser viejo, pero ya no hay quien escriba.
+ *
+ * Un cuerpo que no se puede leer (`hireDate` mal formada, `documentTypeId`
+ * no numérico, `driver.status` fuera del dominio) sale como `400` SIN
+ * cuerpo `Problem` y sin `code`: falla el deserializador antes de llegar
+ * a la validación.
+ *
+ */
+export const createWorker = <ThrowOnError extends boolean = false>(options: Options<CreateWorkerData, ThrowOnError>): RequestResult<CreateWorkerResponses, CreateWorkerErrors, ThrowOnError> => (options.client ?? client).post<CreateWorkerResponses, CreateWorkerErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Obtener un trabajador por ID (ficha completa)
+ *
+ * Devuelve el trabajador con ese `id`, esté activo o inactivo, con su tipo
+ * de documento, su rol (`role`: nombre de sistema, nombre visible, nivel,
+ * si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
+ * de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
+ * usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
+ * última vez. En las filas anteriores a esta unidad, `createdBy` es el
+ * usuario `admin`, que las cargó (nulo si no había admin al migrar), y
+ * `updatedBy` es nulo hasta su primera edición, baja o reactivación
+ * desde la aplicación.
+ *
+ * Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
+ * (el detalle expone documento y teléfono, que el combobox no muestra).
+ * La lectura no aplica rango: cualquiera de los cuatro ve cualquier
+ * detalle.
+ *
+ * `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
+ * cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
+ * conversor de parámetros falla antes de llegar al recurso.
+ *
+ */
+export const getWorker = <ThrowOnError extends boolean = false>(options: Options<GetWorkerData, ThrowOnError>): RequestResult<GetWorkerResponses, GetWorkerErrors, ThrowOnError> => (options.client ?? client).get<GetWorkerResponses, GetWorkerErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers/{id}',
+    ...options
+});
+
+/**
+ * Actualizar un trabajador (su ficha de conductor y, si tiene usuario, el rol del usuario)
+ *
+ * Reemplaza los datos editables con las mismas validaciones, normalización
+ * y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
+ * que no viene queda VACÍO (omitir `phone` lo borra). `isActive`,
+ * `createdAt` y `createdBy` no cambian aunque el cuerpo intente mandarlos;
+ * `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
+ * cuerpo no cambia nada. Un trabajador inactivo también se edita.
+ *
+ * Unicidad contra los demás: guardar el propio número de documento o la
+ * propia licencia sin cambios es `200`, no `409`.
+ *
+ * Motivo (RN-14): si `documentNumber` cambió respecto del guardado,
+ * `reason` es obligatorio: de 10 caracteres ya recortado, y de 500 tal
+ * como llega (el máximo lo mide la forma del cuerpo, antes de recortar) →
+ * si falta o es más corto, `400 WRK-009`; en cualquier otro cambio es opcional y,
+ * si viene, queda en TODAS las filas de auditoría de esa edición. El
+ * mínimo lo mide el servidor y no la forma del cuerpo, justamente porque
+ * es condicional: exigirlo en la forma lo pediría también donde el
+ * contrato dice que es libre.
+ *
+ * Cada campo efectivamente cambiado deja UNA fila de auditoría con el
+ * valor anterior y el nuevo; los campos que se reenvían sin cambios no
+ * dejan ninguna. El cargo se guarda por su nombre de sistema y el tipo de
+ * documento por su código, nunca por su id ni por su nombre visible: un
+ * renombre dejaría el historial mintiendo.
+ *
+ * Rol y usuario (RN-15): si el trabajador tiene usuario y `role` cambia,
+ * `users.role` queda con el rol nuevo en la MISMA transacción (los
+ * permisos rigen en el próximo inicio de sesión o refresco; la sesión
+ * abierta conserva el rol viejo hasta que venza su access token) y la
+ * auditoría registra el cambio del trabajador y el del usuario. Cambiar a
+ * un rol que no inicia sesión a alguien que tiene usuario → `400
+ * WRK-011`: una cuenta no puede quedar con un rol sin permisos; el camino
+ * para dejar a alguien sin acceso es desactivarlo. Cuenta que la fila de
+ * usuario EXISTA, esté activa o no.
+ *
+ * El rol contra el que se mide "cambia" es el de la CUENTA, no el
+ * guardado en el trabajador: es la fila que esta operación escribe y la
+ * que otorga los permisos. Hoy los dos coinciden siempre y nada en esta
+ * API los separa, pero nada los obliga a coincidir, y con la comparación
+ * sobre el trabajador un cuerpo que reenvía su cargo sin cambios movería
+ * la cuenta en silencio. Por el mismo motivo, `WRK-012` mira las DOS
+ * filas: nadie cambia su propio cargo ni en el trabajador ni en su
+ * cuenta.
+ *
+ * Ficha (RN-11): si hay fila en `drivers`, `driver` la actualiza
+ * (`status` ausente → se conserva el actual, a diferencia del alta); si
+ * el rol nuevo no la lleva (`NONE`), la fila queda inactiva y NO se borra
+ * (operaciones la referencia por su id); si el rol vuelve a llevarla y
+ * viene `driver`, la MISMA fila vuelve a activa; si no había fila y el
+ * rol la exige, se crea. Rol `OPTIONAL` sin `driver` con fila existente:
+ * la fila queda inactiva. Sobre un trabajador inactivo: si YA hay fila, sus
+ * datos se corrigen y la fila queda o sigue apagada; si NO hay fila y viene
+ * `driver`, la fila nace apagada con esos datos, y su licencia se compara
+ * contra las demás igual que en cualquier alta (`409 WRK-007`). El
+ * `driver` del cuerpo nunca se descarta. La fila NUNCA se enciende sobre un inactivo:
+ * reactivarlo es lo que la vuelve a encender, y encenderla acá devolvería a
+ * esa persona al combobox de conductores sin pasar por ahí.
+ *
+ * Organigrama (RN-09): el nivel del rol ACTUAL del trabajador, el del rol
+ * NUEVO y el del rol de su CUENTA del sistema, si la tiene, tienen que ser
+ * los tres estrictamente menores al nivel del rol de la sesión; si uno no
+ * lo es → `403 WRK-006`. El de la cuenta se mira aparte porque es la fila
+ * que esta operación escribe, y nada obliga a que coincida con el del
+ * trabajador. `admin` exento. Nadie
+ * cambia su propio cargo, tampoco `admin` → `403 WRK-012`, y se miran las
+ * DOS filas que la edición mueve: la del trabajador y la de su cuenta. Un
+ * `admin` sí edita el resto de su propia ficha. Mientras las dos filas
+ * coincidan, a quien no es `admin` la regla de niveles ya lo frena antes,
+ * con `WRK-006`, porque su propio cargo es de su propio nivel; si
+ * divergen y la del trabajador quedó en un cargo de nivel menor, pasa esa
+ * regla y llega a `WRK-012`.
+ *
+ * Concurrencia: toma la fila del trabajador y también la del trabajador de
+ * la sesión, en orden, antes de validar: dos escrituras sobre el mismo
+ * trabajador se serializan, y dos ediciones cruzadas también. La segunda
+ * relee el cargo actual de quien actúa: si dos administradores se bajan el
+ * cargo entre sí a la vez, la segunda sale `403 WRK-006` si su cargo nuevo
+ * todavía escribe, o `403 COM-003` si ya no. Si otra operación
+ * retiene una de las dos más allá del tope de espera → `409 WRK-013`, que
+ * es transitorio y se reintenta. Sin `If-Match`: entre dos escrituras
+ * serializadas gana la última.
+ *
+ * Orden de evaluación (el `409 WRK-013` no entra en esta cadena: es un
+ * conflicto transitorio que puede interponerse al tomar la fila o al
+ * guardar, ver Concurrencia): `401` → `403 COM-003` → `400 COM-001` (cuerpo
+ * vacío, nulo o campo inválido, incluida la ficha) → `404 WRK-001` (el
+ * `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
+ * actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
+ * `403 WRK-006` (rol de la cuenta) → `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
+ * WRK-009` → `409 WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
+ * puede escribir (cuenta apagada, rol actual en la base fuera de los cuatro de
+ * escritura, o trabajador dado de baja) sale como `403 COM-003` en el primer
+ * escalón del organigrama, después del `404`.
+ *
+ */
+export const updateWorker = <ThrowOnError extends boolean = false>(options: Options<UpdateWorkerData, ThrowOnError>): RequestResult<UpdateWorkerResponses, UpdateWorkerErrors, ThrowOnError> => (options.client ?? client).put<UpdateWorkerResponses, UpdateWorkerErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers/{id}',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Desactivar un trabajador (en cascada: ficha de conductor y usuario)
+ *
+ * Marca `isActive = false` y, en la MISMA transacción, deja inactivos su
+ * ficha de conductor (`drivers.is_active`) y su usuario del sistema
+ * (`users.is_active`), si existen: quien se fue no inicia sesión ni se
+ * asigna a un viaje (la sesión abierta, si la hay, sigue hasta que venza
+ * su access token; el refresco ya la frena). Idempotente: sobre un
+ * inactivo responde `200` sin cambio, sin código de error, sin fila de
+ * auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si llega uno,
+ * o cualquier `Content-Type`, se ignora.
+ *
+ * Nadie desactiva su propio trabajador (el de `users.worker_id` de la
+ * sesión), tampoco `admin` → `403 WRK-010`. Organigrama (RN-09): el nivel
+ * del rol actual del trabajador, y el del rol de su cuenta si la tiene,
+ * tiene que ser estrictamente menor al de la sesión → si no, `403
+ * WRK-006`; `admin` exento, y un `admin` puede desactivar a otro `admin`.
+ * Las guardas corren antes del corte idempotente: repetir sobre alguien
+ * fuera de rango responde `403`.
+ *
+ * Auditoría, solo cuando hubo cambio: una fila `DEACTIVATED` por el
+ * trabajador y una más por cada fila que la cascada apagó (`driver.isActive`
+ * y `user.isActive`); una ficha o una cuenta que ya estaban apagadas no
+ * dejan fila.
+ *
+ * Concurrencia: toma la fila del trabajador y también la del trabajador de
+ * la sesión, en orden: dos desactivaciones cruzadas se serializan y la
+ * segunda encuentra a su actor ya apagado (`403 COM-003`). Si otra
+ * operación retiene una de las dos más allá del tope de espera → `409
+ * WRK-013`, transitorio.
+ *
+ * Orden (el `409 WRK-013` no entra en la cadena): `401` → `403 COM-003` →
+ * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
+ * cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
+ * dado de baja) →
+ * `403 WRK-010` → `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la
+ * cuenta) → `200`.
+ *
+ */
+export const deactivateWorker = <ThrowOnError extends boolean = false>(options: Options<DeactivateWorkerData, ThrowOnError>): RequestResult<DeactivateWorkerResponses, DeactivateWorkerErrors, ThrowOnError> => (options.client ?? client).post<DeactivateWorkerResponses, DeactivateWorkerErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers/{id}/deactivate',
+    ...options
+});
+
+/**
+ * Reactivar un trabajador (y su ficha de conductor; el usuario no)
+ *
+ * Marca `isActive = true` y enciende su ficha de conductor solo si existe
+ * y el rol actual la lleva; un rol `OPTIONAL` la enciende aunque una
+ * edición anterior la haya apagado. **No reactiva el usuario**: eso lo
+ * hace el módulo de usuarios, que exigirá trabajador activo. Tampoco crea
+ * una ficha que no existe. Idempotente: sobre un activo responde `200` sin
+ * cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
+ * llega uno, o cualquier `Content-Type`, se ignora.
+ *
+ * Organigrama (RN-09): igual que desactivar, sobre el rol actual y el de
+ * la cuenta (`403 WRK-006`, `admin` exento). Reactivarse a uno mismo no es
+ * posible: con su trabajador dado de baja, quien actúa no está
+ * habilitado para escribir (`403 COM-003`). Auditoría, solo cuando hubo cambio: una fila
+ * `REACTIVATED` por el trabajador y otra si se encendió la ficha
+ * (`driver.isActive`); nunca una de la cuenta.
+ *
+ * Concurrencia: `409 WRK-013`, como en `deactivateWorker`.
+ *
+ * Orden (el `409 WRK-013` no entra en la cadena): `401` → `403 COM-003` →
+ * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
+ * cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
+ * dado de baja) →
+ * `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la cuenta) → `200`.
+ *
+ */
+export const reactivateWorker = <ThrowOnError extends boolean = false>(options: Options<ReactivateWorkerData, ThrowOnError>): RequestResult<ReactivateWorkerResponses, ReactivateWorkerErrors, ThrowOnError> => (options.client ?? client).post<ReactivateWorkerResponses, ReactivateWorkerErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/workers/{id}/reactivate',
     ...options
 });
 
@@ -848,11 +1260,23 @@ export const listFleetUnits = <ThrowOnError extends boolean = false>(options?: O
  *
  * Catalogo compartido `public.drivers`: quien puede conducir, con su licencia
  * y su disponibilidad. El nombre sale del trabajador asociado, y el `id` que
- * devuelve es el que guarda la asignacion del servicio. Solo lectura desde
- * v2, sin creacion al vuelo: el alta de conductores pertenece a la futura
- * gestion de flota y personal. Sin paginar: plantilla chica. Ademas de
+ * devuelve es el que guarda la asignacion del servicio. Este endpoint es de
+ * lectura y no va a tener alta propia: la ficha de conductor se crea junto con
+ * su trabajador, en la misma transaccion que el,
+ * porque no existe sin su persona. Sin paginar: plantilla chica. Ademas de
  * quienes asignan recursos, `sales` puede consultarlos: registra y edita
  * servicios.
+ *
+ * Solo fichas cuyo trabajador tiene HOY el cargo `driver`, con y sin
+ * filtros: el escolta y el ayudante con licencia también tienen ficha,
+ * pero en los viajes se asignan solo conductores. La ficha de alguien que
+ * dejó de ser conductor tampoco sale, ni siquiera como inactiva.
+ *
+ * Dos banderas, cada una con su filtro. `isActive`: la ficha está
+ * encendida (la columna, tal cual). `isAssignable`: se puede asignar hoy,
+ * la ficha encendida y su trabajador activo. La ficha encendida de un
+ * trabajador dado de baja sale con `isActive: true` y `isAssignable: false`.
+ * El selector de la asignación pide `isAssignable=true`.
  *
  */
 export const listDrivers = <ThrowOnError extends boolean = false>(options?: Options<ListDriversData, ThrowOnError>): RequestResult<ListDriversResponses, ListDriversErrors, ThrowOnError> => (options?.client ?? client).get<ListDriversResponses, ListDriversErrors, ThrowOnError>({
@@ -951,7 +1375,8 @@ export const createService = <ThrowOnError extends boolean = false>(options: Opt
  * Los contadores de recursos miden lo MISMO que el tablero del sistema anterior, para que el
  * número no cambie de significado con el cambio de sistema: `driversOnRoad` = conductores
  * PRINCIPALES distintos en servicios en ruta **(los refuerzos NO cuentan)** sobre el total de
- * conductores de alta; `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
+ * conductores de alta (fichas encendidas de trabajadores activos de cargo `driver`: en el sistema
+ * anterior solo el conductor tenía ficha); `unitsOnRoad` = TRACTOS principales distintos en ruta (los de refuerzo
  * tampoco) sobre el total de tractos de alta. **Las carretas y las escoltas no participan de
  * ningún indicador**, aunque el nombre del campo diga "units".
  *
@@ -1162,7 +1587,11 @@ export const updateService = <ThrowOnError extends boolean = false>(options: Opt
  * el conflicto avisa, no prohíbe. Mandar `force: true` sin que haya conflicto
  * asigna normal y NO deja registrado que se forzara nada.
  *
- * Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+ * Los recursos tienen que existir y estar activos (400 `COM-001`; para el
+ * conductor, la ficha y su trabajador), y la ficha del conductor tiene que ser de un trabajador con cargo `driver`
+ * (400 `OPS-011`: el escolta y el ayudante con licencia también tienen
+ * ficha); ese chequeo va justo después del de la ficha, antes que el tracto
+ * y la carreta. Los viajes ya asignados no se revisan. Su
  * disponibilidad NO se valida: un tracto en mantenimiento se puede asignar igual,
  * porque esa es una decisión operativa y el catálogo de estados existe para ordenar
  * la lista de la pantalla, no para prohibir.
@@ -1364,7 +1793,9 @@ export const changeServiceStatus = <ThrowOnError extends boolean = false>(option
  * RN-OP4 declara no forzable. Mandar `force: true` sin que haya conflicto suma
  * el refuerzo normal y NO deja registrado que se forzara nada.
  *
- * Los recursos tienen que existir y estar activos (400 `COM-001`), pero su
+ * Los recursos tienen que existir y estar activos (400 `COM-001`; para el
+ * conductor, la ficha y su trabajador), y la ficha del conductor tiene que ser de un trabajador con cargo `driver`
+ * (400 `OPS-011`), justo después del chequeo de la ficha. Su
  * disponibilidad NO se valida: sumar un refuerzo ELIGE (a diferencia de reabrir,
  * que RESTAURA), así que rige el mismo criterio que la asignación y un tracto en
  * mantenimiento se puede sumar igual.

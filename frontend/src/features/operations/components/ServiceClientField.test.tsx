@@ -6,7 +6,12 @@ import { http, HttpResponse } from 'msw'
 import { ServiceClientField } from './ServiceClientField'
 import type { ClientResponse } from '../../../api'
 import { server } from '../../../test/mocks/server'
-import { clientsSearch, fakeClient, pageOfClients } from '../../../test/mocks/handlers/clients'
+import {
+  clientsCapture,
+  clientsSearch,
+  fakeClient,
+  pageOfClients,
+} from '../../../test/mocks/handlers/clients'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -190,4 +195,29 @@ describe('ServiceClientField', () => {
     await vi.waitFor(() => expect(onChange).toHaveBeenCalledWith(creado))
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+  /**
+   * Regresión de alcance, no de este componente.
+   *
+   * El maestro de clientes estrenó una pantalla que busca SOLO entre los activos,
+   * y comparte este hook de búsqueda. Si ese filtro se mete adentro del hook en
+   * vez de quedarse en la pantalla, este combobox deja de encontrar a los
+   * desactivados sin que nadie lo pida: alguien que registra un servicio para un
+   * cliente dado de baja dejaría de poder elegirlo.
+   */
+  it('no filtra por estado: el alta al vuelo ve también a los desactivados', async () => {
+    const user = userEvent.setup()
+    const sink: { params?: URLSearchParams } = {}
+    server.use(clientsCapture(sink, [fakeClient()]))
+    renderField()
+
+    await user.type(screen.getByRole('combobox'), 'acme')
+    await screen.findByText('ACME S.A.C.')
+
+    expect(sink.params?.get('q')).toBe('acme')
+    expect(sink.params?.has('isActive')).toBe(false)
+    // El mismo motivo, con el tamaño de página: el maestro de clientes lo usa
+    // como filas de un listado y este desplegable como opciones para elegir.
+    expect(sink.params?.get('size')).toBe('10')
+  })
+
 })

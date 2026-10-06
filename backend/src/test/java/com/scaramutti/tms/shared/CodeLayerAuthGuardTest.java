@@ -22,8 +22,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
  * <p>Existe porque las dos capas devuelven el mismo 401 y, mientras las dos esten puestas, un
  * test comun no distingue cual contesto: se puede borrar {@code @Authenticated} de un recurso y
  * la suite sigue verde. Este perfil deja la politica por ruta en {@code permit} para /api/v1/*,
- * asi que el unico 401 posible es el de la anotacion. Borrar la anotacion de cualquiera de los
- * recursos de aca hace fallar este test, que es justo lo que se quiere proteger.
+ * asi que el unico 401 posible es el del codigo. Ojo con lo que esto NO mide: en un recurso
+ * cuyos metodos llevan todos {@code @RolesAllowed}, esa lista ya rechaza al anonimo con el
+ * mismo 401, asi que borrarle {@code @Authenticated} deja este test en verde. Medido con una
+ * mutacion sobre el recurso de trabajadores. Donde la anotacion de clase es lo UNICO que
+ * contesta, y por lo tanto donde este test de verdad la protege, es en los recursos sin lista
+ * de roles por metodo, como el de monedas.
  *
  * <p>La segunda capa importa porque la politica por ruta se evalua sobre la URL tal como llega, y
  * hay avisos publicados de rutas que la esquivan escribiendo el mismo camino con punto y coma o
@@ -62,6 +66,9 @@ class CodeLayerAuthGuardTest {
         "/quotation-service-types",
         "/cargo-types",
         "/clients",
+        "/workers",
+        "/document-types",
+        "/roles",
         "/auth/me",
     })
     void withoutToken_andWithoutTheRoutePolicy_returns401(String path) {
@@ -107,6 +114,9 @@ class CodeLayerAuthGuardTest {
         "/quotation-service-types",
         "/cargo-types",
         "/clients",
+        "/workers",
+        "/document-types",
+        "/roles",
         "/auth/me",
     })
     void withAValidToken_theGuardLetsThrough(String path) {
@@ -183,9 +193,27 @@ class CodeLayerAuthGuardTest {
         "/quotation-service-types",
         "/cargo-types",
         "/clients",
+        "/workers",
+        "/document-types",
+        "/roles",
         "/auth/me",
     })
     void withTrickyUrls_andWithoutTheRoutePolicy_returns401(String path) {
+        RoutePolicyTrickyUrls.assertReachingVariantsReturn401WithoutToken(path);
+    }
+
+    /**
+     * Las rutas con id van aparte porque no se pueden listar junto a las otras: el caso de
+     * 200 con sesion necesitaria un id sembrado. Lo que si se mide sin sembrar nada es el 401
+     * del anonimo, y es el que importa mas: el detalle de un trabajador es el unico de esta
+     * familia que devuelve numero de documento y telefono.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {
+        "/workers/1",
+        "/clients/1",
+    })
+    void withTrickyUrls_onPathsWithId_withoutToken_returns401(String path) {
         RoutePolicyTrickyUrls.assertReachingVariantsReturn401WithoutToken(path);
     }
 }
