@@ -9,10 +9,10 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
-## [Unreleased]
+## [2.8.0] - 2026-10-06
 
 El mantenimiento de trabajadores completo, del backend a las pantallas; el maestro de clientes con
-pantallas propias; la alerta de reasignación de viajes; y las dependencias al día: PRs #214 a #254.
+pantallas propias; la alerta de reasignación de viajes; y las dependencias al día: PRs #214 a #255.
 Dos migraciones, V010 y V011. El contrato suma nueve operaciones, el filtro `isAssignable` de
 conductores y la marca `needsReassignment` de los viajes; contra 2.7.1 no retira ningún campo.
 
@@ -26,9 +26,10 @@ conductores y la marca `needsReassignment` de los viajes; contra 2.7.1 no retira
   Cada acción se ofrece solo sobre cargos de nivel menor al de la sesión; el admin, siempre.
 - Endpoints del padrón: `GET /workers/{id}`, `POST /workers`, `PUT /workers/{id}`,
   `POST /workers/{id}/deactivate` y `POST /workers/{id}/reactivate`, con los errores `WRK-001` a
-  `WRK-013`, y los catálogos `GET /roles` y `GET /document-types` (#222 a #226). La baja apaga en
-  la misma transacción la ficha de conductor y la cuenta del sistema; la reactivación enciende la
-  ficha si el cargo la lleva y nunca la cuenta. Cada cambio deja su fila de auditoría.
+  `WRK-013`, y los catálogos `GET /roles` y `GET /document-types` (#222, #223, #224, #226). La
+  baja apaga en la misma transacción la ficha de conductor y la cuenta del sistema; la
+  reactivación enciende la ficha si el cargo la lleva y nunca la cuenta. Cada cambio deja su fila
+  de auditoría.
 - Maestro de clientes con pantallas de búsqueda, ficha y edición (#219) y sus endpoints
   `GET /clients/{id}` y `PUT /clients/{id}` (#217).
 - Alerta de reasignación de viajes: el listado y el detalle traen `needsReassignment`, verdadera
@@ -50,19 +51,19 @@ conductores y la marca `needsReassignment` de los viajes; contra 2.7.1 no retira
 
 - `GET /drivers` devuelve solo fichas de trabajadores con cargo de conductor, con o sin filtro de
   vigencia; el escolta y el ayudante con licencia ya no aparecen. La asignación de recursos y el
-  refuerzo rechazan otro cargo con `400 OPS-011`, y la ficha de un trabajador dado de baja con el
-  mismo 400 que una ficha apagada. El tablero cuenta a los conductores con ese criterio (#231,
-  #233).
+  refuerzo rechazan otro cargo con el código nuevo `400 OPS-011`, y la ficha de un trabajador dado
+  de baja con el mismo 400 que una ficha apagada. El tablero cuenta a los conductores con ese
+  criterio (#231, #233).
 - La búsqueda de `GET /workers` mira también el número de documento, solo para los cuatro roles
   que mantienen el padrón; para almacén sigue siendo por nombre y apellido (#222).
 - Nombre y apellido de un trabajador aceptan al menos una letra latina, más espacios, apóstrofo y
   guion; lo demás responde `400 COM-001` en el campo. Se guardan normalizados a NFC (#246).
 - El cargo que muestran la firma del PDF de cotización, el pie del menú y la sesión sale del rol
-  del trabajador, con el nombre fijo de cada rol, y no del texto libre que tenía cada uno: un cargo
-  escrito en femenino pasa a la forma del rol (#222).
+  del trabajador, con el nombre fijo de cada rol, y no del texto libre que tenía cada uno: el cargo
+  de ventas pasa de "Encargado de ventas" a "Ejecutivo de Ventas" (#222).
 - El ítem Clientes del menú pasa al grupo Administración y ventas deja de verlo (#219).
 - Parámetro nuevo `app.workers.edit-lock-timeout-ms` (380 ms): el backend no arranca si las once
-  esperas de una edición no entran bajo la espera del pool de conexiones (#230).
+  esperas de una edición no entran bajo la espera del pool de conexiones (#224, #230).
 - El backend pasa de Quarkus 3.33.3.2 a 3.33.4, con Hibernate ORM de 7.2.19 a 7.2.25, y Mockito
   de 5.23 a 5.24 (#252). El frontend pasa React de 19.2.8 a 19.3.0, vitest de 3.2.4 a 5.0.3 (pide
   Node 22) y jest-dom de 6.9.1 a 7.0.1, más las menores y parches agrupados (#214, #216, #218,
@@ -80,7 +81,7 @@ conductores y la marca `needsReassignment` de los viajes; contra 2.7.1 no retira
   plantillas en Qute; la plantilla del PDF de cotizaciones no usa lo que se retira (#252).
 - Se cierran todas las alertas de Dependabot del frontend, todas de herramientas de desarrollo:
   las de vitest y vite, incluida la única crítica (#218), la de esbuild (#227) y las de los
-  paquetes transitivos (#254). `npm audit` queda en cero.
+  paquetes transitivos (#254). `npm audit` quedó en cero al cerrar #254.
 
 ## [2.7.1] - 2026-09-12
 
