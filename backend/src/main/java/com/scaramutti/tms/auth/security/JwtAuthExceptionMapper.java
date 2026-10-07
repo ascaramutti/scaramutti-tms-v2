@@ -11,12 +11,12 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 
 /**
- * Atrapa fallas de autenticacion JWT lanzadas por el filtro de seguridad de Quarkus
- * y las convierte en Problem (RFC 7807) con el code AUTH-XXX apropiado.
+ * Atrapa fallas de autenticacion JWT, las del filtro de seguridad de Quarkus y el rechazo de
+ * AccessTokenOnlyAugmentor, y las convierte en Problem (RFC 7807) con el code AUTH-XXX apropiado.
  *
  * Diferencia entre:
  *  - TOKEN_EXPIRED (AUTH-007): el JWT venia pero ya caduco
- *  - TOKEN_INVALID (AUTH-008): el JWT esta mal formado, firma incorrecta, etc.
+ *  - TOKEN_INVALID (AUTH-008): el JWT esta mal formado, firma incorrecta, o no es de acceso
  *
  * El caso "no se envio Authorization header" lo maneja Quarkus directamente
  * (responde 401 sin pasar por aca) - se mantiene comportamiento default.

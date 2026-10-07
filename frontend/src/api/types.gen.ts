@@ -1853,7 +1853,11 @@ export type RefreshTokenData = {
 
 export type RefreshTokenErrors = {
     /**
-     * Refresh token inválido o expirado
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Refresh token inválido o expirado, o usuario inactivo
      */
     401: Problem;
 };
@@ -1882,9 +1886,13 @@ export type ChangePasswordErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
+    /**
+     * El usuario del token ya no existe
+     */
+    404: Problem;
 };
 
 export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
@@ -1907,7 +1915,7 @@ export type GetCurrentUserData = {
 
 export type GetCurrentUserErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -1954,7 +1962,7 @@ export type ListCargoTypesErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
 };
@@ -1983,7 +1991,7 @@ export type CreateCargoTypeErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2018,7 +2026,7 @@ export type ListCurrenciesData = {
 
 export type ListCurrenciesErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
 };
@@ -2045,7 +2053,7 @@ export type ListPaymentTermsData = {
 
 export type ListPaymentTermsErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
 };
@@ -2072,7 +2080,7 @@ export type ListQuotationConditionsData = {
 
 export type ListQuotationConditionsErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
 };
@@ -2099,7 +2107,7 @@ export type ListQuotationServiceTypesData = {
 
 export type ListQuotationServiceTypesErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
 };
@@ -2142,7 +2150,7 @@ export type ListClientsErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
 };
@@ -2171,7 +2179,7 @@ export type CreateClientErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2206,7 +2214,7 @@ export type GetClientData = {
 
 export type GetClientErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2241,7 +2249,7 @@ export type UpdateClientErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2320,7 +2328,7 @@ export type ListQuotationsErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2353,7 +2361,7 @@ export type CreateQuotationErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2386,7 +2394,7 @@ export type GetQuotationConfigData = {
 
 export type GetQuotationConfigErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2417,7 +2425,7 @@ export type GetQuotationData = {
 
 export type GetQuotationErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2462,7 +2470,7 @@ export type UpdateQuotationErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2526,7 +2534,7 @@ export type UpdateQuotationStatusErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2574,7 +2582,7 @@ export type DownloadQuotationPdfData = {
 
 export type DownloadQuotationPdfErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2609,7 +2617,7 @@ export type ListWarehouseProductCategoriesData = {
 
 export type ListWarehouseProductCategoriesErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2642,7 +2650,7 @@ export type CreateWarehouseProductCategoryErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2677,7 +2685,7 @@ export type ListWarehouseUnitsOfMeasureData = {
 
 export type ListWarehouseUnitsOfMeasureErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2718,7 +2726,7 @@ export type ListWarehouseSuppliersErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2751,7 +2759,7 @@ export type CreateWarehouseSupplierErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2801,7 +2809,7 @@ export type ListWarehouseProductsErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2834,7 +2842,7 @@ export type CreateWarehouseProductErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2869,7 +2877,7 @@ export type GetWarehouseProductData = {
 
 export type GetWarehouseProductErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2911,7 +2919,7 @@ export type UpdateWarehouseProductErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -2954,7 +2962,7 @@ export type GetWarehouseProductStockData = {
 
 export type GetWarehouseProductStockErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3004,7 +3012,7 @@ export type GetWarehouseProductKardexErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3041,7 +3049,7 @@ export type ListWarehouseOpeningBalancesData = {
 
 export type ListWarehouseOpeningBalancesErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3074,7 +3082,7 @@ export type CreateWarehouseOpeningBalanceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3128,7 +3136,7 @@ export type ListWarehousePurchaseInvoicesErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3161,7 +3169,7 @@ export type CreateWarehousePurchaseInvoiceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3196,7 +3204,7 @@ export type GetWarehousePurchaseInvoiceData = {
 
 export type GetWarehousePurchaseInvoiceErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3238,7 +3246,7 @@ export type UpdateWarehousePurchaseInvoiceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3288,7 +3296,7 @@ export type CancelWarehousePurchaseInvoiceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3350,7 +3358,7 @@ export type ListWarehouseWithdrawalsErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3383,7 +3391,7 @@ export type CreateWarehouseWithdrawalErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3418,7 +3426,7 @@ export type GetWarehouseWithdrawalData = {
 
 export type GetWarehouseWithdrawalErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3460,7 +3468,7 @@ export type UpdateWarehouseWithdrawalErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3510,7 +3518,7 @@ export type CancelWarehouseWithdrawalErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3551,7 +3559,7 @@ export type GetWarehouseStatsData = {
 
 export type GetWarehouseStatsErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3588,7 +3596,7 @@ export type GetWarehouseReportErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3617,7 +3625,7 @@ export type ListRolesData = {
 
 export type ListRolesErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3646,7 +3654,7 @@ export type ListDocumentTypesData = {
 
 export type ListDocumentTypesErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3685,7 +3693,7 @@ export type ListWorkersErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3718,7 +3726,7 @@ export type CreateWorkerErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3753,7 +3761,7 @@ export type GetWorkerData = {
 
 export type GetWorkerErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3792,7 +3800,7 @@ export type UpdateWorkerErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3831,7 +3839,7 @@ export type DeactivateWorkerData = {
 
 export type DeactivateWorkerErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3870,7 +3878,7 @@ export type ReactivateWorkerData = {
 
 export type ReactivateWorkerErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3914,7 +3922,7 @@ export type ListFleetUnitsErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -3956,7 +3964,7 @@ export type ListDriversErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4009,7 +4017,7 @@ export type ListServicesErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4042,7 +4050,7 @@ export type CreateServiceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4075,7 +4083,7 @@ export type GetServiceStatsData = {
 
 export type GetServiceStatsErrors = {
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4113,7 +4121,7 @@ export type GetServicesReportErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4148,7 +4156,7 @@ export type GetServiceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4190,7 +4198,7 @@ export type UpdateServiceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4237,7 +4245,7 @@ export type AssignServiceResourcesErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4286,7 +4294,7 @@ export type ChangeServiceStatusErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4333,7 +4341,7 @@ export type AddServiceResourcesErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -4380,7 +4388,7 @@ export type RemoveServiceResourceErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso ausente, expirado o inválido
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
