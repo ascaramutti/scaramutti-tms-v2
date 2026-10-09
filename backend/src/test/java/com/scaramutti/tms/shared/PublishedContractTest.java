@@ -15,10 +15,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -177,6 +179,28 @@ class PublishedContractTest {
             // una ruta sin operaciones es el sintoma exacto del bloque mal ubicado
             .body("paths.'/services'.put", nullValue())
             .body("paths.'/services/{id}'.post", nullValue());
+    }
+
+    /**
+     * Los roles, el 403 y las cabeceras de las lecturas de clientes. El cliente generado lleva el
+     * 403, pero no los roles ni las cabeceras: sin este test, nada notaria que el contrato los
+     * perdio.
+     */
+    @Test
+    void publishedContract_declaresWhoReadsClientsAndThatTheReadIsNotStored() {
+        JsonPath contract = publishedContract();
+        for (String path : List.of("/clients", "/clients/{id}")) {
+            String read = "paths.'" + path + "'.get.";
+            assertEquals(List.of("admin", "sales", "general_manager", "operations_manager"),
+                contract.getList(read + "'x-required-roles'"), path);
+            assertEquals("#/components/responses/Forbidden",
+                contract.getString(read + "responses.'403'.$ref"), path);
+            assertThat(path,
+                contract.getString(read + "responses.'200'.headers.'Cache-Control'.description"),
+                containsString("no-store"));
+            assertThat(path, contract.getString(read + "responses.'200'.headers.Vary.description"),
+                containsString("Authorization"));
+        }
     }
 
     /** El detalle publica el ETag: es lo que la edición y las transiciones van a exigir. */

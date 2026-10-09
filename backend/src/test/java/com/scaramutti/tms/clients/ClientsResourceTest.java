@@ -11,6 +11,8 @@ import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.Instant;
 import java.util.List;
@@ -66,7 +68,7 @@ class ClientsResourceTest {
             .extract().jsonPath().getString("token");
     }
 
-    /** Genera un JWT valido para un rol sin user seedeado (dispatcher, operations_manager). */
+    /** Genera un JWT de acceso valido para el rol dado, sin pasar por el login. */
     private String fabricateAccessToken(String username, String role) {
         Instant now = Instant.now();
         return Jwt.subject("999")
@@ -1147,39 +1149,40 @@ class ClientsResourceTest {
             .body("code", equalTo("AUTH-007"));
     }
 
-    // ---------- Authorization: cualquier rol autenticado puede listar --------
+    // ---------- Authorization: solo los roles que buscan clientes ------------
 
-    @Test
-    void list_withAdminRole_returns200() {
-        String token = login("admin", "Admin1234");
-        given().header("Authorization", "Bearer " + token)
+    /** Los cuatro roles con una pantalla que busca clientes; el no-store va en cada 200. */
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "sales", "general_manager", "operations_manager"})
+    void list_withRoleThatSearchesClients_returns200NotStored(String role) {
+        given().header("Authorization", "Bearer " + fabricateAccessToken(role + "_test", role))
         .when().get("/clients")
-        .then().statusCode(200);
+        .then()
+            .statusCode(200)
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization");
     }
 
-    @Test
-    void list_withSalesRole_returns200() {
-        String token = login("sales", "Sales1234");
-        given().header("Authorization", "Bearer " + token)
+    @ParameterizedTest
+    @ValueSource(strings = {"dispatcher", "finance_manager", "warehouse_keeper"})
+    void list_withRoleThatDoesNotSearchClients_returns403(String role) {
+        given().header("Authorization", "Bearer " + fabricateAccessToken(role + "_test", role))
         .when().get("/clients")
-        .then().statusCode(200);
+        .then()
+            .statusCode(403)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-003"));
     }
 
+    /** El rol se decide antes que la consulta: un q invalido no le cambia el 403 a un 400. */
     @Test
-    void list_withDispatcherRole_returns200() {
-        // Sin x-required-roles: dispatcher tambien puede listar (a diferencia de POST).
-        String token = fabricateAccessToken("disp_test", "dispatcher");
-        given().header("Authorization", "Bearer " + token)
+    void list_withRoleThatDoesNotSearchClients_andInvalidQuery_returns403NotA400() {
+        given().header("Authorization", "Bearer " + fabricateAccessToken("dispatcher_test", "dispatcher"))
+            .queryParam("q", "ab")
         .when().get("/clients")
-        .then().statusCode(200);
-    }
-
-    @Test
-    void list_withOperationsManagerRole_returns200() {
-        String token = fabricateAccessToken("ops_test", "operations_manager");
-        given().header("Authorization", "Bearer " + token)
-        .when().get("/clients")
-        .then().statusCode(200);
+        .then()
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
     }
 
     // ---------- @NotNull en body (regresion: body vacio NO debe ser 500) -----

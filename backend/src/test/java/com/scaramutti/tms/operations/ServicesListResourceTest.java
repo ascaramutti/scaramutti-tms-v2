@@ -364,14 +364,15 @@ class ServicesListResourceTest {
             .body("content.code", not(hasItem(otherClientService)));
     }
 
-    /** El RUC del cliente también es buscable. */
-    @Test
-    void list_withQueryOnClientRuc_findsTheService() {
+    /** El RUC del cliente también es buscable, y también para despacho: el contrato se lo promete. */
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "dispatcher"})
+    void list_withQueryOnClientRuc_findsTheService(String role) {
         String target = createService("Piura", "Lima");
         String ruc = rucOf(clientId);
 
         given()
-            .header("Authorization", "Bearer " + adminToken)
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("z" + role, role))
             .queryParam("q", ruc)
         .when()
             .get("/services")
@@ -460,6 +461,28 @@ class ServicesListResourceTest {
             .body("content", hasSize(1))
             .body("content[0]", not(hasKey("price")))
             .body("content[0]", not(hasKey("currencyCode")));
+    }
+
+    /**
+     * El despacho no lee clientes por su ruta, pero el contacto del cliente le llega en cada fila:
+     * es lo que el contrato le promete.
+     */
+    @Test
+    void list_asDispatcher_includesTheClientContact() {
+        createService("Piura", "Lima");
+        setClientContact(clientId, "987654321", "ZTEST_ Contacto Ana");
+
+        given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("zdispatcher", "dispatcher"))
+        .when()
+            .get("/services?clientId=" + clientId)
+        .then()
+            .statusCode(200)
+            .body("content", hasSize(1))
+            .body("content[0].client.name", equalTo(nameOf(clientId)))
+            .body("content[0].client.ruc", equalTo(rucOf(clientId)))
+            .body("content[0].client.phone", equalTo("987654321"))
+            .body("content[0].client.contactName", equalTo("ZTEST_ Contacto Ana"));
     }
 
     /** El despacho tampoco ve precios cuando pagina o filtra: la regla no depende de la consulta. */
