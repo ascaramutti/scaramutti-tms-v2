@@ -15,8 +15,9 @@ info:
 
     - **Versionado**: en URL `/api/v1/...`. Cambios breaking suben mayor (`v2`).
       Endpoints obsoletos llevan `deprecated: true` y header `Sunset` con la fecha de retiro.
-    - **Autenticación**: JWT en header `Authorization: Bearer <token>`. Todos los endpoints
-      requieren auth excepto los marcados con `security: []` (ej: `/auth/login`).
+    - **Autenticación**: el token de acceso (JWT) en header `Authorization: Bearer <token>`.
+      Todos los endpoints requieren auth excepto los marcados con `security: []`
+      (por ejemplo, `/auth/login` y `/auth/refresh`).
     - **Errores**: formato Problem Details (RFC 7807). Incluyen `traceId` para correlacionar
       con logs. Errores de validación incluyen array `errors` por campo.
     - **Paginación**: `?page=0&size=20`. Respuesta incluye `content` + metadatos
@@ -135,7 +136,7 @@ paths:
                         message: 'debe tener al menos 8 caracteres'
                         code: 'MIN_LENGTH'
         '401':
-          description: Credenciales inválidas
+          description: Credenciales inválidas o usuario inactivo
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -150,12 +151,23 @@ paths:
                     instance: '/api/v1/auth/login'
                     code: 'AUTH-001'
                     traceId: '3a8b1c5d-7e2f-4a9b-8c3d-6e1f4a5b7c2d'
+                userInactive:
+                  summary: Usuario desactivado
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/login'
+                    code: 'AUTH-002'
+                    traceId: '4b9c2d6e-8f3a-4b1c-9d4e-7f2a5b8c1d3e'
 
   /auth/refresh:
     post:
       tags: [Auth]
       operationId: refreshToken
       summary: Renovar token de acceso
+      security: []
       requestBody:
         required: true
         content:
@@ -167,8 +179,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401':
-          description: Refresh token inválido o expirado
+          description: Refresh token inválido o expirado, o usuario inactivo
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -176,7 +189,7 @@ paths:
                 refreshTokenExpired:
                   summary: Refresh token expirado (requiere re-login)
                   value:
-                    type: 'urn:tms:error:auth-007'
+                    type: 'urn:tms:error:auth-009'
                     title: 'Refresh token expired'
                     status: 401
                     detail: 'El refresh token expiró. Volver a hacer login.'
@@ -184,15 +197,25 @@ paths:
                     code: 'AUTH-009'
                     traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
                 refreshTokenInvalid:
-                  summary: Refresh token mal formado o ya revocado
+                  summary: Refresh token mal formado, de otro tipo o no firmado por este servidor
                   value:
-                    type: 'urn:tms:error:auth-008'
+                    type: 'urn:tms:error:auth-003'
                     title: 'Invalid refresh token'
                     status: 401
                     detail: 'Refresh token inválido o revocado'
                     instance: '/api/v1/auth/refresh'
                     code: 'AUTH-003'
                     traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+                userInactiveOnRefresh:
+                  summary: El usuario quedó inactivo desde el último login
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-002'
+                    traceId: '6d2b3c4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e'
 
   /auth/change-password:
     post:
@@ -208,7 +231,7 @@ paths:
         '204':
           description: Contraseña actualizada
         '400':
-          description: Validación de contraseña fallida
+          description: Validación de contraseña fallida o contraseña actual incorrecta
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -238,6 +261,22 @@ paths:
                     code: 'AUTH-004'
                     traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: El usuario del token ya no existe
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                userNotFound:
+                  summary: El usuario referenciado por el token fue eliminado
+                  value:
+                    type: 'urn:tms:error:auth-005'
+                    title: 'User not found'
+                    status: 404
+                    detail: 'Usuario no encontrado'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-005'
+                    traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
 
   /auth/me:
     get:
@@ -251,6 +290,22 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/UserResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: El usuario del token ya no existe
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                userNotFound:
+                  summary: El usuario referenciado por el token fue eliminado
+                  value:
+                    type: 'urn:tms:error:auth-005'
+                    title: 'User not found'
+                    status: 404
+                    detail: 'Usuario no encontrado'
+                    instance: '/api/v1/auth/me'
+                    code: 'AUTH-005'
+                    traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
 
   # ----- Quotations ----------------------------------------------------------
 
@@ -1160,7 +1215,7 @@ paths:
 
   # ----- Health --------------------------------------------------------------
 
-  /health:
+  /q/health:
     get:
       tags: [Health]
       operationId: getHealth
@@ -1175,7 +1230,13 @@ paths:
                 type: object
                 properties:
                   status: { type: string, example: UP }
-                  timestamp: { type: string, format: date-time }
+                  checks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string, example: Database connections health check }
+                        status: { type: string, example: UP }
 
   # ----- Catálogos compartidos (schema public) --------------------------------
 
@@ -3449,8 +3510,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        JWT firmado con HS256/RS256. Claims esperados:
-        `sub` (userId), `username`, `role`, `iat`, `exp`.
+        JWT firmado con RS256. El API acepta como credencial solo el token de acceso (`token` de
+        `POST /auth/login` y de `POST /auth/refresh`, con `typ: access`). El token de renovación
+        (`refreshToken`, `typ: refresh`) va únicamente en el cuerpo de `POST /auth/refresh`; usado en
+        esta cabecera responde 401 `AUTH-008`, igual que cualquier JWT sin `typ: access`, o
+        `AUTH-007` si ya venció: el vencimiento se revisa antes que la marca.
+        Claims del token de acceso: `sub` (userId), `upn` (username), `groups` (rol), `fullName`,
+        `position`, `typ`, `jti`, `iss`, `aud`, `iat`, `exp`.
 
   parameters:
     IdLong:
@@ -3522,7 +3588,7 @@ components:
                 code: 'COM-002'
                 traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
     Unauthorized:
-      description: Token de acceso ausente, expirado o inválido
+      description: "Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`."
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -3538,25 +3604,15 @@ components:
                 code: 'AUTH-007'
                 traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
             tokenInvalid:
-              summary: Token mal formado o no firmado por este servidor
+              summary: Token mal formado, no firmado por este servidor, o que no es de acceso (por ejemplo, el de renovación)
               value:
                 type: 'urn:tms:error:auth-008'
                 title: 'Token invalid'
                 status: 401
-                detail: 'El token de acceso es inválido'
+                detail: 'El token de acceso es inválido o está mal formado'
                 instance: '/api/v1/quotations'
                 code: 'AUTH-008'
                 traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
-            tokenMissing:
-              summary: No se envió header Authorization
-              value:
-                type: 'urn:tms:error:auth-006'
-                title: 'Token missing'
-                status: 401
-                detail: 'Falta el header Authorization con un token Bearer'
-                instance: '/api/v1/quotations'
-                code: 'AUTH-006'
-                traceId: '4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d'
     Forbidden:
       description: Autenticado pero sin permisos para esta operación
       content:

@@ -18,6 +18,7 @@ public enum AuthError implements ApiError {
         "La contraseña actual proporcionada es incorrecta"),
     USER_NOT_FOUND         ("AUTH-005", 404, "User not found",
         "Usuario no encontrado"),
+    // Defensa interna: por HTTP, un pedido sin token Bearer recibe el 401 sin cuerpo de Quarkus.
     TOKEN_MISSING          ("AUTH-006", 401, "Token missing",
         "Falta el header Authorization con un token Bearer"),
     TOKEN_EXPIRED          ("AUTH-007", 401, "Token expired",
