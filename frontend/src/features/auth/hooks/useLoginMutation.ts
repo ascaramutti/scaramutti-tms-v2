@@ -12,8 +12,11 @@ async function performLogin(body: LoginRequest): Promise<LoginResponse> {
   return data
 }
 
+// gcTime 0: la caché de mutaciones guarda las variables, y acá son la contraseña. Así no sigue
+// en memoria una vez que la pantalla de ingreso se desmonta.
 export function useLoginMutation() {
   return useMutation({
     mutationFn: performLogin,
+    gcTime: 0,
   })
 }
