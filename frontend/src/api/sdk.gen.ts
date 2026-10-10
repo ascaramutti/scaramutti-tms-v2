@@ -154,6 +154,9 @@ export const listQuotationServiceTypes = <ThrowOnError extends boolean = false>(
  * Para no filtrar, OMITIR el parámetro `q` (no enviarlo vacío).
  * Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
  *
+ * Solo los roles que buscan clientes desde una pantalla (cotizaciones, viajes
+ * y clientes); el resto recibe `403` antes de que se valide la consulta.
+ *
  */
 export const listClients = <ThrowOnError extends boolean = false>(options?: Options<ListClientsData, ThrowOnError>): RequestResult<ListClientsResponses, ListClientsErrors, ThrowOnError> => (options?.client ?? client).get<ListClientsResponses, ListClientsErrors, ThrowOnError>({
     responseType: 'json',
@@ -180,10 +183,12 @@ export const createClient = <ThrowOnError extends boolean = false>(options: Opti
  * Obtener cliente por ID
  *
  * Devuelve el cliente con ese `id`, esté activo o inactivo: la edición
- * corrige datos y un cliente inactivo también puede leerse. Sin roles:
- * cualquier sesión puede leerlo (misma exposición que `listClients`).
+ * corrige datos y un cliente inactivo también puede leerse. Mismos roles
+ * que `listClients`: un rol sin acceso recibe `403` antes de que se
+ * convierta o se busque el `id` (también con `abc` o un número fuera de
+ * rango), así que no averigua por esta ruta qué clientes existen.
  *
- * `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
+ * Con un rol permitido, `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
  * existe (incluidos `0` y negativos) → `CLI-003` con cuerpo `Problem`;
  * `id` que NO encaja (porque no es numérico, como `abc`, o porque se pasa
  * de rango, como `99999999999999`) → `404` sin cuerpo, porque el conversor
@@ -1303,7 +1308,9 @@ export const listDrivers = <ThrowOnError extends boolean = false>(options?: Opti
  * con `status=DELETED`.
  *
  * Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` de cada fila
- * (ausentes, no null): opera los viajes, no ve lo que se cobra por ellos.
+ * (ausentes, no null): opera los viajes, no ve lo que se cobra por ellos. El `client`
+ * de cada fila sí le llega con razón social, RUC, teléfono y contacto, y `q` busca
+ * también por nombre y RUC del cliente, aunque no pueda leer `/clients`.
  *
  * Un `status` que no exista responde 400 `COM-001` con el detalle.
  *
@@ -1462,6 +1469,8 @@ export const getServicesReport = <ThrowOnError extends boolean = false>(options:
  *
  * Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` (ausentes, no
  * null), igual que en el listado: opera los viajes, no ve lo que se cobra por ellos.
+ * El `client` sí le llega con razón social, RUC, teléfono y contacto, aunque no pueda
+ * leer `/clients`.
  *
  * Los REFUERZOS viajan en `additionalResources`: lista vacía mientras el viaje no
  * tenga ninguno, NUNCA null.

@@ -425,6 +425,10 @@ paths:
         `similarity(name|ruc, q) DESC`, tiebreak `name ASC`.
         Para no filtrar, OMITIR el parámetro `q` (no enviarlo vacío).
         Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
+
+        Solo los roles que buscan clientes desde una pantalla (cotizaciones, viajes
+        y clientes); el resto recibe `403` antes de que se valide la consulta.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - name: q
           in: query
@@ -438,11 +442,19 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PageOfClient' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Clients]
       operationId: createClient
@@ -473,21 +485,32 @@ paths:
       summary: Obtener cliente por ID
       description: |
         Devuelve el cliente con ese `id`, esté activo o inactivo: la edición
-        corrige datos y un cliente inactivo también puede leerse. Sin roles:
-        cualquier sesión puede leerlo (misma exposición que `listClients`).
+        corrige datos y un cliente inactivo también puede leerse. Mismos roles
+        que `listClients`: un rol sin acceso recibe `403` antes de que se
+        convierta o se busque el `id` (también con `abc` o un número fuera de
+        rango), así que no averigua por esta ruta qué clientes existen.
 
-        `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
+        Con un rol permitido, `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
         existe (incluidos `0` y negativos) → `CLI-003` con cuerpo `Problem`;
         `id` que NO encaja (porque no es numérico, como `abc`, o porque se pasa
         de rango, como `99999999999999`) → `404` sin cuerpo, porque el conversor
         de parámetros falla antes de llegar al recurso.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ClientResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Clients]
@@ -2315,7 +2338,9 @@ paths:
         con `status=DELETED`.
 
         Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` de cada fila
-        (ausentes, no null): opera los viajes, no ve lo que se cobra por ellos.
+        (ausentes, no null): opera los viajes, no ve lo que se cobra por ellos. El `client`
+        de cada fila sí le llega con razón social, RUC, teléfono y contacto, y `q` busca
+        también por nombre y RUC del cliente, aunque no pueda leer `/clients`.
 
         Un `status` que no exista responde 400 `COM-001` con el detalle.
 
@@ -2556,6 +2581,8 @@ paths:
 
         Al rol `dispatcher` el servidor le OMITE `price` y `currencyCode` (ausentes, no
         null), igual que en el listado: opera los viajes, no ve lo que se cobra por ellos.
+        El `client` sí le llega con razón social, RUC, teléfono y contacto, aunque no pueda
+        leer `/clients`.
 
         Los REFUERZOS viajan en `additionalResources`: lista vacía mientras el viaje no
         tenga ninguno, NUNCA null.

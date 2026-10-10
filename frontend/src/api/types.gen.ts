@@ -2153,6 +2153,10 @@ export type ListClientsErrors = {
      * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
 };
 
 export type ListClientsError = ListClientsErrors[keyof ListClientsErrors];
@@ -2217,6 +2221,10 @@ export type GetClientErrors = {
      * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
     /**
      * Recurso no encontrado
      */
