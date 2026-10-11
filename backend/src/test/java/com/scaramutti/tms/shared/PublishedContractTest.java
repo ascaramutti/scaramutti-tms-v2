@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -201,6 +202,48 @@ class PublishedContractTest {
             assertThat(path, contract.getString(read + "responses.'200'.headers.Vary.description"),
                 containsString("Authorization"));
         }
+    }
+
+    /**
+     * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
+     * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
+     * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.
+     */
+    @Test
+    void publishedContract_putsTheWorkerIdOnlyInTheSessionUser() {
+        JsonPath contract = publishedContract();
+        for (String path : List.of("/auth/login", "/auth/refresh")) {
+            assertEquals("#/components/schemas/LoginResponse", contract.getString(
+                "paths.'" + path + "'.post.responses.'200'.content.'application/json'.schema.$ref"), path);
+        }
+        assertEquals("#/components/schemas/SessionUser",
+            contract.getString("components.schemas.LoginResponse.properties.user.$ref"));
+        assertEquals("#/components/schemas/SessionUser", contract.getString(
+            "paths.'/auth/me'.get.responses.'200'.content.'application/json'.schema.$ref"));
+
+        String sessionUser = "components.schemas.SessionUser.allOf";
+        assertEquals("#/components/schemas/UserResponse", contract.getString(sessionUser + "[0].$ref"));
+        assertEquals(List.of("workerId"), contract.getList(sessionUser + "[1].required"));
+        assertEquals("integer", contract.getString(sessionUser + "[1].properties.workerId.type"));
+        assertEquals("int32", contract.getString(sessionUser + "[1].properties.workerId.format"));
+        assertEquals(2, refsTo(contract.get("$"), "#/components/schemas/SessionUser"),
+            "solo el usuario del ingreso y /auth/me apuntan a SessionUser; un autor no lo trae");
+
+        for (String schema : List.of("UserResponse", "UserRef")) {
+            assertFalse(contract.getMap("components.schemas." + schema).toString().contains("workerId"),
+                schema + " no puede declarar workerId: es también el autor embebido");
+        }
+    }
+
+    /** Cuántas veces aparece una referencia en todo el documento. */
+    private static long refsTo(Object node, String ref) {
+        if (node instanceof Map<?, ?> map) {
+            return map.values().stream().mapToLong(value -> refsTo(value, ref)).sum();
+        }
+        if (node instanceof List<?> list) {
+            return list.stream().mapToLong(value -> refsTo(value, ref)).sum();
+        }
+        return ref.equals(node) ? 1 : 0;
     }
 
     /** El detalle publica el ETag: es lo que la edición y las transiciones van a exigir. */

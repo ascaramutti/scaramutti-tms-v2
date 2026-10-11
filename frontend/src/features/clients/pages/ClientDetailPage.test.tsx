@@ -10,7 +10,7 @@ import { CLIENTS_BASE } from '../../../shared/paths'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
-import type { UserResponse, UserRole } from '../../../api'
+import type { SessionUser, UserRole } from '../../../api'
 import {
   fakeClient,
   getClientError,
@@ -23,7 +23,7 @@ import {
 const API = 'http://localhost:8080/api/v1'
 const DETALLE = `${CLIENTS_BASE}/7`
 
-function buildUser(role: UserRole): UserResponse {
+function buildUser(role: UserRole): SessionUser {
   return {
     id: 1,
     username: `user-${role}`,
@@ -31,6 +31,7 @@ function buildUser(role: UserRole): UserResponse {
     position: 'Cargo de prueba',
     role,
     isActive: true,
+    workerId: 29119,
   }
 }
 

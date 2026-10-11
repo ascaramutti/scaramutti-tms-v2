@@ -1,15 +1,18 @@
 import { http, HttpResponse } from 'msw'
-import type { LoginResponse, Problem, UserResponse } from '../../../api'
+import type { LoginResponse, Problem, SessionUser, UserResponse } from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
-export const fakeUser: UserResponse = {
+// El trabajador no es el 1: con el mismo número que la cuenta, un error de cuenta por trabajador
+// pasaría verde, y cada ficha de los fixtures de trabajadores (id 1) sería la propia.
+export const fakeUser: SessionUser = {
   id: 1,
   username: 'admin',
   fullName: 'Admin TMS',
   position: 'Administrador del sistema',
   role: 'admin',
   isActive: true,
+  workerId: 29119,
 }
 
 export const fakeLoginResponse: LoginResponse = {

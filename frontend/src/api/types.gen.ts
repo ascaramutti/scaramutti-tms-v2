@@ -52,7 +52,7 @@ export type LoginResponse = {
      * Segundos hasta expiración del access token
      */
     expiresIn: number;
-    user: UserResponse;
+    user: SessionUser;
 };
 
 export type RefreshRequest = {
@@ -83,6 +83,19 @@ export type UserRef = {
 export type UserResponse = UserRef & {
     role: UserRole;
     isActive: boolean;
+};
+
+/**
+ * El usuario de la sesión (login, refresh y /auth/me): el de UserResponse más el id de su
+ * trabajador, para reconocer la ficha propia. Los autores embebidos en otras respuestas
+ * (UserResponse o UserRef) no lo traen.
+ *
+ */
+export type SessionUser = UserResponse & {
+    /**
+     * ID del trabajador de la cuenta; toda cuenta tiene uno
+     */
+    workerId: number;
 };
 
 export type CurrencyResponse = {
@@ -1930,7 +1943,7 @@ export type GetCurrentUserResponses = {
     /**
      * OK
      */
-    200: UserResponse;
+    200: SessionUser;
 };
 
 export type GetCurrentUserResponse = GetCurrentUserResponses[keyof GetCurrentUserResponses];

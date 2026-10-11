@@ -257,7 +257,7 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UserResponse' }
+              schema: { $ref: '#/components/schemas/SessionUser' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404':
           description: El usuario del token ya no existe
@@ -3632,7 +3632,7 @@ components:
         refreshToken: { type: [string, 'null'], description: 'Token para renovar la sesión sin re-login' }
         expiresAt:    { type: string, format: date-time }
         expiresIn:    { type: integer, format: int64, description: 'Segundos hasta expiración del access token', example: 3600 }
-        user:         { $ref: '#/components/schemas/UserResponse' }
+        user:         { $ref: '#/components/schemas/SessionUser' }
 
     RefreshRequest:
       type: object
@@ -3669,6 +3669,18 @@ components:
           properties:
             role:     { $ref: '#/components/schemas/UserRole' }
             isActive: { type: boolean }
+
+    SessionUser:
+      description: |
+        El usuario de la sesión (login, refresh y /auth/me): el de UserResponse más el id de su
+        trabajador, para reconocer la ficha propia. Los autores embebidos en otras respuestas
+        (UserResponse o UserRef) no lo traen.
+      allOf:
+        - $ref: '#/components/schemas/UserResponse'
+        - type: object
+          required: [workerId]
+          properties:
+            workerId: { type: integer, format: int32, description: 'ID del trabajador de la cuenta; toda cuenta tiene uno', example: 29119 }
 
     # -------- Catálogos: Currency ------------------------------------------
     CurrencyResponse:

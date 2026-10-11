@@ -2,7 +2,7 @@ package com.scaramutti.tms.auth.service;
 
 import com.scaramutti.tms.auth.AuthError;
 import com.scaramutti.tms.auth.dto.LoginResponse;
-import com.scaramutti.tms.auth.dto.UserResponse;
+import com.scaramutti.tms.auth.dto.SessionUserResponse;
 import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.model.AccessToken;
 import com.scaramutti.tms.auth.model.TokenType;
@@ -106,10 +106,10 @@ public class AuthService {
     }
 
     @Transactional
-    public UserResponse findUserById(Integer userId) {
+    public SessionUserResponse findUserById(Integer userId) {
         User user = userRepository.findByIdOptional(userId)
             .orElseThrow(AuthError.USER_NOT_FOUND::toException);
-        return authServiceMapper.toUserResponse(user);
+        return authServiceMapper.toSessionUserResponse(user);
     }
 
     private void verifyPasswordOrThrow(User user, String plainPassword, ApiError errorIfMismatch) {

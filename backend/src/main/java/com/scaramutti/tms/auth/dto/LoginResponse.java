@@ -17,5 +17,5 @@ public record LoginResponse(
     @Schema(description = "Segundos restantes hasta expiracion del access token", example = "3600")
     Long expiresIn,
 
-    UserResponse user
+    SessionUserResponse user
 ) {}

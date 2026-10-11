@@ -10,7 +10,7 @@ import { AuthProvider } from './AuthContext'
 import { tokenStorage } from './tokenStorage'
 import { server } from '../../test/mocks/server'
 import { fakeUser, getCurrentUserErrorResponse } from '../../test/mocks/handlers/auth'
-import type { UserResponse, UserRole } from '../../api'
+import type { SessionUser, UserRole } from '../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -108,7 +108,7 @@ describe('ProtectedRoute', () => {
     tokenStorage.setTokens('finanzas-token', 'finanzas-refresh')
     server.use(
       http.get(`${API}/auth/me`, () =>
-        HttpResponse.json({ ...fakeUser, role: 'finance_manager' } satisfies UserResponse),
+        HttpResponse.json({ ...fakeUser, role: 'finance_manager' } satisfies SessionUser),
       ),
     )
     // La Jefa de Finanzas entrando a Cotizaciones: mandarla a v1 (el destino
@@ -124,7 +124,7 @@ describe('ProtectedRoute', () => {
     tokenStorage.setTokens('finanzas-token', 'finanzas-refresh')
     server.use(
       http.get(`${API}/auth/me`, () =>
-        HttpResponse.json({ ...fakeUser, role: 'finance_manager' } satisfies UserResponse),
+        HttpResponse.json({ ...fakeUser, role: 'finance_manager' } satisfies SessionUser),
       ),
     )
     const user = userEvent.setup()
@@ -138,7 +138,7 @@ describe('ProtectedRoute', () => {
     tokenStorage.setTokens('dispatcher-token', 'dispatcher-refresh')
     server.use(
       http.get(`${API}/auth/me`, () =>
-        HttpResponse.json({ ...fakeUser, role: 'dispatcher' } satisfies UserResponse),
+        HttpResponse.json({ ...fakeUser, role: 'dispatcher' } satisfies SessionUser),
       ),
     )
     renderProtected('/protegida', { allowedRoles: ['sales'], moduleName: 'Cotizaciones' })
