@@ -8,6 +8,10 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./src/test/setup.ts'],
+    // Cada archivo corre con sus módulos propios. Es el valor por defecto y se fija igual:
+    // `shared/auth/session.ts` guarda estado de la pestaña, que solo una recarga reinicia, y sin
+    // aislar, un archivo que cierra sesión cambia lo que ve el siguiente (medido en router.test).
+    isolate: true,
     css: false,
     // La zona del proceso se fija, y se fija LEJOS de la de la operacion. Corriendo
     // bajo `America/Lima`, un calculo hecho con la zona del navegador da el mismo

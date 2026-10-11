@@ -1,10 +1,12 @@
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { delay, http, HttpResponse } from 'msw'
+import { QueryClient } from '@tanstack/react-query'
 import { configureHttpClient } from './client'
 import { client } from '../../api/client.gen'
 import { getCurrentUser, login, refreshToken } from '../../api'
 import { server } from '../../test/mocks/server'
 import { tokenStorage } from '../auth/tokenStorage'
+import { endSession } from '../auth/session'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -32,11 +34,13 @@ describe('http client interceptor (refresh-on-401)', () => {
     tokenStorage.clear()
     onSessionExpired = vi.fn<() => void>()
     // Limpiar interceptores antes de re-configurar (cada configure agrega uno).
+    client.instance.interceptors.request.clear()
     client.instance.interceptors.response.clear()
     configureHttpClient(onSessionExpired)
   })
 
   afterEach(() => {
+    client.instance.interceptors.request.clear()
     client.instance.interceptors.response.clear()
   })
 
@@ -82,9 +86,9 @@ describe('http client interceptor (refresh-on-401)', () => {
 
     await expect(getCurrentUser({ throwOnError: true })).rejects.toThrow()
 
+    // Los tokens no los borra el cliente: los borra la rutina de fin de sesión que corre en
+    // onSessionExpired, la misma de salir (se prueba con la aplicación entera).
     expect(onSessionExpired).toHaveBeenCalledTimes(1)
-    expect(tokenStorage.getAccessToken()).toBeNull() // refresh fallido limpia tokens
-    expect(tokenStorage.getRefreshToken()).toBeNull()
   })
 
   it('N requests 401 paralelos disparan UN solo POST /auth/refresh (dedupe)', async () => {
@@ -169,5 +173,122 @@ describe('http client interceptor (refresh-on-401)', () => {
     // Los tokens huerfanos quedan intactos (no se sobreescribieron)
     expect(tokenStorage.getAccessToken()).toBe('huerfano-access')
     expect(tokenStorage.getRefreshToken()).toBe('huerfano-refresh')
+  })
+})
+
+describe('la respuesta de una sesión que ya terminó', () => {
+  let onSessionExpired: ReturnType<typeof vi.fn<() => void>>
+
+  beforeAll(() => {
+    vi.stubEnv('VITE_API_BASE_URL', API)
+  })
+
+  beforeEach(() => {
+    tokenStorage.clear()
+    onSessionExpired = vi.fn<() => void>()
+    client.instance.interceptors.request.clear()
+    client.instance.interceptors.response.clear()
+    configureHttpClient(onSessionExpired)
+  })
+
+  afterEach(() => {
+    client.instance.interceptors.request.clear()
+    client.instance.interceptors.response.clear()
+  })
+
+  /** Pide /auth/me, termina la sesión cuando el pedido ya salió y espera a que MSW responda. */
+  async function pedirYSalirMientrasVuelve(respuesta: () => Response) {
+    tokenStorage.setTokens('tok-ana', 'ref-ana')
+    let llegada = false
+    let soltar!: () => void
+    const suelta = new Promise<void>((resolve) => (soltar = resolve))
+    let respondida = false
+    server.use(
+      http.get(`${API}/auth/me`, async () => {
+        llegada = true
+        await suelta
+        respondida = true
+        return respuesta()
+      }),
+    )
+    let desenlace = 'pendiente'
+    getCurrentUser({ throwOnError: true }).then(
+      () => (desenlace = 'éxito'),
+      () => (desenlace = 'error'),
+    )
+    await vi.waitFor(() => expect(llegada).toBe(true))
+    endSession(new QueryClient())
+    // El caso real: la respuesta vuelve cuando ya entró otro, con tokens con los que sí se podría renovar.
+    tokenStorage.setTokens('tok-beto', 'ref-beto')
+    soltar()
+    await vi.waitFor(() => expect(respondida).toBe(true))
+    await delay(50)
+    return () => desenlace
+  }
+
+  it('no se entrega como éxito', async () => {
+    const desenlace = await pedirYSalirMientrasVuelve(() => HttpResponse.json(FAKE_USER))
+
+    expect(desenlace()).toBe('pendiente')
+  })
+
+  it('ni como error', async () => {
+    const desenlace = await pedirYSalirMientrasVuelve(() => new HttpResponse(null, { status: 500 }))
+
+    expect(desenlace()).toBe('pendiente')
+  })
+
+  it('ni dispara la renovación ni da la sesión por expirada otra vez con un 401', async () => {
+    let renovaciones = 0
+    server.use(
+      http.post(`${API}/auth/refresh`, () => {
+        renovaciones++
+        return new HttpResponse(null, { status: 401 })
+      }),
+    )
+    const desenlace = await pedirYSalirMientrasVuelve(() => new HttpResponse(null, { status: 401 }))
+
+    expect(desenlace()).toBe('pendiente')
+    expect(renovaciones).toBe(0)
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('ni como error cuando la sesión termina durante la renovación', async () => {
+    tokenStorage.setTokens('tok-ana', 'ref-ana')
+    let llegada = false
+    let soltar!: () => void
+    const suelta = new Promise<void>((resolve) => (soltar = resolve))
+    let respondida = false
+    server.use(
+      http.get(`${API}/auth/me`, () => new HttpResponse(null, { status: 401 })),
+      http.post(`${API}/auth/refresh`, async () => {
+        llegada = true
+        await suelta
+        respondida = true
+        return new HttpResponse(null, { status: 401 })
+      }),
+    )
+    let desenlace = 'pendiente'
+    getCurrentUser({ throwOnError: true }).then(
+      () => (desenlace = 'éxito'),
+      () => (desenlace = 'error'),
+    )
+    await vi.waitFor(() => expect(llegada).toBe(true))
+    endSession(new QueryClient())
+    soltar()
+    await vi.waitFor(() => expect(respondida).toBe(true))
+    await delay(50)
+
+    expect(desenlace).toBe('pendiente')
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('lo que se pide después de terminar sí se entrega: lo que se descarta es lo de antes', async () => {
+    endSession(new QueryClient())
+    tokenStorage.setTokens('tok-beto', 'ref-beto')
+
+    const { data } = await getCurrentUser({ throwOnError: true })
+
+    expect(data).toEqual(FAKE_USER)
   })
 })
