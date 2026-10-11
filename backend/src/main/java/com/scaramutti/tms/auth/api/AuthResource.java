@@ -4,7 +4,7 @@ import com.scaramutti.tms.auth.dto.ChangePasswordRequest;
 import com.scaramutti.tms.auth.dto.LoginRequest;
 import com.scaramutti.tms.auth.dto.LoginResponse;
 import com.scaramutti.tms.auth.dto.RefreshRequest;
-import com.scaramutti.tms.auth.dto.UserResponse;
+import com.scaramutti.tms.auth.dto.SessionUserResponse;
 import com.scaramutti.tms.auth.mapper.AuthResourceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.AuthService;
@@ -63,7 +63,7 @@ public class AuthResource {
     @GET
     @Path("/me")
     @Authenticated
-    public UserResponse me() {
+    public SessionUserResponse me() {
         return authService.findUserById(currentUser.requireId());
     }
 }

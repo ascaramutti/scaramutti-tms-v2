@@ -3,20 +3,22 @@ import { delay, http, HttpResponse } from 'msw'
 import { QueryClient } from '@tanstack/react-query'
 import { configureHttpClient } from './client'
 import { client } from '../../api/client.gen'
-import { getCurrentUser, login, refreshToken } from '../../api'
+import { getCurrentUser, login, refreshToken, type SessionUser } from '../../api'
 import { server } from '../../test/mocks/server'
+import { fakeUser } from '../../test/mocks/handlers/auth'
 import { tokenStorage } from '../auth/tokenStorage'
 import { endSession } from '../auth/session'
 
 const API = 'http://localhost:8080/api/v1'
 
-const FAKE_USER = {
+const FAKE_USER: SessionUser = {
   id: 1,
   username: 'admin',
   fullName: 'Admin TMS',
   position: 'Administrador del sistema',
-  role: 'admin' as const,
+  role: 'admin',
   isActive: true,
+  workerId: 29119,
 }
 
 describe('http client interceptor (refresh-on-401)', () => {
@@ -289,6 +291,7 @@ describe('la respuesta de una sesión que ya terminó', () => {
 
     const { data } = await getCurrentUser({ throwOnError: true })
 
-    expect(data).toEqual(FAKE_USER)
+    // Lo sirve el handler compartido de /auth/me, no los de este archivo.
+    expect(data).toEqual(fakeUser)
   })
 })

@@ -2,7 +2,7 @@ package com.scaramutti.tms.auth.service;
 
 import com.scaramutti.tms.auth.AuthError;
 import com.scaramutti.tms.auth.dto.LoginResponse;
-import com.scaramutti.tms.auth.dto.UserResponse;
+import com.scaramutti.tms.auth.dto.SessionUserResponse;
 import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.model.AccessToken;
 import com.scaramutti.tms.auth.service.cmd.ChangePasswordCommand;
@@ -55,7 +55,7 @@ class AuthServiceTest {
     @InjectMocks AuthService authService;
 
     private User user;
-    private UserResponse userResponse;
+    private SessionUserResponse sessionUserResponse;
     private AccessToken accessToken;
     private LoginResponse loginResponse;
 
@@ -82,11 +82,11 @@ class AuthServiceTest {
         user.role = role;
         user.isActive = true;
 
-        userResponse = new UserResponse(100, "sales", "Valeria Torres", "Ejecutivo de Ventas", "sales", true);
+        sessionUserResponse = new SessionUserResponse(100, "sales", "Valeria Torres", "Ejecutivo de Ventas", "sales", true, 10);
         accessToken = new AccessToken("access.jwt.token", Instant.now().plusSeconds(3600), 3600L);
         loginResponse = new LoginResponse(
             "access.jwt.token", "refresh.jwt.token",
-            OffsetDateTime.now().plusSeconds(3600), 3600L, userResponse
+            OffsetDateTime.now().plusSeconds(3600), 3600L, sessionUserResponse
         );
     }
 
@@ -275,13 +275,13 @@ class AuthServiceTest {
     // ============== findUserById =============================================
 
     @Test
-    void findUserById_withExistingUser_returnsUserResponse() {
+    void findUserById_withExistingUser_returnsTheSessionUser() {
         when(userRepository.findByIdOptional(100)).thenReturn(Optional.of(user));
-        when(authServiceMapper.toUserResponse(user)).thenReturn(userResponse);
+        when(authServiceMapper.toSessionUserResponse(user)).thenReturn(sessionUserResponse);
 
-        UserResponse result = authService.findUserById(100);
+        SessionUserResponse result = authService.findUserById(100);
 
-        assertSame(userResponse, result);
+        assertSame(sessionUserResponse, result);
     }
 
     @Test

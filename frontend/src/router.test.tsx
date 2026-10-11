@@ -23,7 +23,7 @@ import { AuthProvider } from './shared/auth/AuthContext'
 import { ThemeProvider } from './shared/ui/theme/ThemeContext'
 import { tokenStorage } from './shared/auth/tokenStorage'
 import { server } from './test/mocks/server'
-import type { UserResponse, UserRole } from './api'
+import type { SessionUser, UserRole } from './api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -73,7 +73,7 @@ function goTo(role: UserRole | null, path: string) {
   return router
 }
 
-function buildUser(role: UserRole): UserResponse {
+function buildUser(role: UserRole): SessionUser {
   return {
     id: 1,
     username: `user-${role}`,
@@ -81,6 +81,7 @@ function buildUser(role: UserRole): UserResponse {
     position: 'Cargo de prueba',
     role,
     isActive: true,
+    workerId: 29119,
   }
 }
 

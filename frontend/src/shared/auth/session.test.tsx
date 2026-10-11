@@ -11,7 +11,7 @@ import { http, HttpResponse } from 'msw'
 import { toast } from 'sonner'
 import { routes } from '../../router'
 import { client } from '../../api/client.gen'
-import { listServices, type LoginRequest, type LoginResponse, type UserResponse } from '../../api'
+import { listServices, type LoginRequest, type LoginResponse, type SessionUser } from '../../api'
 import { configureSessionHttpClient } from '../http/client'
 import { queryClient as appQueryClient } from '../query/queryClient'
 import { ThemeProvider } from '../ui/theme/ThemeContext'
@@ -33,7 +33,7 @@ import { fakeWorkerDetail } from '../../test/mocks/handlers/workers'
 const API = 'http://localhost:8080/api/v1'
 
 interface Persona {
-  user: UserResponse
+  user: SessionUser
   password: string
   token: string
   refresh: string
@@ -47,6 +47,7 @@ const ANA: Persona = {
     position: 'Jefa de Operaciones',
     role: 'operations_manager',
     isActive: true,
+    workerId: 311,
   },
   password: 'Clave-de-Ana-1',
   token: 'tok-ana',
@@ -61,6 +62,7 @@ const BETO: Persona = {
     position: 'Despachador',
     role: 'dispatcher',
     isActive: true,
+    workerId: 312,
   },
   password: 'Clave-de-Beto-1',
   token: 'tok-beto',
@@ -77,7 +79,7 @@ function bearer(request: Request): string | null {
   return request.headers.get('Authorization')?.replace('Bearer ', '') ?? null
 }
 
-function sesionDe(user: UserResponse, token: string, refresh: string): LoginResponse {
+function sesionDe(user: SessionUser, token: string, refresh: string): LoginResponse {
   return { token, refreshToken: refresh, expiresAt: '2027-01-01T00:00:00Z', expiresIn: 3600, user }
 }
 
