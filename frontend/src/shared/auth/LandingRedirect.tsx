@@ -16,8 +16,8 @@ import { landingPathFor } from './roleLanding'
  * rota no se guarda como destino de retorno: volver a una URL que no existe solo
  * repite el rebote después de iniciar sesión. Por el otro camino, el de un id que
  * no es válido, quien corta antes es la guarda del layout, y esa sí guarda el
- * destino: después del login el desvío vuelve a correr y termina igual en la
- * principal del rol.
+ * destino (mientras no haya terminado una sesión en esta pestaña): después del
+ * login el desvío vuelve a correr y termina igual en la principal del rol.
  *
  * Alcance: llegan las rutas que no matchean nada, y también las que caen en el
  * detalle de cotización con un id que no es un entero positivo, porque
