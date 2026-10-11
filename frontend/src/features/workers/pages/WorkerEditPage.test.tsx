@@ -11,7 +11,7 @@ import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
-import type { UserRole, WorkerDetailResponse, WorkerUpdateRequest } from '../../../api'
+import type { SessionUser, UserRole, WorkerDetailResponse, WorkerUpdateRequest } from '../../../api'
 import { operationsKeys } from '../../operations/queryKeys'
 import { workerKeys } from '../queryKeys'
 import {
@@ -64,20 +64,29 @@ function trabajador(overrides: Partial<WorkerDetailResponse> = {}): WorkerDetail
   })
 }
 
-function renderPage(worker: WorkerDetailResponse | null, role: UserRole = 'general_manager') {
-  // Sin espera entre intentos: el hook decide si reintenta, y los tests cuentan los pedidos.
-  const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, retryDelay: 0 }, mutations: { retry: false } },
-  })
-  tokenStorage.setTokens('fake-access', 'fake-refresh')
-  queryClient.setQueryData(currentUserQueryKey, {
+/** El trabajador de la sesión. Su cuenta es la 1: son ids de tablas distintas. */
+const TRABAJADOR_DE_LA_SESION = 29119
+
+function sesion(role: UserRole, overrides: Partial<SessionUser> = {}): SessionUser {
+  return {
     id: 1,
     username: `user-${role}`,
     fullName: `Usuario ${role}`,
     position: 'Cargo de prueba',
     role,
     isActive: true,
+    workerId: TRABAJADOR_DE_LA_SESION,
+    ...overrides,
+  }
+}
+
+function renderPage(worker: WorkerDetailResponse | null, role: UserRole = 'general_manager', user = sesion(role)) {
+  // Sin espera entre intentos: el hook decide si reintenta, y los tests cuentan los pedidos.
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, retryDelay: 0 }, mutations: { retry: false } },
   })
+  tokenStorage.setTokens('fake-access', 'fake-refresh')
+  queryClient.setQueryData<SessionUser>(currentUserQueryKey, user)
   queryClient.setQueryData(workerKeys.search({ q: 'juan', isActive: true }), [])
   queryClient.setQueryData(operationsKeys.drivers(), [])
   queryClient.setQueryData(operationsKeys.serviceList({ page: 0 }), [])
@@ -255,6 +264,78 @@ describe('WorkerEditPage', () => {
       expect(opciones).toContain('Encargado de Almacén')
       expect(opciones).not.toContain('Conductor')
       expect(opciones).not.toContain('Operador')
+    })
+  })
+
+  /**
+   * La propia ficha se reconoce por el trabajador de la sesión, no por su cuenta. Mientras el rol de
+   * la cuenta y el cargo del trabajador coincidan, solo el admin llega a editarla: a los demás, su
+   * propio cargo ya les cierra el formulario.
+   */
+  describe('la propia ficha', () => {
+    const propia = (overrides: Partial<WorkerDetailResponse> = {}) =>
+      trabajador({ id: TRABAJADOR_DE_LA_SESION, role: rol('admin'), driver: null, hasUser: true, ...overrides })
+    const MOTIVO = 'No puedes cambiar tu propio cargo.'
+
+    it('el Cargo queda fijo en el suyo, con el motivo, y es la única opción', async () => {
+      renderPage(propia(), 'admin')
+      await listo()
+      expect(cargo()).toBeDisabled()
+      expect(cargo()).toHaveValue('admin')
+      expect(cargo()).toHaveAccessibleDescription(MOTIVO)
+      expect(within(cargo()).getAllByRole('option').map((option) => option.getAttribute('value'))).toEqual(['', 'admin'])
+      // El resto del formulario sigue abierto.
+      for (const campo of ['Nombre', 'Apellido', 'Tipo de documento', 'Número de documento', 'Fecha de ingreso', 'Teléfono (opcional)']) {
+        expect(screen.getByLabelText(campo)).toBeEnabled()
+      }
+    })
+
+    it('el resto se guarda y el cargo viaja sin cambios', async () => {
+      const user = userEvent.setup()
+      const sink = capturar()
+      renderPage(propia(), 'admin')
+      await listo()
+      await cambiarApellido(user)
+      await user.click(guardar())
+
+      await waitFor(() => expect(sink.bodies).toHaveLength(1))
+      expect(sink.ids).toEqual([TRABAJADOR_DE_LA_SESION])
+      expect(sink.bodies?.[0]).toMatchObject({ lastName: 'Pérez Huamána', role: 'admin' })
+    })
+
+    /** Un cargo sin acceso, que el desplegable no le ofrecería a quien tiene usuario: igual se muestra y viaja. */
+    it('a quien no es admin, con su trabajador en un cargo menor, también le queda fijo', async () => {
+      const user = userEvent.setup()
+      const sink = capturar()
+      renderPage(propia({ role: rol('operator') }), 'operations_manager')
+      await listo()
+      expect(cargo()).toBeDisabled()
+      expect(cargo()).toHaveValue('operator')
+      await cambiarApellido(user)
+      await user.click(guardar())
+
+      await waitFor(() => expect(sink.bodies).toHaveLength(1))
+      expect(sink.bodies?.[0]).toMatchObject({ role: 'operator' })
+    })
+
+    it('la ficha con el id de su cuenta es ajena: el Cargo se cambia como siempre', async () => {
+      renderPage(propia({ id: 1 }), 'admin')
+      await listo()
+      expect(cargo()).toBeEnabled()
+      expect(screen.queryByText(MOTIVO)).not.toBeInTheDocument()
+    })
+
+    it('sin el trabajador en la sesión (un backend anterior) el Cargo se cambia como hoy', async () => {
+      renderPage(propia(), 'admin', sesion('admin', { workerId: undefined }))
+      await listo()
+      expect(cargo()).toBeEnabled()
+      expect(screen.queryByText(MOTIVO)).not.toBeInTheDocument()
+    })
+
+    it('sin violaciones con el Cargo fijo', async () => {
+      const { container } = renderPage(propia(), 'admin')
+      await listo()
+      expect(await axe(container)).toHaveNoViolations()
     })
   })
 

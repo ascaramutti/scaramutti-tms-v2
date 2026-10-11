@@ -15,6 +15,8 @@ interface WorkerFormProps {
   roles: readonly RoleResponse[]
   /** Los cargos que la sesión puede asignar. */
   roleOptions: readonly RoleResponse[]
+  /** Si viene, el Cargo queda fijo y este texto dice por qué. */
+  roleLockedReason?: string
   defaultValues: WorkerFormValues
   /** En la edición, lo guardado. */
   original?: Pick<WorkerFormValues, 'documentNumber' | 'hireDate'>
@@ -39,6 +41,7 @@ export function WorkerForm({
   documentTypes,
   roles,
   roleOptions,
+  roleLockedReason,
   defaultValues,
   original,
   save,
@@ -145,7 +148,12 @@ export function WorkerForm({
     <FormProvider {...form}>
       <form noValidate onSubmit={(event) => handleSubmit(submitWorker)(event)} aria-busy={formState.isSubmitting} className="space-y-6">
         {notice}
-        <WorkerFormFields documentTypes={documentTypes} roleOptions={roleOptions} disabled={formState.isSubmitting} />
+        <WorkerFormFields
+          documentTypes={documentTypes}
+          roleOptions={roleOptions}
+          roleLockedReason={roleLockedReason}
+          disabled={formState.isSubmitting}
+        />
         {children}
         <WorkerDriverSection profile={profile} disabled={formState.isSubmitting} />
         {sinCargos && (

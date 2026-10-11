@@ -18,6 +18,8 @@ interface WorkerEditFormProps {
   documentTypes: readonly DocumentTypeResponse[]
   roles: readonly RoleResponse[]
   roleOptions: readonly RoleResponse[]
+  /** Si viene, el Cargo queda fijo y este texto dice por qué. */
+  roleLockedReason?: string
   handleOwnError: (error: unknown) => boolean
   onSaved: (saved: WorkerDetailResponse) => void
   onCancel: () => void
