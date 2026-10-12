@@ -44,11 +44,9 @@ public class AuthService {
             throw AuthError.INVALID_CREDENTIALS.toException();
         }
 
-        try {
-            verifyPasswordOrThrow(user, loginCommand.password(), AuthError.INVALID_CREDENTIALS);
-        } catch (RuntimeException e) {
+        if (!passwordService.matches(loginCommand.password(), user.passwordHash)) {
             LOG.warnf("Login fallido: password incorrecta [username=%s]", user.username);
-            throw e;
+            throw AuthError.INVALID_CREDENTIALS.toException();
         }
 
         if (!user.isActive) {

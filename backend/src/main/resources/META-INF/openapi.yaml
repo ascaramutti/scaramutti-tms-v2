@@ -82,7 +82,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/LoginResponse' }
         '400':
-          description: Solicitud inválida (campos faltantes o mal formados)
+          description: 'Solicitud inválida (campos faltantes o mal formados, o una contraseña que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto)'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -200,7 +200,7 @@ paths:
         '204':
           description: Contraseña actualizada
         '400':
-          description: Validación de contraseña fallida o contraseña actual incorrecta
+          description: 'Validación de contraseña fallida (también una que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto) o contraseña actual incorrecta'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -3622,7 +3622,15 @@ components:
           type: string
           format: password
           minLength: 8
-          maxLength: 100
+          maxLength: 72
+          description: >-
+            Hasta 72 bytes en UTF-8, que es lo que procesa BCrypt: una letra con tilde ocupa 2 bytes
+            y un emoji, 3 o más, así que cuántos caracteres entran depende de cuáles sean. Sin
+            caracteres nulos ni surrogates sueltos. El servidor cuenta el mínimo de 8 en unidades
+            UTF-16 (casi todos los emojis valen 2); minLength, que cuenta puntos de código, es más
+            estricto solo con los caracteres fuera del plano básico, como esos emojis.
+            Fuera de eso responde 400 COM-001 en el campo antes de buscar al usuario: la respuesta
+            es la misma exista o no.
 
     LoginResponse:
       type: object
@@ -3648,8 +3656,27 @@ components:
       type: object
       required: [currentPassword, newPassword]
       properties:
-        currentPassword: { type: string, format: password, minLength: 8, maxLength: 100 }
-        newPassword:     { type: string, format: password, minLength: 8, maxLength: 100 }
+        currentPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: >-
+            Las mismas reglas que newPassword: hasta 72 bytes en UTF-8, sin caracteres nulos ni
+            surrogates sueltos y un mínimo de 8 unidades UTF-16. Fuera de eso responde 400 COM-001
+            en el campo.
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: >-
+            Hasta 72 bytes en UTF-8, que es lo que procesa BCrypt: una letra con tilde ocupa 2 bytes
+            y un emoji, 3 o más, así que cuántos caracteres entran depende de cuáles sean. Sin
+            caracteres nulos ni surrogates sueltos. El servidor cuenta el mínimo de 8 en unidades
+            UTF-16 (casi todos los emojis valen 2); minLength, que cuenta puntos de código, es más
+            estricto solo con los caracteres fuera del plano básico, como esos emojis.
+            Fuera de eso responde 400 COM-001 en el campo.
 
     UserRef:
       description: Referencia mínima a un usuario (para embeber en respuestas)
