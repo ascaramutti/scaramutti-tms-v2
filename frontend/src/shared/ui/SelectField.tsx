@@ -1,6 +1,6 @@
 import { Controller, type Control, type FieldValues, type Path } from 'react-hook-form'
 import { cn } from '../utils/cn'
-import { FIELD_ERROR, FIELD_LABEL, fieldClasses } from './fieldClasses'
+import { FIELD_DISABLED, FIELD_ERROR, FIELD_HELPER, FIELD_LABEL, fieldClasses } from './fieldClasses'
 
 export interface SelectOption {
   /** Número (un id) o texto (un nombre de sistema o un valor de enum). */
@@ -17,6 +17,8 @@ interface SelectFieldProps<T extends FieldValues> {
   /** Texto de la opción vacía inicial. Si se omite, no se muestra. */
   placeholder?: string
   error?: string
+  /** Ayuda bajo el campo, anunciada por lector de pantalla (como en `TextField`). */
+  helperText?: string
   disabled?: boolean
   /** Clases extra para el `<label>` (ej. reservar altura en grids multi-columna para alinear). */
   labelClassName?: string
@@ -35,9 +37,12 @@ export function SelectField<T extends FieldValues>({
   options,
   placeholder,
   error,
+  helperText,
   disabled,
   labelClassName,
 }: SelectFieldProps<T>) {
+  const helperId = helperText ? `${id}-helper` : undefined
+  const errorId = error ? `${id}-error` : undefined
   return (
     <div>
       <label htmlFor={id} className={cn(FIELD_LABEL, labelClassName)}>
@@ -59,8 +64,8 @@ export function SelectField<T extends FieldValues>({
             }
             onBlur={field.onBlur}
             aria-invalid={!!error}
-            aria-describedby={error ? `${id}-error` : undefined}
-            className={cn('w-full', fieldClasses({ invalid: !!error }))}
+            aria-describedby={[helperId, errorId].filter(Boolean).join(' ') || undefined}
+            className={cn('w-full', fieldClasses({ invalid: !!error }), FIELD_DISABLED)}
           >
             {placeholder && <option value="">{placeholder}</option>}
             {options.map((option) => (
@@ -71,8 +76,13 @@ export function SelectField<T extends FieldValues>({
           </select>
         )}
       />
+      {helperText && (
+        <p id={helperId} className={FIELD_HELPER}>
+          {helperText}
+        </p>
+      )}
       {error && (
-        <p id={`${id}-error`} role="alert" className={FIELD_ERROR}>
+        <p id={errorId} role="alert" className={FIELD_ERROR}>
           {error}
         </p>
       )}

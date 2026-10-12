@@ -13,7 +13,7 @@ import { server } from '../../../test/mocks/server'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
-import type { UserRole, WorkerDetailResponse } from '../../../api'
+import type { SessionUser, UserRole, WorkerDetailResponse } from '../../../api'
 import { useService } from '../../operations/hooks/useService'
 import { useServicesList } from '../../operations/hooks/useServicesList'
 import { operationsKeys } from '../../operations/queryKeys'
@@ -21,6 +21,7 @@ import { EMPTY_SERVICE_FILTERS } from '../../operations/schemas/service-filters.
 import { pageOfServices } from '../../../test/mocks/handlers/operations'
 import { warehouseKeys } from '../../warehouse/queryKeys'
 import { workerKeys } from '../queryKeys'
+import { fakeUser } from '../../../test/mocks/handlers/auth'
 import {
   changeWorkerStatusCapture,
   changeWorkerStatusEmpty,
@@ -50,19 +51,36 @@ afterEach(() => {
   vi.mocked(toast.success).mockClear()
 })
 
-/** El id de la URL (42) no es el del fixture (1): un id escrito fijo no pasaría. */
-function renderPage(id = 42, role: UserRole = 'operations_manager', client?: QueryClient) {
-  // Sin espera entre intentos: el hook decide si reintenta, y los tests cuentan los pedidos.
-  const queryClient = client ?? new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } })
-  tokenStorage.setTokens('fake-access', 'fake-refresh')
-  queryClient.setQueryData(currentUserQueryKey, {
+/** El trabajador de la sesión. Su cuenta es la 1, como el trabajador del fixture: son ids de tablas distintas. */
+const TRABAJADOR_DE_LA_SESION = 29119
+
+function sesion(role: UserRole, overrides: Partial<SessionUser> = {}): SessionUser {
+  return {
     id: 1,
     username: `user-${role}`,
     fullName: `Usuario ${role}`,
     position: 'Cargo de prueba',
     role,
     isActive: true,
-  })
+    workerId: TRABAJADOR_DE_LA_SESION,
+    ...overrides,
+  }
+}
+
+/**
+ * El id de la URL (42) no es el del fixture (1): un id escrito fijo no pasaría. Con `user` en null
+ * la sesión no se siembra: la trae el `/auth/me` del servidor simulado.
+ */
+function renderPage(
+  id = 42,
+  role: UserRole = 'operations_manager',
+  client?: QueryClient,
+  user: SessionUser | null = sesion(role),
+) {
+  // Sin espera entre intentos: el hook decide si reintenta, y los tests cuentan los pedidos.
+  const queryClient = client ?? new QueryClient({ defaultOptions: { queries: { retry: false, retryDelay: 0 } } })
+  tokenStorage.setTokens('fake-access', 'fake-refresh')
+  if (user) queryClient.setQueryData<SessionUser>(currentUserQueryKey, user)
   const router = createMemoryRouter(
     [
       { path: `${WORKERS_BASE}/:id`, element: <WorkerDetailPage /> },
@@ -471,9 +489,14 @@ describe('WorkerDetailPage', () => {
     }
 
     /** Espera también los cargos: sin ellos no hay nivel y las acciones no se mostrarían por otra razón. */
-    async function abrirComo(worker: WorkerDetailResponse, role: UserRole = 'operations_manager', client?: QueryClient) {
+    async function abrirComo(
+      worker: WorkerDetailResponse,
+      role: UserRole = 'operations_manager',
+      client?: QueryClient,
+      user = sesion(role),
+    ) {
       server.use(getWorkerOk(worker))
-      const vista = renderPage(42, role, client)
+      const vista = renderPage(42, role, client, user)
       await screen.findByRole('heading', { level: 1 })
       await waitFor(() => expect(vista.queryClient.getQueryState(workerKeys.roles())?.status).toBe('success'))
       return vista
@@ -508,9 +531,58 @@ describe('WorkerDetailPage', () => {
       },
     )
 
-    it('el admin lo ve siempre, también sobre otro admin', async () => {
+    it('el admin lo ve sobre otra ficha, también la de otro admin', async () => {
       await abrirComo(trabajador({ role: ADMIN }), 'admin')
       expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument()
+    })
+
+    /**
+     * La propia ficha se reconoce por el trabajador de la sesión, no por su cuenta. Mientras el rol de
+     * la cuenta y el cargo del trabajador coincidan, solo el admin la ve con acciones: a los demás,
+     * su propio cargo ya los deja en solo lectura.
+     */
+    describe('la propia ficha', () => {
+      it('el admin no ve Desactivar en la suya, y sí Editar', async () => {
+        await abrirComo(trabajador({ id: TRABAJADOR_DE_LA_SESION, role: ADMIN }), 'admin')
+        expect(screen.queryByRole('button', { name: /Desactivar|Reactivar/ })).not.toBeInTheDocument()
+        expect(screen.getByRole('link', { name: 'Editar' })).toBeInTheDocument()
+      })
+
+      it('a quien no es admin, con su trabajador en un cargo menor, tampoco se le ofrece', async () => {
+        await abrirComo(trabajador({ id: TRABAJADOR_DE_LA_SESION }), 'operations_manager')
+        expect(screen.getByRole('link', { name: 'Editar' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /Desactivar|Reactivar/ })).not.toBeInTheDocument()
+      })
+
+      it('se reconoce con la sesión que trae /auth/me, sin sembrarla', async () => {
+        server.use(getWorkerOk(trabajador({ id: fakeUser.workerId, role: ADMIN })))
+        renderPage(42, 'admin', undefined, null)
+        // Editar aparece recién con el usuario cargado: antes no hay nivel y faltaría todo por otra razón.
+        expect(await screen.findByRole('link', { name: 'Editar' })).toBeInTheDocument()
+        expect(screen.queryByRole('button', { name: /Desactivar|Reactivar/ })).not.toBeInTheDocument()
+      })
+
+      it('la ficha con el id de su cuenta es ajena: sigue ofreciendo Desactivar', async () => {
+        await abrirComo(trabajador({ id: 1, role: ADMIN }), 'admin')
+        expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument()
+      })
+
+      it('sin el trabajador en la sesión (un backend anterior) se ve como hoy', async () => {
+        await abrirComo(
+          trabajador({ id: TRABAJADOR_DE_LA_SESION, role: ADMIN }),
+          'admin',
+          undefined,
+          sesion('admin', { workerId: undefined }),
+        )
+        expect(screen.getByRole('button', { name: 'Desactivar' })).toBeInTheDocument()
+      })
+
+      // Solo se quita la baja. La vuelta de una propia ficha inactiva también la rechaza el servidor
+      // (quien actúa tiene que estar activo), pero queda fuera de este cambio.
+      it('inactiva, la suya sigue ofreciendo Reactivar', async () => {
+        await abrirComo(trabajador({ id: TRABAJADOR_DE_LA_SESION, role: ADMIN, isActive: false }), 'admin')
+        expect(screen.getByRole('button', { name: 'Reactivar' })).toBeInTheDocument()
+      })
     })
 
     it('mientras llegan los cargos no lo ofrece', async () => {

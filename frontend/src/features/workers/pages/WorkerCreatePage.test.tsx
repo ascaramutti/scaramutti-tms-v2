@@ -11,7 +11,7 @@ import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
-import type { UserResponse, UserRole, WorkerRequest } from '../../../api'
+import type { SessionUser, UserRole, WorkerRequest } from '../../../api'
 import { operationsKeys } from '../../operations/queryKeys'
 import { warehouseKeys } from '../../warehouse/queryKeys'
 import { workerKeys } from '../queryKeys'
@@ -44,8 +44,8 @@ vi.mock('sonner', () => ({
 
 const NUEVO = `${WORKERS_BASE}/nuevo`
 
-function buildUser(role: UserRole, position = 'Cargo de prueba'): UserResponse {
-  return { id: 1, username: `user-${role}`, fullName: `Usuario ${role}`, position, role, isActive: true }
+function buildUser(role: UserRole, position = 'Cargo de prueba'): SessionUser {
+  return { id: 1, username: `user-${role}`, fullName: `Usuario ${role}`, position, role, isActive: true, workerId: 29119 }
 }
 
 function renderPage({ role = 'operations_manager' as UserRole, position }: { role?: UserRole; position?: string } = {}) {
@@ -53,7 +53,7 @@ function renderPage({ role = 'operations_manager' as UserRole, position }: { rol
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   })
   tokenStorage.setTokens('fake-access', 'fake-refresh')
-  queryClient.setQueryData(currentUserQueryKey, buildUser(role, position))
+  queryClient.setQueryData<SessionUser>(currentUserQueryKey, buildUser(role, position))
   // Cachés sembradas: las que el alta tiene que invalidar y una ajena que no.
   queryClient.setQueryData(workerKeys.search({ q: 'ana', isActive: true }), [])
   queryClient.setQueryData(workerKeys.detail(3), fakeWorkerDetail({ id: 3 }))
