@@ -201,36 +201,36 @@ async function cuandoSeEntregue(pedido: string) {
   await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
 }
 
+beforeAll(() => {
+  vi.stubEnv('VITE_API_BASE_URL', API)
+})
+
+beforeEach(() => {
+  client.instance.interceptors.request.clear()
+  client.instance.interceptors.response.clear()
+  pedidos = []
+  entregadas = []
+  server.events.on('request:start', ({ request }) => {
+    const auth = request.headers.get('Authorization') ?? 'sin token'
+    pedidos.push(`${request.method} ${new URL(request.url).pathname} ${auth}`)
+  })
+  server.events.on('response:mocked', ({ request }) => {
+    entregadas.push(`${request.method} ${new URL(request.url).pathname}`)
+  })
+  server.use(...backendDeDosPersonas())
+})
+
+afterEach(() => {
+  client.instance.interceptors.request.clear()
+  client.instance.interceptors.response.clear()
+  server.events.removeAllListeners()
+  window.history.replaceState(null, '', '/')
+  vi.restoreAllMocks()
+  // sonner guarda los avisos en un store del módulo: sin esto, el de un test aparece en el siguiente.
+  toast.dismiss()
+})
+
 describe('fin de sesión', () => {
-  beforeAll(() => {
-    vi.stubEnv('VITE_API_BASE_URL', API)
-  })
-
-  beforeEach(() => {
-    client.instance.interceptors.request.clear()
-    client.instance.interceptors.response.clear()
-    pedidos = []
-    entregadas = []
-    server.events.on('request:start', ({ request }) => {
-      const auth = request.headers.get('Authorization') ?? 'sin token'
-      pedidos.push(`${request.method} ${new URL(request.url).pathname} ${auth}`)
-    })
-    server.events.on('response:mocked', ({ request }) => {
-      entregadas.push(`${request.method} ${new URL(request.url).pathname}`)
-    })
-    server.use(...backendDeDosPersonas())
-  })
-
-  afterEach(() => {
-    client.instance.interceptors.request.clear()
-    client.instance.interceptors.response.clear()
-    server.events.removeAllListeners()
-    window.history.replaceState(null, '', '/')
-    vi.restoreAllMocks()
-    // sonner guarda los avisos en un store del módulo: sin esto, el de un test aparece en el siguiente.
-    toast.dismiss()
-  })
-
   it('quien entra después en la misma pestaña no ve nada del anterior: todo se pide de nuevo', async () => {
     const user = userEvent.setup()
     const router = montar(LOGIN_PATH)
@@ -788,5 +788,146 @@ describe('fin de sesión', () => {
     session.endSession(new QueryClient())
 
     expect(session.hasSessionEndedHere()).toBe(true)
+  })
+})
+
+describe('cambiar la contraseña renueva la sesión como cualquier pedido', () => {
+  const CLAVE_NUEVA = 'Clave-nueva-de-Ana-2'
+  const CUERPO = { currentPassword: ANA.password, newPassword: CLAVE_NUEVA }
+
+  /** El 401 del token vencido, con el texto que manda el servidor. */
+  function tokenVencido() {
+    return HttpResponse.json(
+      { status: 401, code: 'AUTH-007', detail: 'El token de acceso expiró. Use /auth/refresh para renovarlo.' },
+      { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+    )
+  }
+
+  function cambiosDeClave(): string[] {
+    return pedidos.filter((pedido) => pedido.startsWith('POST /api/v1/auth/change-password'))
+  }
+
+  function renovaciones(): string[] {
+    return pedidos.filter((pedido) => pedido.startsWith('POST /api/v1/auth/refresh'))
+  }
+
+  it('con el token vencido renueva una vez, reintenta con el nuevo y la clave se cambia', async () => {
+    const user = userEvent.setup()
+    const cuerpos: unknown[] = []
+    server.use(
+      http.post(`${API}/auth/refresh`, () => HttpResponse.json(sesionDe(ANA.user, ANA.token, ANA.refresh))),
+      http.post(`${API}/auth/change-password`, async ({ request }) => {
+        cuerpos.push(await request.json())
+        return bearer(request) === ANA.token ? new HttpResponse(null, { status: 204 }) : tokenVencido()
+      }),
+    )
+    tokenStorage.setTokens(TOKEN_VENCIDO_DE_ANA, ANA.refresh)
+    const router = montar(CHANGE_PASSWORD_PATH)
+
+    await cambiarLaClave(user, CLAVE_NUEVA)
+
+    expect(await screen.findByText('Contraseña actualizada')).toBeInTheDocument()
+    await waitFor(() => expect(router.state.location.pathname).toBe(landingPathFor(ANA.user.role)))
+    expect(renovaciones()).toHaveLength(1)
+    expect(cambiosDeClave()).toEqual([
+      `POST /api/v1/auth/change-password Bearer ${TOKEN_VENCIDO_DE_ANA}`,
+      `POST /api/v1/auth/change-password Bearer ${ANA.token}`,
+    ])
+    // El reintento manda lo mismo que el primer envío.
+    expect(cuerpos).toEqual([CUERPO, CUERPO])
+  })
+
+  it('un 401 que sigue después de renovar no vuelve a renovar: avisa con un texto propio', async () => {
+    const user = userEvent.setup()
+    const recarga = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    let renovadas = 0
+    server.use(
+      // Corta la renovación a la tercera: sin la guarda, el bucle termina y el test falla en vez de colgarse.
+      http.post(`${API}/auth/refresh`, () => {
+        renovadas++
+        return renovadas < 3
+          ? HttpResponse.json(sesionDe(ANA.user, ANA.token, ANA.refresh))
+          : new HttpResponse(null, { status: 401 })
+      }),
+      http.post(`${API}/auth/change-password`, () => tokenVencido()),
+    )
+    tokenStorage.setTokens(TOKEN_VENCIDO_DE_ANA, ANA.refresh)
+    const router = montar(CHANGE_PASSWORD_PATH)
+
+    await cambiarLaClave(user, CLAVE_NUEVA)
+
+    expect(await screen.findByText('Tu sesión venció. Cierra sesión y vuelve a ingresar.')).toBeInTheDocument()
+    expect(screen.queryByText(/auth\/refresh/)).not.toBeInTheDocument()
+    expect(renovaciones()).toHaveLength(1)
+    expect(cambiosDeClave()).toHaveLength(2)
+    expect(recarga).not.toHaveBeenCalled()
+    expect(router.state.location.pathname).toBe(CHANGE_PASSWORD_PATH)
+  })
+
+  it('con la renovación caída lleva al ingreso sin pintar el aviso del 401', async () => {
+    const user = userEvent.setup()
+    const recarga = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    server.use(http.post(`${API}/auth/change-password`, () => tokenVencido()))
+    tokenStorage.setTokens(TOKEN_VENCIDO_DE_ANA, ANA.refresh)
+    montar(CHANGE_PASSWORD_PATH)
+
+    await cambiarLaClave(user, CLAVE_NUEVA)
+
+    await waitFor(() => expect(recarga).toHaveBeenCalledWith(LOGIN_PATH))
+    await cuandoSeEntregue('POST /api/v1/auth/refresh')
+    expect(recarga).toHaveBeenCalledTimes(1)
+    expect(tokenStorage.getAccessToken()).toBeNull()
+    expect(document.querySelector('[data-sonner-toast]')).toBeNull()
+  })
+
+  it('con el token vencido y la clave actual equivocada, el error del reintento va a su campo', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.post(`${API}/auth/refresh`, () => HttpResponse.json(sesionDe(ANA.user, ANA.token, ANA.refresh))),
+      http.post(`${API}/auth/change-password`, ({ request }) =>
+        bearer(request) === ANA.token
+          ? HttpResponse.json(
+              { status: 400, code: 'AUTH-004', detail: 'La contraseña actual proporcionada es incorrecta' },
+              { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+            )
+          : tokenVencido(),
+      ),
+    )
+    tokenStorage.setTokens(TOKEN_VENCIDO_DE_ANA, ANA.refresh)
+    montar(CHANGE_PASSWORD_PATH)
+
+    await cambiarLaClave(user, CLAVE_NUEVA)
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Contraseña actual')).toHaveAccessibleDescription(
+        'La contraseña actual proporcionada es incorrecta',
+      ),
+    )
+    expect(renovaciones()).toHaveLength(1)
+    expect(cambiosDeClave()).toHaveLength(2)
+  })
+
+  it('la clave actual equivocada no renueva: el error va a su campo', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.post(`${API}/auth/change-password`, () =>
+        HttpResponse.json(
+          { status: 400, code: 'AUTH-004', detail: 'La contraseña actual proporcionada es incorrecta' },
+          { status: 400, headers: { 'Content-Type': 'application/problem+json' } },
+        ),
+      ),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    montar(CHANGE_PASSWORD_PATH)
+
+    await cambiarLaClave(user, CLAVE_NUEVA)
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Contraseña actual')).toHaveAccessibleDescription(
+        'La contraseña actual proporcionada es incorrecta',
+      ),
+    )
+    expect(renovaciones()).toEqual([])
+    expect(cambiosDeClave()).toHaveLength(1)
   })
 })

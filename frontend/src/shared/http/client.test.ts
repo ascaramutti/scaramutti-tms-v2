@@ -79,7 +79,28 @@ describe('http client interceptor (refresh-on-401)', () => {
     expect(onSessionExpired).not.toHaveBeenCalled()
   })
 
-  it('request 401 → refresh tambien falla → onSessionExpired llamado, error rechaza', async () => {
+  it('request 401 → refresh tambien falla → onSessionExpired llamado, y el error ya no se entrega', async () => {
+    tokenStorage.setTokens('old-access', 'expired-refresh')
+    // Como la de producción, la rutina termina la sesión: el pedido que la hizo expirar queda en la terminada.
+    onSessionExpired.mockImplementation(() => endSession(new QueryClient()))
+    server.use(
+      http.get(`${API}/auth/me`, () => HttpResponse.json({ status: 401 }, { status: 401 })),
+      http.post(`${API}/auth/refresh`, () => HttpResponse.json({ status: 401 }, { status: 401 })),
+    )
+    let desenlace = 'pendiente'
+    getCurrentUser({ throwOnError: true }).then(
+      () => (desenlace = 'éxito'),
+      () => (desenlace = 'error'),
+    )
+
+    // Los tokens no los borra el cliente: los borra la rutina de fin de sesión que corre en
+    // onSessionExpired, la misma de salir (se prueba con la aplicación entera).
+    await vi.waitFor(() => expect(onSessionExpired).toHaveBeenCalledTimes(1))
+    await delay(50)
+    expect(desenlace).toBe('pendiente')
+  })
+
+  it('con una rutina que no termina la sesión, el error de la renovación caída sí se entrega', async () => {
     tokenStorage.setTokens('old-access', 'expired-refresh')
     server.use(
       http.get(`${API}/auth/me`, () => HttpResponse.json({ status: 401 }, { status: 401 })),
@@ -88,8 +109,6 @@ describe('http client interceptor (refresh-on-401)', () => {
 
     await expect(getCurrentUser({ throwOnError: true })).rejects.toThrow()
 
-    // Los tokens no los borra el cliente: los borra la rutina de fin de sesión que corre en
-    // onSessionExpired, la misma de salir (se prueba con la aplicación entera).
     expect(onSessionExpired).toHaveBeenCalledTimes(1)
   })
 

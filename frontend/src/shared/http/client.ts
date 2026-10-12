@@ -56,6 +56,7 @@ async function tryRefresh(): Promise<string | null> {
 // Ninguna de las dos se descarta: el ingreso abre una sesión, y la renovación la decide `renew`
 // con la generación, así su promesa siempre termina y no queda colgada en refreshInFlight. Desde
 // que el dedupe es por generación, descartarla no traba a nadie: la diferencia no se ve en pantalla.
+// Son también las únicas que no renuevan ante un 401: ver el interceptor de respuesta.
 function isLoginOrRefresh(url: string | undefined): boolean {
   return !!url && (url.endsWith('/auth/login') || url.endsWith('/auth/refresh'))
 }
@@ -79,7 +80,10 @@ export function configureSessionHttpClient(queryClient: QueryClient): void {
   configureHttpClient(() => expireSession(queryClient))
 }
 
-/** `onSessionExpired` tiene que borrar los tokens: la renovación fallida ya no los borra sola. */
+/**
+ * `onSessionExpired` tiene que terminar la sesión (borrar los tokens y cambiar la generación): la
+ * renovación fallida no borra nada sola, y el error del pedido se entrega si la generación no cambió.
+ */
 export function configureHttpClient(onSessionExpired: () => void): void {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined
   if (!apiBaseUrl) {
@@ -105,16 +109,11 @@ export function configureHttpClient(onSessionExpired: () => void): void {
       if (fromEndedSession(originalRequest)) return neverDelivered()
       const status = error.response?.status
 
-      // Endpoints de auth no deben disparar refresh:
-      // - /auth/refresh fallando = loop infinito
-      // - /auth/login/change-password 401 = credenciales mal, no token expirado.
-      //   Si refresheamos aca, podriamos sobreescribir tokens validos con los de
-      //   otra sesion vieja (refresh token huerfano en localStorage).
-      const url = originalRequest?.url ?? ''
-      const isAuthEndpoint =
-        url.endsWith('/auth/refresh') ||
-        url.endsWith('/auth/login') ||
-        url.endsWith('/auth/change-password')
+      // No renuevan el ingreso (su 401 es de las credenciales o de la cuenta, y renovar ahí podía
+      // pisar los tokens con los de una sesión vieja) ni la renovación (sería un bucle). Cambiar la
+      // contraseña sí: su 401 es siempre del token, porque la clave actual equivocada es un 400, y
+      // reintentar es seguro porque el servidor rechaza el token antes de escribir.
+      const isAuthEndpoint = isLoginOrRefresh(originalRequest?.url)
 
       if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
         originalRequest._retry = true
@@ -130,6 +129,9 @@ export function configureHttpClient(onSessionExpired: () => void): void {
           return client.instance.request(originalRequest)
         }
         onSessionExpired()
+        // La rutina de fin de sesión ya cambió la generación: el error tampoco se entrega. Si no, la
+        // pantalla que lo pidió pintaba su aviso camino al ingreso.
+        if (fromEndedSession(originalRequest)) return neverDelivered()
       }
 
       return Promise.reject(error)
