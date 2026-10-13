@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { passwordField } from './password'
 
 const ONLY_SPACES_MESSAGE = 'No puede tener solo espacios'
 
@@ -19,20 +20,12 @@ function notOnlySpaces(password: string): boolean {
   return ![...password].every(isServerWhitespace)
 }
 
-// Las constraints de password matchean el contrato OpenAPI (ChangePasswordRequest: minLength 8,
-// maxLength 100), más la clave en blanco que el servidor rechaza y el contrato no declara.
+// Las dos claves cuentan como el servidor (ver password.ts), más la clave en blanco que el servidor
+// rechaza y el contrato no declara.
 export const changePasswordSchema = z
   .object({
-    currentPassword: z
-      .string()
-      .min(8, 'Mínimo 8 caracteres')
-      .max(100, 'Máximo 100 caracteres')
-      .refine(notOnlySpaces, ONLY_SPACES_MESSAGE),
-    newPassword: z
-      .string()
-      .min(8, 'Mínimo 8 caracteres')
-      .max(100, 'Máximo 100 caracteres')
-      .refine(notOnlySpaces, ONLY_SPACES_MESSAGE),
+    currentPassword: passwordField().refine(notOnlySpaces, ONLY_SPACES_MESSAGE),
+    newPassword: passwordField().refine(notOnlySpaces, ONLY_SPACES_MESSAGE),
     confirmPassword: z.string(),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {

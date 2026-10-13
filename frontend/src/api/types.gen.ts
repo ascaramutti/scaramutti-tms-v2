@@ -35,6 +35,9 @@ export type UserRole = 'admin' | 'sales' | 'dispatcher' | 'general_manager' | 'o
 
 export type LoginRequest = {
     username: string;
+    /**
+     * Hasta 72 bytes en UTF-8, que es lo que procesa BCrypt: una letra con tilde ocupa 2 bytes y un emoji, 3 o más, así que cuántos caracteres entran depende de cuáles sean. Sin caracteres nulos ni surrogates sueltos. El servidor cuenta el mínimo de 8 en unidades UTF-16 (casi todos los emojis valen 2); minLength, que cuenta puntos de código, es más estricto solo con los caracteres fuera del plano básico, como esos emojis. Fuera de eso responde 400 COM-001 en el campo antes de buscar al usuario: la respuesta es la misma exista o no.
+     */
     password: string;
 };
 
@@ -63,7 +66,13 @@ export type RefreshRequest = {
 };
 
 export type ChangePasswordRequest = {
+    /**
+     * Las mismas reglas que newPassword: hasta 72 bytes en UTF-8, sin caracteres nulos ni surrogates sueltos y un mínimo de 8 unidades UTF-16. Fuera de eso responde 400 COM-001 en el campo.
+     */
     currentPassword: string;
+    /**
+     * Hasta 72 bytes en UTF-8, que es lo que procesa BCrypt: una letra con tilde ocupa 2 bytes y un emoji, 3 o más, así que cuántos caracteres entran depende de cuáles sean. Sin caracteres nulos ni surrogates sueltos. El servidor cuenta el mínimo de 8 en unidades UTF-16 (casi todos los emojis valen 2); minLength, que cuenta puntos de código, es más estricto solo con los caracteres fuera del plano básico, como esos emojis. Fuera de eso responde 400 COM-001 en el campo.
+     */
     newPassword: string;
 };
 
@@ -1837,7 +1846,7 @@ export type LoginData = {
 
 export type LoginErrors = {
     /**
-     * Solicitud inválida (campos faltantes o mal formados)
+     * Solicitud inválida (campos faltantes o mal formados, o una contraseña que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto)
      */
     400: Problem;
     /**
@@ -1895,7 +1904,7 @@ export type ChangePasswordData = {
 
 export type ChangePasswordErrors = {
     /**
-     * Validación de contraseña fallida o contraseña actual incorrecta
+     * Validación de contraseña fallida (también una que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto) o contraseña actual incorrecta
      */
     400: Problem;
     /**

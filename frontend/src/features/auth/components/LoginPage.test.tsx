@@ -4,12 +4,15 @@ import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { http, HttpResponse } from 'msw'
 import { toast } from 'sonner'
 import { LoginPage } from './LoginPage'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
-import { loginAsRoleResponse, loginErrorResponse } from '../../../test/mocks/handlers/auth'
+import { fakeLoginResponse, loginAsRoleResponse, loginErrorResponse } from '../../../test/mocks/handlers/auth'
+
+const API = 'http://localhost:8080/api/v1'
 
 function renderLogin(initialPath: string | { pathname: string; state: { from: string } } = LOGIN_PATH) {
   const queryClient = new QueryClient({
@@ -101,6 +104,41 @@ describe('LoginPage', () => {
     await waitFor(() => expect(screen.getByText(/mínimo 3 caracteres/i)).toBeInTheDocument())
     expect(spy).not.toHaveBeenCalled()
     server.events.removeListener('request:start', spy)
+  })
+
+  // BCrypt procesa hasta 72 bytes: 37 eñes son 37 caracteres, pero 74 bytes.
+  it('rechaza una contraseña de más de 72 bytes, sin llamar al servidor', async () => {
+    const user = userEvent.setup()
+    const spy = vi.fn()
+    server.use(http.post(`${API}/auth/login`, () => {
+      spy()
+      return HttpResponse.json(fakeLoginResponse)
+    }))
+    renderLogin()
+    await user.type(screen.getByLabelText(/usuario/i), 'admin')
+    await user.type(screen.getByLabelText(/contraseña/i), 'ñ'.repeat(37))
+    await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+    await waitFor(() =>
+      expect(screen.getByLabelText(/contraseña/i)).toHaveAccessibleDescription(
+        'Es demasiado larga: máximo 72 bytes; las tildes y los emojis cuentan doble o más',
+      ),
+    )
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('manda una contraseña de 72 bytes con tildes, tal cual', async () => {
+    const user = userEvent.setup()
+    const cuerpos: unknown[] = []
+    server.use(http.post(`${API}/auth/login`, async ({ request }) => {
+      cuerpos.push(await request.json())
+      return HttpResponse.json(fakeLoginResponse)
+    }))
+    renderLogin()
+    await user.type(screen.getByLabelText(/usuario/i), 'admin')
+    await user.type(screen.getByLabelText(/contraseña/i), 'á'.repeat(36))
+    await user.click(screen.getByRole('button', { name: /iniciar sesión/i }))
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(cuerpos).toEqual([{ username: 'admin', password: 'á'.repeat(36) }])
   })
 
   // ----- API integration -----

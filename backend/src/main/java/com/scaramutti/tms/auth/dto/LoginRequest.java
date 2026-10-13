@@ -1,5 +1,6 @@
 package com.scaramutti.tms.auth.dto;
 
+import com.scaramutti.tms.auth.validation.FitsBcrypt;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -13,8 +14,9 @@ public record LoginRequest(
              message = "solo letras, numeros, puntos, guiones y guion bajo")
     String username,
 
-    @Schema(description = "Contrasena del usuario", example = "Sales1234")
+    @Schema(description = "Contrasena del usuario: hasta 72 bytes UTF-8", example = "Sales1234")
     @NotBlank
-    @Size(min = 8, max = 100)
+    @Size(min = 8, message = "debe tener al menos 8 caracteres")
+    @FitsBcrypt
     String password
 ) {}

@@ -235,6 +235,23 @@ class PublishedContractTest {
         }
     }
 
+    /**
+     * Las tres contraseñas declaran el límite de BCrypt, en bytes: el cliente del frontend sale de
+     * este documento, y con el máximo de antes (100) quien lo siguiera mandaba claves que dan 400.
+     */
+    @Test
+    void publishedContract_limitsEveryPasswordTo72Bytes() {
+        JsonPath contract = publishedContract();
+        for (String field : List.of("LoginRequest.properties.password",
+                                    "ChangePasswordRequest.properties.currentPassword",
+                                    "ChangePasswordRequest.properties.newPassword")) {
+            String schema = "components.schemas." + field;
+            assertEquals(8, contract.getInt(schema + ".minLength"), field);
+            assertEquals(72, contract.getInt(schema + ".maxLength"), field);
+            assertTrue(contract.getString(schema + ".description").contains("72 bytes en UTF-8"), field);
+        }
+    }
+
     /** Cuántas veces aparece una referencia en todo el documento. */
     private static long refsTo(Object node, String ref) {
         if (node instanceof Map<?, ?> map) {

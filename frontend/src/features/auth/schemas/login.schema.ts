@@ -1,17 +1,15 @@
 import { z } from 'zod'
+import { passwordField } from './password'
 
-// Las constraints matchean exactamente las del backend (LoginRequest en el
-// contrato OpenAPI). Si el backend cambia, hay que actualizarlas aca tambien.
+// El usuario sigue a LoginRequest en el contrato OpenAPI y la contraseña cuenta como el servidor
+// (ver password.ts). Falta la clave hecha solo de espacios: el servidor la rechaza y acá no se avisa.
 export const loginSchema = z.object({
   username: z
     .string()
     .min(3, 'Mínimo 3 caracteres')
     .max(50, 'Máximo 50 caracteres')
     .regex(/^[a-zA-Z0-9._-]+$/, 'Solo letras, números, puntos, guiones y guión bajo'),
-  password: z
-    .string()
-    .min(8, 'Mínimo 8 caracteres')
-    .max(100, 'Máximo 100 caracteres'),
+  password: passwordField(),
 })
 
 export type LoginFormInput = z.infer<typeof loginSchema>

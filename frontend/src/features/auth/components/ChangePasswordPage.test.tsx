@@ -142,6 +142,46 @@ describe('ChangePasswordPage', () => {
     expect(spy).not.toHaveBeenCalled()
   })
 
+  // BCrypt procesa hasta 72 bytes: 37 eñes son 37 caracteres, pero 74 bytes.
+  it.each([
+    ['la actual', /^contraseña actual$/i, 'ñ'.repeat(37), 'NuevoPassword456'],
+    ['la nueva', /^nueva contraseña$/i, 'Password123', 'ñ'.repeat(37)],
+  ])('rechaza %s de más de 72 bytes, sin llamar al servidor', async (_campo, etiqueta, actual, nueva) => {
+    const user = userEvent.setup()
+    const spy = vi.fn()
+    server.use(http.post(`${API}/auth/change-password`, () => {
+      spy()
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), actual)
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), nueva)
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), nueva)
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    await waitFor(() =>
+      expect(screen.getByLabelText(etiqueta)).toHaveAccessibleDescription(
+        'Es demasiado larga: máximo 72 bytes; las tildes y los emojis cuentan doble o más',
+      ),
+    )
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('manda una nueva de 72 bytes con tildes, tal cual', async () => {
+    const user = userEvent.setup()
+    const cuerpos: unknown[] = []
+    server.use(http.post(`${API}/auth/change-password`, async ({ request }) => {
+      cuerpos.push(await request.json())
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'á'.repeat(36))
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'á'.repeat(36))
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(cuerpos).toEqual([{ currentPassword: 'Password123', newPassword: 'á'.repeat(36) }])
+  })
+
   it('NO llama al endpoint de change-password si el form es inválido', async () => {
     const user = userEvent.setup()
     // Solo nos importa change-password: el AuthProvider sí llama a /auth/me
