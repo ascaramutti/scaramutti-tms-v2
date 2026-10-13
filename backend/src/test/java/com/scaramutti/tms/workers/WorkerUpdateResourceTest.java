@@ -1000,7 +1000,7 @@ class WorkerUpdateResourceTest {
      * <p>Es el cuerpo que la guarda vieja no veia: reenvia el cargo del TRABAJADOR sin cambios, asi
      * que mirando esa fila no se mueve nada, mientras la cascada mueve el de la cuenta. Con las dos
      * filas divergentes, un administrador se degradaba solo y recibia 200. La divergencia se siembra
-     * a mano porque ninguna ruta de la aplicacion la produce.
+     * con los disparadores apagados porque ni la aplicacion ni la base la producen.
      */
     @Test
     void update_admin_demotingItsOwnAccountThroughTheCascade_returns403_WRK012() {
@@ -1773,7 +1773,7 @@ class WorkerUpdateResourceTest {
         var actor = fixtures.seedActor("general_manager", "97");
         int id = seedWorker("ZTESTE132", "operator");
         int userId = fixtures.seedUserFor(id, "ztestuser98b", "operator");
-        // La divergencia que hoy nada impide: la cuenta con un cargo por encima del actor.
+        // La divergencia, sembrada con los disparadores apagados: la cuenta por encima del actor.
         fixtures.setUserRole(userId, "admin");
 
         put(fabricateTokenForUser(actor.userId(), "ztestuser97", "general_manager"))

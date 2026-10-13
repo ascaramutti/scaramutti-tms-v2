@@ -491,7 +491,8 @@ public class WarehouseTestData {
     }
 
     /**
-     * Usuario de prueba sobre un trabajador ya sembrado; devuelve su id.
+     * Usuario de prueba sobre un trabajador ya sembrado; devuelve su id. {@code roleName} tiene que
+     * ser el cargo de ese trabajador, porque la base se lo copia: si no, falla.
      *
      * <p>El nombre DEBE empezar con el prefijo que usa la limpieza. Se comprueba acá y no se
      * confía en quien llama: la limpieza borra por prefijo, así que un nombre fuera de él
@@ -501,14 +502,19 @@ public class WarehouseTestData {
     public int seedUserFor(int workerId, String username, String roleName, boolean isActive) {
         requirePrefix(username, "ztestuser", "seedUserFor");
         return QuarkusTransaction.requiringNew().call(() -> {
-            Object id = entityManager.createNativeQuery(
+            Object[] seeded = (Object[]) entityManager.createNativeQuery(
                 "INSERT INTO public.users (username, password_hash, worker_id, role_id, is_active, created_at) "
                     + "VALUES (?1, 'ztest-no-login', ?2, "
-                    + "(SELECT id FROM public.roles WHERE name = ?3), ?4, CURRENT_TIMESTAMP) RETURNING id")
+                    + "(SELECT id FROM public.roles WHERE name = ?3), ?4, CURRENT_TIMESTAMP) "
+                    + "RETURNING id, (SELECT name FROM public.roles WHERE id = users.role_id)")
                 .setParameter(1, username).setParameter(2, workerId).setParameter(3, roleName)
                 .setParameter(4, isActive)
                 .getSingleResult();
-            return ((Number) id).intValue();
+            if (!roleName.equals(seeded[1])) {
+                throw new IllegalArgumentException("seedUserFor: la cuenta toma el cargo de su trabajador ("
+                    + seeded[1] + "), no " + roleName);
+            }
+            return ((Number) seeded[0]).intValue();
         });
     }
 
@@ -698,8 +704,8 @@ public class WarehouseTestData {
     }
 
     /**
-     * Le cambia el rol a un usuario de prueba, para medir que una regla lea el rol de la BASE
-     * y no el grupo del token.
+     * Le cambia el rol solo a la CUENTA de prueba ({@link #disableTriggersInThisTransaction}),
+     * para medir que una regla lea el rol de la BASE y no el grupo del token.
      *
      * <p>Exige el prefijo igual que el sembrador: sin eso, un descuido le cambia el rol al
      * administrador sembrado y deja en rojo toda la suite, en clases que no tienen nada que
@@ -707,6 +713,7 @@ public class WarehouseTestData {
      */
     public void setUserRole(int userId, String roleName) {
         QuarkusTransaction.requiringNew().run(() -> {
+            disableTriggersInThisTransaction();
             int changed = entityManager.createNativeQuery(
                 "UPDATE public.users SET role_id = (SELECT id FROM public.roles WHERE name = ?1) "
                     + "WHERE id = ?2 AND username LIKE 'ztestuser%'")
@@ -741,12 +748,14 @@ public class WarehouseTestData {
     }
 
     /**
-     * Le cambia el cargo al TRABAJADOR, gemelo de {@link #setUserRole(int, String)}.
+     * Le cambia el cargo solo al TRABAJADOR ({@link #disableTriggersInThisTransaction}), gemelo de
+     * {@link #setUserRole(int, String)}.
      *
      * <p>Existe para sembrar a mano la DIVERGENCIA entre el cargo de un trabajador y el de su
-     * cuenta. Ninguna ruta de la aplicacion la produce hoy —por eso hace falta sembrarla— y varias
-     * reglas se decidieron sobre el supuesto de que puede existir: sin este helper, esas reglas
-     * solo se pueden medir en la mitad de los casos en que rigen.
+     * cuenta. Ninguna ruta de la aplicacion la produce y desde la V012 la base tampoco la deja,
+     * pero varias reglas se decidieron sobre el supuesto de que puede existir y siguen mientras el
+     * codigo lea el rol de la cuenta: sin este helper, solo se miden en la mitad de los casos en
+     * que rigen.
      *
      * <p>Mismo guardia de prefijo que su gemelo, y por el mismo motivo: sin el, un descuido le
      * cambia el cargo a un trabajador sembrado del catalogo y deja en rojo clases que no tienen
@@ -754,6 +763,7 @@ public class WarehouseTestData {
      */
     public void setWorkerRole(int workerId, String roleName) {
         QuarkusTransaction.requiringNew().run(() -> {
+            disableTriggersInThisTransaction();
             int changed = entityManager.createNativeQuery(
                 "UPDATE public.workers SET role_id = (SELECT id FROM public.roles WHERE name = ?1) "
                     + "WHERE id = ?2 AND document_number LIKE 'ZTEST%'")
@@ -908,6 +918,17 @@ public class WarehouseTestData {
             entityManager.createNativeQuery(
                 "DELETE FROM public.roles WHERE name LIKE 'ztestrole%'").executeUpdate();
         });
+    }
+
+    /**
+     * Apaga los disparadores, tambien los de las claves foraneas, hasta el final de la transaccion
+     * en curso. La base copia el cargo del trabajador a su cuenta, asi que una divergencia solo se
+     * siembra asi, y las reglas que la miran siguen mientras el codigo lea el rol de la cuenta:
+     * este atajo se retira con ellas. Pide permiso sobre ese parametro: el rol de la base de tests
+     * lo tiene por ser superusuario, en desarrollo y en CI.
+     */
+    private void disableTriggersInThisTransaction() {
+        entityManager.createNativeQuery("SET LOCAL session_replication_role = replica").executeUpdate();
     }
 
     /** El nombre de un dato de prueba tiene que empezar con el prefijo que lo limpia. */

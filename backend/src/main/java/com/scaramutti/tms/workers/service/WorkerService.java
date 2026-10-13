@@ -376,13 +376,12 @@ public class WorkerService {
      * fila no esta.
      *
      * <p>DEUDA ANOTADA: la fila de la CUENTA se lee SIN bloqueo, se le mide el rango y se escribe
-     * al final. Hoy no es alcanzable —el unico otro escritor de esa columna es el sembrador de dev,
-     * y dos ediciones del mismo trabajador ya se serializan en el bloqueo de arriba— pero el primer
-     * endpoint del modulo de usuarios que la escriba convierte esto en un rango medido sobre un
-     * valor que otra transaccion movio. El presupuesto de esperas YA cuenta esa fila, asi que
-     * tomarla con bloqueo no obliga a recontar. El disparador es ese, y esta escrito ACA porque es
-     * donde lo va a leer quien toque este metodo: un puntero a un documento fuera del repositorio
-     * seria una deuda que solo existe si alguien encuentra el documento.
+     * al final. Desde la V012 la base le fija el rol desde la fila del trabajador, que esta edicion
+     * ya tiene tomada: solo escaparia a estas reglas una cuenta creada o pasada de trabajador en
+     * paralelo, y hoy ninguna ruta lo hace (el sembrador crea cuentas con trabajadores nuevos). El
+     * presupuesto de esperas YA cuenta esa fila. Se vuelve real con el primer endpoint que cree o
+     * mueva cuentas, que tiene que tomar antes la fila del trabajador; esta escrita ACA porque es
+     * donde la va a leer quien toque este metodo, no en un documento fuera del repositorio.
      */
     @Transactional
     public WorkerDetailResponse updateWorker(UpdateWorkerCommand updateWorkerCommand) {
@@ -403,11 +402,10 @@ public class WorkerService {
         User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
         workerRankPolicy.assertCanChangeRoleOf(worker, user, newRole);
         if (user != null) {
-            // Tambien sobre el rol de la CUENTA, que es la fila que esta operacion escribe. Hoy
-            // siempre coincide con el del trabajador, pero NADA lo obliga: no hay restriccion que
-            // los ate, y el modulo de usuarios que viene puede asignar el rol de la cuenta por su
-            // lado. Sin esto, la jerarquia se mediria sobre una fila y la escritura caeria sobre
-            // otra. Mientras coincidan, esta linea no cambia ninguna respuesta.
+            // Tambien sobre el rol de la CUENTA, que es la fila que esta operacion escribe. Desde la
+            // V012 la base la iguala al cargo del trabajador, asi que esta linea no cambia ninguna
+            // respuesta; queda mientras el codigo lea el rol de la cuenta, para que la jerarquia se
+            // mida sobre la misma fila en la que cae la escritura.
             workerRankPolicy.assertCanActOn(user.role);
         }
         assertUserKeepsLogin(user, newRole);
@@ -610,10 +608,11 @@ public class WorkerService {
      *
      * <p>Solo aplica si el cargo DE LA CUENTA cambia. Sin esa condicion, alguien que ya estuviera
      * en ese estado no se podria editar nunca mas, ni para corregirle una errata en el telefono.
-     * Que la condicion mire la cuenta tiene un precio escrito: si las dos filas divergen y la
-     * cuenta esta en un cargo con sesion mientras el trabajador esta en uno sin ella, todo cuerpo
-     * que reenvie el del trabajador sale por aca, y esa ficha no se puede editar sin moverle
-     * tambien el cargo. Es deliberado: converger o rechazar, nunca mover la cuenta en silencio.
+     * Que la condicion mire la cuenta tiene un precio escrito, que desde la V012 la base no deja
+     * pagar: si las dos filas divergen y la cuenta esta en un cargo con sesion mientras el
+     * trabajador esta en uno sin ella, todo cuerpo que reenvie el del trabajador sale por aca, y
+     * esa ficha no se puede editar sin moverle tambien el cargo. Es deliberado: converger o
+     * rechazar, nunca mover la cuenta en silencio.
      *
      * <p>Y cuenta que la fila de usuario EXISTA, no que este vigente: una cuenta apagada se puede
      * volver a encender, y filtrarla aca dejaria armada justo la cuenta rota que esto previene.
@@ -760,9 +759,8 @@ public class WorkerService {
      */
     private void applyUserRole(User user, Role newRole, WorkerFieldChanges changes) {
         // Se compara contra el rol de la CUENTA y no contra el del trabajador, porque es el que
-        // esta linea escribe y audita. Hoy los dos coinciden siempre, pero la guarda de rango de
-        // mas arriba existe justamente porque nada lo obliga: si divergieran, comparar el del
-        // trabajador dejaria la cuenta con su rol viejo y sin fila de rastro.
+        // esta linea escribe y audita. Desde la V012 la base los iguala; si divergieran igual,
+        // comparar el del trabajador dejaria el cambio de la cuenta sin fila de rastro.
         if (user == null || user.role.id.equals(newRole.id)) {
             return;
         }

@@ -118,9 +118,9 @@ public class WorkerRankPolicy {
      *
      * <p>MIRA LAS DOS FILAS PORQUE LA EDICION ESCRIBE LAS DOS, y lo que otorga los permisos es
      * la de la CUENTA: el token sale de ahi. Mientras las dos coincidan, la segunda comparacion
-     * no cambia ninguna respuesta; si divergen —y nada en la base lo impide— mirar solo la del
-     * trabajador deja pasar el cuerpo que reenvia el cargo del trabajador sin cambios mientras
-     * la cascada mueve el de la cuenta. Con eso, un administrador se degrada solo y recibe 200.
+     * no cambia ninguna respuesta (desde la V012 la base las iguala); si divergieran, mirar solo
+     * la del trabajador dejaria pasar el cuerpo que reenvia el cargo del trabajador sin cambios
+     * mientras la cascada mueve el de la cuenta, y un administrador se degradaria solo con 200.
      * Basta con preguntar por la propia ficha para alcanzar las dos filas: la columna que liga
      * una cuenta a su trabajador es UNICA, asi que un trabajador tiene a lo sumo una cuenta y es
      * la del actor.

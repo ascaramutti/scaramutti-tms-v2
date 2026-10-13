@@ -20,7 +20,9 @@ ejecuta la V001 completa.
    columna, agregar columna nullable) y **coordinados** (se anuncian en el TABLERO).
    Renombrar/borrar en `public`: prohibido mientras v1 viva.
 5. **VIEWs y funciones** → `R__` (repeatable): se re-aplican cuando cambia su contenido, no
-   se versionan.
+   se versionan. Excepción: la función de un disparador va en la migración versionada que lo crea
+   (ej. la V012), porque los `R__` corren después de todas las versionadas y el disparador la
+   necesita al crearse.
 6. `out-of-order=false` (default): el orden de aplicación es ley.
 7. Sin rollback automático (Flyway community): revertir = **migración compensatoria** nueva
    + PITR/backup como red de seguridad.
