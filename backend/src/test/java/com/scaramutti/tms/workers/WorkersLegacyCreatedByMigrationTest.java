@@ -120,7 +120,7 @@ class WorkersLegacyCreatedByMigrationTest {
         int workerId = insertWorker(connection, documentNumber, null, null);
         return intOf(connection,
             "INSERT INTO public.users (worker_id, username, password_hash, role_id) VALUES ("
-                + workerId + ", '" + username + "', 'ztest', " + roleId(connection, "admin") + ") RETURNING id");
+                + workerId + ", '" + username + "', 'ztest', " + roleId(connection, "operator") + ") RETURNING id");
     }
 
     private int insertWorker(Connection connection, String documentNumber, Integer createdBy, Integer updatedBy)

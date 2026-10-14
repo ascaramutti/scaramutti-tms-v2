@@ -375,7 +375,7 @@ class WorkerStatusResourceTest {
         int id = fixtures.seedWorker("ZTESTS030", "Juan", "Pérez", "driver", true);
         fixtures.seedDriverProfileFor(id, "ZTESTLS030", null, WarehouseTestData.STATUS_AVAILABLE, true);
         int driverId = fixtures.driverRowOf(id).id();
-        int userId = fixtures.seedUserFor(id, "ztestuserS030", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuserS030", "driver");
 
         post(token, id, DEACTIVATE).statusCode(200);
         assertTrue(!fixtures.workerRowOf(id).isActive());
@@ -846,7 +846,7 @@ class WorkerStatusResourceTest {
         boolean startsActive = DEACTIVATE.equals(operation);
         int id = fixtures.seedWorker("ZTESTS070", "Juan", "Pérez", "driver", startsActive);
         fixtures.seedDriverProfileFor(id, "ZTESTLS070", null, WarehouseTestData.STATUS_AVAILABLE, startsActive);
-        int userId = fixtures.seedUserFor(id, "ztestuserS070", "sales", startsActive);
+        int userId = fixtures.seedUserFor(id, "ztestuserS070", "driver", startsActive);
         String sql = switch (table) {
             case "workers" -> "SELECT id FROM public.workers WHERE id = ? FOR NO KEY UPDATE";
             case "drivers" -> "SELECT id FROM public.drivers WHERE worker_id = ? FOR UPDATE";
