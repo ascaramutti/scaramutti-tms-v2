@@ -179,4 +179,21 @@ class WorkerUniquenessPreChecksTest {
         assertTrue(userRepository.findByWorkerIdOptional(id).isEmpty());
     }
 
+    /** La pregunta de la regla de cargo sin sesion: una cuenta apagada tambien cuenta. */
+    @Test
+    void existsByWorkerId_countsAnInactiveUser() {
+        int id = fixtures.seedWorker("ZTESTU032", "Ana", "Silva", "sales", true);
+        int userId = fixtures.seedUserFor(id, "ztestuser501", "sales");
+        fixtures.setUserActive(userId, false);
+
+        assertTrue(userRepository.existsByWorkerId(id), "una cuenta apagada se puede volver a encender");
+    }
+
+    @Test
+    void existsByWorkerId_withoutUser_isFalse() {
+        int id = fixtures.seedWorker("ZTESTU033", "Ana", "Silva", "operator", true);
+
+        assertFalse(userRepository.existsByWorkerId(id));
+    }
+
 }

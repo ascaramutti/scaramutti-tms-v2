@@ -119,8 +119,8 @@ class WorkersLegacyCreatedByMigrationTest {
     private int createUser(Connection connection, String username, String documentNumber) throws SQLException {
         int workerId = insertWorker(connection, documentNumber, null, null);
         return intOf(connection,
-            "INSERT INTO public.users (worker_id, username, password_hash, role_id) VALUES ("
-                + workerId + ", '" + username + "', 'ztest', " + roleId(connection, "operator") + ") RETURNING id");
+            "INSERT INTO public.users (worker_id, username, password_hash) VALUES ("
+                + workerId + ", '" + username + "', 'ztest') RETURNING id");
     }
 
     private int insertWorker(Connection connection, String documentNumber, Integer createdBy, Integer updatedBy)

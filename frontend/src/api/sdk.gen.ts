@@ -884,7 +884,7 @@ export const getWarehouseReport = <ThrowOnError extends boolean = false>(options
  *
  * Las filas activas de `public.roles`, en el orden del organigrama
  * (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
- * que viaja en `role` del request y en `users.role`), nombre visible
+ * que viaja en `role` del request y en el rol de la sesión), nombre visible
  * (`description`, el cargo que muestran el pie del menú y el PDF),
  * nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
  * de conductor. El mismo catálogo para todos los roles: el cliente
@@ -980,8 +980,8 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * o `409 WRK-007`).
  *
  * Organigrama (RN-09): el nivel del rol del cuerpo tiene que ser
- * estrictamente menor al nivel del rol de la sesión (el de `users.role`,
- * leído de la base) → si no, `403 WRK-006`. `admin` está exento.
+ * estrictamente menor al nivel del rol de la sesión (el cargo de su
+ * trabajador, leído de la base) → si no, `403 WRK-006`. `admin` está exento.
  * `hireDate` futura se acepta: el backend no la rechaza a propósito, para
  * permitir correcciones a mano; la guarda es del formulario. Deja una fila
  * de auditoría `CREATED`. `isActive`, `createdAt`, `createdBy`,
@@ -1046,7 +1046,7 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
 });
 
 /**
- * Actualizar un trabajador (su ficha de conductor y, si tiene usuario, el rol del usuario)
+ * Actualizar un trabajador y su ficha de conductor
  *
  * Reemplaza los datos editables con las mismas validaciones, normalización
  * y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
@@ -1073,24 +1073,16 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * documento por su código, nunca por su id ni por su nombre visible: un
  * renombre dejaría el historial mintiendo.
  *
- * Rol y usuario (RN-15): si el trabajador tiene usuario y `role` cambia,
- * `users.role` queda con el rol nuevo en la MISMA transacción (los
- * permisos rigen en el próximo inicio de sesión o refresco; la sesión
- * abierta conserva el rol viejo hasta que venza su access token) y la
- * auditoría registra el cambio del trabajador y el del usuario. Cambiar a
- * un rol que no inicia sesión a alguien que tiene usuario → `400
- * WRK-011`: una cuenta no puede quedar con un rol sin permisos; el camino
- * para dejar a alguien sin acceso es desactivarlo. Cuenta que la fila de
- * usuario EXISTA, esté activa o no.
- *
- * El rol contra el que se mide "cambia" es el de la CUENTA, no el
- * guardado en el trabajador: es la fila que esta operación escribe y la
- * que otorga los permisos. Hoy los dos coinciden siempre y nada en esta
- * API los separa, pero nada los obliga a coincidir, y con la comparación
- * sobre el trabajador un cuerpo que reenvía su cargo sin cambios movería
- * la cuenta en silencio. Por el mismo motivo, `WRK-012` mira las DOS
- * filas: nadie cambia su propio cargo ni en el trabajador ni en su
- * cuenta.
+ * Rol y usuario (RN-15): el rol de una cuenta del sistema es el cargo de
+ * su trabajador. Si `role` cambia, la cuenta queda con el rol nuevo en la
+ * MISMA transacción (los grupos del token rigen hasta el próximo inicio de
+ * sesión o refresco; `/auth/me` y las escrituras de trabajadores ya leen el
+ * cargo nuevo), y el cambio de cargo deja una sola fila de auditoría, la
+ * del cargo: la cuenta no suma otra.
+ * Cambiar a un rol que no inicia sesión a alguien que tiene usuario →
+ * `400 WRK-011`: una cuenta no puede quedar con un rol sin permisos; el
+ * camino para dejar a alguien sin acceso es desactivarlo. Cuenta que la
+ * fila de usuario EXISTA, esté activa o no.
  *
  * Ficha (RN-11): si hay fila en `drivers`, `driver` la actualiza
  * (`status` ausente → se conserva el actual, a diferencia del alta); si
@@ -1106,19 +1098,13 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * reactivarlo es lo que la vuelve a encender, y encenderla acá devolvería a
  * esa persona al combobox de conductores sin pasar por ahí.
  *
- * Organigrama (RN-09): el nivel del rol ACTUAL del trabajador, el del rol
- * NUEVO y el del rol de su CUENTA del sistema, si la tiene, tienen que ser
- * los tres estrictamente menores al nivel del rol de la sesión; si uno no
- * lo es → `403 WRK-006`. El de la cuenta se mira aparte porque es la fila
- * que esta operación escribe, y nada obliga a que coincida con el del
- * trabajador. `admin` exento. Nadie
- * cambia su propio cargo, tampoco `admin` → `403 WRK-012`, y se miran las
- * DOS filas que la edición mueve: la del trabajador y la de su cuenta. Un
- * `admin` sí edita el resto de su propia ficha. Mientras las dos filas
- * coincidan, a quien no es `admin` la regla de niveles ya lo frena antes,
- * con `WRK-006`, porque su propio cargo es de su propio nivel; si
- * divergen y la del trabajador quedó en un cargo de nivel menor, pasa esa
- * regla y llega a `WRK-012`.
+ * Organigrama (RN-09): el nivel del rol ACTUAL del trabajador y el del rol
+ * NUEVO tienen que ser los dos estrictamente menores al nivel del rol de
+ * la sesión; si uno no lo es → `403 WRK-006`. `admin` exento. Nadie
+ * cambia su propio cargo, tampoco `admin` → `403 WRK-012`. Un `admin` sí
+ * edita el resto de su propia ficha. A quien no es `admin` la regla de
+ * niveles ya lo frena antes, con `WRK-006`, porque su propio cargo es de
+ * su propio nivel.
  *
  * Concurrencia: toma la fila del trabajador y también la del trabajador de
  * la sesión, en orden, antes de validar: dos escrituras sobre el mismo
@@ -1136,7 +1122,7 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * vacío, nulo o campo inválido, incluida la ficha) → `404 WRK-001` (el
  * `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
  * actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
- * `403 WRK-006` (rol de la cuenta) → `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
+ * `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
  * WRK-009` → `409 WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
  * puede escribir (cuenta apagada, rol actual en la base fuera de los cuatro de
  * escritura, o trabajador dado de baja) sale como `403 COM-003` en el primer
@@ -1168,9 +1154,9 @@ export const updateWorker = <ThrowOnError extends boolean = false>(options: Opti
  *
  * Nadie desactiva su propio trabajador (el de `users.worker_id` de la
  * sesión), tampoco `admin` → `403 WRK-010`. Organigrama (RN-09): el nivel
- * del rol actual del trabajador, y el del rol de su cuenta si la tiene,
- * tiene que ser estrictamente menor al de la sesión → si no, `403
- * WRK-006`; `admin` exento, y un `admin` puede desactivar a otro `admin`.
+ * del rol actual del trabajador tiene que ser estrictamente menor al de
+ * la sesión → si no, `403 WRK-006`; `admin` exento, y un `admin` puede
+ * desactivar a otro `admin`.
  * Las guardas corren antes del corte idempotente: repetir sobre alguien
  * fuera de rango responde `403`.
  *
@@ -1189,8 +1175,7 @@ export const updateWorker = <ThrowOnError extends boolean = false>(options: Opti
  * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
  * cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
  * dado de baja) →
- * `403 WRK-010` → `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la
- * cuenta) → `200`.
+ * `403 WRK-010` → `403 WRK-006` (rol actual) → `200`.
  *
  */
 export const deactivateWorker = <ThrowOnError extends boolean = false>(options: Options<DeactivateWorkerData, ThrowOnError>): RequestResult<DeactivateWorkerResponses, DeactivateWorkerErrors, ThrowOnError> => (options.client ?? client).post<DeactivateWorkerResponses, DeactivateWorkerErrors, ThrowOnError>({
@@ -1211,8 +1196,8 @@ export const deactivateWorker = <ThrowOnError extends boolean = false>(options: 
  * cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
  * llega uno, o cualquier `Content-Type`, se ignora.
  *
- * Organigrama (RN-09): igual que desactivar, sobre el rol actual y el de
- * la cuenta (`403 WRK-006`, `admin` exento). Reactivarse a uno mismo no es
+ * Organigrama (RN-09): igual que desactivar, sobre el rol actual
+ * (`403 WRK-006`, `admin` exento). Reactivarse a uno mismo no es
  * posible: con su trabajador dado de baja, quien actúa no está
  * habilitado para escribir (`403 COM-003`). Auditoría, solo cuando hubo cambio: una fila
  * `REACTIVATED` por el trabajador y otra si se encendió la ficha
@@ -1224,7 +1209,7 @@ export const deactivateWorker = <ThrowOnError extends boolean = false>(options: 
  * `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
  * cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
  * dado de baja) →
- * `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la cuenta) → `200`.
+ * `403 WRK-006` (rol actual) → `200`.
  *
  */
 export const reactivateWorker = <ThrowOnError extends boolean = false>(options: Options<ReactivateWorkerData, ThrowOnError>): RequestResult<ReactivateWorkerResponses, ReactivateWorkerErrors, ThrowOnError> => (options.client ?? client).post<ReactivateWorkerResponses, ReactivateWorkerErrors, ThrowOnError>({

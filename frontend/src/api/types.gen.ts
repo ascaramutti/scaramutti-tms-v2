@@ -1073,7 +1073,7 @@ export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
 
 /**
  * Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
- * nombre de sistema (el que llevan `users.role` y el token de sesión, y
+ * nombre de sistema (el que llevan el rol de la sesión y su token, y
  * el que se manda en `role` del request); `description` es el nombre
  * visible del cargo: es el `position` de todo objeto de usuario embebido
  * (sesión, cotizaciones, almacén, operaciones y el detalle de un

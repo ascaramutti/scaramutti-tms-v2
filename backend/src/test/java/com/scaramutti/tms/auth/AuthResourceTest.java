@@ -2,14 +2,19 @@ package com.scaramutti.tms.auth;
 
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
+import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.restassured.path.json.JsonPath;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.List;
 
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,6 +26,7 @@ import static org.hamcrest.Matchers.notNullValue;
 class AuthResourceTest {
 
     @Inject UserRepository userRepository;
+    @Inject WarehouseTestData fixtures;
 
     @Test
     void login_withValidCredentials_returnsToken() {
@@ -43,6 +49,37 @@ class AuthResourceTest {
             .body("user.position", equalTo("Ejecutivo de Ventas"))
             .body("user.role", equalTo("sales"))
             .body("user.fullName", equalTo("Valeria Torres"));
+    }
+
+    /**
+     * El grupo del token, el que mira cada @RolesAllowed, es el cargo de su trabajador. La cuenta de
+     * prueba no se llama como su cargo: con las sembradas (admin, sales) el nombre pasaria igual.
+     */
+    @Test
+    void login_theTokenCarriesTheCargoOfTheWorkerAsItsGroup() {
+        try {
+            int workerId = fixtures.seedWorker("ZTESTGRP1", "Grupo", "Token", "dispatcher", true);
+            int userId = fixtures.seedUserFor(workerId, "ztestusergrupo1", "dispatcher");
+            fixtures.copyPasswordHashFrom(userId, "sales");
+
+            String token = given()
+                .contentType(ContentType.JSON)
+                .body("""
+                    {"username":"ztestusergrupo1","password":"Sales1234"}
+                    """)
+            .when()
+                .post("/auth/login")
+            .then()
+                .statusCode(200)
+                .extract().path("token");
+
+            String payload =
+                new String(Base64.getUrlDecoder().decode(token.split("\\.")[1]), StandardCharsets.UTF_8);
+            assertEquals(List.of("dispatcher"), JsonPath.from(payload).getList("groups"));
+        } finally {
+            fixtures.deleteTestWorkerDependents();
+            QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestWorkers());
+        }
     }
 
     @Test

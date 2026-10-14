@@ -25,16 +25,18 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
         return find(User_.USERNAME, username).singleResultOptional();
     }
 
-    /**
-     * El usuario de un trabajador, o vacio. Hay a lo sumo uno: la columna es unica.
-     *
-     * <p>NO filtra por vigente a proposito. Quien pregunta esto esta decidiendo si un cambio de
-     * cargo dejaria una cuenta con un rol sin permisos, y una cuenta apagada tambien se puede
-     * volver a encender: filtrarla aca dejaria armada exactamente la cuenta rota que esa regla
-     * existe para evitar.
-     */
+    /** El usuario de un trabajador, o vacio. Hay a lo sumo uno: la columna es unica. */
     public Optional<User> findByWorkerIdOptional(Integer workerId) {
         return find("worker.id", workerId).singleResultOptional();
+    }
+
+    /**
+     * Si el trabajador tiene usuario, sin cargarlo. NO filtra por vigente a proposito: quien
+     * pregunta decide si un cambio de cargo dejaria una cuenta con un rol sin permisos, y una
+     * cuenta apagada se puede volver a encender.
+     */
+    public boolean existsByWorkerId(Integer workerId) {
+        return count("worker.id", workerId) > 0;
     }
 
     /**
@@ -56,7 +58,7 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
     public boolean isEnabledToWrite(Integer userId, Collection<String> roleNames) {
         return getEntityManager().createQuery(
                 "SELECT count(u) FROM User u WHERE u.id = :userId AND u.isActive = true "
-                    + "AND u.role.name IN :roleNames AND u.worker.isActive = true", Long.class)
+                    + "AND u.worker.role.name IN :roleNames AND u.worker.isActive = true", Long.class)
             .setParameter("userId", userId).setParameter("roleNames", roleNames)
             .getSingleResult() > 0;
     }

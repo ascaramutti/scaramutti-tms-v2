@@ -565,6 +565,31 @@ class WarehouseProductsResourceTest {
             .body("updatedAt", notNullValue());
     }
 
+    /**
+     * El creador embebido lleva como rol el cargo de su trabajador. La cuenta de prueba no se llama
+     * como su cargo: con admin, un rol leido del nombre de usuario pasaria igual.
+     */
+    @Test
+    void create_theEmbeddedCreator_carriesTheCargoOfItsWorkerAsItsRole() {
+        try {
+            int actorUserId = fixtures.seedActorUser("warehouse_keeper", "P1");
+            given()
+                .header("Authorization", "Bearer " + fabricateTokenForUser(actorUserId, "ztestuserP1", "warehouse_keeper"))
+                .contentType(ContentType.JSON)
+                .body(productJson("ZTEST_Rol del creador", CATEGORY_FILTROS, UNIT_UND, null, null, null, "1", null, null))
+            .when()
+                .post("/warehouse/products")
+            .then()
+                .statusCode(201)
+                .body("createdBy.username", equalTo("ztestuserP1"))
+                .body("createdBy.role", equalTo("warehouse_keeper"));
+        } finally {
+            QuarkusTransaction.requiringNew().run(() -> fixtures.deleteWarehouseTestData());
+            fixtures.deleteTestWorkerDependents();
+            QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestWorkers());
+        }
+    }
+
     @Test
     void create_ignoresClientProvidedCode_autogeneratesInstead() {
         // El SKU es system-owned: si un cliente stale manda `code`, se ignora

@@ -18,9 +18,9 @@ import java.util.Set;
  *
  * <p>Vive sola y no adentro del servicio porque la usan todas las escrituras del modulo y
  * tienen que decidir igual: dos copias de esta regla es la forma en que una jerarquia se pudre.
- * El alta pregunta por el cargo del cuerpo; la edicion pregunta por el actual, por el nuevo y
- * por el de la cuenta; el cambio de estado, por el actual y el de la cuenta. Esta clase no sabe
- * cual de ellas la llama, y por eso no tuvo que cambiar cuando llegaron las otras.
+ * El alta pregunta por el cargo del cuerpo; la edicion, por el actual y por el nuevo; el cambio
+ * de estado, por el actual. Esta clase no sabe cual de ellas la llama, y por eso no tuvo que
+ * cambiar cuando llegaron las otras.
  *
  * <p>EL NIVEL DEL ACTOR SE LEE DE LA BASE, no del token, y no es un detalle: el token no lleva
  * el nivel, y su grupo de rol puede estar viejo, porque cambiar el cargo de un trabajador con
@@ -55,10 +55,10 @@ public class WorkerRankPolicy {
      */
     public void assertCanActOn(Role targetRole) {
         User actor = requireActor();
-        if (EXEMPT_ROLE.equals(actor.role.name)) {
+        if (EXEMPT_ROLE.equals(actor.worker.role.name)) {
             return;
         }
-        if (targetRole.level >= actor.role.level) {
+        if (targetRole.level >= actor.worker.role.level) {
             throw WorkersError.ROLE_OUT_OF_RANK.toException();
         }
     }
@@ -89,7 +89,7 @@ public class WorkerRankPolicy {
 
     /**
      * El usuario de la sesion, leido de la base, y habilitado HOY para escribir: cuenta vigente,
-     * uno de los cuatro roles de escritura en su fila y su trabajador activo. El token vale hasta
+     * su trabajador activo y en uno de los cuatro cargos de escritura. El token vale hasta
      * que vence y su rol puede ser viejo: sin esto, a alguien dado de baja o bajado de cargo le
      * quedaba una ventana para escribir y firmar el rastro. Sin actor habilitado no es un caso
      * del modulo sino el 403 comun: no es que el cargo este fuera de alcance, es que no hay quien.
@@ -98,14 +98,14 @@ public class WorkerRankPolicy {
     private User requireActor() {
         return userRepository.findByIdOptional(currentUser.requireId())
             .filter(user -> Boolean.TRUE.equals(user.isActive))
-            .filter(user -> WRITE_ROLES.contains(user.role.name))
             .filter(user -> user.worker != null && Boolean.TRUE.equals(user.worker.isActive))
+            .filter(user -> WRITE_ROLES.contains(user.worker.role.name))
             .orElseThrow(CommonError.FORBIDDEN::toException);
     }
 
     /**
-     * Exige que quien tiene la sesion no se cambie el cargo a SI MISMO, en NINGUNA de las dos
-     * filas que una edicion mueve: la del trabajador y la de su cuenta del sistema.
+     * Exige que quien tiene la sesion no se cambie el cargo a SI MISMO. Su cuenta toma el cargo
+     * del trabajador, asi que basta con mirar esa fila.
      *
      * <p>No es rango, y por eso es un metodo aparte y no una rama del de arriba: el rango compara
      * niveles y tiene al administrador exento, y esta regla es justamente sobre el administrador,
@@ -116,27 +116,12 @@ public class WorkerRankPolicy {
      * empresa sin administradores por esta API, sin que ninguna otra regla lo note. Editarse el
      * resto de la ficha sigue permitido; lo unico cerrado es el cargo.
      *
-     * <p>MIRA LAS DOS FILAS PORQUE LA EDICION ESCRIBE LAS DOS, y lo que otorga los permisos es
-     * la de la CUENTA: el token sale de ahi. Mientras las dos coincidan, la segunda comparacion
-     * no cambia ninguna respuesta (desde la V012 la base las iguala); si divergieran, mirar solo
-     * la del trabajador dejaria pasar el cuerpo que reenvia el cargo del trabajador sin cambios
-     * mientras la cascada mueve el de la cuenta, y un administrador se degradaria solo con 200.
-     * Basta con preguntar por la propia ficha para alcanzar las dos filas: la columna que liga
-     * una cuenta a su trabajador es UNICA, asi que un trabajador tiene a lo sumo una cuenta y es
-     * la del actor.
-     *
      * @throws com.scaramutti.tms.shared.exception.ApiException si el trabajador es el de la
-     *         sesion y cambia el cargo de cualquiera de las dos filas.
+     *         sesion y el cargo cambia.
      */
-    public void assertCanChangeRoleOf(Worker targetWorker, User targetAccount, Role newRole) {
+    public void assertCanChangeRoleOf(Worker targetWorker, Role newRole) {
         User actor = requireActor();
-        if (!actor.worker.id.equals(targetWorker.id)) {
-            return;
-        }
-        boolean mueveElCargoDelTrabajador = !targetWorker.role.id.equals(newRole.id);
-        boolean mueveElCargoDeLaCuenta =
-            targetAccount != null && !targetAccount.role.id.equals(newRole.id);
-        if (mueveElCargoDelTrabajador || mueveElCargoDeLaCuenta) {
+        if (actor.worker.id.equals(targetWorker.id) && !targetWorker.role.id.equals(newRole.id)) {
             throw WorkersError.SELF_ROLE_CHANGE.toException();
         }
     }

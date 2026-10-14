@@ -113,9 +113,8 @@ class WorkersSchemaMigrationTest {
     }
 
     /**
-     * El rol del trabajador es el de su usuario. Es la invariante que sostiene que cambiar
-     * el cargo cambie los permisos: si se rompe, alguien tiene un cargo que dice una cosa y
-     * un acceso que dice otra.
+     * Ninguna cuenta guarda en su columna un rol distinto del cargo de su trabajador. Desde la
+     * V012 lo garantiza la base; el caso se va con la columna.
      */
     @Test
     void everyWorkerWithUser_carriesTheRoleOfItsUser() throws SQLException {

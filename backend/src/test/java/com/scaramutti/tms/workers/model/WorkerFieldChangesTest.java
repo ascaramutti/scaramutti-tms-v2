@@ -140,7 +140,6 @@ class WorkerFieldChangesTest {
         esperado.put("driver.licenseCategory", "Categoría de licencia");
         esperado.put("driver.status", "Disponibilidad");
         esperado.put("driver.isActive", "Ficha de conductor");
-        esperado.put("user.role", "Rol del usuario");
         esperado.put("isActive", "Trabajador");
         esperado.put("user.isActive", "Usuario del sistema");
 

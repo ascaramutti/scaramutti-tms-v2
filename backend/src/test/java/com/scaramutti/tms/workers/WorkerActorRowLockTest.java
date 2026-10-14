@@ -13,7 +13,6 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
-import org.junit.jupiter.params.provider.ValueSource;
 
 import javax.sql.DataSource;
 import java.sql.Connection;
@@ -235,13 +234,14 @@ class WorkerActorRowLockTest {
 
     /**
      * Quien escribe tiene que quedar INHABILITADO mientras espera su propia fila: otra transaccion la
-     * retiene y le apaga la cuenta sin confirmar. El corte previo lo deja pasar (todavia no se ve), y
-     * al confirmar la otra, la validacion de despues del bloqueo tiene que verlo. Validando antes de
-     * bloquear, la escritura prosperaria con la cuenta ya apagada.
+     * retiene y le apaga la cuenta, o le baja el cargo, sin confirmar. El corte previo lo deja pasar
+     * (todavia no se ve), y al confirmar la otra, la validacion de despues del bloqueo tiene que
+     * verlo. Validando antes de bloquear, la escritura prosperaria ya inhabilitada.
      */
-    @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {"alta", "reactivate"})
-    void aWriterDisabledWhileItWaitsForItsOwnRow_isRejected_notWritten(String operation) throws Exception {
+    @ParameterizedTest(name = "{0} en {1}")
+    @CsvSource({"cuenta_apagada, alta", "cuenta_apagada, reactivate", "cargo_bajado, alta", "cargo_bajado, reactivate"})
+    void aWriterDisabledWhileItWaitsForItsOwnRow_isRejected_notWritten(String condition, String operation)
+            throws Exception {
         var actor = seedEditableActor("general_manager", "H9");
         String token = fabricateTokenForUser(actor.userId(), "ztestuserH9", "general_manager");
         int target = fixtures.seedWorker("ZTESTH917", "Juan", "Pérez", "operator", false);
@@ -250,11 +250,12 @@ class WorkerActorRowLockTest {
             holder.setAutoCommit(false);
             try (PreparedStatement row = holder.prepareStatement(
                     "SELECT id FROM public.workers WHERE id = ? FOR NO KEY UPDATE");
-                 PreparedStatement off = holder.prepareStatement(
-                    "UPDATE public.users SET is_active = false WHERE id = ?")) {
+                 PreparedStatement off = holder.prepareStatement("cuenta_apagada".equals(condition)
+                    ? "UPDATE public.users SET is_active = false WHERE id = ?"
+                    : "UPDATE public.workers SET role_id = (SELECT id FROM public.roles WHERE name = 'sales') WHERE id = ?")) {
                 row.setInt(1, actor.workerId());
                 row.executeQuery().close();
-                off.setInt(1, actor.userId());
+                off.setInt(1, "cuenta_apagada".equals(condition) ? actor.userId() : actor.workerId());
                 off.executeUpdate();
             }
             Future<String> writing = executor.submit(() -> write(token, operation, target,

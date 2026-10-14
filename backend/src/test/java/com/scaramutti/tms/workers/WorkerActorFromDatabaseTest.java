@@ -24,8 +24,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
- * Quien escribe tiene que estar habilitado HOY, leido de la base: cuenta vigente, rol de escritura
- * en su fila y trabajador activo. El token no alcanza: vale hasta que vence y su rol puede ser
+ * Quien escribe tiene que estar habilitado HOY, leido de la base: cuenta vigente y trabajador
+ * activo, en un cargo de escritura. El token no alcanza: vale hasta que vence y su rol puede ser
  * viejo. Cada condicion se mide con tres actores en las cuatro escrituras, contra la fila, y la
  * fila "ninguna" es el control: con el mismo montaje y sin la condicion, la escritura prospera.
  */
