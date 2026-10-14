@@ -54,7 +54,7 @@ public class AuthService {
             throw AuthError.USER_INACTIVE.toException();
         }
 
-        LOG.infof("Login exitoso [username=%s, id=%d, role=%s]", user.username, user.id, user.role.name);
+        LOG.infof("Login exitoso [username=%s, id=%d, role=%s]", user.username, user.id, user.worker.role.name);
         return buildLoginResponse(user);
     }
 

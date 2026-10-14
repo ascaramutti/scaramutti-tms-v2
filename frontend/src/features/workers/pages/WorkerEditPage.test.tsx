@@ -268,9 +268,9 @@ describe('WorkerEditPage', () => {
   })
 
   /**
-   * La propia ficha se reconoce por el trabajador de la sesión, no por su cuenta. Mientras el rol de
-   * la cuenta y el cargo del trabajador coincidan, solo el admin llega a editarla: a los demás, su
-   * propio cargo ya les cierra el formulario.
+   * La propia ficha se reconoce por el trabajador de la sesión, no por su cuenta. La cuenta toma el
+   * cargo de su trabajador, así que solo el admin llega a editarla: a los demás, su propio cargo ya
+   * les cierra el formulario, salvo con una sesión anterior a un cambio de su cargo.
    */
   describe('la propia ficha', () => {
     const propia = (overrides: Partial<WorkerDetailResponse> = {}) =>
@@ -303,19 +303,19 @@ describe('WorkerEditPage', () => {
       expect(sink.bodies?.[0]).toMatchObject({ lastName: 'Pérez Huamána', role: 'admin' })
     })
 
-    /** Un cargo sin acceso, que el desplegable no le ofrecería a quien tiene usuario: igual se muestra y viaja. */
     it('a quien no es admin, con su trabajador en un cargo menor, también le queda fijo', async () => {
       const user = userEvent.setup()
       const sink = capturar()
-      renderPage(propia({ role: rol('operator') }), 'operations_manager')
+      renderPage(propia({ role: rol('warehouse_keeper') }), 'operations_manager')
       await listo()
       expect(cargo()).toBeDisabled()
-      expect(cargo()).toHaveValue('operator')
+      expect(cargo()).toHaveValue('warehouse_keeper')
+      expect(within(cargo()).getAllByRole('option').map((option) => option.getAttribute('value'))).toEqual(['', 'warehouse_keeper'])
       await cambiarApellido(user)
       await user.click(guardar())
 
       await waitFor(() => expect(sink.bodies).toHaveLength(1))
-      expect(sink.bodies?.[0]).toMatchObject({ role: 'operator' })
+      expect(sink.bodies?.[0]).toMatchObject({ role: 'warehouse_keeper' })
     })
 
     it('la ficha con el id de su cuenta es ajena: el Cargo se cambia como siempre', async () => {

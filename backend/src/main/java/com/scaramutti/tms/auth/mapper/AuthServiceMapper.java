@@ -24,8 +24,8 @@ import java.time.ZoneOffset;
 public interface AuthServiceMapper {
 
     /**
-     * Compone UserResponse desde User + Worker (relacion @OneToOne EAGER) +
-     * Role (relacion @ManyToOne EAGER). El {@code fullName} usa el metodo
+     * Compone UserResponse desde User + Worker (relacion @OneToOne EAGER) + el
+     * cargo del trabajador, que da el rol y el cargo visible. El {@code fullName} usa el metodo
      * {@code Worker#fullName()} via expression (MapStruct no detecta metodos
      * sin prefijo {@code get}). Toda cuenta tiene trabajador: la columna
      * {@code users.worker_id} es obligatoria, unica y clave foranea.
@@ -36,7 +36,7 @@ public interface AuthServiceMapper {
      */
     @Mapping(target = "fullName", expression = "java(user.worker.fullName())")
     @Mapping(target = "position", source = "worker.role.description")
-    @Mapping(target = "role",     source = "role.name")
+    @Mapping(target = "role",     source = "worker.role.name")
     UserResponse toUserResponse(User user);
 
     /**
@@ -47,7 +47,7 @@ public interface AuthServiceMapper {
      */
     @Mapping(target = "fullName", expression = "java(user.worker.fullName())")
     @Mapping(target = "position", source = "worker.role.description")
-    @Mapping(target = "role",     source = "role.name")
+    @Mapping(target = "role",     source = "worker.role.name")
     @Mapping(target = "workerId", source = "worker.id")
     SessionUserResponse toSessionUserResponse(User user);
 

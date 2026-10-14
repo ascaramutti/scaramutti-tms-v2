@@ -61,10 +61,6 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        Role role = new Role();
-        role.id = 1;
-        role.name = "sales";
-
         Worker worker = new Worker();
         worker.id = 10;
         worker.firstName = "Valeria";
@@ -79,7 +75,6 @@ class AuthServiceTest {
         user.username = "sales";
         user.passwordHash = "hashed-password";
         user.worker = worker;
-        user.role = role;
         user.isActive = true;
 
         sessionUserResponse = new SessionUserResponse(100, "sales", "Valeria Torres", "Ejecutivo de Ventas", "sales", true, 10);

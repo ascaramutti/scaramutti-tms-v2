@@ -537,9 +537,9 @@ describe('WorkerDetailPage', () => {
     })
 
     /**
-     * La propia ficha se reconoce por el trabajador de la sesión, no por su cuenta. Mientras el rol de
-     * la cuenta y el cargo del trabajador coincidan, solo el admin la ve con acciones: a los demás,
-     * su propio cargo ya los deja en solo lectura.
+     * La propia ficha se reconoce por el trabajador de la sesión, no por su cuenta. La cuenta toma el
+     * cargo de su trabajador, así que solo el admin la ve con acciones: a los demás, su propio cargo
+     * ya los deja en solo lectura, salvo con una sesión anterior a un cambio de su cargo.
      */
     describe('la propia ficha', () => {
       it('el admin no ve Desactivar en la suya, y sí Editar', async () => {
@@ -549,7 +549,7 @@ describe('WorkerDetailPage', () => {
       })
 
       it('a quien no es admin, con su trabajador en un cargo menor, tampoco se le ofrece', async () => {
-        await abrirComo(trabajador({ id: TRABAJADOR_DE_LA_SESION }), 'operations_manager')
+        await abrirComo(trabajador({ id: TRABAJADOR_DE_LA_SESION, role: ALMACEN, hasUser: true }), 'operations_manager')
         expect(screen.getByRole('link', { name: 'Editar' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: /Desactivar|Reactivar/ })).not.toBeInTheDocument()
       })

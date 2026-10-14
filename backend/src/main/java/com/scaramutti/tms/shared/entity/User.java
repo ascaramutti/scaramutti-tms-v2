@@ -7,7 +7,6 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import org.hibernate.annotations.DynamicUpdate;
@@ -16,10 +15,11 @@ import java.time.OffsetDateTime;
 
 /*
  * `@DynamicUpdate` porque transacciones distintas escriben esta fila sin coordinarse: el cambio
- * de contrasena, y la edicion y el cambio de estado de un trabajador. Con la escritura de
- * columnas completas, la que llegue segunda pisa lo que la primera acababa de guardar, y una de
- * las dos se pierde sin ningun error. Escribiendo solo lo que cada una cambia, las dos tocan
- * columnas distintas y ninguna borra a la otra.
+ * de contrasena y el cambio de estado de un trabajador. Con la escritura de columnas completas,
+ * la que llegue segunda pisa lo que la primera acababa de guardar y una se pierde sin error;
+ * escribiendo solo lo que cada una cambia, ninguna borra a la otra. Y un UPDATE que liste
+ * `worker_id` despierta el disparador que toma la fila del trabajador: contra una baja o un
+ * cambio de cargo en curso, PostgreSQL abortaria una de las dos.
  */
 @DynamicUpdate
 @Entity
@@ -39,10 +39,6 @@ public class User {
 
     @Column(name = "password_hash", nullable = false)
     public String passwordHash;
-
-    @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "role_id", nullable = false)
-    public Role role;
 
     @Column(name = "is_active", nullable = false)
     public Boolean isActive = true;

@@ -64,8 +64,9 @@ class UsersRoleFollowsWorkerMigrationTest {
     }
 
     /**
-     * El archivo los deja encendidos en el modo de siempre. En ALWAYS correrian tambien con los
-     * disparadores apagados por sesion, y los tests que siembran una divergencia no podrian.
+     * El archivo los deja en el modo de siempre, el de las claves foraneas, y no en ALWAYS: una
+     * carga en modo replica los salta igual que a ellas, sin una regla mas estricta que la
+     * integridad referencial.
      */
     @Test
     void theFile_leavesBothTriggersEnabled() throws SQLException {
@@ -82,7 +83,7 @@ class UsersRoleFollowsWorkerMigrationTest {
     @Test
     void withDivergentAccounts_theMigrationAborts_namingExactlyThose() throws SQLException {
         inRollback(connection -> {
-            dropTriggersAndAlignLeftovers(connection);
+            dropTriggersAndFunctions(connection);
             int above = insertUser(connection, insertWorker(connection, "ZTESTSYNC1", "sales", true),
                 "ztestusersync1", "admin", true);
             int below = insertUser(connection, insertWorker(connection, "ZTESTSYNC13", "admin", false),
@@ -308,7 +309,7 @@ class UsersRoleFollowsWorkerMigrationTest {
     /** Corre el bloque sobre los disparadores que deja el archivo, no sobre los de la base. */
     private void inFreshMigration(SqlBlock block) throws SQLException {
         inRollback(connection -> {
-            dropTriggersAndAlignLeftovers(connection);
+            dropTriggersAndFunctions(connection);
             runMigration(connection);
             block.run(connection);
         });
@@ -316,18 +317,14 @@ class UsersRoleFollowsWorkerMigrationTest {
 
     /**
      * Saca los disparadores y sus funciones con un tope de 5 s: sin el, si otra conexion tiene
-     * tomada una de las tablas el test espera para siempre. Una corrida cortada de otra clase puede
-     * dejar una divergencia sembrada en una cuenta de prueba: aca se iguala, para que la guarda no
-     * la cuente.
+     * tomada una de las tablas el test espera para siempre.
      */
-    private void dropTriggersAndAlignLeftovers(Connection connection) throws SQLException {
+    private void dropTriggersAndFunctions(Connection connection) throws SQLException {
         execute(connection, "SET LOCAL lock_timeout = '5s'");
         execute(connection, "DROP TRIGGER IF EXISTS users_role_from_worker ON public.users");
         execute(connection, "DROP TRIGGER IF EXISTS workers_role_to_account ON public.workers");
         execute(connection, "DROP FUNCTION IF EXISTS public.users_role_from_worker()");
         execute(connection, "DROP FUNCTION IF EXISTS public.workers_role_to_account()");
-        execute(connection, "UPDATE public.users u SET role_id = w.role_id FROM public.workers w"
-            + " WHERE w.id = u.worker_id AND u.role_id <> w.role_id AND u.username LIKE 'ztestuser%'");
     }
 
     private void runMigration(Connection connection) throws SQLException {

@@ -62,7 +62,7 @@ public class UserLookup {
      * en vez de omitirlo en silencio del mapa.
      *
      * <p>Nota de performance (igual que antes en ListQuotationsService): las
-     * asociaciones EAGER de {@code User} (worker, role) generan SELECTs extra de
+     * asociaciones EAGER de {@code User} (worker y su cargo) generan SELECTs extra de
      * Hibernate por cada creador distinto K, no por page size — K = tamaño del
      * equipo, mismo costo que el login. {@code batch-fetch-size} global lo
      * colapsaría cross-módulo si hiciera falta.
