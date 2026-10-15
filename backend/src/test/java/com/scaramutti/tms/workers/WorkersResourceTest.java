@@ -25,7 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Integration tests de GET /workers. Hermetico: los workers de test se siembran con
  * {@code document_number} prefijo ZTEST y se limpian en {@code @AfterEach}. La tabla
- * {@code public.workers} es COMPARTIDA con v1 (tiene data real), asi que las aserciones
+ * {@code public.workers} tiene datos que no son del test, asi que las aserciones
  * "sin filtro" son por PRESENCIA del registro sembrado (find/hasItem), nunca por tamano.
  */
 @QuarkusTest

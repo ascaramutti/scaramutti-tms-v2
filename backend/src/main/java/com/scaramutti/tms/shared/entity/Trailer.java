@@ -8,7 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Carreta de la flota ({@code public.trailers}, catálogo compartido con v1). Vista mínima
+ * Carreta de la flota ({@code public.trailers}, catálogo que viene de la v1). Vista mínima
  * (id + placa + activo), solo-lectura desde almacén (resuelve la unidad destino del retiro).
  */
 @Entity

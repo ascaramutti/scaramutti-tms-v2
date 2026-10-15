@@ -355,8 +355,8 @@ public class AddServiceResourcesService {
      * la lea no podria distinguir "se asigno el viaje" de "salio un relevo".
      *
      * <p>Todo valor que entra a una linea se aplasta, no solo el texto del usuario: el nombre del
-     * conductor y las placas salen de tablas del sistema anterior, que SI tiene formularios para
-     * escribirlas, y un salto de linea ahi planta una linea falsa con el formato del servidor.
+     * conductor y las placas salen de catalogos que este modulo no escribe ni valida, y un salto
+     * de linea ahi planta una linea falsa con el formato del servidor.
      */
     private void writeReinforcementEvent(Service service, AddedResources resources,
             List<ServiceResourceConflictResponse> conflicts,

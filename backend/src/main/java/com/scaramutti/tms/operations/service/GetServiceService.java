@@ -37,8 +37,8 @@ import java.util.stream.Stream;
  *
  * <p>El cliente, el tipo de carga y la moneda se leen por su id en vez de viajar como relaciones
  * de la entidad: el schema {@code operaciones} guarda los ids sueltos contra tablas de
- * {@code public} que son de v1, y mapearlas como asociaciones ataria este modulo al ciclo de vida
- * de un schema que todavia comparte con el sistema viejo.
+ * {@code public} que este modulo no escribe, y mapearlas como asociaciones ataria este modulo al
+ * ciclo de vida de esas tablas.
  */
 @ApplicationScoped
 public class GetServiceService {

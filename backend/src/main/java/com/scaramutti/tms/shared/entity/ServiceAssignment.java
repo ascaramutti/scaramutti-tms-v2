@@ -22,8 +22,8 @@ import java.time.OffsetDateTime;
  * al lado de cada conductor adicional cuando exista.
  *
  * <p>Los recursos son ids sueltos y no asociaciones, igual que en {@link Service} y por el mismo
- * motivo: viven en el schema {@code public} que se comparte con el sistema anterior, y mapearlos
- * como asociaciones ataria este modulo a ese schema.
+ * motivo: viven en el schema {@code public}, que este modulo no escribe, y mapearlos como
+ * asociaciones ataria este modulo a ese schema.
  */
 @Entity
 @Table(name = "service_assignments", schema = "operaciones")

@@ -12,8 +12,8 @@ import java.util.Optional;
 
 /**
  * Repositorio del catalogo de conductores (GET /drivers). Vive en {@code shared/repository/}
- * por convencion del proyecto: {@code public.drivers} es de v1 y no tiene modulo dueno en v2.
- * El id es {@code Integer} (la tabla de v1 es SERIAL, no BIGSERIAL).
+ * por convencion del proyecto: {@code public.drivers} la escribe trabajadores (la ficha de
+ * conductor) y la leen otros modulos. El id es {@code Integer} (la tabla viene de la v1, SERIAL).
  *
  * <p>El listado no devuelve entidades: el nombre sale de {@code public.workers} y la
  * disponibilidad de {@code public.resource_statuses}, asi que la consulta los une y proyecta

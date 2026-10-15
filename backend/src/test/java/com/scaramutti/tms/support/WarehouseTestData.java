@@ -35,9 +35,9 @@ import static io.restassured.RestAssured.given;
  * Molde hermético (igual que {@link HermeticTestData}): todo se siembra con prefijo
  * {@code ZTEST_} (o placa/documento propios) y se borra por ese prefijo en el {@code @AfterEach}
  * del test. Las tablas de {@code public} (workers, tractors, trailers, escort_vehicles,
- * document_types, resource_statuses) son COMPARTIDAS con v1: por eso la flota se limpia por los
- * ids que estos fixtures sembraron, más un barrido de respaldo por el rango de placas reservado
- * para los tests (ver {@link #deleteTestFleet()}).
+ * document_types, resource_statuses) tienen datos que no son de los tests: por eso la flota se
+ * limpia por los ids que estos fixtures sembraron, más un barrido de respaldo por el rango de
+ * placas reservado para los tests (ver {@link #deleteTestFleet()}).
  */
 @ApplicationScoped
 public class WarehouseTestData {
@@ -252,9 +252,9 @@ public class WarehouseTestData {
     }
 
     // ---------- flota (tractores / semirremolques / escoltas) -------------------
-    // public.tractors/trailers/escort_vehicles son COMPARTIDAS con v1: cada id sembrado se
-    // anota para borrarlo uno por uno al final. brand/model son opcionales (solo /fleet-units
-    // los verifica); el estado por defecto es "disponible".
+    // public.tractors/trailers/escort_vehicles tienen unidades que no son del test: cada id
+    // sembrado se anota para borrarlo uno por uno al final. brand/model son opcionales (solo
+    // /fleet-units los verifica); el estado por defecto es "disponible".
 
     public int seedTractor(String plate) {
         return seedTractor(plate, true);
@@ -403,8 +403,8 @@ public class WarehouseTestData {
             .setParameter(1, TEST_PLATE_PATTERN).executeUpdate();
         // Segundo barrido, para las placas que los tests fabrican CON caracteres de control: no
         // matchean el patron de arriba (el salto no es un digito) y, si una corrida se aborta
-        // antes del @AfterEach, quedan para siempre en la base que se comparte con el sistema
-        // anterior y hacen reventar por unicidad a la corrida siguiente.
+        // antes del @AfterEach, quedan para siempre en la base compartida de dev y hacen reventar
+        // por unicidad a la corrida siguiente.
         entityManager.createNativeQuery(
                 "DELETE FROM " + table + " WHERE plate ~ '^Z[FTRO]' AND plate ~ '[[:cntrl:]]'")
             .executeUpdate();

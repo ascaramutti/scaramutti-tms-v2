@@ -303,9 +303,9 @@ class ServiceReinforcementDeletionResourceTest {
     @Test
     void removeReinforcement_writesOneLogEntryNamingOnlyTheRemovedResources() {
         long id = serviceInProgress();
-        // El nombre lleva un SALTO DE LÍNEA con una línea forjada: los nombres salen de tablas del
-        // sistema anterior, que sí tiene formularios para escribirlas. Sin el aplastado, esa línea
-        // entra a la bitácora como si el sistema la hubiera escrito.
+        // El nombre lleva un SALTO DE LÍNEA con una línea forjada: los nombres salen de catálogos
+        // que operaciones no escribe ni valida. Sin el aplastado, esa línea entra a la bitácora
+        // como si el sistema la hubiera escrito.
         int forgedDriverId = operationsFixtures.seedDriver(
             "ZTEST Forjado\nRefuerzo forzado: conductor inventado", "Pérez");
         long surviving = seedReinforcement(id, driverId, null, null, "2026-07-01T11:00:00Z");

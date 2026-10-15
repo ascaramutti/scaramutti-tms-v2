@@ -19,9 +19,13 @@ ejecuta la V001 completa.
 4. **`public` fue la zona compartida con v1**: mientras v1 vivió, solo cambios
    **aditivos-compatibles** (ampliar columna, agregar columna nullable) y **coordinados** (se
    anuncian en el TABLERO). v1 se apagó en el cutover de la v2.4.0 (2026-08-30): desde entonces
-   se puede borrar o renombrar en `public` lo que la imagen en producción ya no lee, o lo que sí
-   lee con esa imagen apagada en la ventana (ej. la V013). Lo que borra datos solo se deshace con
-   el respaldo de la regla 7.
+   se puede borrar o renombrar en `public` lo que la imagen en producción ya no lee (ej. la V014),
+   o lo que sí lee con esa imagen apagada en la ventana (ej. la V013). Lo que borra datos solo se
+   deshace con el respaldo de la regla 7. Borrar una columna o una tabla con claves foráneas hacia
+   tablas vivas las toma también en exclusivo: va con el bloqueo previo con `NOWAIT` y reintentos
+   de la V013 y la V014, sobre todas las tablas que toma (se miden con `pg_locks`). Ese bloqueo
+   pide ser dueño de cada tabla que nombra o tener `UPDATE`, `DELETE` o `TRUNCATE` sobre ella; el
+   borrado solo, no.
 5. **VIEWs y funciones** → `R__` (repeatable): se re-aplican cuando cambia su contenido, no
    se versionan. Excepción: la función de un disparador va en la migración versionada que lo crea
    (ej. la V012), porque los `R__` corren después de todas las versionadas y el disparador la

@@ -89,8 +89,8 @@ class ServiceUpdateResourceTest {
         operationsFixtures.deleteTestServices();
         // La sintética se borra DESPUÉS de los servicios que la referencian, y solo si algún caso
         // la sembró. Los casos que dan de baja una moneda usan esa y nunca PEN o USD:
-        // `public.currencies` lo comparte el sistema anterior corriendo, y apagarle una moneda
-        // —aunque sea por un instante— le rompe el wizard de cotizaciones.
+        // `public.currencies` la lee en vivo el asistente de cotizaciones, y apagarle una moneda
+        // (aunque sea por un instante) se lo rompe a quien lo esté usando.
         if (disposableCurrencyId != null) {
             fixtures.cleanupDisposableCurrency();
             disposableCurrencyId = null;

@@ -270,14 +270,14 @@ public class AssignServiceResourcesService {
      * <p>La bitacora tiene UNA linea por dato, asi que cualquier salto de linea que se cuele
      * planta una linea FALSA con el formato del servidor, en un rastro que despues nadie puede
      * editar ni borrar. El texto del usuario es el camino obvio, pero no es el unico: el nombre
-     * del conductor y las placas salen de tablas del sistema anterior, que SI tiene formularios
-     * para escribirlas, y el codigo del otro viaje sale de una columna. Aplastar solo la nota
+     * del conductor y las placas salen de catalogos que este modulo no escribe ni valida, y el
+     * codigo del otro viaje sale de una columna. Aplastar solo la nota
      * seria cerrar la puerta y dejar la ventana abierta.
      */
     private String flat(String value) {
-        // El nombre del conductor sale de un JOIN contra los trabajadores del sistema anterior y
-        // puede venir vacio si esa fila no esta: sin esto, la bitacora guardaria literalmente
-        // "Conductor: null" en un rastro que despues nadie puede corregir.
+        // El nombre del conductor sale de un JOIN contra los trabajadores y puede venir vacio si
+        // esa fila no esta: sin esto, la bitacora guardaria literalmente "Conductor: null" en un
+        // rastro que despues nadie puede corregir.
         return ServiceLogText.display(value);
     }
 
