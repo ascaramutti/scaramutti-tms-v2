@@ -203,8 +203,8 @@ public class RemoveServiceResourceService {
     }
 
     /**
-     * Los nombres y placas salen de tablas del sistema anterior, que si tiene formularios para
-     * escribirlas: se aplastan por el mismo motivo que en el alta, que es de SEGURIDAD y no de
+     * Los nombres y placas salen de catalogos que este modulo no escribe ni valida: se aplastan
+     * por el mismo motivo que en el alta, que es de SEGURIDAD y no de
      * formato (una linea forjada entraria a la bitacora como si la hubiera escrito el sistema).
      *
      * <p>⚠️ Solo esta EJERCITADO sobre el nombre del conductor: el caso de la nota forja el salto ahi

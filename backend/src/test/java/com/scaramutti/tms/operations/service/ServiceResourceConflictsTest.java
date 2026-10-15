@@ -27,7 +27,7 @@ import static org.mockito.Mockito.when;
  * <p>Existe por un caso concreto: al extraer esta clase de la asignacion, el aplastado de textos
  * paso de {@code display} a {@code flattenLineBreaks}, y la diferencia es que el primero NOMBRA el
  * vacio y el segundo deja pasar el null. El nombre del conductor sale de un JOIN contra los
- * trabajadores del sistema anterior y puede venir nulo, asi que la regresion escribia
+ * trabajadores y puede venir nulo, asi que la regresion escribia
  * "el conductor null" en la bitacora, que es un rastro que despues nadie corrige.
  *
  * <p>Por HTTP ese caso es dificil de montar —la clave foranea impide dejar un conductor sin
@@ -187,7 +187,7 @@ class ServiceResourceConflictsTest {
 
     /**
      * Mismo motivo que el caso del conflicto forzable: el nombre sale de un JOIN contra los
-     * trabajadores del sistema anterior y puede venir nulo. Sin {@code display}, el mensaje diría
+     * trabajadores y puede venir nulo. Sin {@code display}, el mensaje diría
      * "El conductor null ya participa de este servicio".
      */
     @Test

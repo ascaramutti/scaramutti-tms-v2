@@ -32,8 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Integration tests de GET /drivers. Hermetico: cada conductor de test siembra su propio
  * trabajador y se limpia en {@code @AfterEach} por los ids sembrados (NUNCA por prefijo de
- * licencia: {@code public.drivers} es COMPARTIDA con v1). Los conductores se borran ANTES que
- * los trabajadores, que son su FK. Aserciones por PRESENCIA: la tabla tiene data real.
+ * licencia: {@code public.drivers} tiene fichas que no son del test). Los conductores se
+ * borran ANTES que los trabajadores, que son su FK. Aserciones por PRESENCIA: la tabla tiene
+ * data real.
  */
 @QuarkusTest
 class DriversResourceTest {

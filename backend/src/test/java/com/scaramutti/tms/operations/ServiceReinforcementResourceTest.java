@@ -405,9 +405,9 @@ class ServiceReinforcementResourceTest {
     }
 
     /**
-     * Y tampoco puede hacerlo un dato que salga de las tablas del sistema anterior, que SÍ tiene
-     * formularios para escribirlo. El nombre del conductor es el vector realista: la placa no
-     * entra en el ataque porque su columna admite seis caracteres.
+     * Y tampoco puede hacerlo un dato que salga de un catálogo que operaciones no escribe ni
+     * valida. El nombre del conductor es el vector realista: la placa no entra en el ataque porque
+     * su columna admite seis caracteres.
      */
     @Test
     void addResources_withNewlinesInADriverName_cannotForgeLogLines() {
@@ -424,8 +424,8 @@ class ServiceReinforcementResourceTest {
 
     /**
      * Y por las placas, que son DOS líneas de producción distintas de la del conductor: sacarles
-     * el aplastado no ponía rojo ningún caso. Salen de las tablas del sistema anterior, que sí
-     * tiene formularios para escribirlas.
+     * el aplastado no ponía rojo ningún caso. Salen de catálogos que operaciones no escribe ni
+     * valida.
      */
     @ParameterizedTest
     @ValueSource(strings = {"TRACTOR", "TRAILER"})
@@ -435,7 +435,7 @@ class ServiceReinforcementResourceTest {
         // Arranca con "ZO" y NO con "Z\n": el barrido de respaldo de la limpieza busca
         // ^Z[FTRO] + caracter de control, asi que una placa cuyo SEGUNDO caracter es el salto se
         // le escapa. Si una corrida se aborta entre el seed y el @AfterEach, esa fila queda viva
-        // en una columna UNIQUE de una base compartida con el sistema anterior, y la corrida
+        // en una columna UNIQUE de la base compartida de dev, y la corrida
         // siguiente revienta en el ARMADO por unicidad.
         int unitId = "TRACTOR".equals(kind)
             ? operationsFixtures.seedTractorWithPlate("ZO\nX9")
@@ -486,10 +486,10 @@ class ServiceReinforcementResourceTest {
     @Test
     void addResources_signsTheTraceWithTheAddingUser() {
         long id = serviceInProgress();
-        // sales y NO cscaramutti: el sembrador de dev garantiza admin, sales e inactivo, y
-        // nada mas. cscaramutti existe en la base de desarrollo porque la comparte con el sistema
-        // anterior, asi que el caso pasaba local y reventaba en la CI virgen — y el rojo salia del
-        // ARMADO ("usuario sembrado no encontrado"), que no se lee como un problema del endpoint.
+        // sales, que el sembrador de dev garantiza, y NO una cuenta que solo tenga la base de
+        // desarrollo (asi era cscaramutti): esa pasaba local y reventaba en la CI virgen, y el rojo
+        // salia del ARMADO ("usuario sembrado no encontrado"), que no se lee como un problema del
+        // endpoint.
         // El rol se fabrica en el token; lo unico que el caso necesita es un usuario REAL distinto
         // del que creo el viaje, porque assigned_by tiene clave foranea.
         int dispatcherId = fixtures.userId("sales");

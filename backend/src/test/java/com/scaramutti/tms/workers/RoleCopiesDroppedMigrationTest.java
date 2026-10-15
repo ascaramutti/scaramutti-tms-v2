@@ -8,9 +8,6 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.postgresql.util.PSQLException;
 
 import javax.sql.DataSource;
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -21,11 +18,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
-import static com.scaramutti.tms.support.LockWaiters.UNTIL_IT_ARRIVES_MILLIS;
 import static com.scaramutti.tms.support.LockWaiters.backendPid;
+import static com.scaramutti.tms.support.MigrationLocks.awaitRetry;
+import static com.scaramutti.tms.support.MigrationLocks.firstStatementOf;
+import static com.scaramutti.tms.support.MigrationLocks.lockWaitSamples;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -105,6 +103,8 @@ class RoleCopiesDroppedMigrationTest {
             });
             assertTrue(awaitRetry(observer, migrationPid, locked),
                 "la migracion tiene que estar reintentando antes de la segunda lectura");
+            assertEquals(0, lockWaitSamples(observer, migrationPid, 300),
+                "la migracion espero en la cola en vez de reintentar");
 
             long startNanos = System.nanoTime();
             assertDoesNotThrow(() -> execute(reader, "SELECT count(*) FROM public." + second));
@@ -150,39 +150,6 @@ class RoleCopiesDroppedMigrationTest {
                 gaveUp.getServerErrorMessage().getMessage());
             migration.rollback();
             holder.rollback();
-        }
-    }
-
-    /** Si la migracion llego a dormir entre dos intentos: probo y alguna tabla estaba tomada. */
-    private boolean awaitRetry(Connection observer, int migrationPid, Future<?> orDone)
-            throws Exception {
-        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(UNTIL_IT_ARRIVES_MILLIS);
-        try (PreparedStatement query = observer.prepareStatement(
-                "SELECT count(*) FROM pg_stat_activity WHERE pid = ? AND wait_event = 'PgSleep'")) {
-            query.setInt(1, migrationPid);
-            while (!orDone.isDone() && System.nanoTime() < deadline) {
-                try (ResultSet rows = query.executeQuery()) {
-                    rows.next();
-                    if (rows.getInt(1) == 1) {
-                        return true;
-                    }
-                }
-                Thread.sleep(5);
-            }
-        }
-        return false;
-    }
-
-    /** La primera sentencia del archivo, sin sus comentarios: el bloque del bloqueo. */
-    private String firstStatementOf(String resource) throws IOException {
-        try (InputStream in = Thread.currentThread().getContextClassLoader().getResourceAsStream(resource)) {
-            assertNotNull(in, "no se encontro " + resource);
-            String code = new String(in.readAllBytes(), StandardCharsets.UTF_8).lines()
-                .filter(line -> !line.startsWith("--"))
-                .collect(java.util.stream.Collectors.joining("\n")).strip();
-            assertTrue(code.startsWith("DO $$"),
-                "la primera sentencia no es el bloqueo: " + code.lines().findFirst().orElse(""));
-            return code.substring(0, code.indexOf("END $$;") + "END $$;".length());
         }
     }
 

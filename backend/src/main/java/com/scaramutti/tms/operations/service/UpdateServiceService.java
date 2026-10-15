@@ -63,7 +63,7 @@ public class UpdateServiceService {
      * <p>El tope de espera lo pone la lectura con lock y rige hasta que la transaccion termina,
      * asi que desde ahi cualquier sentencia puede rendirse: las lecturas de catalogo, las
      * escrituras, y las media docena de consultas que arman el detalle de la respuesta. Todas
-     * tocan tablas que este modulo no controla solo —la base la comparte el sistema anterior— y a
+     * tocan tablas que este modulo no controla solo (los catalogos de public no los escribe) y a
      * cualquiera la puede frenar un DDL durante un deploy. Traducirlas por tramos deja huecos que
      * salen como error del servidor donde el contrato declara un 409 transitorio; envolver la
      * operacion entera los cierra, con una excepcion conocida: el COMMIT ocurre despues de que

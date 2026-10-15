@@ -66,9 +66,9 @@ public class ServiceResourceConflicts {
             // un bloque de texto tendria el mismo agujero que la bitacora cierra.
             conflicts.add(new ServiceResourceConflictResponse(
                 // display() y no flattenLineBreaks(): ademas de aplastar, NOMBRA el vacio. El
-                // nombre sale de un JOIN contra los trabajadores del sistema anterior y puede venir
-                // nulo si esa fila no esta; sin esto la bitacora guarda "el conductor null" en un
-                // rastro que despues nadie puede corregir.
+                // nombre sale de un JOIN contra los trabajadores y puede venir nulo si esa fila no
+                // esta; sin esto la bitacora guarda "el conductor null" en un rastro que despues
+                // nadie puede corregir.
                 row.resource(), ServiceLogText.display(namesByKind.get(row.resource())),
                 ServiceLogText.display(row.serviceCode()), row.serviceStatus()));
         }
@@ -131,8 +131,8 @@ public class ServiceResourceConflicts {
      *
      * <p>Vuelve a aplastar los saltos aunque {@link #find} ya lo haga: es un metodo publico sobre
      * un record publico que cualquiera puede construir, y la linea termina en la bitacora, que es
-     * una linea por dato. La fuente realista de un salto es el nombre del conductor, que viene de
-     * los catalogos compartidos con el sistema anterior. Aplastar dos veces no cuesta nada;
+     * una linea por dato. La fuente realista de un salto es el nombre del conductor, que viene del
+     * catalogo de trabajadores, que este modulo no valida. Aplastar dos veces no cuesta nada;
      * confiar en que el que llama ya lo hizo cuesta el agujero entero.
      */
     public String forcedLine(ServiceResourceConflictResponse conflict) {
