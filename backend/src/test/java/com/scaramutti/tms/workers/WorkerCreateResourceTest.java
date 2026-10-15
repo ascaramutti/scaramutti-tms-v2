@@ -1103,12 +1103,8 @@ class WorkerCreateResourceTest {
         assertEquals(before, fixtures.countWorkerAuditRowsByAuthor(actorUserId));
     }
 
-    /**
-     * La ultima asercion documenta que el cargo dejo de tener dos origenes: el dia que alguien
-     * vuelva a escribir la columna muerta, esto lo dice.
-     */
     @Test
-    void create_theWorkerRow_carriesTheAuthorAndLeavesTheDeadColumnAlone() {
+    void create_theWorkerRow_carriesTheRoleAndTheAuthor() {
         int actorUserId = fixtures.seedActorUser("general_manager", "64");
 
         int id = post(fabricateTokenForUser(actorUserId, "ztestuser64", "general_manager"))
@@ -1120,7 +1116,6 @@ class WorkerCreateResourceTest {
         assertEquals(LocalDate.of(2024, 3, 1), row.hireDate());
         assertEquals(actorUserId, row.createdBy());
         assertEquals(actorUserId, row.updatedBy());
-        assertNull(row.position(), "la columna de cargo vieja no se escribe nunca mas");
     }
 
     // ---------- lo que pone el servidor y el cuerpo no mueve -------------------------

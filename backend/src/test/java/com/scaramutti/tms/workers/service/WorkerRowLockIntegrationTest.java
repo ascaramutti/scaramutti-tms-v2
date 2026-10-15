@@ -379,7 +379,7 @@ class WorkerRowLockIntegrationTest {
     /**
      * POR QUE EL PRESUPUESTO CUENTA DOS TOPES POR FILA: con cola, quien llega espera primero el
      * bloqueo de la tupla que tiene el primero de la fila y, cuando ese se rinde, otro tope entero
-     * contra quien la retiene. Si el motor dejara de hacerlo, el once estaria sobrecontado; si
+     * contra quien la retiene. Si el motor dejara de hacerlo, el nueve estaria sobrecontado; si
      * gastara tres, la guarda dejaria pasar una configuracion que no entra.
      */
     @Test

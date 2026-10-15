@@ -492,7 +492,7 @@ public class WarehouseTestData {
 
     /**
      * Usuario de prueba sobre un trabajador ya sembrado; devuelve su id. {@code roleName} tiene que
-     * ser el cargo de ese trabajador, porque la base se lo copia: si no, falla.
+     * ser el cargo de ese trabajador, porque la cuenta no tiene rol propio: si no, falla.
      *
      * <p>El nombre DEBE empezar con el prefijo que usa la limpieza. Se comprueba acá y no se
      * confía en quien llama: la limpieza borra por prefijo, así que un nombre fuera de él
@@ -565,23 +565,23 @@ public class WarehouseTestData {
             .setParameter(1, documentNumber).getSingleResult()).intValue();
     }
 
-    /** Lo que quedo en la fila del trabajador, incluida la columna muerta. */
+    /** Lo que quedo en la fila del trabajador. */
     public record WorkerRow(int roleId, LocalDate hireDate, Integer createdBy, Integer updatedBy,
-        String position, String firstName, String lastName, String documentNumber, String phone,
+        String firstName, String lastName, String documentNumber, String phone,
         boolean isActive, OffsetDateTime createdAt, OffsetDateTime updatedAt, int documentTypeId) {}
 
     public WorkerRow workerRowOf(int workerId) {
         Object[] row = (Object[]) entityManager.createNativeQuery(
-            "SELECT role_id, hire_date, created_by, updated_by, position, first_name, last_name, "
+            "SELECT role_id, hire_date, created_by, updated_by, first_name, last_name, "
                 + "document_number, phone, is_active, created_at, updated_at, document_type_id "
                 + "FROM public.workers WHERE id = ?1")
             .setParameter(1, workerId).getSingleResult();
         return new WorkerRow(((Number) row[0]).intValue(), (LocalDate) row[1],
             row[2] == null ? null : ((Number) row[2]).intValue(),
             row[3] == null ? null : ((Number) row[3]).intValue(),
-            (String) row[4], (String) row[5], (String) row[6], (String) row[7], (String) row[8],
-            (Boolean) row[9], timestampOf(row[10]), timestampOf(row[11]),
-            ((Number) row[12]).intValue());
+            (String) row[4], (String) row[5], (String) row[6], (String) row[7],
+            (Boolean) row[8], timestampOf(row[9]), timestampOf(row[10]),
+            ((Number) row[11]).intValue());
     }
 
     /** Lo que quedo en la ficha de conductor de un trabajador, o nulo si no tiene. */
@@ -709,9 +709,8 @@ public class WarehouseTestData {
     }
 
     /**
-     * Le cambia el rol a una cuenta de prueba, que es el cargo de su trabajador: cambia ese cargo y
-     * la base se lo copia a la cuenta. Para medir que una regla lea el rol de la BASE y no el grupo
-     * del token.
+     * Le cambia el rol a una cuenta de prueba, que es el cargo de su trabajador: cambia ese cargo.
+     * Para medir que una regla lea el rol de la BASE y no el grupo del token.
      *
      * <p>Exige el prefijo igual que el sembrador: sin eso, un descuido le cambia el rol al
      * administrador sembrado y deja en rojo toda la suite, en clases que no tienen nada que
@@ -754,8 +753,8 @@ public class WarehouseTestData {
     }
 
     /**
-     * Le cambia el cargo a un trabajador de prueba desde su propia transaccion; si tiene cuenta, la
-     * base se lo copia. Gemelo de {@link #setUserRole(int, String)}, que llega por la cuenta.
+     * Le cambia el cargo a un trabajador de prueba desde su propia transaccion; si tiene cuenta, es
+     * tambien su rol. Gemelo de {@link #setUserRole(int, String)}, que llega por la cuenta.
      *
      * <p>Mismo guardia de prefijo que su gemelo, y por el mismo motivo: sin el, un descuido le
      * cambia el cargo a un trabajador sembrado del catalogo y deja en rojo clases que no tienen

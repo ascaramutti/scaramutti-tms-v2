@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -1026,16 +1027,16 @@ class WorkerUpdateResourceTest {
     }
 
     /**
-     * El mismo choque sobre la fila de la CUENTA, que es la ultima espera del presupuesto y la
-     * unica que se escribe sin haberla tomado con bloqueo.
-     *
-     * <p>Este trabajador NO tiene ficha, asi que el par con el de arriba cubre los dos caminos:
-     * con ficha previa y sin ella. Sin el envoltorio, este sale 500.
+     * Cambiar el cargo de quien tiene cuenta no espera por la fila de la cuenta: su rol es el cargo
+     * y la edicion no la escribe. Por eso la cuenta salio del presupuesto de esperas de la
+     * edicion; si algo vuelve a escribirla, este caso da 409 en vez de 200. El control es la baja,
+     * que si la escribe: con la misma fila tomada, da 409.
      */
     @Test
-    void update_whenAnotherTransactionHoldsTheAccountRow_returns409_WRK013() throws Exception {
-        int id = seedWorker("ZTESTE161", "operator");
-        fixtures.seedUserFor(id, "ztestuser161", "operator");
+    void update_changingTheRoleWhileAnotherTransactionHoldsTheAccountRow_doesNotWaitForIt()
+            throws Exception {
+        int id = seedWorker("ZTESTE161", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuser161", "sales");
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         try (Connection holder = dataSource.getConnection()) {
@@ -1043,7 +1044,9 @@ class WorkerUpdateResourceTest {
             try (PreparedStatement lock = holder.prepareStatement(
                 "SELECT id FROM public.users WHERE worker_id = ? FOR UPDATE")) {
                 lock.setInt(1, id);
-                lock.executeQuery().close();
+                try (ResultSet rows = lock.executeQuery()) {
+                    assertTrue(rows.next(), "precondicion: la otra sesion tiene tomada la cuenta");
+                }
             }
 
             Future<Respuesta> response = executor.submit(() -> {
@@ -1052,10 +1055,18 @@ class WorkerUpdateResourceTest {
                 String code = extracted.path("code");
                 return new Respuesta(extracted.statusCode(), code);
             });
-
             var result = response.get(30, TimeUnit.SECONDS);
-            assertEquals(409, result.statusCode());
-            assertEquals("WRK-013", result.code());
+            assertEquals(200, result.statusCode(), "codigo " + result.code());
+
+            Future<Respuesta> deactivation = executor.submit(() -> {
+                var extracted = given().header("Authorization", "Bearer " + adminToken())
+                    .when().post("/workers/" + id + "/deactivate").then().extract();
+                String code = extracted.path("code");
+                return new Respuesta(extracted.statusCode(), code);
+            });
+            var control = deactivation.get(30, TimeUnit.SECONDS);
+            assertEquals(409, control.statusCode(), "control: la baja escribe la cuenta tomada");
+            assertEquals("WRK-013", control.code());
             holder.rollback();
         } finally {
             executor.shutdownNow();
@@ -1063,18 +1074,18 @@ class WorkerUpdateResourceTest {
                 System.err.println("AVISO: quedo un hilo vivo del caso de bloqueo de la cuenta");
             }
         }
+        assertEquals("dispatcher", fixtures.userRoleNameOf(userId));
     }
 
     /**
      * Y el choque en la rama que CREA la ficha, que es el UNICO camino que distingue el alcance del
      * envoltorio del traductor.
      *
-     * <p>Los dos casos de arriba sostienen filas que ya existen, y esas escrituras salen en la
-     * descarga FINAL: con el envoltorio angosto —cubriendo solo esa descarga— los dos siguen
-     * verdes. La ficha que NACE se graba con una descarga propia, antes, y ahi el envoltorio
-     * angosto deja escapar el choque como error del servidor. Sin este caso, achicar el envoltorio
-     * a lo que era no rompe nada y el comentario que dice "TODA la fase de escritura" es una
-     * afirmacion sin medir.
+     * <p>El caso de la ficha sostiene una fila que ya existe, y esa escritura sale en la descarga
+     * FINAL: con el envoltorio angosto, cubriendo solo esa descarga, sigue verde. La ficha que NACE
+     * se graba con una descarga propia, antes, y ahi el envoltorio angosto deja escapar el choque
+     * como error del servidor. Sin este caso, achicar el envoltorio a lo que era no rompe nada y el
+     * comentario que dice "TODA la fase de escritura" es una afirmacion sin medir.
      *
      * <p>Es determinista sin depender de tiempos: la otra conexion inserta una ficha con la MISMA
      * licencia y no confirma, asi que el INSERT de esta edicion espera contra esa entrada del
