@@ -357,7 +357,7 @@ public class WorkerService {
 
     /**
      * Edita un trabajador y su ficha de conductor EN UNA SOLA TRANSACCION. Si tiene usuario, la
-     * base le copia el cargo nuevo a su cuenta en esa misma transaccion.
+     * cuenta no se escribe: su rol es este cargo.
      *
      * <p>Es un REEMPLAZO y no un parche: cada campo del cuerpo pisa al guardado, y un opcional
      * que no viene queda vacio. Por eso no hay comprobaciones de nulo antes de asignar; tratarlas
@@ -376,9 +376,10 @@ public class WorkerService {
      * fila no esta.
      *
      * <p>DEUDA ANOTADA: WRK-011 mira si hay cuenta sin bloquear la tabla de cuentas. Una cuenta
-     * creada o pasada a este trabajador mientras la edicion lo tiene tomado espera (solo por el
-     * disparador de la cuenta) y queda con el cargo nuevo aunque no inicie sesion. La primera ruta
-     * que cree o mueva cuentas tiene que tomar antes la fila del trabajador y mirar el cargo.
+     * creada o pasada a este trabajador mientras la edicion lo tiene tomado no la espera (salvo
+     * que ya haya escrito un documento nuevo, y ni asi se vuelve a mirar) y puede quedar en un
+     * cargo sin sesion. Hoy ninguna ruta crea ni mueve cuentas; la primera que lo haga tiene que
+     * tomar antes la fila del trabajador y mirar el cargo y la vigencia.
      */
     @Transactional
     public WorkerDetailResponse updateWorker(UpdateWorkerCommand updateWorkerCommand) {
@@ -542,8 +543,9 @@ public class WorkerService {
      * al actor. Sin la segunda, dos administradores que se desactivan o se bajan el cargo entre si
      * a la vez pasaban los dos la validacion y la empresa podia quedar sin administradores; con
      * ella, el segundo espera y relee su propio cargo ya cambiado. El orden por id impide el
-     * abrazo mortal. Protege a la cuenta solo porque quien le escribe el cargo o la vigencia toma
-     * antes la fila de su trabajador: un escritor nuevo de cuentas tiene que hacer lo mismo.
+     * abrazo mortal. Protege a la cuenta solo porque quien le escribe la vigencia toma antes la
+     * fila de su trabajador (el cargo ya vive ahi): un escritor nuevo de cuentas tiene que hacer lo
+     * mismo.
      * Antes de bloquear: el 404 y el corte a quien ya no escribe, sin cargar nada, en ese orden.
      */
     private Worker lockTargetAndOwnWorker(Integer targetId) {

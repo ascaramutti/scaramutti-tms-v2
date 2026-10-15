@@ -17,9 +17,7 @@ import java.time.OffsetDateTime;
  * `@DynamicUpdate` porque transacciones distintas escriben esta fila sin coordinarse: el cambio
  * de contrasena y el cambio de estado de un trabajador. Con la escritura de columnas completas,
  * la que llegue segunda pisa lo que la primera acababa de guardar y una se pierde sin error;
- * escribiendo solo lo que cada una cambia, ninguna borra a la otra. Y un UPDATE que liste
- * `worker_id` despierta el disparador que toma la fila del trabajador: contra una baja o un
- * cambio de cargo en curso, PostgreSQL abortaria una de las dos.
+ * escribiendo solo lo que cada una cambia, ninguna borra a la otra.
  */
 @DynamicUpdate
 @Entity

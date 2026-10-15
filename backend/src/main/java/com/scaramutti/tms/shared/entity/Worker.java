@@ -19,10 +19,8 @@ import java.time.OffsetDateTime;
 /**
  * Trabajador de {@code public.workers}.
  *
- * <p>El cargo es el ROL: la columna {@code position} sigue en la base con sus valores
- * viejos para que la imagen anterior de la aplicacion arranque si hay que volver atras,
- * pero esta entidad ya no la mapea y nadie la lee. El cargo visible sale de
- * {@code role.description}. La columna se borra en una migracion posterior.
+ * <p>El cargo es el ROL: su nombre visible sale de {@code role.description}, que es lo que las
+ * respuestas llaman {@code position}.
  *
  * <p>{@code hireDate} es cuando la persona entro a la empresa y {@code createdAt} cuando
  * se grabo la fila: no son lo mismo y por eso son dos columnas.

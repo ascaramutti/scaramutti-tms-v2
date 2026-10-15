@@ -112,29 +112,6 @@ class WorkersSchemaMigrationTest {
         assertEquals(0, count("SELECT count(*) FROM public.workers WHERE role_id IS NULL"));
     }
 
-    /**
-     * Ninguna cuenta guarda en su columna un rol distinto del cargo de su trabajador. Desde la
-     * V012 lo garantiza la base; el caso se va con la columna.
-     */
-    @Test
-    void everyWorkerWithUser_carriesTheRoleOfItsUser() throws SQLException {
-        assertEquals(0, count(
-            "SELECT count(*) FROM public.workers w JOIN public.users u ON u.worker_id = w.id"
-                + " WHERE w.role_id <> u.role_id"));
-    }
-
-    /**
-     * La columna del cargo viejo deja de ser obligatoria. Es lo unico que hace posible
-     * volver a la imagen anterior de la aplicacion dentro de la ventana de la release: esa
-     * imagen todavia la escribe.
-     */
-    @Test
-    void theOldPositionColumn_isNoLongerMandatory() throws SQLException {
-        assertEquals("YES", textOf(
-            "SELECT is_nullable FROM information_schema.columns"
-                + " WHERE table_schema = 'public' AND table_name = 'workers' AND column_name = 'position'"));
-    }
-
     // ---------- fecha de ingreso y auditoria -------------------------------------
 
     @Test
@@ -302,12 +279,6 @@ class WorkersSchemaMigrationTest {
         try (Statement st = connection.createStatement(); ResultSet rs = st.executeQuery(sql)) {
             rs.next();
             return rs.getInt(1);
-        }
-    }
-
-    private String textOf(String sql) throws SQLException {
-        try (Connection connection = dataSource.getConnection()) {
-            return textOf(connection, sql);
         }
     }
 
