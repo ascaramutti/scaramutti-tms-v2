@@ -9,6 +9,67 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.9.0] - 2026-10-16
+
+Sesiones y contraseñas más estrictas, la lectura de clientes por rol, y el cargo como única fuente
+del rol de cada cuenta; además se borran las tablas de viajes que quedaban de la v1: PRs #258 a
+#264 y #267 a #270. Tres migraciones, V012, V013 y V014; la V013 y la V014 borran columnas y
+tablas, así que volver a 2.8.0 es restaurar el respaldo tomado antes del release. El contrato suma
+`workerId` al usuario de la sesión, declara los roles que leen clientes y baja el largo máximo de
+las contraseñas a 72 bytes; contra 2.8.0 no retira ningún campo.
+
+### Added
+
+- El usuario de la sesión (ingreso, renovación y `/auth/me`) trae `workerId`, el id del trabajador
+  de la cuenta (#261). En su propia ficha, quien mantiene el padrón ya no ve Desactivar y, en la
+  edición, el cargo queda fijo en el suyo con el motivo debajo: el servidor rechazaba siempre esas
+  dos acciones, pero recién al confirmar o al guardar (#262).
+
+### Changed
+
+- El rol de una cuenta es el cargo de su trabajador: el token, la sesión, los autores y los
+  permisos lo leen de ahí, y la cuenta ya no guarda una copia. Las reglas de rango de la edición
+  del padrón miran solo el cargo y un cambio de cargo deja una sola fila de auditoría (#268). La
+  migración V012 igualó las dos copias con disparadores mientras el código cambiaba; antes de
+  crearlos abortaba con la lista de cuentas si alguna ya difería (#267).
+- La edición de un trabajador ya no espera la fila de su cuenta: el tope de esperas de una
+  edición baja de once a nueve, con `app.workers.edit-lock-timeout-ms` en los mismos 380 ms (#269).
+- El contrato documenta el 401 sin token como una respuesta sin cuerpo (#258).
+
+### Removed
+
+- Migración V013: borra `users.role_id`, con los disparadores y las funciones de la V012, y
+  `workers.position`. Antes toma `workers`, `users` y `roles` en exclusivo sin hacer cola,
+  reintenta hasta 30 segundos y, si no lo logra, falla sin aplicar nada. Quien la aplica tiene que
+  ser dueño de `users` y `workers` (#269).
+- Migración V014: borra las cinco tablas de viajes de la v1 (`public.services` y sus asignaciones,
+  auditoría, estados y tipos), sin lectores desde que la v2.4.0 pasó los viajes a `operaciones`.
+  Toma antes, de la misma forma, esas cinco tablas y las siete tablas vivas a las que apuntaban sus
+  claves foráneas (#270).
+
+### Security
+
+- Solo el token de acceso es credencial del API: el de renovación, o cualquier otro JWT firmado
+  sin la marca de acceso, responde `401 AUTH-008` en toda ruta con sesión, o `AUTH-007` si ya
+  venció. El de renovación sigue sirviendo en el cuerpo de `/auth/refresh` (#258).
+- El listado y la ficha de clientes exigen uno de los cuatro roles que buscan clientes (admin,
+  ventas, gerencia general y gerencia de operaciones); finanzas, almacén y despacho reciben
+  `403 COM-003` antes de que se valide la consulta o el id. Las respuestas no se guardan en el
+  navegador (`Cache-Control: no-store`) (#259).
+- Al cerrar sesión, al expirar la sesión o al fallar la renovación, la pestaña borra los datos que
+  había cargado el usuario: quien entra después ya no arranca con la memoria del anterior. Una
+  respuesta que vuelve de una sesión anterior no se entrega (#260).
+
+### Fixed
+
+- Las contraseñas de más de 72 bytes UTF-8, el máximo que procesa BCrypt, daban un error 500.
+  Ahora el ingreso y el cambio de contraseña las rechazan con `400 COM-001` en su campo, antes de
+  buscar al usuario, igual que una con un carácter nulo o un surrogate suelto. Los formularios
+  cuentan el máximo en bytes, como el servidor (#264).
+- Cambiar la contraseña con el token de acceso vencido fallaba siempre: ahora renueva la sesión y
+  reintenta como cualquier pedido. La pantalla trae textos propios para el token vencido o
+  inválido, y rechaza una clave en blanco con el mismo criterio que el servidor (#263).
+
 ## [2.8.0] - 2026-10-06
 
 El mantenimiento de trabajadores completo, del backend a las pantallas; el maestro de clientes con
