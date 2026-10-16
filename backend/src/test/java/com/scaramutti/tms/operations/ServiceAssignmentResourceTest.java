@@ -297,16 +297,9 @@ class ServiceAssignmentResourceTest {
     }
 
     /**
-     * El salto de linea puede venir de la BASE, no solo del cuerpo del request: el nombre del
-     * conductor y las placas salen de tablas del sistema anterior, que sigue corriendo y sí tiene
-     * formularios para escribirlas. Aplastar solo la nota del usuario es cerrar la puerta y dejar
-     * la ventana abierta, y sin este caso esa mitad queda sin red.
-     */
-    /**
      * El salto de línea puede venir de la BASE, no solo del cuerpo del request: el nombre del
-     * conductor y las placas salen de tablas del sistema anterior, que sigue corriendo y sí tiene
-     * formularios para escribirlas. Aplastar solo la nota del usuario es cerrar la puerta y dejar
-     * la ventana abierta.
+     * conductor y las placas salen de catálogos que operaciones no escribe ni valida. Aplastar
+     * solo la nota del usuario es cerrar la puerta y dejar la ventana abierta.
      *
      * <p>La placa da menos juego que el nombre: la columna admite 6 caracteres, así que ahí el
      * salto entra pero no alcanza para redactar una línea convincente. Igual se cubre: lo que se

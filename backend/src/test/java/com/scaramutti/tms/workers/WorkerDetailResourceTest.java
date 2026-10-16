@@ -204,7 +204,7 @@ class WorkerDetailResourceTest {
     @Test
     void get_workerWithUser_hasUserIsTrue() {
         int id = fixtures.seedWorker("ZTESTB020", "Diana", "Rojas", "operator", true);
-        fixtures.seedUserFor(id, "ztestuser20", "sales");
+        fixtures.seedUserFor(id, "ztestuser20", "operator");
 
         given().header("Authorization", "Bearer " + adminToken())
         .when().get("/workers/" + id)
@@ -353,7 +353,7 @@ class WorkerDetailResourceTest {
     @Test
     void get_workerWithInactiveUser_hasUserIsStillTrue() {
         int id = fixtures.seedWorker("ZTESTB025", "Cuenta", "Apagada", "operator", true);
-        fixtures.seedUserFor(id, "ztestuser25", "sales", false);
+        fixtures.seedUserFor(id, "ztestuser25", "operator", false);
 
         given().header("Authorization", "Bearer " + adminToken())
         .when().get("/workers/" + id)

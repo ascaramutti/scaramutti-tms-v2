@@ -24,13 +24,14 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import org.jboss.resteasy.reactive.ResponseStatus;
+import org.jboss.resteasy.reactive.RestResponse;
 
 /**
  * Exige sesion tambien en el codigo, no solo en la policy por ruta de application.properties:
  * esa policy se evalua sobre la URL tal como llega, y hay avisos publicados de rutas que la
  * esquivan escribiendo el mismo camino con punto y coma o con barras codificadas. La
- * comprobacion del codigo no depende de como se escriba la ruta. No cambia quien puede hacer
- * que: los metodos con @RolesAllowed conservan el suyo.
+ * comprobacion del codigo no depende de como se escriba la ruta. Con todos los metodos bajo
+ * @RolesAllowed es redundante a proposito: cubre el dia que se sume uno sin lista de roles.
  */
 @Authenticated
 @Path("/clients")
@@ -42,53 +43,44 @@ public class ClientResource {
     @Inject ClientResourceMapper clientResourceMapper;
 
     /**
-     * Sin @RolesAllowed: el contrato listClients no tiene `x-required-roles`,
-     * cualquier autenticado puede listar. El authn lo exigen dos capas: la policy
-     * global protected-paths y el @Authenticated de la clase (sin token → 401).
-     *
-     * Bean Validation en query-params: violaciones disparan
-     * ConstraintViolationException → ValidationExceptionMapper → 400 COM-001.
-     *
-     * `@Size(min=3, max=200)` en `q` valida el minimo de busqueda esperado
-     * por el combobox del frontend. Defense-in-depth: si el front tiene un bug
-     * y manda q="ab", backend rechaza. Tambien previene queries patologicos
-     * en BD grandes (q="a" daria miles de matches por ILIKE). Mismo patron
-     * que GET /cargo-types.
+     * Leer clientes es de los roles que los buscan desde una pantalla (cotizaciones, viajes y
+     * clientes); los demas no buscan clientes en ninguna. El rol va en el recurso y no en el
+     * service, porque cotizaciones usa el service para validar el cliente. El cuerpo es
+     * sensible: no-store para que no sobreviva a la sesion en el navegador. El minimo de 3 en q
+     * es el mismo que el combobox exige antes de buscar.
      */
     @GET
-    public PageResponse<ClientResponse> listClients(
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
+    public RestResponse<PageResponse<ClientResponse>> listClients(
         @QueryParam("q")        @Size(min = 3, max = 200)         String q,
         @QueryParam("isActive")                                   Boolean isActive,
         @QueryParam("page")     @DefaultValue("0")  @Min(0)       int page,
         @QueryParam("size")     @DefaultValue("20") @Min(1) @Max(100) int size
     ) {
-        return clientService.listClients(
+        return notStored(clientService.listClients(
             clientResourceMapper.toListClientsQuery(q, isActive, page, size)
-        );
+        ));
     }
 
     /**
-     * Sin @RolesAllowed: el contrato getClient no tiene `x-required-roles`, o sea
-     * que cualquier sesion puede leerlo, igual que el listado. El @Authenticated
-     * de la clase y la policy protected-paths exigen la sesion.
-     *
-     * Devuelve activos e inactivos: el service no filtra por isActive.
-     *
-     * Un id que no es entero NO llega aca: el conversor de parametros falla antes
-     * del match de ruta y RESTEasy responde 404 sin cuerpo. Un id numerico que no
-     * existe (incluidos 0 y negativos) si llega, y sale como 404 CLI-003.
+     * Mismos roles y mismas cabeceras que el listado, por lo mismo. El rol se decide antes de
+     * convertir o buscar el id: un rol sin acceso no averigua por esta ruta que clientes existen.
+     * Devuelve activos e inactivos porque la edicion tambien corrige a un inactivo. Con un rol
+     * permitido, un id que no entra en un entero responde 404 sin cuerpo: el conversor falla
+     * antes de llegar aca.
      */
     @GET
     @Path("/{id}")
-    public ClientResponse getClient(@PathParam("id") Integer id) {
-        return clientService.findById(id);
+    @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
+    public RestResponse<ClientResponse> getClient(@PathParam("id") Integer id) {
+        return notStored(clientService.findById(id));
     }
 
     /**
      * Reemplaza los cuatro datos editables. Sin @ResponseStatus: 200 ya es el
      * default de JAX-RS para un metodo con cuerpo (el 201 del POST se declara
-     * justamente porque no lo es). Devuelve el DTO y no un Response porque no
-     * hay header que colgar: sin If-Match no hay ETag que versionar.
+     * justamente porque no lo es). Devuelve el DTO sin las cabeceras de las lecturas:
+     * sin If-Match no hay ETag que colgar, y un PUT no se guarda en cache.
      *
      * `@Valid @NotNull` los dos: sin @NotNull un cuerpo vacio llegaria como null
      * al mapper y saldria un 500 en vez del 400 que declara el contrato.
@@ -110,5 +102,16 @@ public class ClientResource {
         return clientService.createClient(
             clientResourceMapper.toCreateClientCommand(clientRequest)
         );
+    }
+
+    /**
+     * El tipo ata la respuesta al cuerpo: devolver la entidad en vez del DTO no compila. Vary
+     * ademas de no-store: si alguien quitara el no-store, un cache no mezcla sesiones.
+     */
+    private static <T> RestResponse<T> notStored(T body) {
+        return RestResponse.ResponseBuilder.ok(body)
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .build();
     }
 }

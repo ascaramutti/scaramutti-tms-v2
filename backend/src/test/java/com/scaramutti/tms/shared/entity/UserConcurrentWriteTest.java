@@ -15,11 +15,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /**
  * Dos escrituras sin coordinar sobre la MISMA fila de usuario no se pisan.
  *
- * <p>La edicion de un trabajador le cambia el rol a su cuenta; el cambio de contrasena le cambia
- * el hash. Son dos transacciones distintas, sin bloqueo entre ellas, y con escritura de columnas
- * completas la que llegue segunda pisaria lo que la primera acababa de guardar: una de las dos se
- * pierde sin ningun error, y si la que se pierde es el cargo, queda una fila de rastro afirmando
- * un cambio de permisos que en la fila no esta.
+ * <p>La baja de un trabajador le apaga la cuenta; el cambio de contrasena le cambia el hash. Son
+ * dos transacciones distintas, sin bloqueo entre ellas, y con escritura de columnas completas la
+ * que llegue segunda pisaria lo que la primera acababa de guardar: una de las dos se pierde sin
+ * ningun error, y si la que se pierde es la baja, la cuenta sigue encendida con una fila de rastro
+ * que afirma que se apago.
  *
  * <p>Lo que lo evita es que la entidad escriba SOLO las columnas que cada transaccion cambio. Esa
  * decision vive en una anotacion de una linea, y este caso es lo unico que la sostiene: sin el,
@@ -48,14 +48,15 @@ class UserConcurrentWriteTest {
             User user = userRepository.findById(userId);
             user.passwordHash = "hash-nuevo-de-la-otra-operacion";
 
-            // T2, en su propia transaccion, le cambia SOLO el rol y confirma.
-            fixtures.setUserRole(userId, "finance_manager");
+            // T2, en su propia transaccion, le apaga SOLO la cuenta y confirma.
+            fixtures.setUserActive(userId, false);
 
             // Al cerrar T1, su UPDATE tiene que tocar unicamente la columna que cambio.
         });
 
-        assertEquals("finance_manager", fixtures.userRoleNameOf(userId),
-            "el cargo que escribio la otra transaccion no se puede perder");
+        assertEquals(false,
+            QuarkusTransaction.requiringNew().call(() -> userRepository.findById(userId).isActive),
+            "la baja que escribio la otra transaccion no se puede perder");
         assertEquals("hash-nuevo-de-la-otra-operacion",
             QuarkusTransaction.requiringNew().call(() -> userRepository.findById(userId).passwordHash),
             "y el hash de esta tampoco");

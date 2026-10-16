@@ -16,11 +16,11 @@ import { AuthProvider } from '../auth/AuthContext'
 import { ThemeProvider } from '../ui/theme/ThemeContext'
 import { tokenStorage } from '../auth/tokenStorage'
 import { server } from '../../test/mocks/server'
-import type { UserResponse, UserRole } from '../../api'
+import type { SessionUser, UserRole } from '../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
-function buildUser(role: UserRole): UserResponse {
+function buildUser(role: UserRole): SessionUser {
   return {
     id: 1,
     username: `user-${role}`,
@@ -28,6 +28,7 @@ function buildUser(role: UserRole): UserResponse {
     position: 'Cargo de prueba',
     role,
     isActive: true,
+    workerId: 29119,
   }
 }
 

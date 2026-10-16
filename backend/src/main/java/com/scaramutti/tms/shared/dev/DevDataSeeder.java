@@ -246,10 +246,8 @@ public class DevDataSeeder {
             User user = existing.get();
             user.passwordHash = passwordService.hash(password);
             user.isActive = isActive;
-            if (user.worker != null) {
-                user.worker.firstName = firstName;
-                user.worker.lastName = lastName;
-            }
+            user.worker.firstName = firstName;
+            user.worker.lastName = lastName;
             return;
         }
         Worker worker = new Worker();
@@ -268,7 +266,6 @@ public class DevDataSeeder {
         user.username = username;
         user.passwordHash = passwordService.hash(password);
         user.worker = worker;
-        user.role = role;
         user.isActive = isActive;
         user.createdAt = DateUtils.nowUtcMicros();
         userRepository.persist(user);

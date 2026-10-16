@@ -24,6 +24,13 @@ type FieldName = keyof ChangePasswordFormInput
 
 const CHANGE_PASSWORD_FIELDS: readonly FieldName[] = ['currentPassword', 'newPassword']
 
+// Un 401 llega hasta acá solo si el servidor rechaza también el token recién renovado. Su texto es
+// para quien programa, no para el usuario: el de AUTH-007 va en usted y nombra una ruta de la API.
+const SESSION_ERROR_MESSAGES: Record<string, string> = {
+  'AUTH-007': 'Tu sesión venció. Cierra sesión y vuelve a ingresar.',
+  'AUTH-008': 'Tu sesión no es válida. Cierra sesión y vuelve a ingresar.',
+}
+
 export function ChangePasswordPage() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -68,6 +75,7 @@ export function ChangePasswordPage() {
         fallbackMessage: 'No se pudo cambiar la contraseña. Verifica tu conexión e intenta de nuevo.',
         allowedFields: CHANGE_PASSWORD_FIELDS,
         codeFieldMap: { 'AUTH-004': 'currentPassword' },
+        codeMessages: SESSION_ERROR_MESSAGES,
       })
     }
   })

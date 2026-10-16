@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
  *       {@link QuotationCalculatorService#calculateFromEntities} — MISMA funcion
  *       que el detalle → totales identicos) + itemsCount (items root).</li>
  *   <li>{@link UserLookup#requireAllById} — createdBy de toda la pagina (1 query,
- *       dedup). Nota: las asociaciones EAGER de {@code User} (worker, role)
+ *       dedup). Nota: las asociaciones EAGER de {@code User} (worker y su cargo)
  *       generan SELECTs extra de Hibernate por cada creador distinto K — no escala
  *       con el page size (K = tamaño del equipo de ventas), mismo costo que el
  *       login y el GET by id. Si se quisiera colapsar, {@code batch-fetch-size}

@@ -23,7 +23,8 @@ import { AuthProvider } from './shared/auth/AuthContext'
 import { ThemeProvider } from './shared/ui/theme/ThemeContext'
 import { tokenStorage } from './shared/auth/tokenStorage'
 import { server } from './test/mocks/server'
-import type { UserResponse, UserRole } from './api'
+import { fakeUser } from './test/mocks/handlers/auth'
+import type { SessionUser, UserRole } from './api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -73,7 +74,7 @@ function goTo(role: UserRole | null, path: string) {
   return router
 }
 
-function buildUser(role: UserRole): UserResponse {
+function buildUser(role: UserRole): SessionUser {
   return {
     id: 1,
     username: `user-${role}`,
@@ -81,6 +82,7 @@ function buildUser(role: UserRole): UserResponse {
     position: 'Cargo de prueba',
     role,
     isActive: true,
+    workerId: 29119,
   }
 }
 
@@ -651,4 +653,38 @@ describe('router - URL viejas y la raíz del dominio', () => {
 
   })
 
+})
+
+/**
+ * La sesión que deja el ingreso es la que usan las pantallas hasta recargar: si perdiera el
+ * trabajador, la propia ficha volvería a ofrecer la baja sin que ningún otro test lo note.
+ */
+describe('router: la propia ficha después de iniciar sesión', () => {
+  beforeEach(() => {
+    tokenStorage.clear()
+  })
+
+  it('la sesión del ingreso reconoce la propia ficha: no ofrece Desactivar', async () => {
+    const user = userEvent.setup()
+    server.use(getWorkerOk(fakeWorkerDetail({ id: fakeUser.workerId, role: ROLES[0], isActive: true })))
+    const router = createMemoryRouter(routes, { initialEntries: [workerDetailPath(fakeUser.workerId)] })
+    render(
+      <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+        <ThemeProvider>
+          <AuthProvider>
+            <RouterProvider router={router} />
+          </AuthProvider>
+        </ThemeProvider>
+      </QueryClientProvider>,
+    )
+    await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    await user.type(await screen.findByLabelText('Usuario'), 'admin')
+    await user.type(screen.getByLabelText('Contraseña'), 'clave-de-prueba')
+    await user.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+
+    // Editar aparece recién con la sesión cargada: antes faltaría todo por otra razón.
+    expect(await screen.findByRole('link', { name: 'Editar' }, { timeout: 4000 })).toBeInTheDocument()
+    expect(router.state.location.pathname).toBe(workerDetailPath(fakeUser.workerId))
+    expect(screen.queryByRole('button', { name: /Desactivar|Reactivar/ })).not.toBeInTheDocument()
+  })
 })

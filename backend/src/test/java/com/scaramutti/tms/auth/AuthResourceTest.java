@@ -1,20 +1,32 @@
 package com.scaramutti.tms.auth;
 
+import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
+import com.scaramutti.tms.support.WarehouseTestData;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.restassured.path.json.JsonPath;
 import io.smallrye.jwt.build.Jwt;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
 
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
+import java.util.List;
 
 import static io.restassured.RestAssured.given;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 
 @QuarkusTest
 class AuthResourceTest {
+
+    @Inject UserRepository userRepository;
+    @Inject WarehouseTestData fixtures;
 
     @Test
     void login_withValidCredentials_returnsToken() {
@@ -37,6 +49,37 @@ class AuthResourceTest {
             .body("user.position", equalTo("Ejecutivo de Ventas"))
             .body("user.role", equalTo("sales"))
             .body("user.fullName", equalTo("Valeria Torres"));
+    }
+
+    /**
+     * El grupo del token, el que mira cada @RolesAllowed, es el cargo de su trabajador. La cuenta de
+     * prueba no se llama como su cargo: con las sembradas (admin, sales) el nombre pasaria igual.
+     */
+    @Test
+    void login_theTokenCarriesTheCargoOfTheWorkerAsItsGroup() {
+        try {
+            int workerId = fixtures.seedWorker("ZTESTGRP1", "Grupo", "Token", "dispatcher", true);
+            int userId = fixtures.seedUserFor(workerId, "ztestusergrupo1", "dispatcher");
+            fixtures.copyPasswordHashFrom(userId, "sales");
+
+            String token = given()
+                .contentType(ContentType.JSON)
+                .body("""
+                    {"username":"ztestusergrupo1","password":"Sales1234"}
+                    """)
+            .when()
+                .post("/auth/login")
+            .then()
+                .statusCode(200)
+                .extract().path("token");
+
+            String payload =
+                new String(Base64.getUrlDecoder().decode(token.split("\\.")[1]), StandardCharsets.UTF_8);
+            assertEquals(List.of("dispatcher"), JsonPath.from(payload).getList("groups"));
+        } finally {
+            fixtures.deleteTestWorkerDependents();
+            QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestWorkers());
+        }
     }
 
     @Test
@@ -251,6 +294,35 @@ class AuthResourceTest {
             .statusCode(401);
     }
 
+    /**
+     * El cliente renueva el token ante este 401 y reintenta el mismo pedido: es seguro solo si el
+     * vencido se rechaza antes de escribir. La nueva es la misma clave, así admin sigue entrando si
+     * la regla fallara; el hash cambiaría igual (otra sal), y eso es lo que se mide.
+     */
+    @Test
+    void changePassword_withExpiredAccessToken_returns401TokenExpired_andThePasswordStaysTheSame() {
+        String expiredAccessToken = expiredAdminAccessToken();
+        String hashBefore = adminPasswordHash();
+        try {
+            given()
+                .header("Authorization", "Bearer " + expiredAccessToken)
+                .contentType(ContentType.JSON)
+                .body("""
+                    {"currentPassword":"Admin1234","newPassword":"Admin1234"}
+                    """)
+            .when()
+                .post("/auth/change-password")
+            .then()
+                .statusCode(401)
+                .contentType("application/problem+json")
+                .body("code", equalTo("AUTH-007"));
+
+            assertEquals(hashBefore, adminPasswordHash());
+        } finally {
+            restoreAdminPasswordHash(hashBefore);
+        }
+    }
+
     @Test
     void login_withInactiveUser_returns401_userInactive() {
         given()
@@ -338,14 +410,7 @@ class AuthResourceTest {
     void me_withExpiredAccessToken_returns401_tokenExpired() {
         // Access token expirado: el filtro de seguridad de Quarkus lo rechaza
         // y nuestro JwtAuthExceptionMapper lo clasifica como AUTH-007.
-        Instant past = Instant.now().minusSeconds(60);
-        String expiredAccessToken = Jwt.subject("1")
-            .upn("admin")
-            .groups(java.util.Set.of("admin"))
-            .claim("typ", "access")
-            .issuedAt(past.minusSeconds(3600))
-            .expiresAt(past)
-            .sign();
+        String expiredAccessToken = expiredAdminAccessToken();
 
         given()
             .header("Authorization", "Bearer " + expiredAccessToken)
@@ -455,6 +520,28 @@ class AuthResourceTest {
     }
 
     // ----- helpers ----------------------------------------------------------
+
+    /** Vencido hace una hora: lejos de la tolerancia de reloj del verificador, que es de un minuto. */
+    private static String expiredAdminAccessToken() {
+        Instant anHourAgo = Instant.now().minusSeconds(3600);
+        return Jwt.subject("1")
+            .upn("admin")
+            .groups(java.util.Set.of("admin"))
+            .claim("typ", "access")
+            .issuedAt(anHourAgo.minusSeconds(3600))
+            .expiresAt(anHourAgo)
+            .sign();
+    }
+
+    private String adminPasswordHash() {
+        return QuarkusTransaction.requiringNew().call(() ->
+            userRepository.findByUsername("admin").orElseThrow().passwordHash);
+    }
+
+    private void restoreAdminPasswordHash(String hash) {
+        QuarkusTransaction.requiringNew().run(() ->
+            userRepository.findByUsername("admin").orElseThrow().passwordHash = hash);
+    }
 
     private String login(String username, String password) {
         return given()

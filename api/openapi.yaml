@@ -15,8 +15,9 @@ info:
 
     - **Versionado**: en URL `/api/v1/...`. Cambios breaking suben mayor (`v2`).
       Endpoints obsoletos llevan `deprecated: true` y header `Sunset` con la fecha de retiro.
-    - **Autenticación**: JWT en header `Authorization: Bearer <token>`. Todos los endpoints
-      requieren auth excepto los marcados con `security: []` (ej: `/auth/login`).
+    - **Autenticación**: el token de acceso (JWT) en header `Authorization: Bearer <token>`.
+      Todos los endpoints requieren auth excepto los marcados con `security: []`
+      (por ejemplo, `/auth/login` y `/auth/refresh`).
     - **Errores**: formato Problem Details (RFC 7807). Incluyen `traceId` para correlacionar
       con logs. Errores de validación incluyen array `errors` por campo.
     - **Paginación**: `?page=0&size=20`. Respuesta incluye `content` + metadatos
@@ -112,7 +113,7 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/LoginResponse' }
         '400':
-          description: Solicitud inválida (campos faltantes o mal formados)
+          description: 'Solicitud inválida (campos faltantes o mal formados, o una contraseña que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto)'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -135,7 +136,7 @@ paths:
                         message: 'debe tener al menos 8 caracteres'
                         code: 'MIN_LENGTH'
         '401':
-          description: Credenciales inválidas
+          description: Credenciales inválidas o usuario inactivo
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -150,12 +151,23 @@ paths:
                     instance: '/api/v1/auth/login'
                     code: 'AUTH-001'
                     traceId: '3a8b1c5d-7e2f-4a9b-8c3d-6e1f4a5b7c2d'
+                userInactive:
+                  summary: Usuario desactivado
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/login'
+                    code: 'AUTH-002'
+                    traceId: '4b9c2d6e-8f3a-4b1c-9d4e-7f2a5b8c1d3e'
 
   /auth/refresh:
     post:
       tags: [Auth]
       operationId: refreshToken
       summary: Renovar token de acceso
+      security: []
       requestBody:
         required: true
         content:
@@ -167,8 +179,9 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/LoginResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401':
-          description: Refresh token inválido o expirado
+          description: Refresh token inválido o expirado, o usuario inactivo
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -176,7 +189,7 @@ paths:
                 refreshTokenExpired:
                   summary: Refresh token expirado (requiere re-login)
                   value:
-                    type: 'urn:tms:error:auth-007'
+                    type: 'urn:tms:error:auth-009'
                     title: 'Refresh token expired'
                     status: 401
                     detail: 'El refresh token expiró. Volver a hacer login.'
@@ -184,15 +197,25 @@ paths:
                     code: 'AUTH-009'
                     traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
                 refreshTokenInvalid:
-                  summary: Refresh token mal formado o ya revocado
+                  summary: Refresh token mal formado, de otro tipo o no firmado por este servidor
                   value:
-                    type: 'urn:tms:error:auth-008'
+                    type: 'urn:tms:error:auth-003'
                     title: 'Invalid refresh token'
                     status: 401
                     detail: 'Refresh token inválido o revocado'
                     instance: '/api/v1/auth/refresh'
                     code: 'AUTH-003'
                     traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+                userInactiveOnRefresh:
+                  summary: El usuario quedó inactivo desde el último login
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-002'
+                    traceId: '6d2b3c4e-5f6a-7b8c-9d0e-1f2a3b4c5d6e'
 
   /auth/change-password:
     post:
@@ -208,7 +231,7 @@ paths:
         '204':
           description: Contraseña actualizada
         '400':
-          description: Validación de contraseña fallida
+          description: 'Validación de contraseña fallida (también una que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto) o contraseña actual incorrecta'
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -238,6 +261,22 @@ paths:
                     code: 'AUTH-004'
                     traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: El usuario del token ya no existe
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                userNotFound:
+                  summary: El usuario referenciado por el token fue eliminado
+                  value:
+                    type: 'urn:tms:error:auth-005'
+                    title: 'User not found'
+                    status: 404
+                    detail: 'Usuario no encontrado'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-005'
+                    traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
 
   /auth/me:
     get:
@@ -249,8 +288,24 @@ paths:
           description: OK
           content:
             application/json:
-              schema: { $ref: '#/components/schemas/UserResponse' }
+              schema: { $ref: '#/components/schemas/SessionUser' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: El usuario del token ya no existe
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                userNotFound:
+                  summary: El usuario referenciado por el token fue eliminado
+                  value:
+                    type: 'urn:tms:error:auth-005'
+                    title: 'User not found'
+                    status: 404
+                    detail: 'Usuario no encontrado'
+                    instance: '/api/v1/auth/me'
+                    code: 'AUTH-005'
+                    traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
 
   # ----- Quotations ----------------------------------------------------------
 
@@ -638,6 +693,10 @@ paths:
         `similarity(name|ruc, q) DESC`, tiebreak `name ASC`.
         Para no filtrar, OMITIR el parámetro `q` (no enviarlo vacío).
         Un `isActive` no booleano se interpreta como `false` (binder de JAX-RS).
+
+        Solo los roles que buscan clientes desde una pantalla (cotizaciones, viajes
+        y clientes); el resto recibe `403` antes de que se valide la consulta.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       parameters:
         - name: q
           in: query
@@ -651,11 +710,19 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/PageOfClient' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       tags: [Clients]
       operationId: createClient
@@ -686,21 +753,32 @@ paths:
       summary: Obtener cliente por ID
       description: |
         Devuelve el cliente con ese `id`, esté activo o inactivo: la edición
-        corrige datos y un cliente inactivo también puede leerse. Sin roles:
-        cualquier sesión puede leerlo (misma exposición que `listClients`).
+        corrige datos y un cliente inactivo también puede leerse. Mismos roles
+        que `listClients`: un rol sin acceso recibe `403` antes de que se
+        convierta o se busque el `id` (también con `abc` o un número fuera de
+        rango), así que no averigua por esta ruta qué clientes existen.
 
-        `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
+        Con un rol permitido, `404` cubre dos casos: `id` que ENCAJA en un entero de 32 bits y no
         existe (incluidos `0` y negativos) → `CLI-003` con cuerpo `Problem`;
         `id` que NO encaja (porque no es numérico, como `abc`, o porque se pasa
         de rango, como `99999999999999`) → `404` sin cuerpo, porque el conversor
         de parámetros falla antes de llegar al recurso.
+      x-required-roles: [admin, sales, general_manager, operations_manager]
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/ClientResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
     put:
       tags: [Clients]
@@ -1160,7 +1238,7 @@ paths:
 
   # ----- Health --------------------------------------------------------------
 
-  /health:
+  /q/health:
     get:
       tags: [Health]
       operationId: getHealth
@@ -1175,7 +1253,13 @@ paths:
                 type: object
                 properties:
                   status: { type: string, example: UP }
-                  timestamp: { type: string, format: date-time }
+                  checks:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name: { type: string, example: Database connections health check }
+                        status: { type: string, example: UP }
 
   # ----- Catálogos compartidos (schema public) --------------------------------
 
@@ -1187,7 +1271,7 @@ paths:
       description: |
         Las filas activas de `public.roles`, en el orden del organigrama
         (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
-        que viaja en `role` del request y en `users.role`), nombre visible
+        que viaja en `role` del request y en el rol de la sesión), nombre visible
         (`description`, el cargo que muestran el pie del menú y el PDF),
         nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
         de conductor. El mismo catálogo para todos los roles: el cliente
@@ -1311,8 +1395,8 @@ paths:
         o `409 WRK-007`).
 
         Organigrama (RN-09): el nivel del rol del cuerpo tiene que ser
-        estrictamente menor al nivel del rol de la sesión (el de `users.role`,
-        leído de la base) → si no, `403 WRK-006`. `admin` está exento.
+        estrictamente menor al nivel del rol de la sesión (el cargo de su
+        trabajador, leído de la base) → si no, `403 WRK-006`. `admin` está exento.
         `hireDate` futura se acepta: el backend no la rechaza a propósito, para
         permitir correcciones a mano; la guarda es del formulario. Deja una fila
         de auditoría `CREATED`. `isActive`, `createdAt`, `createdBy`,
@@ -1390,7 +1474,7 @@ paths:
     put:
       tags: [Workers]
       operationId: updateWorker
-      summary: Actualizar un trabajador (su ficha de conductor y, si tiene usuario, el rol del usuario)
+      summary: Actualizar un trabajador y su ficha de conductor
       description: |
         Reemplaza los datos editables con las mismas validaciones, normalización
         y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
@@ -1417,24 +1501,16 @@ paths:
         documento por su código, nunca por su id ni por su nombre visible: un
         renombre dejaría el historial mintiendo.
 
-        Rol y usuario (RN-15): si el trabajador tiene usuario y `role` cambia,
-        `users.role` queda con el rol nuevo en la MISMA transacción (los
-        permisos rigen en el próximo inicio de sesión o refresco; la sesión
-        abierta conserva el rol viejo hasta que venza su access token) y la
-        auditoría registra el cambio del trabajador y el del usuario. Cambiar a
-        un rol que no inicia sesión a alguien que tiene usuario → `400
-        WRK-011`: una cuenta no puede quedar con un rol sin permisos; el camino
-        para dejar a alguien sin acceso es desactivarlo. Cuenta que la fila de
-        usuario EXISTA, esté activa o no.
-
-        El rol contra el que se mide "cambia" es el de la CUENTA, no el
-        guardado en el trabajador: es la fila que esta operación escribe y la
-        que otorga los permisos. Hoy los dos coinciden siempre y nada en esta
-        API los separa, pero nada los obliga a coincidir, y con la comparación
-        sobre el trabajador un cuerpo que reenvía su cargo sin cambios movería
-        la cuenta en silencio. Por el mismo motivo, `WRK-012` mira las DOS
-        filas: nadie cambia su propio cargo ni en el trabajador ni en su
-        cuenta.
+        Rol y usuario (RN-15): el rol de una cuenta del sistema es el cargo de
+        su trabajador. Si `role` cambia, la cuenta queda con el rol nuevo en la
+        MISMA transacción (los grupos del token rigen hasta el próximo inicio de
+        sesión o refresco; `/auth/me` y las escrituras de trabajadores ya leen el
+        cargo nuevo), y el cambio de cargo deja una sola fila de auditoría, la
+        del cargo: la cuenta no suma otra.
+        Cambiar a un rol que no inicia sesión a alguien que tiene usuario →
+        `400 WRK-011`: una cuenta no puede quedar con un rol sin permisos; el
+        camino para dejar a alguien sin acceso es desactivarlo. Cuenta que la
+        fila de usuario EXISTA, esté activa o no.
 
         Ficha (RN-11): si hay fila en `drivers`, `driver` la actualiza
         (`status` ausente → se conserva el actual, a diferencia del alta); si
@@ -1450,19 +1526,13 @@ paths:
         reactivarlo es lo que la vuelve a encender, y encenderla acá devolvería a
         esa persona al combobox de conductores sin pasar por ahí.
 
-        Organigrama (RN-09): el nivel del rol ACTUAL del trabajador, el del rol
-        NUEVO y el del rol de su CUENTA del sistema, si la tiene, tienen que ser
-        los tres estrictamente menores al nivel del rol de la sesión; si uno no
-        lo es → `403 WRK-006`. El de la cuenta se mira aparte porque es la fila
-        que esta operación escribe, y nada obliga a que coincida con el del
-        trabajador. `admin` exento. Nadie
-        cambia su propio cargo, tampoco `admin` → `403 WRK-012`, y se miran las
-        DOS filas que la edición mueve: la del trabajador y la de su cuenta. Un
-        `admin` sí edita el resto de su propia ficha. Mientras las dos filas
-        coincidan, a quien no es `admin` la regla de niveles ya lo frena antes,
-        con `WRK-006`, porque su propio cargo es de su propio nivel; si
-        divergen y la del trabajador quedó en un cargo de nivel menor, pasa esa
-        regla y llega a `WRK-012`.
+        Organigrama (RN-09): el nivel del rol ACTUAL del trabajador y el del rol
+        NUEVO tienen que ser los dos estrictamente menores al nivel del rol de
+        la sesión; si uno no lo es → `403 WRK-006`. `admin` exento. Nadie
+        cambia su propio cargo, tampoco `admin` → `403 WRK-012`. Un `admin` sí
+        edita el resto de su propia ficha. A quien no es `admin` la regla de
+        niveles ya lo frena antes, con `WRK-006`, porque su propio cargo es de
+        su propio nivel.
 
         Concurrencia: toma la fila del trabajador y también la del trabajador de
         la sesión, en orden, antes de validar: dos escrituras sobre el mismo
@@ -1480,7 +1550,7 @@ paths:
         vacío, nulo o campo inválido, incluida la ficha) → `404 WRK-001` (el
         `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
         actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
-        `403 WRK-006` (rol de la cuenta) → `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
+        `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
         WRK-009` → `409 WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
         puede escribir (cuenta apagada, rol actual en la base fuera de los cuatro de
         escritura, o trabajador dado de baja) sale como `403 COM-003` en el primer
@@ -1522,9 +1592,9 @@ paths:
 
         Nadie desactiva su propio trabajador (el de `users.worker_id` de la
         sesión), tampoco `admin` → `403 WRK-010`. Organigrama (RN-09): el nivel
-        del rol actual del trabajador, y el del rol de su cuenta si la tiene,
-        tiene que ser estrictamente menor al de la sesión → si no, `403
-        WRK-006`; `admin` exento, y un `admin` puede desactivar a otro `admin`.
+        del rol actual del trabajador tiene que ser estrictamente menor al de
+        la sesión → si no, `403 WRK-006`; `admin` exento, y un `admin` puede
+        desactivar a otro `admin`.
         Las guardas corren antes del corte idempotente: repetir sobre alguien
         fuera de rango responde `403`.
 
@@ -1543,8 +1613,7 @@ paths:
         `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
         cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
         dado de baja) →
-        `403 WRK-010` → `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la
-        cuenta) → `200`.
+        `403 WRK-010` → `403 WRK-006` (rol actual) → `200`.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager]
       responses:
         '200':
@@ -1573,8 +1642,8 @@ paths:
         cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
         llega uno, o cualquier `Content-Type`, se ignora.
 
-        Organigrama (RN-09): igual que desactivar, sobre el rol actual y el de
-        la cuenta (`403 WRK-006`, `admin` exento). Reactivarse a uno mismo no es
+        Organigrama (RN-09): igual que desactivar, sobre el rol actual
+        (`403 WRK-006`, `admin` exento). Reactivarse a uno mismo no es
         posible: con su trabajador dado de baja, quien actúa no está
         habilitado para escribir (`403 COM-003`). Auditoría, solo cuando hubo cambio: una fila
         `REACTIVATED` por el trabajador y otra si se encendió la ficha
@@ -1586,7 +1655,7 @@ paths:
         `404 WRK-001` → `403 COM-003` (sesión cuyo usuario ya no puede escribir:
         cuenta apagada, rol actual fuera de los cuatro de escritura o trabajador
         dado de baja) →
-        `403 WRK-006` (rol actual) → `403 WRK-006` (rol de la cuenta) → `200`.
+        `403 WRK-006` (rol actual) → `200`.
       x-required-roles: [admin, general_manager, operations_manager, finance_manager]
       responses:
         '200':
@@ -2661,7 +2730,9 @@ paths:
         tabulación): fuera de eso la respuesta es 400.
 
         RN-OP8 — al rol `dispatcher` el servidor le OMITE `price` y
-        `currencyCode` de cada fila (ausentes, no null).
+        `currencyCode` de cada fila (ausentes, no null). El `client` de cada fila sí
+        le llega con razón social, RUC, teléfono y contacto, y `q` busca también por
+        nombre y RUC del cliente, aunque despacho no pueda leer `/clients`.
       x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
       parameters:
         - name: q
@@ -2896,7 +2967,8 @@ paths:
         Incluye la bitácora (`events`, orden cronológico) y los recursos
         adicionales asignados en ruta. Devuelve el header `ETag` que exigen el
         PUT, la cancelación y la eliminación. RN-OP8 — `dispatcher` no recibe
-        `price` ni `currencyCode`.
+        `price` ni `currencyCode`. El `client` trae razón social, RUC, teléfono y
+        contacto también para despacho, aunque no pueda leer `/clients`.
       x-required-roles: [admin, sales, general_manager, operations_manager, dispatcher]
       responses:
         '200':
@@ -3449,8 +3521,13 @@ components:
       scheme: bearer
       bearerFormat: JWT
       description: |
-        JWT firmado con HS256/RS256. Claims esperados:
-        `sub` (userId), `username`, `role`, `iat`, `exp`.
+        JWT firmado con RS256. El API acepta como credencial solo el token de acceso (`token` de
+        `POST /auth/login` y de `POST /auth/refresh`, con `typ: access`). El token de renovación
+        (`refreshToken`, `typ: refresh`) va únicamente en el cuerpo de `POST /auth/refresh`; usado en
+        esta cabecera responde 401 `AUTH-008`, igual que cualquier JWT sin `typ: access`, o
+        `AUTH-007` si ya venció: el vencimiento se revisa antes que la marca.
+        Claims del token de acceso: `sub` (userId), `upn` (username), `groups` (rol), `fullName`,
+        `position`, `typ`, `jti`, `iss`, `aud`, `iat`, `exp`.
 
   parameters:
     IdLong:
@@ -3522,7 +3599,7 @@ components:
                 code: 'COM-002'
                 traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
     Unauthorized:
-      description: Token de acceso ausente, expirado o inválido
+      description: "Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`."
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -3538,25 +3615,15 @@ components:
                 code: 'AUTH-007'
                 traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
             tokenInvalid:
-              summary: Token mal formado o no firmado por este servidor
+              summary: Token mal formado, no firmado por este servidor, o que no es de acceso (por ejemplo, el de renovación)
               value:
                 type: 'urn:tms:error:auth-008'
                 title: 'Token invalid'
                 status: 401
-                detail: 'El token de acceso es inválido'
+                detail: 'El token de acceso es inválido o está mal formado'
                 instance: '/api/v1/quotations'
                 code: 'AUTH-008'
                 traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
-            tokenMissing:
-              summary: No se envió header Authorization
-              value:
-                type: 'urn:tms:error:auth-006'
-                title: 'Token missing'
-                status: 401
-                detail: 'Falta el header Authorization con un token Bearer'
-                instance: '/api/v1/quotations'
-                code: 'AUTH-006'
-                traceId: '4a5b6c7d-8e9f-0a1b-2c3d-4e5f6a7b8c9d'
     Forbidden:
       description: Autenticado pero sin permisos para esta operación
       content:
@@ -3925,7 +3992,15 @@ components:
           type: string
           format: password
           minLength: 8
-          maxLength: 100
+          maxLength: 72
+          description: >-
+            Hasta 72 bytes en UTF-8, que es lo que procesa BCrypt: una letra con tilde ocupa 2 bytes
+            y un emoji, 3 o más, así que cuántos caracteres entran depende de cuáles sean. Sin
+            caracteres nulos ni surrogates sueltos. El servidor cuenta el mínimo de 8 en unidades
+            UTF-16 (casi todos los emojis valen 2); minLength, que cuenta puntos de código, es más
+            estricto solo con los caracteres fuera del plano básico, como esos emojis.
+            Fuera de eso responde 400 COM-001 en el campo antes de buscar al usuario: la respuesta
+            es la misma exista o no.
 
     LoginResponse:
       type: object
@@ -3935,7 +4010,7 @@ components:
         refreshToken: { type: [string, 'null'], description: 'Token para renovar la sesión sin re-login' }
         expiresAt:    { type: string, format: date-time }
         expiresIn:    { type: integer, format: int64, description: 'Segundos hasta expiración del access token', example: 3600 }
-        user:         { $ref: '#/components/schemas/UserResponse' }
+        user:         { $ref: '#/components/schemas/SessionUser' }
 
     RefreshRequest:
       type: object
@@ -3951,8 +4026,27 @@ components:
       type: object
       required: [currentPassword, newPassword]
       properties:
-        currentPassword: { type: string, format: password, minLength: 8, maxLength: 100 }
-        newPassword:     { type: string, format: password, minLength: 8, maxLength: 100 }
+        currentPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: >-
+            Las mismas reglas que newPassword: hasta 72 bytes en UTF-8, sin caracteres nulos ni
+            surrogates sueltos y un mínimo de 8 unidades UTF-16. Fuera de eso responde 400 COM-001
+            en el campo.
+        newPassword:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 72
+          description: >-
+            Hasta 72 bytes en UTF-8, que es lo que procesa BCrypt: una letra con tilde ocupa 2 bytes
+            y un emoji, 3 o más, así que cuántos caracteres entran depende de cuáles sean. Sin
+            caracteres nulos ni surrogates sueltos. El servidor cuenta el mínimo de 8 en unidades
+            UTF-16 (casi todos los emojis valen 2); minLength, que cuenta puntos de código, es más
+            estricto solo con los caracteres fuera del plano básico, como esos emojis.
+            Fuera de eso responde 400 COM-001 en el campo.
 
     UserRef:
       description: Referencia mínima a un usuario (para embeber en respuestas)
@@ -3972,6 +4066,18 @@ components:
           properties:
             role:     { $ref: '#/components/schemas/UserRole' }
             isActive: { type: boolean }
+
+    SessionUser:
+      description: |
+        El usuario de la sesión (login, refresh y /auth/me): el de UserResponse más el id de su
+        trabajador, para reconocer la ficha propia. Los autores embebidos en otras respuestas
+        (UserResponse o UserRef) no lo traen.
+      allOf:
+        - $ref: '#/components/schemas/UserResponse'
+        - type: object
+          required: [workerId]
+          properties:
+            workerId: { type: integer, format: int32, description: 'ID del trabajador de la cuenta; toda cuenta tiene uno', example: 29119 }
 
     # -------- Catálogos: Client --------------------------------------------
     ClientRef:
@@ -4658,7 +4764,7 @@ components:
       type: object
       description: |
         Un rol de `public.roles`: la jerarquía única de cargos. `name` es el
-        nombre de sistema (el que llevan `users.role` y el token de sesión, y
+        nombre de sistema (el que llevan el rol de la sesión y su token, y
         el que se manda en `role` del request); `description` es el nombre
         visible del cargo: es el `position` de todo objeto de usuario embebido
         (sesión, cotizaciones, almacén, operaciones y el detalle de un

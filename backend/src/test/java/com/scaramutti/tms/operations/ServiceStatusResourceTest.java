@@ -249,7 +249,7 @@ class ServiceStatusResourceTest {
 
         // Se filtra por el cliente de la corrida y se mira ESTE viaje, no un texto que ningún dato
         // de la suite contiene: con un listado vacío, "no aparece" pasa siempre y además barre la
-        // base que se comparte con el sistema anterior.
+        // base compartida de dev.
         assertFalse(listedIdsOf().contains(serviceId),
             "el eliminado sigue apareciendo en el listado por defecto");
         assertTrue(listedIdsOf("DELETED").contains(serviceId),
@@ -1713,8 +1713,8 @@ class ServiceStatusResourceTest {
         response.then().statusCode(200)
             .body("$", not(hasKey("price")))
             .body("$", not(hasKey("currencyCode")));
-        // Se busca la CLAVE y no el número: el cuerpo lleva ids de seis cifras de una base que
-        // comparte v1, así que "contiene 3200" se pone rojo el día que a un viaje le toca un id
+        // Se busca la CLAVE y no el número: el cuerpo lleva ids de varias cifras de una base con
+        // datos ajenos a la suite, así que "contiene 3200" se pone rojo el día que a un viaje le toca un id
         // que lo contenga. Buscar la clave además alcanza a un precio anidado, que el otro no veía.
         assertFalse(response.body().asString().contains("\"price\""),
             "el importe apareció en el cuerpo que recibe el despacho");

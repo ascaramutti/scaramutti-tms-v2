@@ -25,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * Integration tests de GET /fleet-units. Hermetico: la flota de test se limpia en
  * {@code @AfterEach} por los ids que sembro el fixture, con un barrido de respaldo por el
- * rango de placas reservado ({@code public.tractors}/etc son COMPARTIDAS con v1). Placas en
- * el rango PROPIO {@code ZF00xx} (los retiros usan {@code ZT0xxx} y los reportes
+ * rango de placas reservado ({@code public.tractors}/etc tienen unidades que no son del test).
+ * Placas en el rango PROPIO {@code ZF00xx} (los retiros usan {@code ZT0xxx} y los reportes
  * {@code ZR00xx}: rangos disjuntos para no colisionar en la BD compartida). Aserciones por
  * PRESENCIA.
  */

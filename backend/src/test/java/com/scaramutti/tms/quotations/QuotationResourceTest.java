@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.matchesRegex;
 import static org.hamcrest.Matchers.not;
@@ -982,6 +983,15 @@ class QuotationResourceTest {
             .body("isExpired", equalTo(false))
             .body("createdBy.username", equalTo("admin"))
             .body("updatedBy.username", equalTo("admin"))
+            // El autor tiene sus propias reglas de nombre, cargo y rol, separadas de las de la
+            // sesion: son la firma de cotizaciones y almacen, y sin esto ningun test las mide.
+            .body("createdBy.fullName", equalTo("Admin TMS"))
+            .body("createdBy.position", equalTo("Administrador del Sistema"))
+            .body("createdBy.role", equalTo("admin"))
+            // El id del trabajador va solo en el usuario de la sesion: el autor es el mismo tipo
+            // en cotizaciones y almacen, y ahi lo veria cualquier rol que lea la cotizacion.
+            .body("createdBy", not(hasKey("workerId")))
+            .body("updatedBy", not(hasKey("workerId")))
             .body("createdAt", notNullValue())
             .body("updatedAt", notNullValue());
     }

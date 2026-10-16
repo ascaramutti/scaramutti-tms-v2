@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  *
  * <p><b>Todas las aserciones son DELTAS, no valores absolutos.</b> El endpoint no acepta un solo
  * parámetro: los contadores son globales y los totales son el padrón entero de {@code drivers} y
- * {@code tractors}, que son tablas COMPARTIDAS con el sistema anterior. No hay por dónde acotar a
+ * {@code tractors}, que tienen datos que no son de la corrida. No hay por dónde acotar a
  * los datos de la corrida, así que cada caso lee el baseline, siembra, y compara contra
  * {@code base + N}. Un {@code greaterThan(0)} pasaría siempre sin medir nada.
  *

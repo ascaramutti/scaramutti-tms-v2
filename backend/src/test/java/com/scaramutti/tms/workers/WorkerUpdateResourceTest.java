@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.time.LocalDate;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -714,8 +715,12 @@ class WorkerUpdateResourceTest {
 
     // ---------- el cargo y la cuenta ----------
 
+    /**
+     * El cambio de cargo deja UNA fila de rastro, aunque el trabajador tenga cuenta: la cuenta no
+     * tiene un rol propio que auditar. Y su sesion ya sale con el cargo nuevo.
+     */
     @Test
-    void update_changingTheRoleOfAWorkerWithUser_alsoChangesTheUserRole() {
+    void update_changingTheRoleOfAWorkerWithUser_leavesOneRow_andItsSessionTakesTheNewRole() {
         var actor = fixtures.seedActor("general_manager", "93");
         int id = seedWorker("ZTESTE060", "sales");
         int userId = fixtures.seedUserFor(id, "ztestuser94", "sales");
@@ -724,28 +729,11 @@ class WorkerUpdateResourceTest {
             .body(unchangedBody("ZTESTE060", "finance_manager"))
         .when().put("/workers/" + id).then().statusCode(200);
 
-        assertEquals("finance_manager", fixtures.userRoleNameOf(userId),
-            "el cargo y el rol de su cuenta son la misma decision");
-        assertEquals(List.of("role", "user.role"), auditFieldNames(id));
-        // Los DOS valores: sin esto, invertir los argumentos deja el historial diciendo que la
-        // cuenta fue al reves, y ningun caso se entera.
-        var rastroDeLaCuenta = fixtures.workerAuditRows(id).get(1);
-        assertEquals("sales", rastroDeLaCuenta.oldValue());
-        assertEquals("finance_manager", rastroDeLaCuenta.newValue());
-        assertEquals("Rol del usuario", rastroDeLaCuenta.fieldLabel());
-    }
-
-    /** Sin usuario, una sola fila: escribir siempre la del usuario seria una mentira. */
-    @Test
-    void update_changingTheRoleOfAWorkerWithoutUser_leavesOnlyOneRow() {
-        var actor = fixtures.seedActor("general_manager", "95");
-        int id = seedWorker("ZTESTE061", "sales");
-
-        put(fabricateTokenForUser(actor.userId(), "ztestuser95", "general_manager"))
-            .body(unchangedBody("ZTESTE061", "finance_manager"))
-        .when().put("/workers/" + id).then().statusCode(200);
-
         assertEquals(List.of("role"), auditFieldNames(id));
+        String accountToken = fabricateTokenForUser(userId, "ztestuser94", "sales");
+        given().header("Authorization", "Bearer " + accountToken)
+        .when().get("/auth/me")
+        .then().statusCode(200).body("role", equalTo("finance_manager"));
     }
 
     /**
@@ -995,31 +983,6 @@ class WorkerUpdateResourceTest {
     }
 
     /**
-     * Y TAMPOCO el cargo de su propia CUENTA, que es la fila que da los permisos.
-     *
-     * <p>Es el cuerpo que la guarda vieja no veia: reenvia el cargo del TRABAJADOR sin cambios, asi
-     * que mirando esa fila no se mueve nada, mientras la cascada mueve el de la cuenta. Con las dos
-     * filas divergentes, un administrador se degradaba solo y recibia 200. La divergencia se siembra
-     * a mano porque ninguna ruta de la aplicacion la produce.
-     */
-    @Test
-    void update_admin_demotingItsOwnAccountThroughTheCascade_returns403_WRK012() {
-        var actor = fixtures.seedActor("admin", "99");
-        fixtures.setWorkerDocumentType(actor.workerId(), documentTypeId());
-        fixtures.setWorkerHireDate(actor.workerId(), LocalDate.of(2024, 3, 1));
-        // El trabajador baja de cargo; la CUENTA se queda en admin.
-        fixtures.setWorkerRole(actor.workerId(), "general_manager");
-
-        put(fabricateTokenForUser(actor.userId(), "ztestuser99", "admin"))
-            .body(body("Actor", "admin", "ZTESTA99", null, "general_manager", "2024-03-01", null, null))
-        .when().put("/workers/" + actor.workerId())
-        .then().statusCode(403).body("code", equalTo("WRK-012"));
-
-        assertEquals("admin", fixtures.userRoleNameOf(actor.userId()), "la cuenta no se movio");
-        assertEquals(List.of(), auditFieldNames(actor.workerId()));
-    }
-
-    /**
      * El choque de bloqueo en la FASE DE ESCRITURA, no al tomar la fila: la otra conexion sostiene
      * la fila de la FICHA y el cuerpo cambia la licencia.
      *
@@ -1064,16 +1027,16 @@ class WorkerUpdateResourceTest {
     }
 
     /**
-     * El mismo choque sobre la fila de la CUENTA, que es la ultima espera del presupuesto y la
-     * unica que se escribe sin haberla tomado con bloqueo.
-     *
-     * <p>Este trabajador NO tiene ficha, asi que el par con el de arriba cubre los dos caminos:
-     * con ficha previa y sin ella. Sin el envoltorio, este sale 500.
+     * Cambiar el cargo de quien tiene cuenta no espera por la fila de la cuenta: su rol es el cargo
+     * y la edicion no la escribe. Por eso la cuenta salio del presupuesto de esperas de la
+     * edicion; si algo vuelve a escribirla, este caso da 409 en vez de 200. El control es la baja,
+     * que si la escribe: con la misma fila tomada, da 409.
      */
     @Test
-    void update_whenAnotherTransactionHoldsTheAccountRow_returns409_WRK013() throws Exception {
-        int id = seedWorker("ZTESTE161", "operator");
-        fixtures.seedUserFor(id, "ztestuser161", "operator");
+    void update_changingTheRoleWhileAnotherTransactionHoldsTheAccountRow_doesNotWaitForIt()
+            throws Exception {
+        int id = seedWorker("ZTESTE161", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuser161", "sales");
         ExecutorService executor = Executors.newSingleThreadExecutor();
 
         try (Connection holder = dataSource.getConnection()) {
@@ -1081,7 +1044,9 @@ class WorkerUpdateResourceTest {
             try (PreparedStatement lock = holder.prepareStatement(
                 "SELECT id FROM public.users WHERE worker_id = ? FOR UPDATE")) {
                 lock.setInt(1, id);
-                lock.executeQuery().close();
+                try (ResultSet rows = lock.executeQuery()) {
+                    assertTrue(rows.next(), "precondicion: la otra sesion tiene tomada la cuenta");
+                }
             }
 
             Future<Respuesta> response = executor.submit(() -> {
@@ -1090,10 +1055,18 @@ class WorkerUpdateResourceTest {
                 String code = extracted.path("code");
                 return new Respuesta(extracted.statusCode(), code);
             });
-
             var result = response.get(30, TimeUnit.SECONDS);
-            assertEquals(409, result.statusCode());
-            assertEquals("WRK-013", result.code());
+            assertEquals(200, result.statusCode(), "codigo " + result.code());
+
+            Future<Respuesta> deactivation = executor.submit(() -> {
+                var extracted = given().header("Authorization", "Bearer " + adminToken())
+                    .when().post("/workers/" + id + "/deactivate").then().extract();
+                String code = extracted.path("code");
+                return new Respuesta(extracted.statusCode(), code);
+            });
+            var control = deactivation.get(30, TimeUnit.SECONDS);
+            assertEquals(409, control.statusCode(), "control: la baja escribe la cuenta tomada");
+            assertEquals("WRK-013", control.code());
             holder.rollback();
         } finally {
             executor.shutdownNow();
@@ -1101,18 +1074,18 @@ class WorkerUpdateResourceTest {
                 System.err.println("AVISO: quedo un hilo vivo del caso de bloqueo de la cuenta");
             }
         }
+        assertEquals("dispatcher", fixtures.userRoleNameOf(userId));
     }
 
     /**
      * Y el choque en la rama que CREA la ficha, que es el UNICO camino que distingue el alcance del
      * envoltorio del traductor.
      *
-     * <p>Los dos casos de arriba sostienen filas que ya existen, y esas escrituras salen en la
-     * descarga FINAL: con el envoltorio angosto —cubriendo solo esa descarga— los dos siguen
-     * verdes. La ficha que NACE se graba con una descarga propia, antes, y ahi el envoltorio
-     * angosto deja escapar el choque como error del servidor. Sin este caso, achicar el envoltorio
-     * a lo que era no rompe nada y el comentario que dice "TODA la fase de escritura" es una
-     * afirmacion sin medir.
+     * <p>El caso de la ficha sostiene una fila que ya existe, y esa escritura sale en la descarga
+     * FINAL: con el envoltorio angosto, cubriendo solo esa descarga, sigue verde. La ficha que NACE
+     * se graba con una descarga propia, antes, y ahi el envoltorio angosto deja escapar el choque
+     * como error del servidor. Sin este caso, achicar el envoltorio a lo que era no rompe nada y el
+     * comentario que dice "TODA la fase de escritura" es una afirmacion sin medir.
      *
      * <p>Es determinista sin depender de tiempos: la otra conexion inserta una ficha con la MISMA
      * licencia y no confirma, asi que el INSERT de esta edicion espera contra esa entrada del
@@ -1431,9 +1404,9 @@ class WorkerUpdateResourceTest {
      * El cargo llega a la FILA.
      *
      * <p>Este caso existe por un agujero que encontró una revisión: borrar la asignación del
-     * cargo dejaba la suite entera en verde. El rastro de auditoría se arma ANTES de asignar, la
-     * cascada a la cuenta usa la variable nueva, y las transiciones de ficha deciden con ella,
-     * así que ninguna de las tres notaba que la columna se quedaba con el valor viejo. Era la
+     * cargo dejaba la suite entera en verde. El rastro de auditoría se arma ANTES de asignar y las
+     * transiciones de ficha deciden con la variable nueva, así que ninguna de las dos nota que la
+     * columna se queda con el valor viejo. Era la
      * asignación central de la operación sin un solo oráculo.
      */
     @Test
@@ -1760,30 +1733,6 @@ class WorkerUpdateResourceTest {
         assertEquals("AVAILABLE", rows.get(2).newValue());
     }
 
-    /**
-     * La jerarquia mira tambien el cargo de la CUENTA, que es la fila que esta operacion escribe.
-     *
-     * <p>Hoy el cargo del trabajador y el de su cuenta siempre coinciden, asi que la guarda es un
-     * no-op y ningun caso normal la distingue. Este los separa a proposito, sembrando la
-     * divergencia por fuera: sin la guarda, un gerente que ve un trabajador de cargo bajo le
-     * degrada la cuenta a alguien que nunca estuvo debajo suyo en el organigrama, con 200.
-     */
-    @Test
-    void update_theRankAlsoLooksAtTheAccountRole_notOnlyAtTheWorkerOne() {
-        var actor = fixtures.seedActor("general_manager", "97");
-        int id = seedWorker("ZTESTE132", "operator");
-        int userId = fixtures.seedUserFor(id, "ztestuser98b", "operator");
-        // La divergencia que hoy nada impide: la cuenta con un cargo por encima del actor.
-        fixtures.setUserRole(userId, "admin");
-
-        put(fabricateTokenForUser(actor.userId(), "ztestuser97", "general_manager"))
-            .body(unchangedBody("ZTESTE132", "assistant"))
-        .when().put("/workers/" + id)
-        .then().statusCode(403).body("code", equalTo("WRK-006"));
-
-        assertEquals("admin", fixtures.userRoleNameOf(userId), "la cuenta no se movio");
-    }
-
 
     // ---------- los pares del orden que quedaban sin ancla ----------
 
@@ -1836,6 +1785,22 @@ class WorkerUpdateResourceTest {
         .then().statusCode(400).body("code", equalTo("WRK-004"));
     }
 
+    /**
+     * Nadie cambia su propio cargo se decide antes que la cuenta sin sesion: un admin que se pasa
+     * a un cargo sin sesion, con su cuenta, ve WRK-012 y no WRK-011.
+     */
+    @Test
+    void order_theOwnRoleChangeBeatsTheAccountWithoutLogin() {
+        var actor = fixtures.seedActor("admin", "9A");
+        fixtures.setWorkerDocumentType(actor.workerId(), documentTypeId());
+        fixtures.setWorkerHireDate(actor.workerId(), LocalDate.of(2024, 3, 1));
+
+        put(fabricateTokenForUser(actor.userId(), "ztestuser9A", "admin"))
+            .body(body("Actor", "admin", "ZTESTA9A", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + actor.workerId())
+        .then().statusCode(403).body("code", equalTo("WRK-012"));
+    }
+
     /** El rechazo por cuenta sin sesion se decide antes que el tipo de documento. */
     @Test
     void order_theAccountWithoutLoginBeatsAnInvalidDocumentType() {
@@ -1872,56 +1837,5 @@ class WorkerUpdateResourceTest {
         assertEquals("MAINTENANCE", estado.get(0).newValue());
     }
 
-
-    /**
-     * La cascada a la cuenta se decide por el cargo DE LA CUENTA, no por el del trabajador.
-     *
-     * <p>Hoy los dos coinciden siempre y ningun caso normal los separa. Este los separa a
-     * proposito, sembrando la divergencia por fuera, y usa el unico cuerpo que los distingue: uno
-     * que reenvia el cargo del TRABAJADOR sin cambios. Comparando el del trabajador, el metodo
-     * sale temprano y la cuenta se queda con un cargo que ya no le corresponde, sin rastro.
-     */
-    @Test
-    void update_theAccountCascade_isDecidedByTheAccountRole_notTheWorkerOne() {
-        int id = seedWorker("ZTESTE150", "dispatcher");
-        int userId = fixtures.seedUserFor(id, "ztestuser150", "dispatcher");
-        fixtures.setUserRole(userId, "sales");
-
-        // El cuerpo reenvia el cargo del trabajador SIN cambios.
-        put(adminToken()).body(unchangedBody("ZTESTE150", "dispatcher"))
-        .when().put("/workers/" + id).then().statusCode(200);
-
-        assertEquals("dispatcher", fixtures.userRoleNameOf(userId),
-            "la cuenta tiene que alinearse con el cargo del trabajador");
-        assertEquals(List.of("user.role"), auditFieldNames(id));
-
-        // Y los VALORES del rastro, no solo que exista una fila con ese nombre: sin esto, invertir
-        // los dos argumentos de la comparacion deja el caso verde con el historial al reves.
-        var rastro = fixtures.workerAuditRows(id).get(0);
-        assertEquals("sales", rastro.oldValue(), "de donde venia la cuenta");
-        assertEquals("dispatcher", rastro.newValue(), "adonde fue");
-        assertEquals(fixtures.roleIdOf("dispatcher"), fixtures.workerRowOf(id).roleId(),
-            "el cargo del trabajador no se movio: el cuerpo lo reenvio igual");
-    }
-
-    /**
-     * Y el rechazo por cuenta sin sesion, tambien.
-     *
-     * <p>Mismo montaje: el cuerpo reenvia el cargo del trabajador, que no inicia sesion, y la
-     * cuenta esta en otro que si. Mirando el del trabajador, el metodo sale temprano y la cuenta
-     * termina con un cargo sin permisos, que es exactamente lo que esta regla existe para impedir.
-     */
-    @Test
-    void update_theLoginCheck_isDecidedByTheAccountRole_notTheWorkerOne() {
-        int id = seedWorker("ZTESTE151", "operator");
-        int userId = fixtures.seedUserFor(id, "ztestuser151", "operator");
-        fixtures.setUserRole(userId, "sales");
-
-        put(adminToken()).body(unchangedBody("ZTESTE151", "operator"))
-        .when().put("/workers/" + id)
-        .then().statusCode(400).body("code", equalTo("WRK-011"));
-
-        assertEquals("sales", fixtures.userRoleNameOf(userId), "la cuenta no se movio");
-    }
 
 }

@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { SessionLoading } from './SessionLoading'
 import { useAuth } from './AuthContext'
+import { hasSessionEndedHere } from './session'
 import { landingLabelFor, landingPathFor } from './roleLanding'
 import type { UserRole } from '../../api'
 import { cn } from '../utils/cn'
@@ -86,7 +87,10 @@ export function ProtectedRoute({
   }
 
   if (!isAuthenticated || !user) {
-    return <Navigate to={LOGIN_PATH} replace state={{ from: location.pathname }} />
+    // Después de que terminó una sesión en esta pestaña (al salir, o al expirar en el ingreso) la
+    // ruta no se guarda: es la del usuario anterior, y el siguiente aterrizaría donde aquel estaba.
+    const state = hasSessionEndedHere() ? undefined : { from: location.pathname }
+    return <Navigate to={LOGIN_PATH} replace state={state} />
   }
 
   if (allowedRoles && !allowedRoles.includes(user.role)) {

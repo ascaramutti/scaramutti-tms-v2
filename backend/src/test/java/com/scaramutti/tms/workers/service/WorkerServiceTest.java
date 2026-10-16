@@ -151,7 +151,6 @@ class WorkerServiceTest {
         existing.role.name = "operator";
         existing.role.driverProfile = "NONE";
         when(workerRowLock.findByIdForUpdate(5)).thenReturn(existing);
-        when(userRepository.findByWorkerIdOptional(5)).thenReturn(java.util.Optional.empty());
         when(driverRepository.findByWorkerIdOptional(5)).thenReturn(java.util.Optional.empty());
         return existing;
     }

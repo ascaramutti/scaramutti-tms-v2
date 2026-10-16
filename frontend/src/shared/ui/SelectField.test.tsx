@@ -12,10 +12,14 @@ function TestForm({
   options,
   onValue,
   error,
+  helperText,
+  disabled,
 }: {
   options: SelectOption[]
   onValue: (value: Values['campo']) => void
   error?: string
+  helperText?: string
+  disabled?: boolean
 }) {
   const { control, handleSubmit, setError } = useForm<Values>({ defaultValues: { campo: null } })
   onValue(useWatch({ control, name: 'campo' }))
@@ -29,6 +33,8 @@ function TestForm({
         options={options}
         placeholder="Elige"
         error={error}
+        helperText={helperText}
+        disabled={disabled}
       />
       <button type="button" onClick={() => setError('campo', { message: 'mal' }, { shouldFocus: true })}>
         Marcar
@@ -65,6 +71,44 @@ describe('SelectField', () => {
     await user.selectOptions(screen.getByLabelText('Campo'), 'Uno')
     await user.selectOptions(screen.getByLabelText('Campo'), 'Elige')
     expect(valor).toBeNull()
+  })
+
+  it('sin ayuda ni error no apunta a ninguna descripción', () => {
+    render(<TestForm options={[]} onValue={() => {}} />)
+    expect(screen.getByLabelText('Campo')).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('la ayuda va en el tono apagado y antes del error, que sigue en rojo', () => {
+    render(<TestForm options={[]} onValue={() => {}} helperText="Ayuda" error="Mal" />)
+    const ayuda = screen.getByText('Ayuda')
+    expect(ayuda).toHaveClass('text-xs', 'text-fg-muted')
+    expect(ayuda).not.toHaveClass('text-danger')
+    expect(screen.getByText('Mal')).toHaveClass('text-danger')
+    expect(ayuda.compareDocumentPosition(screen.getByText('Mal')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  /** Como en el campo de texto: la ayuda y el error se anuncian juntos al enfocar el select. */
+  it('anuncia la ayuda, y la ayuda y el error juntos', () => {
+    const { rerender } = render(<TestForm options={[]} onValue={() => {}} helperText="Ayuda" />)
+    expect(screen.getByLabelText('Campo')).toHaveAccessibleDescription('Ayuda')
+    // La ayuda no es un error: no se anuncia sola al abrir la pantalla.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+
+    rerender(<TestForm options={[]} onValue={() => {}} helperText="Ayuda" error="Mal" />)
+    expect(screen.getByLabelText('Campo')).toHaveAccessibleDescription('Ayuda Mal')
+  })
+
+  /** Un select fijo (un cargo que no se puede cambiar) se ve apagado, igual que un campo de texto. */
+  it('deshabilitado lleva el estilo apagado de los campos', () => {
+    render(<TestForm options={[]} onValue={() => {}} disabled />)
+    expect(screen.getByLabelText('Campo')).toBeDisabled()
+    // Contra literales y no contra la constante: si la constante pierde una clase, el test lo nota.
+    expect(screen.getByLabelText('Campo')).toHaveClass(
+      'disabled:bg-surface-subtle',
+      'disabled:text-fg-subtle',
+      'disabled:opacity-60',
+      'disabled:cursor-not-allowed',
+    )
   })
 
   /** Con el ref, el formulario puede llevar el foco al select que tiene el error. */

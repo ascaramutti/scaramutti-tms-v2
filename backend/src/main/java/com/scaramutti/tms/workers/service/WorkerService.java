@@ -356,8 +356,8 @@ public class WorkerService {
 
 
     /**
-     * Edita un trabajador, su ficha de conductor y, si tiene usuario, el rol de ese usuario, EN
-     * UNA SOLA TRANSACCION.
+     * Edita un trabajador y su ficha de conductor EN UNA SOLA TRANSACCION. Si tiene usuario, la
+     * cuenta no se escribe: su rol es este cargo.
      *
      * <p>Es un REEMPLAZO y no un parche: cada campo del cuerpo pisa al guardado, y un opcional
      * que no viene queda vacio. Por eso no hay comprobaciones de nulo antes de asignar; tratarlas
@@ -375,14 +375,11 @@ public class WorkerService {
      * y bloquee despues pierde su cambio sin ningun error y deja un rastro que afirma algo que en la
      * fila no esta.
      *
-     * <p>DEUDA ANOTADA: la fila de la CUENTA se lee SIN bloqueo, se le mide el rango y se escribe
-     * al final. Hoy no es alcanzable —el unico otro escritor de esa columna es el sembrador de dev,
-     * y dos ediciones del mismo trabajador ya se serializan en el bloqueo de arriba— pero el primer
-     * endpoint del modulo de usuarios que la escriba convierte esto en un rango medido sobre un
-     * valor que otra transaccion movio. El presupuesto de esperas YA cuenta esa fila, asi que
-     * tomarla con bloqueo no obliga a recontar. El disparador es ese, y esta escrito ACA porque es
-     * donde lo va a leer quien toque este metodo: un puntero a un documento fuera del repositorio
-     * seria una deuda que solo existe si alguien encuentra el documento.
+     * <p>DEUDA ANOTADA: WRK-011 mira si hay cuenta sin bloquear la tabla de cuentas. Una cuenta
+     * creada o pasada a este trabajador mientras la edicion lo tiene tomado no la espera (salvo
+     * que ya haya escrito un documento nuevo, y ni asi se vuelve a mirar) y puede quedar en un
+     * cargo sin sesion. Hoy ninguna ruta crea ni mueve cuentas; la primera que lo haga tiene que
+     * tomar antes la fila del trabajador y mirar el cargo y la vigencia.
      */
     @Transactional
     public WorkerDetailResponse updateWorker(UpdateWorkerCommand updateWorkerCommand) {
@@ -396,21 +393,8 @@ public class WorkerService {
 
         workerRankPolicy.assertCanActOn(newRole);
 
-        // La cuenta se carga ANTES de la guarda del cargo propio porque esa guarda mira las DOS
-        // filas que esta operacion mueve. Cargar no es comprobar: el orden de errores publicado
-        // sigue siendo WRK-006 (actual) -> WRK-005 -> WRK-006 (nuevo) -> WRK-012 -> WRK-006
-        // (cuenta) -> WRK-011.
-        User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
-        workerRankPolicy.assertCanChangeRoleOf(worker, user, newRole);
-        if (user != null) {
-            // Tambien sobre el rol de la CUENTA, que es la fila que esta operacion escribe. Hoy
-            // siempre coincide con el del trabajador, pero NADA lo obliga: no hay restriccion que
-            // los ate, y el modulo de usuarios que viene puede asignar el rol de la cuenta por su
-            // lado. Sin esto, la jerarquia se mediria sobre una fila y la escritura caeria sobre
-            // otra. Mientras coincidan, esta linea no cambia ninguna respuesta.
-            workerRankPolicy.assertCanActOn(user.role);
-        }
-        assertUserKeepsLogin(user, newRole);
+        workerRankPolicy.assertCanChangeRoleOf(worker, newRole);
+        assertUserKeepsLogin(worker, newRole);
 
         DocumentType newDocumentType =
             documentTypeRepository.findByIdOptional(updateWorkerCommand.documentTypeId())
@@ -463,7 +447,6 @@ public class WorkerService {
         workerRowLock.runTranslatingLockConflicts(() -> {
             applyWorkerChanges(worker, updateWorkerCommand, newRole, newDocumentType, changes, currentUserId);
             applyDriverProfile(worker, existingDriver, transition, updateWorkerCommand.driver(), changes);
-            applyUserRole(user, newRole, changes);
 
             writeAuditLogs(worker.id, WorkerAuditChangeType.FIELD_EDIT, changes.asList(),
                 updateWorkerCommand.reason(), currentUserId);
@@ -484,13 +467,13 @@ public class WorkerService {
     public WorkerDetailResponse deactivateWorker(Integer workerId) {
         Worker worker = lockTargetAndOwnWorker(workerId);
         workerRankPolicy.assertIsNotOwnWorker(worker);
-        User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
-        assertCanChangeStatusOf(worker, user);
+        workerRankPolicy.assertCanActOn(worker.role);
         if (!Boolean.TRUE.equals(worker.isActive)) {
             return getWorker(worker.id);
         }
 
         Driver driver = driverRepository.findByWorkerIdOptional(worker.id).orElse(null);
+        User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
         Integer currentUserId = currentUser.requireId();
         WorkerFieldChanges changes = new WorkerFieldChanges();
         workerRowLock.runTranslatingLockConflicts(() -> {
@@ -528,8 +511,7 @@ public class WorkerService {
     @Transactional
     public WorkerDetailResponse reactivateWorker(Integer workerId) {
         Worker worker = lockTargetAndOwnWorker(workerId);
-        User user = userRepository.findByWorkerIdOptional(worker.id).orElse(null);
-        assertCanChangeStatusOf(worker, user);
+        workerRankPolicy.assertCanActOn(worker.role);
         if (Boolean.TRUE.equals(worker.isActive)) {
             return getWorker(worker.id);
         }
@@ -560,9 +542,10 @@ public class WorkerService {
      * Toma la fila del destino Y la del trabajador de la sesion, en orden de id, antes de validar
      * al actor. Sin la segunda, dos administradores que se desactivan o se bajan el cargo entre si
      * a la vez pasaban los dos la validacion y la empresa podia quedar sin administradores; con
-     * ella, el segundo espera y relee su propia cuenta ya cambiada. El orden por id impide el
-     * abrazo mortal. Protege a la cuenta solo porque quien le escribe el cargo o la vigencia toma
-     * antes la fila de su trabajador: un escritor nuevo de cuentas tiene que hacer lo mismo.
+     * ella, el segundo espera y relee su propio cargo ya cambiado. El orden por id impide el
+     * abrazo mortal. Protege a la cuenta solo porque quien le escribe la vigencia toma antes la
+     * fila de su trabajador (el cargo ya vive ahi): un escritor nuevo de cuentas tiene que hacer lo
+     * mismo.
      * Antes de bloquear: el 404 y el corte a quien ya no escribe, sin cargar nada, en ese orden.
      */
     private Worker lockTargetAndOwnWorker(Integer targetId) {
@@ -593,41 +576,21 @@ public class WorkerService {
     }
 
     /**
-     * El rango del cambio de estado: el cargo ACTUAL del trabajador y, si tiene cuenta, el de la
-     * cuenta, que es la que da los permisos. Mismo criterio que la edicion.
-     */
-    private void assertCanChangeStatusOf(Worker worker, User user) {
-        workerRankPolicy.assertCanActOn(worker.role);
-        if (user != null) {
-            workerRankPolicy.assertCanActOn(user.role);
-        }
-    }
-
-    /**
      * Una cuenta no puede quedar con un cargo que no inicia sesion: iniciaria igual, recibiria un
      * token con un grupo que ningun endpoint acepta y el frontend no sabria donde llevarla. El
      * camino para dejar a alguien sin acceso es darlo de baja, que apaga la cuenta y deja rastro.
      *
-     * <p>Solo aplica si el cargo DE LA CUENTA cambia. Sin esa condicion, alguien que ya estuviera
-     * en ese estado no se podria editar nunca mas, ni para corregirle una errata en el telefono.
-     * Que la condicion mire la cuenta tiene un precio escrito: si las dos filas divergen y la
-     * cuenta esta en un cargo con sesion mientras el trabajador esta en uno sin ella, todo cuerpo
-     * que reenvie el del trabajador sale por aca, y esa ficha no se puede editar sin moverle
-     * tambien el cargo. Es deliberado: converger o rechazar, nunca mover la cuenta en silencio.
+     * <p>Solo aplica si el cargo cambia. Sin esa condicion, alguien que ya estuviera en ese estado
+     * no se podria editar nunca mas, ni para corregirle una errata en el telefono.
      *
      * <p>Y cuenta que la fila de usuario EXISTA, no que este vigente: una cuenta apagada se puede
      * volver a encender, y filtrarla aca dejaria armada justo la cuenta rota que esto previene.
      */
-    private void assertUserKeepsLogin(User user, Role newRole) {
-        // Se compara contra el rol de la CUENTA por el mismo motivo que la cascada: la cuenta es
-        // la que termina con el cargo nuevo, asi que es la que decide si el cambio la rompe.
-        // Comparar el del trabajador dejaria pasar el caso en que los dos difieren y el cuerpo
-        // reenvia el del trabajador: la cuenta se moveria a un cargo sin sesion sin que nadie lo
-        // mire.
-        if (user == null || user.role.id.equals(newRole.id)) {
+    private void assertUserKeepsLogin(Worker worker, Role newRole) {
+        if (worker.role.id.equals(newRole.id) || Boolean.TRUE.equals(newRole.canLogin)) {
             return;
         }
-        if (!Boolean.TRUE.equals(newRole.canLogin)) {
+        if (userRepository.existsByWorkerId(worker.id)) {
             throw WorkersError.ROLE_CANNOT_LOGIN_WITH_USER.toException();
         }
     }
@@ -750,24 +713,6 @@ public class WorkerService {
             }
             default -> throw new IllegalStateException("transicion de ficha sin resolver: " + transition);
         }
-    }
-
-    /**
-     * Si el cargo cambio y hay usuario, su rol cambia en la MISMA transaccion.
-     *
-     * <p>Los permisos rigen en el proximo inicio de sesion o refresco: la sesion abierta conserva
-     * el rol viejo hasta que venza su token, que es una ventana aceptada y escrita.
-     */
-    private void applyUserRole(User user, Role newRole, WorkerFieldChanges changes) {
-        // Se compara contra el rol de la CUENTA y no contra el del trabajador, porque es el que
-        // esta linea escribe y audita. Hoy los dos coinciden siempre, pero la guarda de rango de
-        // mas arriba existe justamente porque nada lo obliga: si divergieran, comparar el del
-        // trabajador dejaria la cuenta con su rol viejo y sin fila de rastro.
-        if (user == null || user.role.id.equals(newRole.id)) {
-            return;
-        }
-        changes.compare(WorkerAuditField.USER_ROLE, user.role.name, newRole.name);
-        user.role = newRole;
     }
 
     /** Una fila por campo cambiado, todas con el mismo tipo de cambio y el mismo motivo si lo hay. */

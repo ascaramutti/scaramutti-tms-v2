@@ -8,6 +8,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
@@ -15,10 +16,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static io.restassured.RestAssured.given;
+import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -177,6 +180,87 @@ class PublishedContractTest {
             // una ruta sin operaciones es el sintoma exacto del bloque mal ubicado
             .body("paths.'/services'.put", nullValue())
             .body("paths.'/services/{id}'.post", nullValue());
+    }
+
+    /**
+     * Los roles, el 403 y las cabeceras de las lecturas de clientes. El cliente generado lleva el
+     * 403, pero no los roles ni las cabeceras: sin este test, nada notaria que el contrato los
+     * perdio.
+     */
+    @Test
+    void publishedContract_declaresWhoReadsClientsAndThatTheReadIsNotStored() {
+        JsonPath contract = publishedContract();
+        for (String path : List.of("/clients", "/clients/{id}")) {
+            String read = "paths.'" + path + "'.get.";
+            assertEquals(List.of("admin", "sales", "general_manager", "operations_manager"),
+                contract.getList(read + "'x-required-roles'"), path);
+            assertEquals("#/components/responses/Forbidden",
+                contract.getString(read + "responses.'403'.$ref"), path);
+            assertThat(path,
+                contract.getString(read + "responses.'200'.headers.'Cache-Control'.description"),
+                containsString("no-store"));
+            assertThat(path, contract.getString(read + "responses.'200'.headers.Vary.description"),
+                containsString("Authorization"));
+        }
+    }
+
+    /**
+     * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
+     * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
+     * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.
+     */
+    @Test
+    void publishedContract_putsTheWorkerIdOnlyInTheSessionUser() {
+        JsonPath contract = publishedContract();
+        for (String path : List.of("/auth/login", "/auth/refresh")) {
+            assertEquals("#/components/schemas/LoginResponse", contract.getString(
+                "paths.'" + path + "'.post.responses.'200'.content.'application/json'.schema.$ref"), path);
+        }
+        assertEquals("#/components/schemas/SessionUser",
+            contract.getString("components.schemas.LoginResponse.properties.user.$ref"));
+        assertEquals("#/components/schemas/SessionUser", contract.getString(
+            "paths.'/auth/me'.get.responses.'200'.content.'application/json'.schema.$ref"));
+
+        String sessionUser = "components.schemas.SessionUser.allOf";
+        assertEquals("#/components/schemas/UserResponse", contract.getString(sessionUser + "[0].$ref"));
+        assertEquals(List.of("workerId"), contract.getList(sessionUser + "[1].required"));
+        assertEquals("integer", contract.getString(sessionUser + "[1].properties.workerId.type"));
+        assertEquals("int32", contract.getString(sessionUser + "[1].properties.workerId.format"));
+        assertEquals(2, refsTo(contract.get("$"), "#/components/schemas/SessionUser"),
+            "solo el usuario del ingreso y /auth/me apuntan a SessionUser; un autor no lo trae");
+
+        for (String schema : List.of("UserResponse", "UserRef")) {
+            assertFalse(contract.getMap("components.schemas." + schema).toString().contains("workerId"),
+                schema + " no puede declarar workerId: es también el autor embebido");
+        }
+    }
+
+    /**
+     * Las tres contraseñas declaran el límite de BCrypt, en bytes: el cliente del frontend sale de
+     * este documento, y con el máximo de antes (100) quien lo siguiera mandaba claves que dan 400.
+     */
+    @Test
+    void publishedContract_limitsEveryPasswordTo72Bytes() {
+        JsonPath contract = publishedContract();
+        for (String field : List.of("LoginRequest.properties.password",
+                                    "ChangePasswordRequest.properties.currentPassword",
+                                    "ChangePasswordRequest.properties.newPassword")) {
+            String schema = "components.schemas." + field;
+            assertEquals(8, contract.getInt(schema + ".minLength"), field);
+            assertEquals(72, contract.getInt(schema + ".maxLength"), field);
+            assertTrue(contract.getString(schema + ".description").contains("72 bytes en UTF-8"), field);
+        }
+    }
+
+    /** Cuántas veces aparece una referencia en todo el documento. */
+    private static long refsTo(Object node, String ref) {
+        if (node instanceof Map<?, ?> map) {
+            return map.values().stream().mapToLong(value -> refsTo(value, ref)).sum();
+        }
+        if (node instanceof List<?> list) {
+            return list.stream().mapToLong(value -> refsTo(value, ref)).sum();
+        }
+        return ref.equals(node) ? 1 : 0;
     }
 
     /** El detalle publica el ETag: es lo que la edición y las transiciones van a exigir. */

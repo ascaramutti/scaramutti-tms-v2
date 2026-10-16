@@ -11,6 +11,8 @@ interface WorkerFormFieldsProps {
   documentTypes: readonly DocumentTypeResponse[]
   /** Solo los cargos que la sesión puede asignar. */
   roleOptions: readonly RoleResponse[]
+  /** Si viene, el Cargo queda fijo y este texto dice por qué. */
+  roleLockedReason?: string
   disabled: boolean
 }
 
@@ -18,7 +20,7 @@ interface WorkerFormFieldsProps {
  * Los datos del trabajador, en el orden de la ficha. El alta y la edición comparten este
  * grupo; lo propio de cada pantalla vive en su contenedor.
  */
-export function WorkerFormFields({ documentTypes, roleOptions, disabled }: WorkerFormFieldsProps) {
+export function WorkerFormFields({ documentTypes, roleOptions, roleLockedReason, disabled }: WorkerFormFieldsProps) {
   const {
     register,
     control,
@@ -57,7 +59,8 @@ export function WorkerFormFields({ documentTypes, roleOptions, disabled }: Worke
           placeholder="Elige el cargo"
           options={roleOptions.map((role) => ({ value: role.name, label: role.description }))}
           error={errors.role?.message}
-          disabled={disabled}
+          helperText={roleLockedReason}
+          disabled={disabled || roleLockedReason !== undefined}
         />
         <DateField<WorkerFormValues>
           id="trabajador-hire-date"

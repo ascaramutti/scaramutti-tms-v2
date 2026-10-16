@@ -43,7 +43,7 @@ export const FIELD_FOCUS_INVALID = 'focus:ring-danger focus:border-danger'
 export const FIELD_PLACEHOLDER = 'placeholder:text-fg-subtle'
 
 /**
- * El deshabilitado, que solo tiene el campo de texto.
+ * El deshabilitado, que tienen el campo de texto y el select.
  *
  * Lleva opacidad además del tono: el texto apagado y el tipeado se distinguen por el color, y esa
  * distancia depende de dos tokens que pueden moverse por otro motivo. El fondo tampoco ayuda, que
@@ -64,8 +64,8 @@ export const FIELD_DENSITY: Record<FieldDensity, string> = {
 }
 
 /**
- * La forma común: caja, espaciado, foco y borde. Es exactamente lo que tienen el select, el
- * campo de fecha y los controles de las barras. El campo de texto le suma sus tres extras.
+ * La forma común: caja, espaciado, foco y borde. Es exactamente lo que tienen el campo de fecha
+ * y los controles de las barras. El select le suma el deshabilitado y el campo de texto, sus tres extras.
  */
 export function fieldClasses({
   density = 'comfortable',

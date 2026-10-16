@@ -28,7 +28,6 @@ public enum WorkerAuditField {
     DRIVER_LICENSE_CATEGORY ("driver.licenseCategory", "Categoría de licencia"),
     DRIVER_STATUS           ("driver.status",          "Disponibilidad"),
     DRIVER_IS_ACTIVE        ("driver.isActive",        "Ficha de conductor"),
-    USER_ROLE               ("user.role",              "Rol del usuario"),
     IS_ACTIVE               ("isActive",               "Trabajador"),
     USER_IS_ACTIVE          ("user.isActive",          "Usuario del sistema");
 

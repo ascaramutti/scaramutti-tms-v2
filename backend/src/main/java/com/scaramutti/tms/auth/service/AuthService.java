@@ -2,7 +2,7 @@ package com.scaramutti.tms.auth.service;
 
 import com.scaramutti.tms.auth.AuthError;
 import com.scaramutti.tms.auth.dto.LoginResponse;
-import com.scaramutti.tms.auth.dto.UserResponse;
+import com.scaramutti.tms.auth.dto.SessionUserResponse;
 import com.scaramutti.tms.auth.mapper.AuthServiceMapper;
 import com.scaramutti.tms.auth.model.AccessToken;
 import com.scaramutti.tms.auth.model.TokenType;
@@ -44,11 +44,9 @@ public class AuthService {
             throw AuthError.INVALID_CREDENTIALS.toException();
         }
 
-        try {
-            verifyPasswordOrThrow(user, loginCommand.password(), AuthError.INVALID_CREDENTIALS);
-        } catch (RuntimeException e) {
+        if (!passwordService.matches(loginCommand.password(), user.passwordHash)) {
             LOG.warnf("Login fallido: password incorrecta [username=%s]", user.username);
-            throw e;
+            throw AuthError.INVALID_CREDENTIALS.toException();
         }
 
         if (!user.isActive) {
@@ -56,7 +54,7 @@ public class AuthService {
             throw AuthError.USER_INACTIVE.toException();
         }
 
-        LOG.infof("Login exitoso [username=%s, id=%d, role=%s]", user.username, user.id, user.role.name);
+        LOG.infof("Login exitoso [username=%s, id=%d, role=%s]", user.username, user.id, user.worker.role.name);
         return buildLoginResponse(user);
     }
 
@@ -106,10 +104,10 @@ public class AuthService {
     }
 
     @Transactional
-    public UserResponse findUserById(Integer userId) {
+    public SessionUserResponse findUserById(Integer userId) {
         User user = userRepository.findByIdOptional(userId)
             .orElseThrow(AuthError.USER_NOT_FOUND::toException);
-        return authServiceMapper.toUserResponse(user);
+        return authServiceMapper.toSessionUserResponse(user);
     }
 
     private void verifyPasswordOrThrow(User user, String plainPassword, ApiError errorIfMismatch) {

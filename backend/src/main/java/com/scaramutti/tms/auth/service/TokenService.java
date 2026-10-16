@@ -40,7 +40,7 @@ public class TokenService {
 
         String token = Jwt.subject(user.id.toString())
             .upn(user.username)
-            .groups(Set.of(user.role.name))
+            .groups(Set.of(user.worker.role.name))
             .claim(CLAIM_FULL_NAME, user.worker.fullName())
             .claim(CLAIM_POSITION, user.worker.role.description)
             .claim(CLAIM_TYPE, TokenType.ACCESS.claimValue())

@@ -214,32 +214,52 @@ class ClientByIdResourceTest {
             .statusCode(401);
     }
 
-    /**
-     * Sin `@RolesAllowed`: cualquier sesión lee. Los dos roles son de fuera de la lista del PUT,
-     * así que un `@RolesAllowed` copiado del PUT, o cualquier lista angosta, muere acá.
-     */
-    @Test
-    void get_withSalesRole_returns200() {
-        Integer id = seedClient(NAME_PREFIX + "SALES", nextRuc());
+    /** Los cuatro roles que buscan clientes leen la ficha, sin que quede guardada en el navegador. */
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "sales", "general_manager", "operations_manager"})
+    void get_withRoleThatSearchesClients_returns200NotStored(String role) {
+        Integer id = seedClient(NAME_PREFIX + "LEE_" + role.toUpperCase(), nextRuc());
 
         given()
-            .header("Authorization", "Bearer " + TestAuth.login("sales", "Sales1234"))
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken(role + "_test", role))
         .when()
             .get("/clients/" + id)
         .then()
-            .statusCode(200);
+            .statusCode(200)
+            .header("Cache-Control", "no-store")
+            .header("Vary", "Authorization")
+            .body("id", equalTo(id));
     }
 
-    @Test
-    void get_withDispatcherRole_returns200() {
-        Integer id = seedClient(NAME_PREFIX + "DISPATCHER", nextRuc());
+    @ParameterizedTest
+    @ValueSource(strings = {"dispatcher", "finance_manager", "warehouse_keeper"})
+    void get_withRoleThatDoesNotSearchClients_returns403(String role) {
+        Integer id = seedClient(NAME_PREFIX + "NOLEE_" + role.toUpperCase(), nextRuc());
 
+        given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken(role + "_test", role))
+        .when()
+            .get("/clients/" + id)
+        .then()
+            .statusCode(403)
+            .contentType("application/problem+json")
+            .body("code", equalTo("COM-003"));
+    }
+
+    /**
+     * El rol se decide antes de buscar o convertir el id: un rol sin acceso recibe el mismo 403 con
+     * un id inexistente, no numerico o fuera de rango, y no averigua por esta ruta que existe.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"999999", "abc", "99999999999999"})
+    void get_withRoleThatDoesNotSearchClients_andAnyId_returns403NotA404(String id) {
         given()
             .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("dispatcher_test", "dispatcher"))
         .when()
             .get("/clients/" + id)
         .then()
-            .statusCode(200);
+            .statusCode(403)
+            .body("code", equalTo("COM-003"));
     }
 
     // ---------- PUT: happy path ----------------------------------------------

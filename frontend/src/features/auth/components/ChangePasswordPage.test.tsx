@@ -106,6 +106,82 @@ describe('ChangePasswordPage', () => {
     expect(await screen.findByText(/debe ser diferente a la actual/i)).toBeInTheDocument()
   })
 
+  it('rechaza una contraseña actual de solo espacios, sin llamar al servidor', async () => {
+    const user = userEvent.setup()
+    const spy = vi.fn()
+    server.use(http.post(`${API}/auth/change-password`, () => {
+      spy()
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), '        ')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^contraseña actual$/i)).toHaveAccessibleDescription('No puede tener solo espacios'),
+    )
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('rechaza una nueva contraseña de solo espacios, sin llamar al servidor', async () => {
+    const user = userEvent.setup()
+    const spy = vi.fn()
+    server.use(http.post(`${API}/auth/change-password`, () => {
+      spy()
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), '         ')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), '         ')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^nueva contraseña$/i)).toHaveAccessibleDescription('No puede tener solo espacios'),
+    )
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  // BCrypt procesa hasta 72 bytes: 37 eñes son 37 caracteres, pero 74 bytes.
+  it.each([
+    ['la actual', /^contraseña actual$/i, 'ñ'.repeat(37), 'NuevoPassword456'],
+    ['la nueva', /^nueva contraseña$/i, 'Password123', 'ñ'.repeat(37)],
+  ])('rechaza %s de más de 72 bytes, sin llamar al servidor', async (_campo, etiqueta, actual, nueva) => {
+    const user = userEvent.setup()
+    const spy = vi.fn()
+    server.use(http.post(`${API}/auth/change-password`, () => {
+      spy()
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), actual)
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), nueva)
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), nueva)
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    await waitFor(() =>
+      expect(screen.getByLabelText(etiqueta)).toHaveAccessibleDescription(
+        'Es demasiado larga: máximo 72 bytes; las tildes y los emojis cuentan doble o más',
+      ),
+    )
+    expect(spy).not.toHaveBeenCalled()
+  })
+
+  it('manda una nueva de 72 bytes con tildes, tal cual', async () => {
+    const user = userEvent.setup()
+    const cuerpos: unknown[] = []
+    server.use(http.post(`${API}/auth/change-password`, async ({ request }) => {
+      cuerpos.push(await request.json())
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'á'.repeat(36))
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'á'.repeat(36))
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(cuerpos).toEqual([{ currentPassword: 'Password123', newPassword: 'á'.repeat(36) }])
+  })
+
   it('NO llama al endpoint de change-password si el form es inválido', async () => {
     const user = userEvent.setup()
     // Solo nos importa change-password: el AuthProvider sí llama a /auth/me
@@ -146,6 +222,59 @@ describe('ChangePasswordPage', () => {
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
     expect(await screen.findByText('HOME')).toBeInTheDocument()
     expect(toastSpy).toHaveBeenCalledWith('Contraseña actualizada')
+  })
+
+  it('manda la contraseña actual y la nueva, cada una en su lugar y sin la confirmación', async () => {
+    const user = userEvent.setup()
+    const cuerpos: unknown[] = []
+    server.use(http.post(`${API}/auth/change-password`, async ({ request }) => {
+      cuerpos.push(await request.json())
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(cuerpos).toEqual([{ currentPassword: 'Password123', newPassword: 'NuevoPassword456' }])
+  })
+
+  it('manda las claves tal cual, con sus espacios', async () => {
+    const user = userEvent.setup()
+    const cuerpos: unknown[] = []
+    server.use(http.post(`${API}/auth/change-password`, async ({ request }) => {
+      cuerpos.push(await request.json())
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), ' Clave con espacios ')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), ' Nueva clave 2 ')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), ' Nueva clave 2 ')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(cuerpos).toEqual([{ currentPassword: ' Clave con espacios ', newPassword: ' Nueva clave 2 ' }])
+  })
+
+  it('un doble clic manda un solo pedido', async () => {
+    const user = userEvent.setup()
+    let soltar!: () => void
+    const suelta = new Promise<void>((resolve) => (soltar = resolve))
+    let pedidos = 0
+    server.use(http.post(`${API}/auth/change-password`, async () => {
+      pedidos++
+      await suelta
+      return new HttpResponse(null, { status: 204 })
+    }))
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
+    await user.dblClick(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    await waitFor(() => expect(pedidos).toBe(1))
+    soltar()
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(pedidos).toBe(1)
   })
 
   // ----- Landing por rol al salir (unificación v1+v2) -----
@@ -198,7 +327,11 @@ describe('ChangePasswordPage', () => {
     await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
     await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
-    expect(await screen.findByText(/la contraseña actual proporcionada es incorrecta/i)).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^contraseña actual$/i)).toHaveAccessibleDescription(
+        'La contraseña actual proporcionada es incorrecta',
+      ),
+    )
   })
 
   it('COM-001 con errors[] mapea cada error a su campo', async () => {
@@ -222,6 +355,39 @@ describe('ChangePasswordPage', () => {
     await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
     expect(await screen.findByText(/backend: política de password/i)).toBeInTheDocument()
+  })
+
+  it.each([
+    [
+      'AUTH-007',
+      'El token de acceso expiró. Use /auth/refresh para renovarlo.',
+      'Tu sesión venció. Cierra sesión y vuelve a ingresar.',
+    ],
+    [
+      'AUTH-008',
+      'El token de acceso es inválido o está mal formado',
+      'Tu sesión no es válida. Cierra sesión y vuelve a ingresar.',
+    ],
+  ])('el 401 %s avisa con un texto propio, no con el del servidor', async (code, detail, propio) => {
+    const user = userEvent.setup()
+    const toastSpy = vi.spyOn(toast, 'error').mockImplementation(() => 'id')
+    server.use(
+      changePasswordErrorResponse(401, {
+        type: `urn:tms:error:${code.toLowerCase()}`,
+        title: 'Unauthorized',
+        status: 401,
+        detail,
+        code,
+        traceId: 'test-3',
+      }),
+    )
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(propio))
+    expect(toastSpy).toHaveBeenCalledTimes(1)
   })
 
   // ----- A11y -----

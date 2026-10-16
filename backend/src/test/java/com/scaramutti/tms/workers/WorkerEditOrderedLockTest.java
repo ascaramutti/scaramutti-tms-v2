@@ -101,7 +101,7 @@ class WorkerEditOrderedLockTest {
 
     /**
      * El cruce, sin depender de la suerte: otra conexion sostiene las DOS filas hasta ver a los dos
-     * pedidos esperando, y recien ahi suelta. Uno prospera; el otro relee su cuenta ya bajada: fuera
+     * pedidos esperando, y recien ahi suelta. Uno prospera; el otro relee su cargo ya bajado: fuera
      * de rango si su cargo nuevo escribe, sin permiso si ya no. Tomando solo el destino, los dos dan
      * 200; sin el orden por id, abrazo mortal y 409. Por eso se afirma el resultado exacto.
      */
@@ -136,7 +136,7 @@ class WorkerEditOrderedLockTest {
             List<String> outcomes = Stream.of(aLowersB.get(30, TimeUnit.SECONDS),
                 bLowersA.get(30, TimeUnit.SECONDS)).sorted().toList();
             assertEquals(List.of("200", rejected), outcomes,
-                "uno prospera y el otro relee su cuenta ya bajada");
+                "uno prospera y el otro relee su cargo ya bajado");
         } finally {
             executor.shutdownNow();
         }

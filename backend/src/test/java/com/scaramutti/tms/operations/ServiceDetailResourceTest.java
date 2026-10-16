@@ -331,6 +331,33 @@ class ServiceDetailResourceTest {
             .body("events", hasSize(1));
     }
 
+    /**
+     * El despacho no lee clientes por su ruta, pero el contacto del cliente le llega en el
+     * detalle del viaje: es lo que el contrato le promete.
+     */
+    @Test
+    void getService_asDispatcher_includesTheClientContact() {
+        long id = createService("Piura", "Lima");
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                "UPDATE public.clients SET phone = ?1, contact_name = ?2 WHERE id = ?3")
+            .setParameter(1, "987654321").setParameter(2, "ZTEST_ Contacto Ana").setParameter(3, clientId)
+            .executeUpdate());
+        Object[] client = (Object[]) entityManager.createNativeQuery(
+                "SELECT name, ruc FROM public.clients WHERE id = ?1")
+            .setParameter(1, clientId).getSingleResult();
+
+        given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("despacho", "dispatcher"))
+        .when()
+            .get("/services/" + id)
+        .then()
+            .statusCode(200)
+            .body("client.name", equalTo(client[0]))
+            .body("client.ruc", equalTo(client[1]))
+            .body("client.phone", equalTo("987654321"))
+            .body("client.contactName", equalTo("ZTEST_ Contacto Ana"));
+    }
+
     /** El veto manda sobre la lista positiva: dos roles no suman permiso. */
     @Test
     void getService_asDispatcherWithAnotherPricedRole_stillOmitsPrices() {

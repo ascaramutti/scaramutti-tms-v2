@@ -109,7 +109,7 @@ class WorkerStatusResourceTest {
         assertEquals(driverId, ficha.id(), "la MISMA ficha, apagada y no borrada");
         assertEquals("ZTESTLS001", ficha.licenseNumber(), "sus datos intactos");
         assertTrue(!fixtures.userIsActive(userId), "la cuenta");
-        assertEquals("sales", fixtures.userRoleNameOf(userId), "la cuenta no cambia de rol");
+        assertEquals("sales", fixtures.userRoleNameOf(userId), "la baja no toca el cargo");
 
         var rows = fixtures.workerAuditRows(id);
         assertEquals(3, rows.size());
@@ -375,7 +375,7 @@ class WorkerStatusResourceTest {
         int id = fixtures.seedWorker("ZTESTS030", "Juan", "Pérez", "driver", true);
         fixtures.seedDriverProfileFor(id, "ZTESTLS030", null, WarehouseTestData.STATUS_AVAILABLE, true);
         int driverId = fixtures.driverRowOf(id).id();
-        int userId = fixtures.seedUserFor(id, "ztestuserS030", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuserS030", "driver");
 
         post(token, id, DEACTIVATE).statusCode(200);
         assertTrue(!fixtures.workerRowOf(id).isActive());
@@ -510,41 +510,6 @@ class WorkerStatusResourceTest {
         assertTrue(fixtures.userIsActive(a.userId()), "la del que actua sigue viva");
         assertEquals(List.of("isActive", "user.isActive"), auditFieldNames(b.workerId()));
         fixtures.workerAuditRows(b.workerId()).forEach(r -> assertEquals(a.userId(), r.changedBy()));
-    }
-
-    /**
-     * El rango mira tambien el rol de la CUENTA. La divergencia se siembra: el trabajador es de un
-     * cargo alcanzable y su cuenta es de administrador. Es la fila que da los permisos, y sin esta
-     * guarda un gerente apagaria la cuenta de un administrador.
-     */
-    @ParameterizedTest(name = "{0}")
-    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
-    void theRankAlsoLooksAtTheAccountRole(String operation) {
-        var actor = fixtures.seedActor("general_manager", "S13");
-        boolean startsActive = DEACTIVATE.equals(operation);
-        int id = fixtures.seedWorker("ZTESTS101", "Juan", "Pérez", "operator", startsActive);
-        int userId = fixtures.seedUserFor(id, "ztestuserS101", "operator");
-        fixtures.setUserRole(userId, "admin");
-
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS13", "general_manager"), id, operation)
-            .statusCode(403).body("code", equalTo("WRK-006"));
-
-        assertEquals(startsActive, fixtures.workerRowOf(id).isActive());
-        assertTrue(fixtures.userIsActive(userId), "la cuenta no se toco");
-        assertEquals(List.of(), auditFieldNames(id));
-    }
-
-    /** El control: sin la divergencia, el mismo montaje pasa. Sin el, "siempre 403" pasaria arriba. */
-    @Test
-    void theRankOnTheAccount_withoutDivergence_lets_itThrough() {
-        var actor = fixtures.seedActor("general_manager", "S14");
-        int id = fixtures.seedWorker("ZTESTS102", "Juan", "Pérez", "operator", true);
-        int userId = fixtures.seedUserFor(id, "ztestuserS102", "operator");
-
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS14", "general_manager"), id, DEACTIVATE)
-            .statusCode(200);
-
-        assertTrue(!fixtures.userIsActive(userId));
     }
 
     /** La exencion del administrador sale de la BASE: un token que dice admin no alcanza. */
@@ -846,7 +811,7 @@ class WorkerStatusResourceTest {
         boolean startsActive = DEACTIVATE.equals(operation);
         int id = fixtures.seedWorker("ZTESTS070", "Juan", "Pérez", "driver", startsActive);
         fixtures.seedDriverProfileFor(id, "ZTESTLS070", null, WarehouseTestData.STATUS_AVAILABLE, startsActive);
-        int userId = fixtures.seedUserFor(id, "ztestuserS070", "sales", startsActive);
+        int userId = fixtures.seedUserFor(id, "ztestuserS070", "driver", startsActive);
         String sql = switch (table) {
             case "workers" -> "SELECT id FROM public.workers WHERE id = ? FOR NO KEY UPDATE";
             case "drivers" -> "SELECT id FROM public.drivers WHERE worker_id = ? FOR UPDATE";

@@ -19,8 +19,8 @@ import java.util.concurrent.atomic.AtomicLong;
  * necesita y almacén no: los conductores.
  *
  * Molde hermético de la casa: todo lo sintético lleva el prefijo {@code ZTEST} y se borra en
- * el {@code @AfterEach} del test. {@code public.drivers} es COMPARTIDA con v1, así que se
- * limpia por los ids sembrados más un barrido por el trabajador asociado (mismo criterio que
+ * el {@code @AfterEach} del test. {@code public.drivers} tiene fichas que no son del test, así
+ * que se limpia por los ids sembrados más un barrido por el trabajador asociado (mismo criterio que
  * la flota; ver {@link #deleteTestDrivers()}), y el trabajador lo borra
  * {@link WarehouseTestData#deleteTestWorkers()} DESPUÉS (es su FK).
  */

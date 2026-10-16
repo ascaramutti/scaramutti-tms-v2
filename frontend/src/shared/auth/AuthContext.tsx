@@ -1,15 +1,17 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { toast } from 'sonner'
 import { getCurrentUser } from '../../api'
-import type { UserResponse } from '../../api'
+import type { SessionUser } from '../../api'
 import { tokenStorage } from './tokenStorage'
 import { currentUserQueryKey } from './queryKeys'
+import { beginSession, endSession } from './session'
 
 interface AuthContextValue {
-  user: UserResponse | null
+  user: SessionUser | null
   isLoading: boolean
   isAuthenticated: boolean
-  setSession(accessToken: string, refreshToken: string | null, user: UserResponse): void
+  setSession(accessToken: string, refreshToken: string | null, user: SessionUser): void
   clearSession(): void
 }
 
@@ -21,7 +23,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const { data, isLoading: queryLoading } = useQuery({
     queryKey: currentUserQueryKey,
-    queryFn: async (): Promise<UserResponse | null> => {
+    queryFn: async (): Promise<SessionUser | null> => {
       const { data: userResponse } = await getCurrentUser({ throwOnError: true })
       return userResponse ?? null
     },
@@ -35,20 +37,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLoading = hasToken && queryLoading
 
   const setSession = useCallback(
-    (accessToken: string, refreshToken: string | null, sessionUser: UserResponse) => {
+    (accessToken: string, refreshToken: string | null, sessionUser: SessionUser) => {
+      beginSession()
+      // La carga del usuario con los tokens de antes ya no se entrega: sin cancelarla, la query
+      // quedaba cargando para siempre (medido), aunque la pantalla ya mostrara al que entró.
+      void queryClient.cancelQueries({ queryKey: currentUserQueryKey })
       tokenStorage.setTokens(accessToken, refreshToken)
-      queryClient.setQueryData<UserResponse | null>(currentUserQueryKey, sessionUser)
+      queryClient.setQueryData<SessionUser | null>(currentUserQueryKey, sessionUser)
     },
     [queryClient],
   )
 
+  // Salir no recarga la página: sin la rutina, el que entra después en esta pestaña arranca con
+  // la memoria del anterior. La comparte con la sesión expirada, que en el ingreso tampoco recarga.
+  // Los avisos se cierran solo acá: al salir son del que sale; cuando la sesión expira en el
+  // ingreso, son de quien está entrando (medido: se le cerraba el de la clave equivocada).
   const clearSession = useCallback(() => {
-    tokenStorage.clear()
-    // setQueryData(null) en vez de removeQueries: garantiza que el useQuery
-    // dispare un re-render con data=null, incluso cuando la query queda
-    // disabled tras limpiar el token. removeQueries puede no notificar a
-    // suscriptores cuando enabled pasa a false.
-    queryClient.setQueryData<UserResponse | null>(currentUserQueryKey, null)
+    endSession(queryClient)
+    toast.dismiss()
   }, [queryClient])
 
   const value = useMemo<AuthContextValue>(

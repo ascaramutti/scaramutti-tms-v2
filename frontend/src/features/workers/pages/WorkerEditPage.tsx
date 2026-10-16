@@ -11,6 +11,7 @@ import { EmptyState } from '../../../shared/ui/EmptyState'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { WORKERS_BASE, workerDetailPath } from '../../../shared/paths'
+import { useAuth } from '../../../shared/auth/AuthContext'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { WorkerAuditFooter } from '../components/WorkerAuditFooter'
 import { WorkerEditForm } from '../components/WorkerEditForm'
@@ -19,6 +20,8 @@ import { useDocumentTypes } from '../hooks/useDocumentTypes'
 import { useSessionRankLevel } from '../hooks/useSessionRankLevel'
 import { useWorker } from '../hooks/useWorker'
 import { workerKeys } from '../queryKeys'
+import { WORKER_UPDATE_ERRORS } from '../workerApiErrors'
+import { isOwnRecord } from '../ownRecord'
 import { assignableRoles, canManageWorker } from '../rank'
 
 /** El aviso del 404, al abrir o al guardar: los trabajadores no se borran, así que es un id que no existe. */
@@ -26,7 +29,8 @@ const NOT_FOUND = 'Este trabajador no existe'
 
 /**
  * Edición de un trabajador. Sin el trabajador y los dos catálogos no hay formulario. Si su cargo
- * es de nivel igual o mayor al de la sesión, no se ofrece: el backend lo rechazaría igual.
+ * es de nivel igual o mayor al de la sesión, no se ofrece: el backend lo rechazaría igual. En la
+ * propia ficha, por lo mismo, el Cargo queda fijo.
  */
 export function WorkerEditPage() {
   const id = Number(useParams().id)
@@ -34,6 +38,7 @@ export function WorkerEditPage() {
   const worker = useWorker(id)
   const documentTypes = useDocumentTypes()
   const { level, roles } = useSessionRankLevel()
+  const { user } = useAuth()
 
   if (worker.isLoading || documentTypes.isLoading || roles.isLoading) {
     return (
@@ -99,13 +104,16 @@ export function WorkerEditPage() {
     )
   }
 
+  // Con el Cargo fijo, la única opción es el suyo: así se ve, y viaja sin cambios.
+  const ownRecord = isOwnRecord(data.id, user)
   return (
     <Shell id={id} worker={data}>
       <WorkerEditForm
         worker={data}
         documentTypes={documentTypes.data}
         roles={roles.data}
-        roleOptions={editableRoles(roles.data, level, data)}
+        roleOptions={ownRecord ? [data.role] : editableRoles(roles.data, level, data)}
+        roleLockedReason={ownRecord ? WORKER_UPDATE_ERRORS['WRK-012'].message : undefined}
         handleOwnError={(error) => {
           if (!isNotFoundError(error)) return false
           toast.error(`${NOT_FOUND}.`)

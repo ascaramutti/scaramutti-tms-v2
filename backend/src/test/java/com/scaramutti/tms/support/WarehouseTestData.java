@@ -35,9 +35,9 @@ import static io.restassured.RestAssured.given;
  * Molde hermético (igual que {@link HermeticTestData}): todo se siembra con prefijo
  * {@code ZTEST_} (o placa/documento propios) y se borra por ese prefijo en el {@code @AfterEach}
  * del test. Las tablas de {@code public} (workers, tractors, trailers, escort_vehicles,
- * document_types, resource_statuses) son COMPARTIDAS con v1: por eso la flota se limpia por los
- * ids que estos fixtures sembraron, más un barrido de respaldo por el rango de placas reservado
- * para los tests (ver {@link #deleteTestFleet()}).
+ * document_types, resource_statuses) tienen datos que no son de los tests: por eso la flota se
+ * limpia por los ids que estos fixtures sembraron, más un barrido de respaldo por el rango de
+ * placas reservado para los tests (ver {@link #deleteTestFleet()}).
  */
 @ApplicationScoped
 public class WarehouseTestData {
@@ -252,9 +252,9 @@ public class WarehouseTestData {
     }
 
     // ---------- flota (tractores / semirremolques / escoltas) -------------------
-    // public.tractors/trailers/escort_vehicles son COMPARTIDAS con v1: cada id sembrado se
-    // anota para borrarlo uno por uno al final. brand/model son opcionales (solo /fleet-units
-    // los verifica); el estado por defecto es "disponible".
+    // public.tractors/trailers/escort_vehicles tienen unidades que no son del test: cada id
+    // sembrado se anota para borrarlo uno por uno al final. brand/model son opcionales (solo
+    // /fleet-units los verifica); el estado por defecto es "disponible".
 
     public int seedTractor(String plate) {
         return seedTractor(plate, true);
@@ -403,8 +403,8 @@ public class WarehouseTestData {
             .setParameter(1, TEST_PLATE_PATTERN).executeUpdate();
         // Segundo barrido, para las placas que los tests fabrican CON caracteres de control: no
         // matchean el patron de arriba (el salto no es un digito) y, si una corrida se aborta
-        // antes del @AfterEach, quedan para siempre en la base que se comparte con el sistema
-        // anterior y hacen reventar por unicidad a la corrida siguiente.
+        // antes del @AfterEach, quedan para siempre en la base compartida de dev y hacen reventar
+        // por unicidad a la corrida siguiente.
         entityManager.createNativeQuery(
                 "DELETE FROM " + table + " WHERE plate ~ '^Z[FTRO]' AND plate ~ '[[:cntrl:]]'")
             .executeUpdate();
@@ -491,7 +491,8 @@ public class WarehouseTestData {
     }
 
     /**
-     * Usuario de prueba sobre un trabajador ya sembrado; devuelve su id.
+     * Usuario de prueba sobre un trabajador ya sembrado; devuelve su id. {@code roleName} tiene que
+     * ser el cargo de ese trabajador, porque la cuenta no tiene rol propio: si no, falla.
      *
      * <p>El nombre DEBE empezar con el prefijo que usa la limpieza. Se comprueba acá y no se
      * confía en quien llama: la limpieza borra por prefijo, así que un nombre fuera de él
@@ -501,14 +502,18 @@ public class WarehouseTestData {
     public int seedUserFor(int workerId, String username, String roleName, boolean isActive) {
         requirePrefix(username, "ztestuser", "seedUserFor");
         return QuarkusTransaction.requiringNew().call(() -> {
-            Object id = entityManager.createNativeQuery(
-                "INSERT INTO public.users (username, password_hash, worker_id, role_id, is_active, created_at) "
-                    + "VALUES (?1, 'ztest-no-login', ?2, "
-                    + "(SELECT id FROM public.roles WHERE name = ?3), ?4, CURRENT_TIMESTAMP) RETURNING id")
-                .setParameter(1, username).setParameter(2, workerId).setParameter(3, roleName)
-                .setParameter(4, isActive)
+            Object[] seeded = (Object[]) entityManager.createNativeQuery(
+                "INSERT INTO public.users (username, password_hash, worker_id, is_active, created_at) "
+                    + "VALUES (?1, 'ztest-no-login', ?2, ?3, CURRENT_TIMESTAMP) "
+                    + "RETURNING id, (SELECT r.name FROM public.workers w JOIN public.roles r "
+                    + "ON r.id = w.role_id WHERE w.id = users.worker_id)")
+                .setParameter(1, username).setParameter(2, workerId).setParameter(3, isActive)
                 .getSingleResult();
-            return ((Number) id).intValue();
+            if (!roleName.equals(seeded[1])) {
+                throw new IllegalArgumentException("seedUserFor: la cuenta toma el cargo de su trabajador ("
+                    + seeded[1] + "), no " + roleName);
+            }
+            return ((Number) seeded[0]).intValue();
         });
     }
 
@@ -537,6 +542,12 @@ public class WarehouseTestData {
             entityManager.createNativeQuery(
                 "DELETE FROM public.worker_audit_logs WHERE changed_by IN "
                     + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+            // Lo mismo un producto de prueba que creo un usuario de prueba, si una corrida cortada
+            // no llego a la limpieza de almacen.
+            entityManager.createNativeQuery(
+                "DELETE FROM almacen.products WHERE name LIKE ?1 AND created_by IN "
+                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')")
+                .setParameter(1, PREFIX + "%").executeUpdate();
             entityManager.createNativeQuery(
                 "DELETE FROM public.users WHERE username LIKE 'ztestuser%'").executeUpdate();
         });
@@ -554,23 +565,23 @@ public class WarehouseTestData {
             .setParameter(1, documentNumber).getSingleResult()).intValue();
     }
 
-    /** Lo que quedo en la fila del trabajador, incluida la columna muerta. */
+    /** Lo que quedo en la fila del trabajador. */
     public record WorkerRow(int roleId, LocalDate hireDate, Integer createdBy, Integer updatedBy,
-        String position, String firstName, String lastName, String documentNumber, String phone,
+        String firstName, String lastName, String documentNumber, String phone,
         boolean isActive, OffsetDateTime createdAt, OffsetDateTime updatedAt, int documentTypeId) {}
 
     public WorkerRow workerRowOf(int workerId) {
         Object[] row = (Object[]) entityManager.createNativeQuery(
-            "SELECT role_id, hire_date, created_by, updated_by, position, first_name, last_name, "
+            "SELECT role_id, hire_date, created_by, updated_by, first_name, last_name, "
                 + "document_number, phone, is_active, created_at, updated_at, document_type_id "
                 + "FROM public.workers WHERE id = ?1")
             .setParameter(1, workerId).getSingleResult();
         return new WorkerRow(((Number) row[0]).intValue(), (LocalDate) row[1],
             row[2] == null ? null : ((Number) row[2]).intValue(),
             row[3] == null ? null : ((Number) row[3]).intValue(),
-            (String) row[4], (String) row[5], (String) row[6], (String) row[7], (String) row[8],
-            (Boolean) row[9], timestampOf(row[10]), timestampOf(row[11]),
-            ((Number) row[12]).intValue());
+            (String) row[4], (String) row[5], (String) row[6], (String) row[7],
+            (Boolean) row[8], timestampOf(row[9]), timestampOf(row[10]),
+            ((Number) row[11]).intValue());
     }
 
     /** Lo que quedo en la ficha de conductor de un trabajador, o nulo si no tiene. */
@@ -698,8 +709,8 @@ public class WarehouseTestData {
     }
 
     /**
-     * Le cambia el rol a un usuario de prueba, para medir que una regla lea el rol de la BASE
-     * y no el grupo del token.
+     * Le cambia el rol a una cuenta de prueba, que es el cargo de su trabajador: cambia ese cargo.
+     * Para medir que una regla lea el rol de la BASE y no el grupo del token.
      *
      * <p>Exige el prefijo igual que el sembrador: sin eso, un descuido le cambia el rol al
      * administrador sembrado y deja en rojo toda la suite, en clases que no tienen nada que
@@ -708,20 +719,21 @@ public class WarehouseTestData {
     public void setUserRole(int userId, String roleName) {
         QuarkusTransaction.requiringNew().run(() -> {
             int changed = entityManager.createNativeQuery(
-                "UPDATE public.users SET role_id = (SELECT id FROM public.roles WHERE name = ?1) "
-                    + "WHERE id = ?2 AND username LIKE 'ztestuser%'")
+                "UPDATE public.workers SET role_id = (SELECT id FROM public.roles WHERE name = ?1) "
+                    + "WHERE id = (SELECT worker_id FROM public.users WHERE id = ?2 "
+                    + "AND username LIKE 'ztestuser%') AND document_number LIKE 'ZTEST%'")
                 .setParameter(1, roleName).setParameter(2, userId).executeUpdate();
             if (changed != 1) {
                 throw new IllegalArgumentException(
-                    "setUserRole solo toca usuarios ztestuser%; no cambio nada para el id " + userId);
+                    "setUserRole solo toca usuarios ztestuser% de trabajadores ZTEST%; "
+                        + "no cambio nada para el id " + userId);
             }
         });
     }
 
     /**
      * Le cambia la disponibilidad a la FICHA de un conductor de prueba, desde su propia
-     * transaccion. Gemelo de {@link #setUserRole(int, String)} y por el mismo motivo: medir que dos
-     * escrituras sin coordinar sobre la misma fila no se pisen.
+     * transaccion, para medir que dos escrituras sin coordinar sobre la misma fila no se pisen.
      *
      * <p>Mismo guardia de prefijo que el resto: solo toca fichas cuya licencia sea de prueba.
      */
@@ -741,12 +753,8 @@ public class WarehouseTestData {
     }
 
     /**
-     * Le cambia el cargo al TRABAJADOR, gemelo de {@link #setUserRole(int, String)}.
-     *
-     * <p>Existe para sembrar a mano la DIVERGENCIA entre el cargo de un trabajador y el de su
-     * cuenta. Ninguna ruta de la aplicacion la produce hoy —por eso hace falta sembrarla— y varias
-     * reglas se decidieron sobre el supuesto de que puede existir: sin este helper, esas reglas
-     * solo se pueden medir en la mitad de los casos en que rigen.
+     * Le cambia el cargo a un trabajador de prueba desde su propia transaccion; si tiene cuenta, es
+     * tambien su rol. Gemelo de {@link #setUserRole(int, String)}, que llega por la cuenta.
      *
      * <p>Mismo guardia de prefijo que su gemelo, y por el mismo motivo: sin el, un descuido le
      * cambia el cargo a un trabajador sembrado del catalogo y deja en rojo clases que no tienen
@@ -772,7 +780,7 @@ public class WarehouseTestData {
      *
      * <p>Vive en el fixture compartido y no en una clase de test porque la edicion y el cambio
      * de estado necesitan exactamente el mismo actor, y la regla de rango que los tres miden
-     * lee el rol de la fila del usuario.
+     * lee el cargo del trabajador del usuario.
      */
     public int seedActorUser(String roleName, String suffix) {
         return seedActor(roleName, suffix).userId();
@@ -792,11 +800,12 @@ public class WarehouseTestData {
         return new ActorSeed(seedUserFor(workerId, "ztestuser" + suffix, roleName), workerId);
     }
 
-    /** El nombre de sistema del rol de un usuario, para medir la cascada del cambio de cargo. */
+    /** El nombre de sistema del rol de un usuario, que es el cargo de su trabajador. */
     public String userRoleNameOf(int userId) {
         return (String) entityManager.createNativeQuery(
-            "SELECT r.name FROM public.users u JOIN public.roles r ON r.id = u.role_id "
-                + "WHERE u.id = ?1").setParameter(1, userId).getSingleResult();
+            "SELECT r.name FROM public.users u JOIN public.workers w ON w.id = u.worker_id "
+                + "JOIN public.roles r ON r.id = w.role_id WHERE u.id = ?1")
+            .setParameter(1, userId).getSingleResult();
     }
 
     /** Cuantos usuarios tiene un trabajador. Es cero o uno: la columna es unica. */

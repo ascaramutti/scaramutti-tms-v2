@@ -42,7 +42,7 @@ import java.util.TreeSet;
  * choque sale como el conflicto transitorio del contrato. El lock debil sigue siendo el correcto
  * porque evita ese acople en todas las demas ediciones, que son la mayoria.
  *
- * <p>Por eso el presupuesto cuenta ONCE topes y no uno. La cuenta que importa es cuanto puede
+ * <p>Por eso el presupuesto cuenta NUEVE topes y no uno. La cuenta que importa es cuanto puede
  * retener su conexion UNA transaccion, y el detalle esta en
  * {@link #MAX_LOCK_WAITS_PER_TRANSACTION}.
  *
@@ -88,10 +88,11 @@ public class WorkerRowLock {
      *       titular (659ms y 601ms).
      * </ul>
      *
-     * <p>La edicion es la que mas gasta, ONCE: la fila del destino (2), la de quien actua (2), el
-     * documento (tupla 1 e indice 1), la ficha (tupla 2 e indice de la licencia 1) y la cuenta (2).
-     * Desactivar gasta ocho (destino, quien actua, ficha y cuenta, dos cada una); reactivar, seis
-     * (destino, quien actua y ficha); el alta, cuatro (quien actua 2, documento 1, licencia 1).
+     * <p>La edicion es la que mas gasta, NUEVE: la fila del destino (2), la de quien actua (2), el
+     * documento (tupla 1 e indice 1) y la ficha (tupla 2 e indice de la licencia 1); la cuenta no
+     * la escribe. Desactivar gasta ocho (destino, quien actua, ficha y cuenta, dos cada una);
+     * reactivar, seis (destino, quien actua y ficha); el alta, cuatro (quien actua 2, documento 1,
+     * licencia 1).
      *
      * <p>NO ES UN TECHO: la misma espera se repite con cada titular distinto. Tres caminos lo pasan
      * sin error: cambiar una clave con varios bloqueos de clave de hijas en curso (se espera a cada
@@ -106,18 +107,17 @@ public class WorkerRowLock {
      * tope en 1s.
      *
      * <p>LO QUE CUENTA ES LA COLUMNA QUE ESTA EDICION CAMBIA, no cuantos indices unicos tenga la
-     * tabla. Las tres tablas tienen mas: {@code drivers_worker_id_key}, {@code users_worker_id_key}
-     * y {@code users_username_key} —verificados contra el esquema, no supuestos— y NO suman, porque
-     * esta operacion no toca esas columnas y una insercion de indice que repite el valor anterior
-     * de la propia fila no espera contra nadie. Sumar una columna unica obliga a recontar aca solo
-     * si la edicion la escribe.
+     * tabla. La ficha tiene otro, {@code drivers_worker_id_key} (verificado contra el esquema, no
+     * supuesto), y NO suma, porque esta operacion no toca esa columna y una insercion de indice que
+     * repite el valor anterior de la propia fila no espera contra nadie. Sumar una columna unica
+     * obliga a recontar aca solo si la edicion la escribe.
      *
      * <p>El INSERT de la ficha que nace no suma: es excluyente con su UPDATE.
      */
-    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 11;
+    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 9;
 
     /**
-     * En MILISEGUNDOS y no en segundos: con once topes, el valor entero mas chico expresable en
+     * En MILISEGUNDOS y no en segundos: con nueve topes, el valor entero mas chico expresable en
      * segundos ya se pasa del techo del pool. La unidad nativa del motor para esta opcion es el
      * milisegundo, asi que ademas se escribe tal cual.
      */

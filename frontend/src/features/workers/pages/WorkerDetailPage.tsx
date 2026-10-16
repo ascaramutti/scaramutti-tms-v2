@@ -9,6 +9,7 @@ import { EmptyState } from '../../../shared/ui/EmptyState'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { WORKERS_BASE, workerEditPath } from '../../../shared/paths'
+import { useAuth } from '../../../shared/auth/AuthContext'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { WorkerAuditFooter } from '../components/WorkerAuditFooter'
 import { WorkerDetailCard } from '../components/WorkerDetailCard'
@@ -16,19 +17,21 @@ import { WorkerDriverCard } from '../components/WorkerDriverCard'
 import { WorkerStatusDialog } from '../components/WorkerStatusDialog'
 import { useSessionRankLevel } from '../hooks/useSessionRankLevel'
 import { useWorker } from '../hooks/useWorker'
+import { isOwnRecord } from '../ownRecord'
 import { canManageWorker } from '../rank'
 
 /**
  * Ficha de un trabajador. Sale del endpoint del detalle y no de la fila de la búsqueda,
  * que trae menos datos. Un 404 es un id que nunca existió: los trabajadores no se borran.
  * Se edita en su propia pantalla y se desactiva o reactiva en un diálogo, las dos solo si el cargo
- * es de nivel menor al de la sesión.
+ * es de nivel menor al de la sesión. La propia ficha no se desactiva: el servidor lo rechaza siempre.
  */
 export function WorkerDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { data, isLoading, isError, error, refetch } = useWorker(Number(id))
   const { level } = useSessionRankLevel()
+  const { user } = useAuth()
   const [changingStatus, setChangingStatus] = useState(false)
 
   if (isLoading) {
@@ -80,7 +83,8 @@ export function WorkerDetailPage() {
         description={data.role.description}
         divider
         action={
-          // Solo sobre cargos de nivel menor al de la sesión; el admin, siempre. Un inactivo también se edita.
+          // Solo sobre cargos de nivel menor al de la sesión (el admin, siempre); en la propia ficha,
+          // nunca la baja. Un inactivo también se edita.
           level !== undefined && canManageWorker(data.role.level, level) ? (
             <div className="flex flex-wrap gap-3">
               <Link to={workerEditPath(data.id)} className={buttonClasses({ variant: 'secondary' })}>
@@ -88,10 +92,12 @@ export function WorkerDetailPage() {
                 Editar
               </Link>
               {/* Con el relleno de rechazar y aceptar una cotización: la baja en peligro, la vuelta en éxito. */}
-              <Button variant={data.isActive ? 'danger' : 'success'} onClick={() => setChangingStatus(true)}>
-                <Power className="mr-2 h-4 w-4" aria-hidden="true" />
-                {data.isActive ? 'Desactivar' : 'Reactivar'}
-              </Button>
+              {!(data.isActive && isOwnRecord(data.id, user)) && (
+                <Button variant={data.isActive ? 'danger' : 'success'} onClick={() => setChangingStatus(true)}>
+                  <Power className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {data.isActive ? 'Desactivar' : 'Reactivar'}
+                </Button>
+              )}
             </div>
           ) : undefined
         }

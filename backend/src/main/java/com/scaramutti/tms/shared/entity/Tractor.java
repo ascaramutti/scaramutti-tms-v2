@@ -8,7 +8,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
 /**
- * Tracto de la flota ({@code public.tractors}, catálogo compartido con v1). Vista mínima
+ * Tracto de la flota ({@code public.tractors}, catálogo que viene de la v1). Vista mínima
  * (id + placa + activo): almacén solo lo LEE para resolver la unidad destino de un retiro
  * ({@code FleetUnitRef}). El ABM de flota es de otro módulo (fase RRHH); acá no se escribe.
  */
