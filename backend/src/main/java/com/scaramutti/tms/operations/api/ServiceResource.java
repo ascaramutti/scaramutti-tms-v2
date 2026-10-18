@@ -8,6 +8,7 @@ import com.scaramutti.tms.operations.dto.ServiceStatusChangeRequest;
 import com.scaramutti.tms.operations.dto.ServiceStatsResponse;
 import com.scaramutti.tms.operations.dto.ServiceSummaryResponse;
 import com.scaramutti.tms.operations.dto.ServiceUpdateRequest;
+import com.scaramutti.tms.operations.dto.ServicesReportResponse;
 import com.scaramutti.tms.operations.mapper.ServiceResourceMapper;
 import com.scaramutti.tms.operations.service.AddServiceResourcesService;
 import com.scaramutti.tms.operations.service.AssignServiceResourcesService;
@@ -36,7 +37,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
+import org.jboss.resteasy.reactive.RestResponse;
 
 import java.net.URI;
 
@@ -63,7 +64,7 @@ public class ServiceResource {
      */
     @GET
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager", "dispatcher"})
-    public Response listServices(
+    public RestResponse<PageResponse<ServiceSummaryResponse>> listServices(
         @QueryParam("q")        String q,
         @QueryParam("status")   String status,
         @QueryParam("clientId") String clientId,
@@ -77,7 +78,7 @@ public class ServiceResource {
         );
         // El cuerpo depende de QUIEN pregunta (el despacho no recibe precios), asi que no debe
         // guardarse en ningun cache intermedio: serviria la respuesta de un rol a otro.
-        return Response.ok(services)
+        return RestResponse.ResponseBuilder.ok(services)
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
             .build();
@@ -109,8 +110,8 @@ public class ServiceResource {
     @GET
     @Path("/stats")
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager", "dispatcher"})
-    public Response getServiceStats() {
-        return Response.ok(getServiceStatsService.getServiceStats())
+    public RestResponse<ServiceStatsResponse> getServiceStats() {
+        return RestResponse.ResponseBuilder.ok(getServiceStatsService.getServiceStats())
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
             .build();
@@ -158,8 +159,10 @@ public class ServiceResource {
     @GET
     @Path("/report")
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
-    public Response getServicesReport(@QueryParam("weekStart") String weekStart) {
-        return Response.ok(getServicesReportService.getServicesReport(
+    public RestResponse<ServicesReportResponse> getServicesReport(
+        @QueryParam("weekStart") String weekStart
+    ) {
+        return RestResponse.ResponseBuilder.ok(getServicesReportService.getServicesReport(
                 serviceResourceMapper.toGetServicesReportQuery(weekStart)))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
@@ -176,12 +179,12 @@ public class ServiceResource {
     @GET
     @Path("/{id}")
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager", "dispatcher"})
-    public Response getService(@PathParam("id") String id) {
+    public RestResponse<ServiceDetailResponse> getService(@PathParam("id") String id) {
         ServiceDetailResponse response = getServiceService.getService(
             serviceResourceMapper.toServiceId(id));
         // El cuerpo depende de QUIEN pregunta (el despacho no recibe precios), asi que no debe
         // guardarse en ningun cache intermedio: serviria la respuesta de un rol a otro.
-        return Response.ok(response)
+        return RestResponse.ResponseBuilder.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
@@ -198,7 +201,7 @@ public class ServiceResource {
     @Path("/{id}")
     @Consumes(MediaType.APPLICATION_JSON)
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
-    public Response updateService(
+    public RestResponse<ServiceDetailResponse> updateService(
         @PathParam("id") String id,
         @HeaderParam("If-Match") String ifMatch,
         @Valid @NotNull ServiceUpdateRequest serviceUpdateRequest
@@ -211,7 +214,7 @@ public class ServiceResource {
         // depende de QUIEN pregunta y no debe guardarse en ningun cache intermedio. El `Vary`
         // lo deja explicito: el ETag no distingue el rol, asi que si algun dia alguien saca el
         // `no-store` por rendimiento, la misma version identificaria dos cuerpos distintos.
-        return Response.ok(response)
+        return RestResponse.ResponseBuilder.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
@@ -235,7 +238,7 @@ public class ServiceResource {
     @Path("/{id}/assignment")
     @Consumes(MediaType.APPLICATION_JSON)
     @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
-    public Response assignServiceResources(
+    public RestResponse<ServiceDetailResponse> assignServiceResources(
         @PathParam("id") String id,
         @Valid @NotNull ServiceAssignResourcesRequest serviceAssignResourcesRequest
     ) {
@@ -245,7 +248,7 @@ public class ServiceResource {
         );
         // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
         // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
-        return Response.ok(response)
+        return RestResponse.ResponseBuilder.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
@@ -271,7 +274,7 @@ public class ServiceResource {
     @Path("/{id}/resources")
     @Consumes(MediaType.APPLICATION_JSON)
     @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
-    public Response addServiceResources(
+    public RestResponse<ServiceDetailResponse> addServiceResources(
         @PathParam("id") String id,
         @Valid @NotNull ServiceAddResourcesRequest serviceAddResourcesRequest
     ) {
@@ -281,7 +284,7 @@ public class ServiceResource {
         );
         // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
         // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
-        return Response.ok(response)
+        return RestResponse.ResponseBuilder.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
@@ -312,7 +315,7 @@ public class ServiceResource {
     @DELETE
     @Path("/{id}/resources/{assignmentId}")
     @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
-    public Response removeServiceResource(
+    public RestResponse<ServiceDetailResponse> removeServiceResource(
         @PathParam("id") String id,
         @PathParam("assignmentId") String assignmentId
     ) {
@@ -321,7 +324,7 @@ public class ServiceResource {
             serviceResourceMapper.toAssignmentId(assignmentId));
         // Mismas tres cabeceras que el alta, por el mismo motivo: el cuerpo es el detalle, depende
         // de QUIEN pregunta y no se guarda en ninguna cache.
-        return Response.ok(response)
+        return RestResponse.ResponseBuilder.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
@@ -343,7 +346,7 @@ public class ServiceResource {
     @Path("/{id}/status")
     @Consumes(MediaType.APPLICATION_JSON)
     @RolesAllowed({"admin", "general_manager", "operations_manager", "dispatcher"})
-    public Response changeServiceStatus(
+    public RestResponse<ServiceDetailResponse> changeServiceStatus(
         @PathParam("id") String id,
         @HeaderParam("If-Match") String ifMatch,
         @Valid @NotNull ServiceStatusChangeRequest serviceStatusChangeRequest
@@ -352,7 +355,7 @@ public class ServiceResource {
             serviceResourceMapper.toChangeServiceStatusCommand(
                 serviceResourceMapper.toServiceId(id), ifMatch, serviceStatusChangeRequest)
         );
-        return Response.ok(response)
+        return RestResponse.ResponseBuilder.ok(response)
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
@@ -366,7 +369,9 @@ public class ServiceResource {
     @POST
     @Consumes(MediaType.APPLICATION_JSON)
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
-    public Response createService(@Valid @NotNull ServiceCreateRequest serviceCreateRequest) {
+    public RestResponse<ServiceDetailResponse> createService(
+        @Valid @NotNull ServiceCreateRequest serviceCreateRequest
+    ) {
         ServiceDetailResponse response = createServiceService.createService(
             serviceResourceMapper.toCreateServiceCommand(serviceCreateRequest)
         );
@@ -374,11 +379,11 @@ public class ServiceResource {
         // sus mismas condiciones. Un 201 no lo guarda ninguna cache compartida por defecto, pero
         // dejarlo como el unico cuerpo sin marcar del recurso es justo la asimetria por la que
         // estas reglas se pudren.
-        return Response.created(URI.create("services/" + response.id()))
+        return RestResponse.ResponseBuilder.create(RestResponse.Status.CREATED, response)
+            .location(URI.create("services/" + response.id()))
             .header("ETag", Etag.of(response.updatedAt()))
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
-            .entity(response)
             .build();
     }
 }
