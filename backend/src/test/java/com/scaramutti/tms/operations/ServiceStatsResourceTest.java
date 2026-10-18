@@ -10,6 +10,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -27,6 +28,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.matchesPattern;
@@ -661,7 +664,7 @@ class ServiceStatsResourceTest {
      * de browser compartido. El {@code Vary} evitaría que un cache le sirva a un rol la respuesta
      * armada para otro, cosa que hoy no puede pasar porque el cuerpo no depende de quién pregunta
      * (eso lo prueba {@code getStats_withAnyAllowedRole_returnsTheSameBodyAsAdmin}); se manda igual,
-     * como en los siete endpoints hermanos, para que siga habiendo una red el día en que alguien
+     * como en el resto de los endpoints de viajes, para que siga habiendo una red el día en que alguien
      * relaje el {@code no-store} para poder cachear.
      *
      * <p>Se afirman las DOS. Con solo la primera, ese día el único test rojo es el del
@@ -678,6 +681,31 @@ class ServiceStatsResourceTest {
             .statusCode(200)
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization");
+    }
+
+    @Test
+    void getStats_asDispatcher_sendsEachCacheHeaderOnceWithoutEtag() {
+        Response response = given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("zdispatcher", "dispatcher"))
+        .when()
+            .get("/services/stats");
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "ETag", "Location");
+    }
+
+    @Test
+    void getStats_asWarehouseKeeper_returns403WithoutCacheHeaders() {
+        Response response = given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("zalmacen", "warehouse_keeper"))
+        .when()
+            .get("/services/stats");
+
+        assertEquals(403, response.statusCode());
+        assertEquals("COM-003", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     // ---------- Roles -------------------------------------------------------------

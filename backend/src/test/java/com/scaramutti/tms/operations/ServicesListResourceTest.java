@@ -9,6 +9,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsString;
@@ -92,6 +95,33 @@ class ServicesListResourceTest {
             .body("page", equalTo(0))
             .body("size", equalTo(20))
             .body("content", notNullValue());
+    }
+
+    /** Con el despacho, el rol que recibe el cuerpo recortado: cada cabecera una sola vez. */
+    @Test
+    void list_asDispatcher_sendsEachCacheHeaderOnceWithoutEtag() {
+        Response response = given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("zdispatcher", "dispatcher"))
+        .when()
+            .get("/services?clientId=" + clientId);
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "ETag", "Location");
+    }
+
+    /** Las cabeceras van en el éxito y no en un filtro: un error sale sin ellas. */
+    @Test
+    void list_withUnknownStatus_returns400WithoutCacheHeaders() {
+        Response response = given()
+            .header("Authorization", "Bearer " + adminToken)
+        .when()
+            .get("/services?status=NOPE");
+
+        assertEquals(400, response.statusCode());
+        assertEquals("COM-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     // ---------- Contenido y orden ----------------------------------------------

@@ -10,6 +10,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import io.restassured.response.ValidatableResponse;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -34,6 +35,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.containsString;
@@ -313,6 +316,44 @@ class ServiceReinforcementResourceTest {
             .statusCode(200)
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization");
+    }
+
+    /** Con un usuario real: el refuerzo firma la bitácora con quien lo suma. */
+    @Test
+    void addResources_asDispatcher_sendsEtagAndEachCacheHeaderOnce() {
+        long id = serviceInProgress();
+        String token = TestAuth.fabricateTokenForUser(fixtures.userId("sales"), "zdespacho", "dispatcher");
+
+        Response response = given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(payload(driverId, null, null))
+        .when()
+            .post("/services/" + id + "/resources");
+
+        assertEquals(200, response.statusCode(), response.asString());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertSentOnce(response, "ETag", etagOf(id));
+        assertTrue(response.header("ETag").matches("\"[^\"]+\""), response.header("ETag"));
+        assertNotSent(response, "Location");
+    }
+
+    /** El 401 de un token roto sale de su propio mapper, distinto del de los demás errores. */
+    @Test
+    void addResources_withABrokenToken_returns401WithoutCacheHeaders() {
+        long id = serviceInProgress();
+
+        Response response = given()
+            .header("Authorization", "Bearer abc")
+            .contentType(ContentType.JSON)
+            .body(payload(driverId, null, null))
+        .when()
+            .post("/services/" + id + "/resources");
+
+        assertEquals(401, response.statusCode());
+        assertEquals("AUTH-008", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     /**

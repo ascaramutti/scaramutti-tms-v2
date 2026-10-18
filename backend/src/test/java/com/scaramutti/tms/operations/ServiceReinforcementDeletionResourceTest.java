@@ -10,6 +10,7 @@ import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import io.restassured.response.ValidatableResponse;
 
 import jakarta.inject.Inject;
@@ -28,6 +29,8 @@ import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasKey;
@@ -351,13 +354,47 @@ class ServiceReinforcementDeletionResourceTest {
         String returned = removeReinforcement(id, assignmentId)
             .statusCode(200)
             // El cuerpo es el detalle y depende del rol: sin `Vary`, una cache podría servirle a
-            // otro usuario el cuerpo de éste. Ninguna otra aserción de la clase las miraba.
+            // otro usuario el cuerpo de éste.
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
             .extract().header("ETag");
 
         assertNotEquals(etagBefore, returned, "la versión tiene que moverse");
         assertEquals(etagOf(id), returned, "y ser la que la base tiene, no una anterior al flush");
+    }
+
+    /** Con un usuario real: la baja firma la bitácora con quien la hace. */
+    @Test
+    void removeReinforcement_asDispatcher_sendsEtagAndEachCacheHeaderOnce() {
+        long id = serviceInProgress();
+        long assignmentId = seedReinforcement(id, driverId, null, null, "2026-07-01T11:00:00Z");
+        String token = TestAuth.fabricateTokenForUser(fixtures.userId("sales"), "zdespacho", "dispatcher");
+
+        Response response = given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .delete("/services/" + id + "/resources/" + assignmentId);
+
+        assertEquals(200, response.statusCode(), response.asString());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertSentOnce(response, "ETag", etagOf(id));
+        assertTrue(response.header("ETag").matches("\"[^\"]+\""), response.header("ETag"));
+        assertNotSent(response, "Location");
+    }
+
+    @Test
+    void removeReinforcement_withTextAssignmentId_returns400WithoutCacheHeaders() {
+        long id = serviceInProgress();
+
+        Response response = given()
+            .header("Authorization", "Bearer " + adminToken)
+        .when()
+            .delete("/services/" + id + "/resources/abc");
+
+        assertEquals(400, response.statusCode());
+        assertEquals("COM-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     /** Una fila de auditoría por recurso dado de baja, con el recurso en el valor VIEJO. */
