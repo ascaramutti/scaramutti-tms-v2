@@ -10,6 +10,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
@@ -920,6 +923,25 @@ class ServicesReportResourceTest {
             .then().statusCode(200)
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization");
+    }
+
+    @Test
+    void report_asSales_sendsEachCacheHeaderOnceWithoutEtag() {
+        Response response = reportRequest(TestAuth.fabricateAccessToken("zventas", "sales"), ANCHOR.toString());
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "ETag", "Location");
+    }
+
+    @Test
+    void report_withMalformedWeek_returns400WithoutCacheHeaders() {
+        Response response = reportRequest(adminToken, "abc");
+
+        assertEquals(400, response.statusCode());
+        assertEquals("COM-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     // ---------- Helpers --------------------------------------------------------------

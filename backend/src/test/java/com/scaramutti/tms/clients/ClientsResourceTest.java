@@ -7,6 +7,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
@@ -18,6 +19,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.anyOf;
 import static org.hamcrest.Matchers.containsInRelativeOrder;
@@ -1161,6 +1164,50 @@ class ClientsResourceTest {
             .statusCode(200)
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization");
+    }
+
+    @Test
+    void list_asSales_sendsEachCacheHeaderOnceWithoutEtag() {
+        Response response = given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("sales_test", "sales"))
+        .when()
+            .get("/clients");
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "ETag", "Location");
+    }
+
+    /** Las cabeceras van en las dos lecturas y no en un filtro: un error sale sin ellas. */
+    @Test
+    void list_withTooShortQuery_returns400WithoutCacheHeaders() {
+        Response response = given()
+            .header("Authorization", "Bearer " + fabricateAccessToken("admin_test", "admin"))
+        .when()
+            .get("/clients?q=ab");
+
+        assertEquals(400, response.statusCode());
+        assertEquals("COM-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
+    }
+
+    @Test
+    void create_returns201WithoutCacheHeaders() {
+        String ruc = TEST_RUC_PREFIX + "555000111";
+        try {
+            Response response = given()
+                .header("Authorization", "Bearer " + fabricateAccessToken("sales_test", "sales"))
+                .contentType(ContentType.JSON)
+                .body(body(TEST_NAME_PREFIX + "SIN_CACHE", ruc, null, null))
+            .when()
+                .post("/clients");
+
+            assertEquals(201, response.statusCode(), response.asString());
+            assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
+        } finally {
+            cleanupClientByRuc(ruc);
+        }
     }
 
     @ParameterizedTest
