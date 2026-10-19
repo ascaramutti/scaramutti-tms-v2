@@ -5,6 +5,7 @@ import com.scaramutti.tms.clients.dto.ClientResponse;
 import com.scaramutti.tms.clients.mapper.ClientResourceMapper;
 import com.scaramutti.tms.clients.service.ClientService;
 import com.scaramutti.tms.shared.dto.PageResponse;
+import com.scaramutti.tms.shared.util.CacheHeaders;
 import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
@@ -57,9 +58,9 @@ public class ClientResource {
         @QueryParam("page")     @DefaultValue("0")  @Min(0)       int page,
         @QueryParam("size")     @DefaultValue("20") @Min(1) @Max(100) int size
     ) {
-        return notStored(clientService.listClients(
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(clientService.listClients(
             clientResourceMapper.toListClientsQuery(q, isActive, page, size)
-        ));
+        )));
     }
 
     /**
@@ -73,7 +74,7 @@ public class ClientResource {
     @Path("/{id}")
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager"})
     public RestResponse<ClientResponse> getClient(@PathParam("id") Integer id) {
-        return notStored(clientService.findById(id));
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(clientService.findById(id)));
     }
 
     /**
@@ -102,16 +103,5 @@ public class ClientResource {
         return clientService.createClient(
             clientResourceMapper.toCreateClientCommand(clientRequest)
         );
-    }
-
-    /**
-     * El tipo ata la respuesta al cuerpo: devolver la entidad en vez del DTO no compila. Vary
-     * ademas de no-store: si alguien quitara el no-store, un cache no mezcla sesiones.
-     */
-    private static <T> RestResponse<T> notStored(T body) {
-        return RestResponse.ResponseBuilder.ok(body)
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
     }
 }
