@@ -21,6 +21,7 @@ import com.scaramutti.tms.operations.service.ListServicesService;
 import com.scaramutti.tms.operations.service.RemoveServiceResourceService;
 import com.scaramutti.tms.operations.service.UpdateServiceService;
 import com.scaramutti.tms.shared.dto.PageResponse;
+import com.scaramutti.tms.shared.util.CacheHeaders;
 import com.scaramutti.tms.shared.util.Etag;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
@@ -76,12 +77,8 @@ public class ServiceResource {
         PageResponse<ServiceSummaryResponse> services = listServicesService.listServices(
             serviceResourceMapper.toListServicesQuery(q, status, clientId, dateFrom, dateTo, page, size)
         );
-        // El cuerpo depende de QUIEN pregunta (el despacho no recibe precios), asi que no debe
-        // guardarse en ningun cache intermedio: serviria la respuesta de un rol a otro.
-        return RestResponse.ResponseBuilder.ok(services)
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        // El despacho no recibe precios: el cuerpo depende de quien pregunta.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(services));
     }
 
     /**
@@ -91,14 +88,9 @@ public class ServiceResource {
      * cinco roles. Se deja escrito para que nadie copie aca la maquinaria que le esconde los precios
      * al despacho.
      *
-     * <p>Las dos cabeceras van igual que en los vecinos, aunque el argumento de cada una sea
-     * distinto aca. El {@code no-store} protege de que la respuesta sobreviva a la SESION: sin el,
-     * un proxy o un perfil de browser compartido puede guardar el cuerpo y servirlo despues del
-     * cierre de sesion. El {@code Vary} protegeria de mezclar ROLES, que hoy no puede pasar porque
-     * el cuerpo no depende de quien pregunta; se manda igual porque es la segunda red del dia en
-     * que alguien saque el {@code no-store} para poder cachear —y este, que es un tablero, es
-     * justamente el cuerpo donde mas tienta hacerlo—. Un test fija las DOS cabeceras, y otro
-     * fija la premisa de la segunda: que el cuerpo es igual para los cinco roles.
+     * <p>Sale sin guardar aunque el cuerpo sea igual para los cinco roles: no debe sobrevivir a la
+     * sesion en un proxy o en un perfil de browser compartido. Y un tablero es donde mas tienta
+     * relajar eso para cachear. Un test fija que el cuerpo es el mismo para todos.
      *
      * <p>⚠️ Declarado ANTES que {@code @Path("/{id}")} a proposito. El detalle recibe el id como
      * TEXTO —para poder contestar un 400 con detalle en vez del 404 vacio del framework— asi que
@@ -111,10 +103,8 @@ public class ServiceResource {
     @Path("/stats")
     @RolesAllowed({"admin", "sales", "general_manager", "operations_manager", "dispatcher"})
     public RestResponse<ServiceStatsResponse> getServiceStats() {
-        return RestResponse.ResponseBuilder.ok(getServiceStatsService.getServiceStats())
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        ServiceStatsResponse stats = getServiceStatsService.getServiceStats();
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(stats));
     }
 
 
@@ -162,11 +152,9 @@ public class ServiceResource {
     public RestResponse<ServicesReportResponse> getServicesReport(
         @QueryParam("weekStart") String weekStart
     ) {
-        return RestResponse.ResponseBuilder.ok(getServicesReportService.getServicesReport(
-                serviceResourceMapper.toGetServicesReportQuery(weekStart)))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        ServicesReportResponse report = getServicesReportService.getServicesReport(
+            serviceResourceMapper.toGetServicesReportQuery(weekStart));
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(report));
     }
 
     /**
@@ -182,19 +170,15 @@ public class ServiceResource {
     public RestResponse<ServiceDetailResponse> getService(@PathParam("id") String id) {
         ServiceDetailResponse response = getServiceService.getService(
             serviceResourceMapper.toServiceId(id));
-        // El cuerpo depende de QUIEN pregunta (el despacho no recibe precios), asi que no debe
-        // guardarse en ningun cache intermedio: serviria la respuesta de un rol a otro.
-        return RestResponse.ResponseBuilder.ok(response)
-            .header("ETag", Etag.of(response.updatedAt()))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        // El despacho no recibe precios: el cuerpo depende de quien pregunta.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(response)
+            .header("ETag", Etag.of(response.updatedAt())));
     }
 
     /**
      * El despacho no edita viajes, por el mismo motivo por el que no los registra.
      *
-     * <p>El {@code If-Match} llega como texto y se pasa tal cual: el helper compartido lo compara
+     * <p>El {@code If-Match} llega como texto y se pasa tal cual: {@code Etag.verify} lo compara
      * contra la version actual y contesta 412 tanto si falta como si quedo viejo.
      */
     @PUT
@@ -210,15 +194,10 @@ public class ServiceResource {
             serviceResourceMapper.toUpdateServiceCommand(
                 serviceResourceMapper.toServiceId(id), ifMatch, serviceUpdateRequest)
         );
-        // El cuerpo es el mismo detalle que sirve el GET, asi que arrastra su misma condicion:
-        // depende de QUIEN pregunta y no debe guardarse en ningun cache intermedio. El `Vary`
-        // lo deja explicito: el ETag no distingue el rol, asi que si algun dia alguien saca el
-        // `no-store` por rendimiento, la misma version identificaria dos cuerpos distintos.
-        return RestResponse.ResponseBuilder.ok(response)
-            .header("ETag", Etag.of(response.updatedAt()))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        // Mismo cuerpo que el detalle. El ETag no distingue el rol: si se relajara el no-store, la
+        // misma version identificaria dos cuerpos distintos.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(response)
+            .header("ETag", Etag.of(response.updatedAt())));
     }
 
     /**
@@ -246,13 +225,9 @@ public class ServiceResource {
             serviceResourceMapper.toAssignServiceResourcesCommand(
                 serviceResourceMapper.toServiceId(id), serviceAssignResourcesRequest)
         );
-        // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
-        // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
-        return RestResponse.ResponseBuilder.ok(response)
-            .header("ETag", Etag.of(response.updatedAt()))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        // Mismo cuerpo que el detalle: al despacho le faltan los importes.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(response)
+            .header("ETag", Etag.of(response.updatedAt())));
     }
 
     /**
@@ -282,13 +257,9 @@ public class ServiceResource {
             serviceResourceMapper.toAddServiceResourcesCommand(
                 serviceResourceMapper.toServiceId(id), serviceAddResourcesRequest)
         );
-        // Mismo cuerpo que el detalle, asi que arrastra sus mismas condiciones: depende de QUIEN
-        // pregunta (al despacho le faltan los importes) y no se guarda en ninguna cache.
-        return RestResponse.ResponseBuilder.ok(response)
-            .header("ETag", Etag.of(response.updatedAt()))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        // Mismo cuerpo que el detalle: al despacho le faltan los importes.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(response)
+            .header("ETag", Etag.of(response.updatedAt())));
     }
 
     /**
@@ -322,13 +293,9 @@ public class ServiceResource {
         ServiceDetailResponse response = removeServiceResourceService.removeServiceResource(
             serviceResourceMapper.toServiceId(id),
             serviceResourceMapper.toAssignmentId(assignmentId));
-        // Mismas tres cabeceras que el alta, por el mismo motivo: el cuerpo es el detalle, depende
-        // de QUIEN pregunta y no se guarda en ninguna cache.
-        return RestResponse.ResponseBuilder.ok(response)
-            .header("ETag", Etag.of(response.updatedAt()))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        // Mismo cuerpo que el detalle: al despacho le faltan los importes.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(response)
+            .header("ETag", Etag.of(response.updatedAt())));
     }
 
     /**
@@ -355,11 +322,8 @@ public class ServiceResource {
             serviceResourceMapper.toChangeServiceStatusCommand(
                 serviceResourceMapper.toServiceId(id), ifMatch, serviceStatusChangeRequest)
         );
-        return RestResponse.ResponseBuilder.ok(response)
-            .header("ETag", Etag.of(response.updatedAt()))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(response)
+            .header("ETag", Etag.of(response.updatedAt())));
     }
 
     /**
@@ -375,15 +339,11 @@ public class ServiceResource {
         ServiceDetailResponse response = createServiceService.createService(
             serviceResourceMapper.toCreateServiceCommand(serviceCreateRequest)
         );
-        // El cuerpo es el mismo detalle que sirven el GET y el PUT, con importes adentro: arrastra
-        // sus mismas condiciones. Un 201 no lo guarda ninguna cache compartida por defecto, pero
-        // dejarlo como el unico cuerpo sin marcar del recurso es justo la asimetria por la que
-        // estas reglas se pudren.
-        return RestResponse.ResponseBuilder.create(RestResponse.Status.CREATED, response)
-            .location(URI.create("services/" + response.id()))
-            .header("ETag", Etag.of(response.updatedAt()))
-            .header("Cache-Control", "no-store")
-            .header("Vary", "Authorization")
-            .build();
+        // Un 201 no lo guarda ninguna cache compartida por defecto, pero es el mismo detalle con
+        // importes: sin marcar, seria el unico cuerpo del recurso que se escapa.
+        return CacheHeaders.notStored(
+            RestResponse.ResponseBuilder.create(RestResponse.Status.CREATED, response)
+                .location(URI.create("services/" + response.id()))
+                .header("ETag", Etag.of(response.updatedAt())));
     }
 }

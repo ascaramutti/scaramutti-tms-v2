@@ -290,7 +290,7 @@ class ServiceDetailResourceTest {
      * importa para el cliente: que venga, que tenga la forma que manda el protocolo (entre
      * comillas) y que dos lecturas sin cambios devuelvan el MISMO valor.
      *
-     * <p>Lo que NO se afirma, porque no es cierto: que sea opaco. El helper compartido lo arma
+     * <p>Lo que NO se afirma, porque no es cierto: que sea opaco. {@code Etag.of} lo arma
      * con la última actualización del recurso entre comillas, así que es reconstruible desde el
      * cuerpo. Lo que se pide al cliente es que lo reenvíe tal cual, no que lo adivine: las
      * comillas son parte del valor y armarlo a mano termina en un 412 inexplicable.
