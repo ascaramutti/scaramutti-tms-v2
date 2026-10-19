@@ -2753,7 +2753,7 @@ paths:
               description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
               schema: { type: string }
             Vary:
-              description: 'Siempre `Authorization`: el mismo ETag identifica cuerpos distintos según el rol, así que ninguna cache puede reusar uno para otro usuario'
+              description: 'Siempre `Authorization`: el cuerpo depende del rol (el despacho no recibe precios), así que ninguna cache puede reusarlo para otro usuario'
               schema: { type: string }
           content:
             application/json:
