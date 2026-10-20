@@ -7,6 +7,7 @@ import com.scaramutti.tms.support.TestAuth;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -20,6 +21,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
@@ -144,6 +147,35 @@ class ServiceDetailResourceTest {
             .header("Vary", equalTo("Authorization"));
     }
 
+    @Test
+    void getService_asDispatcher_sendsEtagAndEachCacheHeaderOnce() {
+        long id = createService("Piura", "Lima");
+
+        Response response = given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("zdispatcher", "dispatcher"))
+        .when()
+            .get("/services/" + id);
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertSentOnce(response, "ETag", etagOf(id));
+        assertTrue(response.header("ETag").matches("\"[^\"]+\""), response.header("ETag"));
+        assertNotSent(response, "Location");
+    }
+
+    @Test
+    void getService_withTextId_returns400WithoutCacheHeaders() {
+        Response response = given()
+            .header("Authorization", "Bearer " + adminToken)
+        .when()
+            .get("/services/abc");
+
+        assertEquals(400, response.statusCode());
+        assertEquals("COM-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
+    }
+
     // ---------- Bitácora ---------------------------------------------------------
 
     /** El alta deja su línea, con el autor y el tipo de evento. */
@@ -258,7 +290,7 @@ class ServiceDetailResourceTest {
      * importa para el cliente: que venga, que tenga la forma que manda el protocolo (entre
      * comillas) y que dos lecturas sin cambios devuelvan el MISMO valor.
      *
-     * <p>Lo que NO se afirma, porque no es cierto: que sea opaco. El helper compartido lo arma
+     * <p>Lo que NO se afirma, porque no es cierto: que sea opaco. {@code Etag.of} lo arma
      * con la última actualización del recurso entre comillas, así que es reconstruible desde el
      * cuerpo. Lo que se pide al cliente es que lo reenvíe tal cual, no que lo adivine: las
      * comillas son parte del valor y armarlo a mano termina en un 412 inexplicable.

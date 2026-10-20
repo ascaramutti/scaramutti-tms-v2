@@ -9,6 +9,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -30,6 +31,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -204,6 +207,41 @@ class ServiceAssignmentResourceTest {
             .statusCode(200)
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization");
+    }
+
+    /** Con un usuario real: la asignación firma la bitácora con quien asigna. */
+    @Test
+    void assign_asDispatcher_sendsEtagAndEachCacheHeaderOnce() {
+        long id = createService();
+        String token = TestAuth.fabricateTokenForUser(fixtures.userId("sales"), "zdespacho", "dispatcher");
+
+        Response response = given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(assignmentPayload())
+        .when()
+            .post("/services/" + id + "/assignment");
+
+        assertEquals(200, response.statusCode(), response.asString());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertSentOnce(response, "ETag", etagOf(id));
+        assertTrue(response.header("ETag").matches("\"[^\"]+\""), response.header("ETag"));
+        assertNotSent(response, "Location");
+    }
+
+    @Test
+    void assign_onAMissingService_returns404WithoutCacheHeaders() {
+        Response response = given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(assignmentPayload())
+        .when()
+            .post("/services/999999999/assignment");
+
+        assertEquals(404, response.statusCode());
+        assertEquals("OPS-005", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     /**

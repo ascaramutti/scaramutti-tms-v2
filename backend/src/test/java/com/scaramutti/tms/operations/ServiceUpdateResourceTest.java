@@ -7,6 +7,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import io.restassured.response.ValidatableResponse;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
@@ -37,6 +38,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.containsInAnyOrder;
@@ -244,6 +247,44 @@ class ServiceUpdateResourceTest {
             // rendimiento: el ETag no distingue el rol, así que sin él la misma versión
             // identificaría el cuerpo con importes y el que no los tiene.
             .header("Vary", equalTo("Authorization"));
+    }
+
+    /** Con un usuario real: la edición firma la bitácora con quien edita. */
+    @Test
+    void update_asGeneralManager_sendsEtagAndEachCacheHeaderOnce() {
+        long id = createService();
+        String token = TestAuth.fabricateTokenForUser(fixtures.userId("sales"), "zgerencia", "general_manager");
+
+        Response response = given()
+            .header("Authorization", "Bearer " + token)
+            .header("If-Match", etagOf(id))
+            .contentType(ContentType.JSON)
+            .body(changedPayload(id))
+        .when()
+            .put("/services/" + id);
+
+        assertEquals(200, response.statusCode(), response.asString());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertSentOnce(response, "ETag", etagOf(id));
+        assertTrue(response.header("ETag").matches("\"[^\"]+\""), response.header("ETag"));
+        assertNotSent(response, "Location");
+    }
+
+    @Test
+    void update_withEmptyBody_returns400WithoutCacheHeaders() {
+        long id = createService();
+
+        Response response = given()
+            .header("Authorization", "Bearer " + adminToken)
+            .header("If-Match", etagOf(id))
+            .contentType(ContentType.JSON)
+        .when()
+            .put("/services/" + id);
+
+        assertEquals(400, response.statusCode());
+        assertEquals("COM-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     /**

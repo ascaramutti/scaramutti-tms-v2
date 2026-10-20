@@ -10,6 +10,7 @@ import com.scaramutti.tms.support.TestAuth;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -22,6 +23,8 @@ import org.hibernate.exception.ConstraintViolationException;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
@@ -229,6 +232,51 @@ class ClientByIdResourceTest {
             .header("Cache-Control", "no-store")
             .header("Vary", "Authorization")
             .body("id", equalTo(id));
+    }
+
+    @Test
+    void get_asSales_sendsEachCacheHeaderOnceWithoutEtag() {
+        Integer id = seedClient(NAME_PREFIX + "CAB", nextRuc());
+
+        Response response = given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("sales_test", "sales"))
+        .when()
+            .get("/clients/" + id);
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "ETag", "Location");
+    }
+
+    @Test
+    void get_onAMissingClient_returns404WithoutCacheHeaders() {
+        Response response = given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("admin_test", "admin"))
+        .when()
+            .get("/clients/999999999");
+
+        assertEquals(404, response.statusCode());
+        assertEquals("CLI-003", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
+    }
+
+    @Test
+    void update_returns200WithoutCacheHeaders() {
+        String name = NAME_PREFIX + "SIN_CACHE";
+        String ruc = nextRuc();
+        Integer id = seedClient(name, ruc);
+
+        Response response = given()
+            .header("Authorization", "Bearer "
+                + TestAuth.fabricateAccessToken("operations_manager_test", "operations_manager"))
+            .contentType(ContentType.JSON)
+            .body(body(name, ruc, "955555555", null))
+        .when()
+            .put("/clients/" + id);
+
+        assertEquals(200, response.statusCode(), response.asString());
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     @ParameterizedTest

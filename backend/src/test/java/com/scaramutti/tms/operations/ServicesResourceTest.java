@@ -8,6 +8,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.AfterEach;
@@ -18,10 +19,13 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.junit.jupiter.params.ParameterizedTest;
 
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.allOf;
 import static org.hamcrest.Matchers.containsString;
@@ -33,6 +37,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests de POST /services. Hermético: cliente y tipo de carga sintéticos
@@ -113,6 +118,64 @@ class ServicesResourceTest {
         assertEquals(28000f, body.getFloat("weightKg"));
         assertEquals(12.5f, body.getFloat("lengthM"));
         assertEquals(5800f, body.getFloat("price"));
+    }
+
+    /** Con un usuario real: el alta firma el viaje con quien lo registra. */
+    @Test
+    void create_asSales_sendsEachHeaderExactlyOnce() {
+        String token = TestAuth.fabricateTokenForUser(fixtures.userId("sales"), "zventas", "sales");
+
+        Response response = given()
+            .header("Authorization", "Bearer " + token)
+            .contentType(ContentType.JSON)
+            .body(validPayload())
+        .when()
+            .post("/services");
+
+        assertEquals(201, response.statusCode(), response.asString());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertSentOnce(response, "ETag", response.header("ETag"));
+        assertTrue(response.header("ETag").matches("\"[^\"]+\""), response.header("ETag"));
+        assertSentOnce(response, "Location", response.header("Location"));
+    }
+
+    /**
+     * El ETag del alta es la versión guardada y el Location apunta al viaje creado. Contra el
+     * cuerpo se compara como instante: el ETag sale del {@code toString} de la fecha y el cuerpo,
+     * de Jackson, y los dos pueden escribir distinto la fracción.
+     */
+    @Test
+    void create_etagIsTheStoredVersion_locationEndsInTheNewId() {
+        Response response = given()
+            .header("Authorization", "Bearer " + adminToken)
+            .contentType(ContentType.JSON)
+            .body(validPayload())
+        .when()
+            .post("/services");
+
+        assertEquals(201, response.statusCode(), response.asString());
+        long id = response.jsonPath().getLong("id");
+        String etag = response.header("ETag");
+        assertEquals(etagOf(id), etag, "el ETag del alta tiene que ser el que después lee el GET");
+        assertEquals(OffsetDateTime.parse(response.jsonPath().getString("updatedAt")).toInstant(),
+            OffsetDateTime.parse(etag.substring(1, etag.length() - 1)).toInstant());
+        assertTrue(response.header("Location").matches("https?://[^/]+/api/v1/services/" + id),
+            response.header("Location"));
+    }
+
+    @Test
+    void create_asDispatcher_returns403WithoutCacheHeaders() {
+        Response response = given()
+            .header("Authorization", "Bearer " + TestAuth.fabricateAccessToken("zdispatcher", "dispatcher"))
+            .contentType(ContentType.JSON)
+            .body(validPayload())
+        .when()
+            .post("/services");
+
+        assertEquals(403, response.statusCode());
+        assertEquals("COM-003", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     /** El alta deja su registro de auditoría, que todavía no se expone por la API. */
@@ -587,6 +650,16 @@ class ServicesResourceTest {
         .then()
             .statusCode(201)
             .extract().jsonPath().getLong("id");
+    }
+
+    private String etagOf(long serviceId) {
+        return given()
+            .header("Authorization", "Bearer " + adminToken)
+        .when()
+            .get("/services/" + serviceId)
+        .then()
+            .statusCode(200)
+            .extract().header("ETag");
     }
 
     private String createAndReturnCode(Map<String, Object> payload) {

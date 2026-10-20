@@ -41,6 +41,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Stream;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
@@ -271,6 +273,35 @@ class ServiceStatusResourceTest {
             "el ETag devuelto no es el que quedó guardado: el próximo If-Match daría 412");
         assertEquals("no-store", response.header("Cache-Control"));
         assertEquals("Authorization", response.header("Vary"));
+    }
+
+    /** Con un usuario real: la transición firma la bitácora con quien la hace. */
+    @Test
+    void changeStatus_asDispatcher_sendsEtagAndEachCacheHeaderOnce() {
+        long serviceId = serviceInStatus(ServiceStatus.PENDING_START);
+        String token = TestAuth.fabricateTokenForUser(fixtures.userId("sales"), "zdespacho", "dispatcher");
+
+        io.restassured.response.Response response =
+            post(serviceId, body("IN_PROGRESS", null, null), null, token);
+
+        assertEquals(200, response.statusCode(), response.asString());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertSentOnce(response, "ETag", etagOf(serviceId));
+        assertTrue(response.header("ETag").matches("\"[^\"]+\""), response.header("ETag"));
+        assertNotSent(response, "Location");
+    }
+
+    @Test
+    void changeStatus_cancelWithoutIfMatch_returns412WithoutCacheHeaders() {
+        long serviceId = serviceInStatus(ServiceStatus.PENDING_START);
+
+        io.restassured.response.Response response =
+            post(serviceId, body("CANCELLED", null, VALID_REASON), null, adminToken);
+
+        assertEquals(412, response.statusCode());
+        assertEquals("COM-004", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "ETag", "Location");
     }
 
     /**
