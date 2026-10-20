@@ -9,6 +9,30 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.9.1] - 2026-10-20
+
+El refactor de los endpoints de viajes: respuestas tipadas y el par de cabeceras anti caché
+mandado desde un único lugar, con tests que lo fijan antes de moverlo: PRs #273 a #276. Sin
+migraciones ni configuración, y el frontend no cambia. Lo único distinto en las respuestas es el
+`Content-Type` de cuatro HEAD; el contrato cambia en una descripción y contra 2.9.0 no agrega ni
+retira campos.
+
+### Changed
+
+- Un HEAD al listado, al tablero, al reporte o al detalle de viajes declara ahora `charset=UTF-8`
+  en su `Content-Type`, como su GET y como las lecturas de clientes. Los diez endpoints de viajes
+  devuelven respuestas tipadas; fuera de esa línea, cada respuesta sale con el mismo estado, las
+  mismas cabeceras y el mismo cuerpo (#274).
+- `Cache-Control: no-store` y `Vary: Authorization` salen de un ayudante compartido en los diez
+  endpoints de viajes y en las dos lecturas de clientes, con los mismos valores. Los errores y las
+  escrituras de clientes siguen sin ellas (#275).
+- Tests fijan qué respuestas de viajes y clientes mandan esas dos cabeceras, contando cada línea:
+  antes, una cabecera mandada dos veces pasaba en verde, porque los tests miraban solo su último
+  valor (#273).
+- La descripción del `Vary` del listado de viajes en el contrato ya no nombra un ETag, que el
+  listado no manda: el cuerpo depende del rol, porque el despacho no recibe precios. El cliente
+  generado no cambia (#276).
+
 ## [2.9.0] - 2026-10-16
 
 Sesiones y contraseñas más estrictas, la lectura de clientes por rol, y el cargo como única fuente
