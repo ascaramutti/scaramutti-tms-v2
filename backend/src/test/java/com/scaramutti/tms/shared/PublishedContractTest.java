@@ -205,6 +205,27 @@ class PublishedContractTest {
     }
 
     /**
+     * Las cabeceras de caché de la sesión: el ingreso y la renovación traen tokens ({@code no-store}
+     * y {@code Pragma}, sin {@code Vary}); {@code /auth/me}, los datos de la cuenta ({@code no-store}
+     * y {@code Vary}). El cliente generado no lleva cabeceras: sin este test, nada notaría que el
+     * contrato las perdió.
+     */
+    @Test
+    void publishedContract_declaresTheSessionResponsesNotStored() {
+        JsonPath contract = publishedContract();
+        for (String path : List.of("/auth/login", "/auth/refresh")) {
+            String headers = "paths.'" + path + "'.post.responses.'200'.headers.";
+            assertThat(path, contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+            assertThat(path, contract.getString(headers + "Pragma.description"), containsString("no-cache"));
+            assertThat(path, contract.get(headers + "Vary"), nullValue());
+        }
+        String me = "paths.'/auth/me'.get.responses.'200'.headers.";
+        assertThat(contract.getString(me + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(me + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(me + "Pragma"), nullValue());
+    }
+
+    /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
      * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.
