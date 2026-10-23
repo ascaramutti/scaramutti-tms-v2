@@ -11,10 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Unit puro de {@link CacheHeaders}, sin Quarkus: es una API compartida, así que su contrato se
- * fija acá y no a través de un endpoint. El caso es la forma más cargada, la del alta: quien llama
- * pone el estado, el Location y el ETag, y el helper no pisa ninguno. Se compara la lista entera de
- * cada nombre: una cabecera repetida, con otro valor (el {@code no-transform} de un
- * {@code CacheControl} nuevo), perdida o de más, falla.
+ * fija acá y no a través de un endpoint. El caso de {@code notStored} es la forma más cargada, la
+ * del alta: quien llama pone el estado, el Location y el ETag, y el helper no pisa ninguno. Se
+ * compara la lista entera de cada nombre: una cabecera repetida, con otro valor (el
+ * {@code no-transform} de un {@code CacheControl} nuevo), perdida o de más, falla.
  */
 class CacheHeadersTest {
 
@@ -33,6 +33,26 @@ class CacheHeadersTest {
                 "Vary", List.of("Authorization"),
                 "ETag", List.of("\"v\""),
                 "Location", List.of("services/7")),
+            Map.copyOf(response.getStringHeaders()));
+    }
+
+    /**
+     * La pieza de los tokens, con lo que pone quien llama: las suyas una vez cada una, sin el
+     * {@code Vary} de la otra, y el estado y el ETag intactos.
+     */
+    @Test
+    void tokensNotStored_addsNoStoreAndPragmaOnce_keepingWhatTheCallerSet() {
+        RestResponse<String> response = CacheHeaders.tokensNotStored(
+            RestResponse.ResponseBuilder.create(RestResponse.Status.CREATED, "cuerpo")
+                .header("ETag", "\"v\""));
+
+        assertEquals(201, response.getStatus());
+        assertEquals("cuerpo", response.getEntity());
+        assertEquals(
+            Map.of(
+                "Cache-Control", List.of("no-store"),
+                "Pragma", List.of("no-cache"),
+                "ETag", List.of("\"v\"")),
             Map.copyOf(response.getStringHeaders()));
     }
 }
