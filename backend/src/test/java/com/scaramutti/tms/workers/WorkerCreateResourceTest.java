@@ -3,6 +3,7 @@ package com.scaramutti.tms.workers;
 import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +24,8 @@ import java.util.concurrent.TimeUnit;
 import static com.scaramutti.tms.support.LockWaiters.UNTIL_IT_ARRIVES_MILLIS;
 import static com.scaramutti.tms.support.LockWaiters.awaitWaiters;
 import static com.scaramutti.tms.support.LockWaiters.backendPid;
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
@@ -1485,6 +1488,24 @@ class WorkerCreateResourceTest {
             System.err.println("AVISO: quedo un hilo vivo del caso de carrera de " 
                 + "WorkerCreateResourceTest; puede pisar a la clase siguiente");
         }
+    }
+
+    // ---------- cabeceras de cache -----------------------------------------------
+
+    /**
+     * El 201 trae la ficha del detalle: sale con sus mismas cabeceras, una vez cada una, y sigue
+     * siendo 201.
+     */
+    @Test
+    void create_sendsNoStoreAndVaryOnce() {
+        Response response = post(adminToken()).body(body("ZTESTC190", "operator"))
+        .when().post("/workers");
+
+        assertEquals(201, response.statusCode());
+        assertEquals("ZTESTC190", response.jsonPath().getString("documentNumber"));
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
     }
 
 }

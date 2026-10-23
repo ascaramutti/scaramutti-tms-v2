@@ -4,6 +4,7 @@ import com.scaramutti.tms.support.WarehouseTestData;
 import com.scaramutti.tms.support.WarehouseTestData.WorkerAuditRow;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.response.Response;
 import io.restassured.response.ValidatableResponse;
 import jakarta.inject.Inject;
 import javax.sql.DataSource;
@@ -23,6 +24,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
 import static io.restassured.RestAssured.given;
@@ -845,5 +848,27 @@ class WorkerStatusResourceTest {
         assertEquals(startsActive, fixtures.driverRowOf(id).isActive(), "la ficha tampoco");
         assertEquals(startsActive, fixtures.userIsActive(userId), "ni la cuenta");
         assertEquals(List.of(), auditFieldNames(id), "ni quedo rastro");
+    }
+
+    // ---------- cabeceras de cache ----------
+
+    /**
+     * Las dos devuelven la ficha del detalle: salen con sus mismas cabeceras, una vez cada una. Con
+     * un cambio de verdad, no el corte idempotente.
+     */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
+    void changingTheStatus_sendsNoStoreAndVaryOnce(String operation) {
+        boolean startsActive = DEACTIVATE.equals(operation);
+        int id = fixtures.seedWorker("ZTESTS110", "Juan", "Pérez", "operator", startsActive);
+
+        Response response = given().header("Authorization", "Bearer " + adminToken())
+        .when().post("/workers/" + id + "/" + operation);
+
+        assertEquals(200, response.statusCode());
+        assertEquals(!startsActive, response.jsonPath().getBoolean("isActive"));
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
     }
 }

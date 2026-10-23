@@ -7,8 +7,8 @@ import java.time.OffsetDateTime;
 
 /**
  * Un trabajador completo. No reusa la respuesta del listado: esa tiene cuatro campos para un
- * combobox y esta tiene quince, con el documento y el telefono, que el combobox nunca muestra
- * y por eso el detalle lo leen menos roles.
+ * combobox y esta tiene quince, entre ellos el documento, que el combobox nunca muestra y por
+ * eso el detalle lo leen menos roles.
  *
  * <p>{@code hasUser} no es una columna: se deriva de que exista una fila de usuario apuntando
  * a este trabajador. Es verdadero tambien cuando ese usuario esta inactivo, porque desactivar

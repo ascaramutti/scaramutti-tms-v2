@@ -3,6 +3,7 @@ package com.scaramutti.tms.workers;
 import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +14,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static io.restassured.RestAssured.given;
@@ -20,6 +23,7 @@ import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration tests de GET /workers/{id}.
@@ -421,6 +425,59 @@ class WorkerDetailResourceTest {
             .body("code", equalTo("WRK-001"))
             .body("status", equalTo(404))
             .body("detail", equalTo("Trabajador no encontrado"));
+    }
+
+    // ---------- cabeceras de cache -----------------------------------------------
+
+    /**
+     * La ficha trae el documento y no la leen todos los roles: ninguna cache la guarda, y cada
+     * cabecera sale una sola vez.
+     */
+    @Test
+    void get_sendsNoStoreAndVaryOnce() {
+        int id = fixtures.seedWorker("ZTESTB090", "Juan", "Perez", "operator", true);
+
+        Response response = given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id);
+
+        assertEquals(200, response.statusCode());
+        assertEquals(id, response.jsonPath().getInt("id"));
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /**
+     * El HEAD lo contesta el framework con el mismo metodo: las mismas cabeceras y el Content-Type
+     * del GET. Con un Response sin tipo, el HEAD pierde el charset que lleva el GET.
+     */
+    @Test
+    void get_head_sendsNoStoreAndVaryOnceWithTheContentTypeOfTheGet() {
+        int id = fixtures.seedWorker("ZTESTB091", "Juan", "Perez", "operator", true);
+        String token = adminToken();
+        String getContentType = given().header("Authorization", "Bearer " + token)
+        .when().get("/workers/" + id)
+        .then().statusCode(200).extract().contentType();
+
+        Response response = given().header("Authorization", "Bearer " + token)
+        .when().head("/workers/" + id);
+
+        assertEquals(200, response.statusCode());
+        assertEquals(getContentType, response.contentType());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /** Las cabeceras van en el exito y no en un filtro: el 404 del servicio sale sin ellas. */
+    @Test
+    void get_idThatDoesNotExist_returns404WithoutCacheHeaders() {
+        Response response = given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/999999999");
+
+        assertEquals(404, response.statusCode());
+        assertEquals("WRK-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "Pragma");
     }
 
 }

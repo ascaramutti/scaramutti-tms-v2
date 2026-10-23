@@ -3,6 +3,7 @@ package com.scaramutti.tms.workers;
 import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import javax.sql.DataSource;
 
@@ -23,6 +24,8 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.List;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
 import static io.restassured.RestAssured.given;
@@ -1837,5 +1840,21 @@ class WorkerUpdateResourceTest {
         assertEquals("MAINTENANCE", estado.get(0).newValue());
     }
 
+    // ---------- cabeceras de cache ----------
+
+    /** La edicion devuelve la ficha del detalle: sale con sus mismas cabeceras, una vez cada una. */
+    @Test
+    void update_sendsNoStoreAndVaryOnce() {
+        int id = seedWorker("ZTESTE200", "operator");
+
+        Response response = put(adminToken()).body(unchangedBody("ZTESTE200", "operator"))
+        .when().put("/workers/" + id);
+
+        assertEquals(200, response.statusCode());
+        assertEquals(id, response.jsonPath().getInt("id"));
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
 
 }

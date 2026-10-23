@@ -226,6 +226,29 @@ class PublishedContractTest {
     }
 
     /**
+     * Las cabeceras de caché de trabajadores: el listado depende del rol y la ficha trae el
+     * documento ({@code no-store} y {@code Vary}, sin {@code Pragma}), y las cuatro escrituras
+     * devuelven esa ficha. El cliente generado no lleva cabeceras: sin este test, nada notaría que
+     * el contrato las perdió.
+     */
+    @Test
+    void publishedContract_declaresTheWorkerResponsesNotStored() {
+        JsonPath contract = publishedContract();
+        for (String success : List.of(
+                "'/workers'.get.responses.'200'", "'/workers'.post.responses.'201'",
+                "'/workers/{id}'.get.responses.'200'", "'/workers/{id}'.put.responses.'200'",
+                "'/workers/{id}/deactivate'.post.responses.'200'",
+                "'/workers/{id}/reactivate'.post.responses.'200'")) {
+            String headers = "paths." + success + ".headers.";
+            assertThat(success, contract.getString(headers + "'Cache-Control'.description"),
+                containsString("no-store"));
+            assertThat(success, contract.getString(headers + "Vary.description"),
+                containsString("Authorization"));
+            assertThat(success, contract.get(headers + "Pragma"), nullValue());
+        }
+    }
+
+    /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
      * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.
