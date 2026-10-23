@@ -1368,6 +1368,13 @@ paths:
       responses:
         '200':
           description: Trabajadores
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo depende del rol (el encargado de almacén no busca por documento), así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema:
@@ -1447,6 +1454,13 @@ paths:
       responses:
         '201':
           description: Creado
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1474,9 +1488,8 @@ paths:
         desde la aplicación.
 
         Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
-        (el detalle expone documento y teléfono, que el combobox no muestra).
-        La lectura no aplica rango: cualquiera de los cuatro ve cualquier
-        detalle.
+        (el detalle expone el número de documento, que el listado no trae). La
+        lectura no aplica rango: cualquiera de los cuatro ve cualquier detalle.
 
         `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
         cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
@@ -1485,6 +1498,13 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: la ficha trae el número de documento, que no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: no todos los roles leen la ficha, así que ninguna cache puede reusarla para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1585,6 +1605,13 @@ paths:
       responses:
         '200':
           description: Actualizado
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1639,6 +1666,13 @@ paths:
       responses:
         '200':
           description: Trabajador con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1681,6 +1715,13 @@ paths:
       responses:
         '200':
           description: Trabajador con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }

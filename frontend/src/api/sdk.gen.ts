@@ -1029,9 +1029,8 @@ export const createWorker = <ThrowOnError extends boolean = false>(options: Opti
  * desde la aplicación.
  *
  * Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
- * (el detalle expone documento y teléfono, que el combobox no muestra).
- * La lectura no aplica rango: cualquiera de los cuatro ve cualquier
- * detalle.
+ * (el detalle expone el número de documento, que el listado no trae). La
+ * lectura no aplica rango: cualquiera de los cuatro ve cualquier detalle.
  *
  * `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
  * cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
