@@ -1179,12 +1179,19 @@ export type WorkerUpdateRequest = WorkerRequest & {
  * primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
  * o reactivación desde la aplicación. Instantes en UTC
  * (`createdAt`, `updatedAt`); `hireDate` es día calendario.
+ * `fullName` une nombres, paterno y materno con un espacio, sin el
+ * materno si es nulo, y recorta los espacios de los extremos;
+ * `maternalLastName` es nulo si el trabajador no tiene materno, y
+ * `lastName` son los dos apellidos juntos.
  *
  */
 export type WorkerDetailResponse = {
     id: number;
     firstName: string;
     lastName: string;
+    paternalLastName: string;
+    maternalLastName: string | null;
+    fullName: string;
     documentType: DocumentTypeResponse;
     documentNumber: string;
     phone?: string | null;

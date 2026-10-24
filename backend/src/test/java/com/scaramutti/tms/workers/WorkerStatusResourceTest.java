@@ -28,6 +28,7 @@ import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
 import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
+import static com.scaramutti.tms.support.WorkerDetailNames.assertSameAsTheNextGet;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
@@ -848,6 +849,22 @@ class WorkerStatusResourceTest {
         assertEquals(startsActive, fixtures.driverRowOf(id).isActive(), "la ficha tampoco");
         assertEquals(startsActive, fixtures.userIsActive(userId), "ni la cuenta");
         assertEquals(List.of(), auditFieldNames(id), "ni quedo rastro");
+    }
+
+    // ---------- la ficha que responden ----------
+
+    /** Las dos responden las partes y el nombre que da el GET siguiente, con el materno incluido. */
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {DEACTIVATE, REACTIVATE})
+    void changingTheStatus_respondsWithTheSurnamesAndTheFullNameOfTheNextGet(String operation) {
+        int id = fixtures.seedWorker("ZTESTS111", "Rosa", "Diaz", "Núñez", "operator",
+            DEACTIVATE.equals(operation));
+
+        Response response = given().header("Authorization", "Bearer " + adminToken())
+        .when().post("/workers/" + id + "/" + operation);
+
+        assertEquals(200, response.statusCode());
+        assertSameAsTheNextGet(response, id, "Diaz Núñez", "Diaz", "Núñez", "Rosa Diaz Núñez");
     }
 
     // ---------- cabeceras de cache ----------
