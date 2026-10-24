@@ -18,8 +18,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Este caso existe porque el javadoc del cuerpo de edicion afirmaba que existia y NO existia.
  * La afirmacion importaba: el contrato declara el cuerpo de edicion como el del alta mas el
  * motivo, y un record no hereda, asi que las dos formas pueden separarse sin que nada deje de
- * compilar. El dia que alguien sume un campo al alta, el contrato lo declara tambien en la
- * edicion, el cliente generado lo manda, y la edicion lo ignora en silencio.
+ * compilar. Un campo nuevo del alta obliga a decidir si entra en la edicion de la spec runtime
+ * (PublishedContractTest); si entra, el cliente generado lo manda y la edicion lo ignora.
  *
  * <p>Compara tambien las ANOTACIONES, no solo los nombres: perder un limite de largo o el formato
  * del telefono al copiar es exactamente el error que esto ataja, y ninguno de los dos se ve en
