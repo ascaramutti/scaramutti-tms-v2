@@ -120,6 +120,23 @@ class ServicesReportResourceTest {
         assertEquals(0, report.getList("totals").size());
     }
 
+    /**
+     * El conductor principal con materno y sin el: 200 con los dos nombres. Sin materno es la fila que
+     * una regla que concatenara el materno con {@code ||} dejaria en nulo, y el reporte daria 500.
+     */
+    @Test
+    void report_namesThePrincipalDriverWithAndWithoutTheMaternalSurname() {
+        seedCompleted(limaNoon(ANCHOR), penId, new BigDecimal("100.00"), "PROVINCIA",
+            operationsFixtures.seedDriver("Melchor", "Principal"));
+        seedCompleted(limaNoon(ANCHOR).plusHours(1), penId, new BigDecimal("200.00"), "PROVINCIA",
+            operationsFixtures.seedDriver("Melchor", "Principal", "Núñez"));
+
+        List<Map<String, Object>> rows = report(ANCHOR).getList("rows");
+
+        assertEquals(List.of("Melchor Principal", "Melchor Principal Núñez"),
+            rows.stream().map(row -> row.get("principalDriver")).toList());
+    }
+
     /** El camino feliz: una fila con todo lo que el contrato promete. */
     @Test
     void report_withOneCompletedService_returnsItsRowWithEveryDeclaredField() {

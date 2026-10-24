@@ -3709,7 +3709,7 @@ export type ListWorkersData = {
     path?: never;
     query?: {
         /**
-         * Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         * Búsqueda libre por nombres, apellido paterno o materno; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
          */
         q?: string;
         isActive?: boolean;

@@ -71,7 +71,7 @@ class WorkerServiceTest {
         Worker w = new Worker();
         w.id = id;
         w.firstName = first;
-        w.lastName = last;
+        w.assignSurnames(last, null);
         Role role = new Role();
         role.description = roleDescription;
         w.role = role;

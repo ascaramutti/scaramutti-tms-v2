@@ -76,10 +76,27 @@ class WorkersResourceTest {
         int id = fixtures.seedWorker("ZTESTW903", "Juan", "Perez", "operator", true);
         String token = adminToken();
 
-        // "juan perez": cada palabra matchea first_name O last_name (MultiWordSearch, AND de ORs)
+        // "juan perez": cada palabra matchea los nombres, el paterno o el materno (MultiWordSearch, AND de ORs)
         given().header("Authorization", "Bearer " + token).queryParam("q", "juan perez")
         .when().get("/workers")
         .then().statusCode(200).body("id", hasItem(id));
+    }
+
+    /**
+     * Cada palabra calza tambien en el materno, con su acento, y para quien no busca por documento
+     * igual: las dos listas de columnas lo llevan.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "warehouse_keeper"})
+    void listWorkers_qMatchesTheMaternalWithItsAccent(String role) {
+        int id = fixtures.seedWorker("ZTESTW970", "Rosa", "Ztpaterno", "Ztmáterno", "operator", true);
+
+        given().header("Authorization", "Bearer " + fabricateAccessToken("ztest-" + role, role))
+            .queryParam("q", "ztmáterno")
+        .when().get("/workers")
+        .then().statusCode(200)
+            .body("id", hasItem(id))
+            .body("find { it.id == " + id + " }.fullName", equalTo("Rosa Ztpaterno Ztmáterno"));
     }
 
     @Test
@@ -154,13 +171,33 @@ class WorkersResourceTest {
         int alfa = fixtures.seedWorker("ZTESTW908", "Aaa", "Ztestord", "driver", true);
         String token = adminToken();
 
-        // q acota el universo a los 2 sembrados (last_name comun); orden por first_name: Aaa antes que Zzz
+        // q acota el universo a los 2 sembrados (paterno comun); orden por first_name: Aaa antes que Zzz
         List<Integer> ids = given().header("Authorization", "Bearer " + token).queryParam("q", "ztestord")
         .when().get("/workers")
         .then().statusCode(200).extract().jsonPath().getList("id", Integer.class);
 
         assertTrue(ids.indexOf(alfa) < ids.indexOf(zeta),
             "Aaa (first_name) debe venir antes que Zzz; ids=" + ids);
+    }
+
+    /**
+     * Nombres, paterno y materno, y entre dos con los mismos nombres y paterno, el que no tiene materno
+     * primero. El paterno de dos palabras va despues de los maternos de "Ztordena", y por los apellidos
+     * juntos quedaria entre ellos. Se siembran en otro orden que el esperado, para que el alta no lo de.
+     */
+    @Test
+    void listWorkers_orderedByFirstNameThenPaternalThenMaternal_withoutMaternalFirst() {
+        int otherPaternal = fixtures.seedWorker("ZTESTW980", "Aaa", "Ztordenb", null, "operator", true);
+        int maternalZeta = fixtures.seedWorker("ZTESTW981", "Aaa", "Ztordena", "Zeta", "operator", true);
+        int twoWordPaternal = fixtures.seedWorker("ZTESTW984", "Aaa", "Ztordena Beta", null, "operator", true);
+        int withoutMaternal = fixtures.seedWorker("ZTESTW982", "Aaa", "Ztordena", null, "operator", true);
+        int maternalAlfa = fixtures.seedWorker("ZTESTW983", "Aaa", "Ztordena", "Alfa", "operator", true);
+
+        List<Integer> ids = given().header("Authorization", "Bearer " + adminToken()).queryParam("q", "ztorden")
+        .when().get("/workers")
+        .then().statusCode(200).extract().jsonPath().getList("id", Integer.class);
+
+        assertEquals(List.of(withoutMaternal, maternalAlfa, maternalZeta, twoWordPaternal, otherPaternal), ids);
     }
 
     // ---------- roles ------------------------------------------------------------

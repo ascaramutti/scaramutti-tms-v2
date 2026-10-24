@@ -459,6 +459,50 @@ class WorkerUpdateResourceTest {
         assertEquals(List.of(), auditFieldNames(id));
     }
 
+    /**
+     * Mientras la edicion reciba un solo apellido: el mismo de la fila deja las partes como estan, y
+     * un materno puesto por SQL no se pierde.
+     */
+    @Test
+    void update_withTheSameLastName_keepsAMaternalSetBySql() {
+        int id = seedWorker("ZTESTE210", "operator");
+        fixtures.setWorkerMaternalLastName(id, "Núñez");
+
+        put(adminToken()).body(body("Juan", "Pérez Núñez", "ZTESTE210", "987654321", "operator",
+                "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(200).body("lastName", equalTo("Pérez Núñez"));
+
+        assertEquals("Pérez Núñez|Pérez|Núñez", fixtures.workerSurnames(id));
+        assertEquals(List.of("phone"), auditFieldNames(id));
+    }
+
+    /** Otro apellido es la copia de la migracion: entero al paterno, y el materno se vacia. */
+    @Test
+    void update_withAnotherLastName_copiesItToThePaternal_andEmptiesTheMaternal() {
+        int id = seedWorker("ZTESTE211", "operator");
+        fixtures.setWorkerMaternalLastName(id, "Núñez");
+
+        put(adminToken()).body(body("Juan", "Rojas Vega", "ZTESTE211", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(200).body("lastName", equalTo("Rojas Vega"));
+
+        assertEquals("Rojas Vega|Rojas Vega|nulo", fixtures.workerSurnames(id));
+    }
+
+    /** Cambiar solo la caja del apellido es otro apellido: se copia al paterno y queda en el rastro. */
+    @Test
+    void update_changingOnlyTheCaseOfTheLastName_copiesIt() {
+        int id = seedWorker("ZTESTE212", "operator");
+
+        put(adminToken()).body(body("Juan", "pérez", "ZTESTE212", null, "operator", "2024-03-01", null, null))
+        .when().put("/workers/" + id)
+        .then().statusCode(200).body("lastName", equalTo("pérez"));
+
+        assertEquals("pérez|pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals(List.of("lastName"), auditFieldNames(id));
+    }
+
     /** Cambiar solo la caja ES un cambio: comparar ignorando mayusculas lo perderia. */
     @Test
     void update_changingOnlyTheCase_isAChange() {

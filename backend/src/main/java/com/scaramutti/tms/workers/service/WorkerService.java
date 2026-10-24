@@ -205,7 +205,8 @@ public class WorkerService {
     private Worker newWorker(CreateWorkerCommand createWorkerCommand, Role role, Integer currentUserId) {
         Worker worker = new Worker();
         worker.firstName = createWorkerCommand.firstName();
-        worker.lastName = createWorkerCommand.lastName();
+        // Mientras el alta reciba un solo apellido, entero es el paterno: la copia de la migracion.
+        worker.assignSurnames(createWorkerCommand.lastName(), null);
         worker.documentTypeId = createWorkerCommand.documentTypeId();
         worker.documentNumber = createWorkerCommand.documentNumber();
         worker.phone = createWorkerCommand.phone();
@@ -633,7 +634,11 @@ public class WorkerService {
             String.valueOf(worker.hireDate), String.valueOf(command.hireDate()));
 
         worker.firstName = command.firstName();
-        worker.lastName = command.lastName();
+        // El mismo apellido de la fila, caracter por caracter, deja las partes como estan: una edicion
+        // que lo reenvia igual no pierde el materno. Otro es la copia de la migracion, entero al paterno.
+        if (!Objects.equals(worker.lastName, command.lastName())) {
+            worker.assignSurnames(command.lastName(), null);
+        }
         worker.documentTypeId = command.documentTypeId();
         worker.documentNumber = command.documentNumber();
         worker.phone = command.phone();

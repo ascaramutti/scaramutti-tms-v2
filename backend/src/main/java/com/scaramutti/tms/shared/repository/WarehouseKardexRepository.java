@@ -178,7 +178,7 @@ public class WarehouseKardexRepository {
             return Map.of();
         }
         Query nativeQuery = entityManager.createNativeQuery(
-            "SELECT w.id, wk.first_name, wk.last_name, "
+            "SELECT w.id, " + WorkerRepository.fullNameExpression("wk") + " AS worker_full_name, "
             + "COALESCE(t.plate, tr.plate, ev.plate) AS plate "
             + "FROM almacen.withdrawals w "
             + "JOIN public.workers wk ON wk.id = w.received_by "
@@ -193,10 +193,9 @@ public class WarehouseKardexRepository {
         List<Tuple> rows = nativeQuery.getResultList();
         Map<Integer, SalidaReferenceView> byId = new LinkedHashMap<>();
         for (Tuple row : rows) {
-            String fullName = row.get(1) + " " + row.get(2);
             byId.put(
                 ((Number) row.get(0)).intValue(),
-                new SalidaReferenceView(fullName, (String) row.get(3))
+                new SalidaReferenceView((String) row.get(1), (String) row.get(2))
             );
         }
         return byId;

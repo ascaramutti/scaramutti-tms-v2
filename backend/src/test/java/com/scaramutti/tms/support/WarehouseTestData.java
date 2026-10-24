@@ -235,10 +235,16 @@ public class WarehouseTestData {
      */
     public int seedWorker(String documentNumber, String firstName, String lastName, String roleName,
             boolean isActive) {
+        return seedWorker(documentNumber, firstName, lastName, null, roleName, isActive);
+    }
+
+    /** El mismo trabajador con los dos apellidos; el materno nulo es el de arriba. */
+    public int seedWorker(String documentNumber, String firstName, String paternalLastName,
+            String maternalLastName, String roleName, boolean isActive) {
         return QuarkusTransaction.requiringNew().call(() -> {
             Worker worker = new Worker();
             worker.firstName = firstName;
-            worker.lastName = lastName;
+            worker.assignSurnames(paternalLastName, maternalLastName);
             worker.documentTypeId = dniDocumentTypeId();
             worker.documentNumber = documentNumber;
             worker.role = roleRepository.findByName(roleName).orElseThrow(
@@ -435,6 +441,21 @@ public class WarehouseTestData {
         QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
             "UPDATE public.workers SET first_name = ?1 WHERE id = ?2")
             .setParameter(1, firstName).setParameter(2, workerId).executeUpdate());
+    }
+
+    /** El materno puesto por SQL, como hasta que la edicion lo reciba: el disparador recompone last_name. */
+    public void setWorkerMaternalLastName(int workerId, String maternalLastName) {
+        QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+            "UPDATE public.workers SET maternal_last_name = ?1 WHERE id = ?2")
+            .setParameter(1, maternalLastName).setParameter(2, workerId).executeUpdate());
+    }
+
+    /** Los apellidos como estan en la fila: last_name, el paterno y el materno ("nulo" si no tiene). */
+    public String workerSurnames(int workerId) {
+        return QuarkusTransaction.requiringNew().call(() -> (String) entityManager.createNativeQuery(
+            "SELECT last_name || '|' || paternal_last_name || '|' || coalesce(maternal_last_name, 'nulo') "
+                + "FROM public.workers WHERE id = ?1")
+            .setParameter(1, workerId).getSingleResult());
     }
 
     /** Fecha de ingreso de un trabajador sembrado. */
