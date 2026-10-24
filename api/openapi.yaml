@@ -1345,16 +1345,17 @@ paths:
       description: |
         Catálogo compartido `public.workers`. **Solo búsqueda rápida — SIN
         creación al vuelo** (regla del dueño 2026-07-04: trabajadores y unidades
-        de flota nunca se crean desde almacén). Sin paginar — plantilla chica.
-        `q` es multi-palabra case-insensitive (≥ 3 caracteres): cada palabra
-        debe matchear en el nombre o el apellido y, **solo para los cuatro roles
+        de flota nunca se crean desde almacén). Sin paginar (plantilla chica),
+        ordenada por nombres, apellido paterno y materno (entre dos con los mismos
+        nombres y paterno, primero el que no tiene materno). `q` es multi-palabra
+        case-insensitive (≥ 3 caracteres): cada palabra debe matchear en los
+        nombres, el apellido paterno o el materno y, **solo para los cuatro roles
         que mantienen el padrón**, también en el número de documento. Para el
-        encargado de almacén la búsqueda sigue siendo por nombre y apellido: ese
+        encargado de almacén la búsqueda sigue siendo por nombres y apellidos: ese
         número no viaja en esta respuesta, y buscarlo permitiría confirmarlo
         probando prefijos. (Esta última frase NO se porta a la spec runtime a
-        propósito: ese documento se sirve sin sesión y no tiene por qué
-        describir el ataque que la guarda cierra.) Para no filtrar, OMITIR el
-        parámetro.
+        propósito: ese documento se sirve sin sesión y no tiene por qué describir
+        el ataque que la guarda cierra.) Para no filtrar, OMITIR el parámetro.
         Operaciones NO lo consume: para asignar un viaje necesita conductores
         (`GET /drivers`), no la planilla completa. El detalle completo de un
         trabajador es `GET /workers/{id}`.
@@ -1362,7 +1363,7 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          description: Búsqueda libre por nombres, apellido paterno o materno; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: isActive, in: query, schema: { type: boolean } }
       responses:

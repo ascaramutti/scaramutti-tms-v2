@@ -1905,11 +1905,13 @@ paths:
       description: |
         Catalogo compartido `public.workers`. Solo busqueda rapida, SIN creacion
         al vuelo (trabajadores y unidades de flota nunca se crean desde almacen).
-        Sin paginar (plantilla chica). `q` es multi-palabra case-insensitive
-        (>= 3 caracteres): cada palabra debe matchear en el nombre o el apellido
+        Sin paginar (plantilla chica), ordenada por nombres, apellido paterno y
+        materno (entre dos con los mismos nombres y paterno, primero el que no
+        tiene materno). `q` es multi-palabra case-insensitive (>= 3 caracteres): cada
+        palabra debe matchear en los nombres, el apellido paterno o el materno
         y, solo para los cuatro roles que mantienen el padron, tambien en el
         numero de documento; para el encargado de almacen la busqueda sigue
-        siendo por nombre y apellido, porque ese numero no viaja en esta
+        siendo por nombres y apellidos, porque ese numero no viaja en esta
         respuesta. Para no filtrar, OMITIR el parametro. Operaciones NO lo
         consume: para asignar un viaje necesita conductores (`GET /drivers`), no
         la planilla completa.
@@ -1918,7 +1920,7 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          description: Búsqueda libre por nombres, apellido paterno o materno; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: isActive, in: query, schema: { type: boolean } }
       responses:

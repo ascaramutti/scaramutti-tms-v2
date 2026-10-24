@@ -64,7 +64,7 @@ class AuthServiceTest {
         Worker worker = new Worker();
         worker.id = 10;
         worker.firstName = "Valeria";
-        worker.lastName = "Torres";
+        worker.assignSurnames("Torres", null);
         Role workerRole = new Role();
         workerRole.name = "sales";
         workerRole.description = "Ejecutivo de Ventas";

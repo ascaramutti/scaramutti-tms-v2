@@ -247,12 +247,13 @@ public class DevDataSeeder {
             user.passwordHash = passwordService.hash(password);
             user.isActive = isActive;
             user.worker.firstName = firstName;
-            user.worker.lastName = lastName;
+            // Sin materno: uno puesto a mano en la base restaurada tambien es un nombre real.
+            user.worker.assignSurnames(lastName, null);
             return;
         }
         Worker worker = new Worker();
         worker.firstName = firstName;
-        worker.lastName = lastName;
+        worker.assignSurnames(lastName, null);
         worker.documentTypeId = documentTypeId;
         worker.documentNumber = documentNumber;
         worker.role = role;

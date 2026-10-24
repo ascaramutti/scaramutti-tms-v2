@@ -924,11 +924,13 @@ export const listDocumentTypes = <ThrowOnError extends boolean = false>(options?
  *
  * Catalogo compartido `public.workers`. Solo busqueda rapida, SIN creacion
  * al vuelo (trabajadores y unidades de flota nunca se crean desde almacen).
- * Sin paginar (plantilla chica). `q` es multi-palabra case-insensitive
- * (>= 3 caracteres): cada palabra debe matchear en el nombre o el apellido
+ * Sin paginar (plantilla chica), ordenada por nombres, apellido paterno y
+ * materno (entre dos con los mismos nombres y paterno, primero el que no
+ * tiene materno). `q` es multi-palabra case-insensitive (>= 3 caracteres): cada
+ * palabra debe matchear en los nombres, el apellido paterno o el materno
  * y, solo para los cuatro roles que mantienen el padron, tambien en el
  * numero de documento; para el encargado de almacen la busqueda sigue
- * siendo por nombre y apellido, porque ese numero no viaja en esta
+ * siendo por nombres y apellidos, porque ese numero no viaja en esta
  * respuesta. Para no filtrar, OMITIR el parametro. Operaciones NO lo
  * consume: para asignar un viaje necesita conductores (`GET /drivers`), no
  * la planilla completa.

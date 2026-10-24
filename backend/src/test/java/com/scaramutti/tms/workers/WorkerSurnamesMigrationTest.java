@@ -1,6 +1,5 @@
 package com.scaramutti.tms.workers;
 
-import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
@@ -291,8 +290,8 @@ class WorkerSurnamesMigrationTest {
     }
 
     /**
-     * El {@code last_name} que compone el disparador da, con la regla de hoy en Java y en SQL, el
-     * nombre de las partes con un espacio entre cada una, con materno y sin el.
+     * El {@code last_name} que compone el disparador da, con la regla de la imagen anterior (los
+     * nombres y {@code last_name}), el nombre que da la regla de las partes, con materno y sin el.
      */
     @ParameterizedTest(name = "{0} {1} {2}")
     @CsvSource({"María José, De la Cruz, Núñez, María José De la Cruz Núñez", "Fabiola, Quispe, , Fabiola Quispe"})
@@ -300,11 +299,9 @@ class WorkerSurnamesMigrationTest {
             String fullName) throws SQLException {
         inFreshMigration(connection -> {
             int workerId = insertWorker(connection, "ZTESTSUR14", firstName, null, paternal, maternal);
-            Worker worker = new Worker();
-            worker.firstName = textOf(connection, "SELECT first_name FROM public.workers WHERE id = " + workerId);
-            worker.lastName = textOf(connection, "SELECT last_name FROM public.workers WHERE id = " + workerId);
 
-            assertEquals(fullName, worker.fullName());
+            assertEquals(fullName, textOf(connection, "SELECT trim(first_name || ' ' || last_name)"
+                + " FROM public.workers WHERE id = " + workerId));
             assertEquals(fullName, textOf(connection, "SELECT " + WorkerRepository.fullNameExpression("w")
                 + " FROM public.workers w WHERE w.id = " + workerId));
         });

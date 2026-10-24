@@ -17,8 +17,8 @@ import java.util.Optional;
  *
  * <p>El listado no devuelve entidades: el nombre sale de {@code public.workers} y la
  * disponibilidad de {@code public.resource_statuses}, asi que la consulta los une y proyecta
- * una fila plana, y solo trae fichas de trabajadores con cargo de conductor. Orden natural por
- * nombre ASC (el frontend reordena para presentacion, politica de catalogos). Read-only.
+ * una fila plana, y solo trae fichas de trabajadores con cargo de conductor. Orden por nombre,
+ * el de {@link WorkerRepository#fullNameOrder}. Read-only.
  */
 @ApplicationScoped
 public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> {
@@ -63,7 +63,7 @@ public class DriverRepository implements PanacheRepositoryBase<Driver, Integer> 
             + (isActive != null ? "AND d.is_active = :isActive " : "")
             + (isAssignable != null
                 ? "AND " + assignableToday("d", "w", "role") + " = :isAssignable " : "")
-            + "ORDER BY w.first_name ASC, w.last_name ASC";
+            + "ORDER BY " + WorkerRepository.fullNameOrder("w");
 
         Query query = getEntityManager().createNativeQuery(sql, Tuple.class);
         if (isActive != null) {

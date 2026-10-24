@@ -227,6 +227,24 @@ class WarehouseKardexResourceTest {
             .body("content[0].reference", equalTo("Retiro · recibe Rosa Diaz"));
     }
 
+    /** Quien recibe, con su materno: el kardex lo nombra entero. */
+    @Test
+    void kardex_salida_namesTheReceiverWithTheMaternalSurname() {
+        int productId = fixtures.seedProduct("ZTEST_Kardex SalidaConMaterno");
+        seedOpeningBalance(productId, "50", lima(2026, 1, 1, 8, 0));
+        int workerId = fixtures.seedWorker("ZTESTW003", "Rosa", "Diaz", "Núñez", "operator", true);
+        seedWithdrawal(productId, "5", lima(2026, 1, 2, 10, 0), workerId, null, false);
+        String token = login("admin", "Admin1234");
+
+        given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/warehouse/products/" + productId + "/kardex")
+        .then()
+            .statusCode(200)
+            .body("content[0].reference", equalTo("Retiro · recibe Rosa Diaz Núñez"));
+    }
+
     // ---------- RN-WH13: saldo corrido sobre historia completa (regresion obligatoria) --
 
     /**
