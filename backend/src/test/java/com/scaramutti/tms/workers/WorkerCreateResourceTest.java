@@ -29,6 +29,7 @@ import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
+import static com.scaramutti.tms.support.WorkerDetailNames.assertSameAsTheNextGet;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -111,7 +112,7 @@ class WorkerCreateResourceTest {
     // ---------- camino feliz -----------------------------------------------------
 
     @Test
-    void create_withTheFullBody_returns201WithTheFifteenKeys() {
+    void create_withTheFullBody_returns201WithTheEighteenKeys() {
         post(adminToken()).body("""
             {"firstName":"Juan","lastName":"Pérez Huamán","documentTypeId":%d,
              "documentNumber":"ZTESTC001","phone":"987654321","role":"operator",
@@ -122,9 +123,9 @@ class WorkerCreateResourceTest {
             // El conjunto ENTERO de claves: un campo de mas, que es como se filtra un dato sin
             // querer, tambien hace fallar el caso.
             .body("keySet()", containsInAnyOrder(
-                "id", "firstName", "lastName", "documentType", "documentNumber", "phone",
-                "role", "hireDate", "isActive", "createdAt", "createdBy", "updatedAt",
-                "updatedBy", "driver", "hasUser"))
+                "id", "firstName", "lastName", "paternalLastName", "maternalLastName", "fullName",
+                "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
+                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
             .body("id", notNullValue())
             .body("firstName", equalTo("Juan"))
             .body("lastName", equalTo("Pérez Huamán"))
@@ -138,6 +139,17 @@ class WorkerCreateResourceTest {
             .body("isActive", equalTo(true))
             .body("hasUser", equalTo(false))
             .body("driver", nullValue());
+    }
+
+    /** El alta copia el apellido entero al paterno, y responde las partes que da el GET siguiente. */
+    @Test
+    void create_respondsWithTheSurnamesAndTheFullNameOfTheNextGet() {
+        Response created = post(adminToken()).body(bodyWithDriver("ZTESTC191", "operator", "null"))
+        .when().post("/workers");
+
+        assertEquals(201, created.statusCode());
+        assertSameAsTheNextGet(created, created.path("id"),
+            "Pérez Huamán", "Pérez Huamán", null, "Juan Pérez Huamán");
     }
 
     /**

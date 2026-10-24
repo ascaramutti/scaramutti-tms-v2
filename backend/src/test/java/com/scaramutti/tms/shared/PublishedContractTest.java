@@ -296,6 +296,23 @@ class PublishedContractTest {
         }
     }
 
+    /**
+     * La ficha manda siempre las dos partes y el nombre, el materno nulo si no hay: el contrato los
+     * exige, y así el cliente generado no los tipa opcionales ni le quita el nulo al materno.
+     */
+    @Test
+    void publishedContract_requiresTheSurnamesAndTheFullNameOfTheWorkerDetail() {
+        JsonPath contract = publishedContract();
+        String schema = "components.schemas.WorkerDetailResponse.";
+        List<String> required = contract.getList(schema + "required");
+        for (String field : List.of("paternalLastName", "maternalLastName", "fullName")) {
+            assertTrue(required.contains(field), field + " no está en required");
+        }
+        assertEquals("string", contract.get(schema + "properties.paternalLastName.type"));
+        assertEquals(List.of("string", "null"), contract.get(schema + "properties.maternalLastName.type"));
+        assertEquals("string", contract.get(schema + "properties.fullName.type"));
+    }
+
     /** Cuántas veces aparece una referencia en todo el documento. */
     private static long refsTo(Object node, String ref) {
         if (node instanceof Map<?, ?> map) {

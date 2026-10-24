@@ -21,6 +21,7 @@ import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -53,7 +54,7 @@ class WorkerDetailResourceTest {
     // ---------- la ficha completa ------------------------------------------------
 
     @Test
-    void get_returnsTheFifteenFieldsOfTheContract() {
+    void get_returnsTheEighteenFieldsOfTheContract() {
         int id = fixtures.seedWorker("ZTESTB001", "Juan", "Pérez Huamán", "driver", true);
         fixtures.setWorkerPhone(id, "987654321");
         fixtures.setWorkerHireDate(id, LocalDate.of(2024, 3, 1));
@@ -66,9 +67,9 @@ class WorkerDetailResourceTest {
             // El conjunto ENTERO de claves y no campo por campo: asi un campo de mas, que es
             // como se filtra un dato sin querer, tambien hace fallar el caso.
             .body("keySet()", containsInAnyOrder(
-                "id", "firstName", "lastName", "documentType", "documentNumber", "phone",
-                "role", "hireDate", "isActive", "createdAt", "createdBy", "updatedAt",
-                "updatedBy", "driver", "hasUser"))
+                "id", "firstName", "lastName", "paternalLastName", "maternalLastName", "fullName",
+                "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
+                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
             .body("id", equalTo(id))
             .body("firstName", equalTo("Juan"))
             .body("lastName", equalTo("Pérez Huamán"))
@@ -77,6 +78,60 @@ class WorkerDetailResourceTest {
             .body("isActive", equalTo(true))
             .body("createdAt", notNullValue())
             .body("updatedAt", notNullValue());
+    }
+
+    // ---------- los apellidos y el nombre completo ---------------------------------
+
+    /** Cada parte en su clave: el paterno y el materno son palabras distintas, cruzarlos se nota. */
+    @Test
+    void get_workerWithMaternal_carriesEachSurnameAndTheFullName() {
+        int id = fixtures.seedWorker("ZTESTB092", "Rosa", "Diaz", "Núñez", "operator", true);
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("lastName", equalTo("Diaz Núñez"))
+            .body("paternalLastName", equalTo("Diaz"))
+            .body("maternalLastName", equalTo("Núñez"))
+            .body("fullName", equalTo("Rosa Diaz Núñez"));
+    }
+
+    /**
+     * Sin materno la clave viaja con nulo, no vacia ni ausente: {@code nullValue()} pasa tambien
+     * sin la clave, por eso se afirma aparte. El nombre, igual que antes y sin espacio al final.
+     */
+    @Test
+    void get_workerWithoutMaternal_sendsTheMaternalKeyAsNull_andTheFullNameWithoutTrailingSpace() {
+        int id = fixtures.seedWorker("ZTESTB093", "Pedro", "Rios", "operator", true);
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("$", hasKey("maternalLastName"))
+            .body("maternalLastName", nullValue())
+            .body("paternalLastName", equalTo("Rios"))
+            .body("fullName", equalTo("Pedro Rios"));
+    }
+
+    /**
+     * La ficha compone el nombre en SQL y el listado en Java: con espacios delante de los nombres,
+     * puestos por SQL, las dos los recortan y la misma persona se llama igual.
+     */
+    @Test
+    void get_fullName_isTheOneTheListGives() {
+        int id = fixtures.seedWorker("ZTESTB094", "Rosa", "Diaz", "Ztmaternoficha", "operator", true);
+        fixtures.setWorkerFirstName(id, "  Rosa");
+
+        String fromTheList = given().header("Authorization", "Bearer " + adminToken())
+            .queryParam("q", "ztmaternoficha")
+        .when().get("/workers")
+        .then().statusCode(200)
+            .extract().path("find { it.id == " + id + " }.fullName");
+
+        assertEquals("Rosa Diaz Ztmaternoficha", fromTheList, "el listado");
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200).body("fullName", equalTo(fromTheList));
     }
 
     /** El rol viaja entero: el formulario necesita el nivel y la modalidad del cargo actual. */

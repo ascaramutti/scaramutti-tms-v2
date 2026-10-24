@@ -4915,11 +4915,18 @@ components:
         primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
         o reactivación desde la aplicación. Instantes en UTC
         (`createdAt`, `updatedAt`); `hireDate` es día calendario.
-      required: [id, firstName, lastName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
+        `fullName` une nombres, paterno y materno con un espacio, sin el
+        materno si es nulo, y recorta los espacios de los extremos;
+        `maternalLastName` es nulo si el trabajador no tiene materno, y
+        `lastName` son los dos apellidos juntos.
+      required: [id, firstName, lastName, paternalLastName, maternalLastName, fullName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
       properties:
         id:             { type: integer, format: int32, example: 8 }
         firstName:      { type: string, example: 'Juan' }
         lastName:       { type: string, example: 'Pérez Huamán' }
+        paternalLastName: { type: string, example: 'Pérez' }
+        maternalLastName: { type: [string, 'null'], example: 'Huamán' }
+        fullName:       { type: string, example: 'Juan Pérez Huamán' }
         documentType:   { $ref: '#/components/schemas/DocumentTypeResponse' }
         documentNumber: { type: string, example: '45678912' }
         phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }

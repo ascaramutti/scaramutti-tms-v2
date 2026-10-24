@@ -41,7 +41,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     /**
      * El nombre completo en SQL, con la regla de {@link Worker#fullName()}. Es un metodo y no un
      * literal repetido porque lo componen los conductores, los viajes y su reporte, la asignacion
-     * de recursos, el kardex y el detalle (dos veces, de ahi el alias): dos formas de armarlo harian
+     * de recursos, el kardex y el detalle (tres veces, de ahi el alias): dos formas de armarlo harian
      * que la misma persona se llame distinto segun por donde se la mire. Los nombres van con
      * {@code ||} y fuera del {@code concat_ws}: sin fila de trabajador (un LEFT JOIN que no
      * encontro) da nulo, y el reporte de viajes rechaza esa fila por el nulo.
@@ -115,11 +115,13 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
      * <p>{@code hasUser} es verdadero tambien con el usuario inactivo: desactivar un
      * trabajador apaga la cuenta y no la borra, y la pantalla necesita saber que sigue ahi.
      *
-     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y tres: leerlas por
+     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y seis: leerlas por
      * numero es el modo de falla obvio el dia que alguien agregue una en el medio.
      */
     public Optional<WorkerDetailRow> findDetailById(Integer workerId) {
         String sql = "SELECT w.id AS w_id, w.first_name AS w_first_name, w.last_name AS w_last_name, "
+            + "w.paternal_last_name AS w_paternal_last_name, w.maternal_last_name AS w_maternal_last_name, "
+            + fullNameExpression("w") + " AS w_full_name, "
             + "w.document_number AS w_document_number, w.phone AS w_phone, w.hire_date AS w_hire_date, "
             + "w.is_active AS w_is_active, w.created_at AS w_created_at, w.updated_at AS w_updated_at, "
             + "dt.id AS dt_id, dt.code AS dt_code, dt.name AS dt_name, "
@@ -161,6 +163,9 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             intOf(row, "w_id"),
             (String) row.get("w_first_name"),
             (String) row.get("w_last_name"),
+            (String) row.get("w_paternal_last_name"),
+            (String) row.get("w_maternal_last_name"),
+            (String) row.get("w_full_name"),
             new DocumentTypeRow(
                 intOf(row, "dt_id"),
                 (String) row.get("dt_code"),
@@ -226,6 +231,9 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
         Integer id,
         String firstName,
         String lastName,
+        String paternalLastName,
+        String maternalLastName,
+        String fullName,
         DocumentTypeRow documentType,
         String documentNumber,
         String phone,

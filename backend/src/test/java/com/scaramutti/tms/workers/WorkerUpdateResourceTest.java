@@ -28,6 +28,7 @@ import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
 import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateTokenForUser;
+import static com.scaramutti.tms.support.WorkerDetailNames.assertSameAsTheNextGet;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
@@ -122,7 +123,7 @@ class WorkerUpdateResourceTest {
     // ---------- el reemplazo, que es lo que distingue este endpoint de un parche ----------
 
     @Test
-    void update_withTheFullBody_returns200WithTheFifteenKeys() {
+    void update_withTheFullBody_returns200WithTheEighteenKeys() {
         int id = seedWorker("ZTESTE001", "operator");
 
         put(adminToken()).body(body("Ana", "Silva", "ZTESTE001", "987654321", "operator",
@@ -130,9 +131,9 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200)
             .body("keySet()", containsInAnyOrder(
-                "id", "firstName", "lastName", "documentType", "documentNumber", "phone",
-                "role", "hireDate", "isActive", "createdAt", "createdBy", "updatedAt",
-                "updatedBy", "driver", "hasUser"))
+                "id", "firstName", "lastName", "paternalLastName", "maternalLastName", "fullName",
+                "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
+                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
             .body("id", equalTo(id))
             .body("firstName", equalTo("Ana"))
             .body("lastName", equalTo("Silva"))
@@ -501,6 +502,27 @@ class WorkerUpdateResourceTest {
 
         assertEquals("pérez|pérez|nulo", fixtures.workerSurnames(id));
         assertEquals(List.of("lastName"), auditFieldNames(id));
+    }
+
+    /**
+     * La edicion responde las partes y el nombre que da el GET siguiente: con el mismo apellido, el
+     * materno puesto por SQL sigue; con otro, el apellido va entero al paterno.
+     */
+    @ParameterizedTest(name = "{1}")
+    @CsvSource(delimiter = '|', nullValues = "nulo", value = {
+        "ZTESTE213|Pérez Núñez|Pérez|Núñez|Ana Pérez Núñez",
+        "ZTESTE214|Rojas Vega|Rojas Vega|nulo|Ana Rojas Vega"})
+    void update_respondsWithTheSurnamesAndTheFullNameOfTheNextGet(String documentNumber,
+            String lastName, String paternalLastName, String maternalLastName, String fullName) {
+        int id = seedWorker(documentNumber, "operator");
+        fixtures.setWorkerMaternalLastName(id, "Núñez");
+
+        Response updated = put(adminToken()).body(body("Ana", lastName, documentNumber, null, "operator",
+                "2024-03-01", null, null))
+        .when().put("/workers/" + id);
+
+        assertEquals(200, updated.statusCode());
+        assertSameAsTheNextGet(updated, id, lastName, paternalLastName, maternalLastName, fullName);
     }
 
     /** Cambiar solo la caja ES un cambio: comparar ignorando mayusculas lo perderia. */
