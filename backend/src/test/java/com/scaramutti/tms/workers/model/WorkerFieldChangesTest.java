@@ -87,11 +87,11 @@ class WorkerFieldChangesTest {
     @Test
     void asList_keepsTheOrderInWhichTheyWereCompared() {
         WorkerFieldChanges changes = new WorkerFieldChanges();
-        changes.compare(WorkerAuditField.LAST_NAME, "a", "b");
+        changes.compare(WorkerAuditField.PATERNAL_LAST_NAME, "a", "b");
         changes.compare(WorkerAuditField.FIRST_NAME, "c", "d");
         changes.compare(WorkerAuditField.PHONE, "e", "f");
 
-        assertEquals(List.of(WorkerAuditField.LAST_NAME, WorkerAuditField.FIRST_NAME,
+        assertEquals(List.of(WorkerAuditField.PATERNAL_LAST_NAME, WorkerAuditField.FIRST_NAME,
             WorkerAuditField.PHONE), changes.asList().stream().map(WorkerFieldChange::field).toList());
     }
 
@@ -130,7 +130,8 @@ class WorkerFieldChangesTest {
     void everyField_keepsItsNameAndItsLabel() {
         var esperado = new java.util.LinkedHashMap<String, String>();
         esperado.put("firstName", "Nombre");
-        esperado.put("lastName", "Apellido");
+        esperado.put("paternalLastName", "Apellido paterno");
+        esperado.put("maternalLastName", "Apellido materno");
         esperado.put("documentType", "Tipo de documento");
         esperado.put("documentNumber", "Número de documento");
         esperado.put("phone", "Teléfono");

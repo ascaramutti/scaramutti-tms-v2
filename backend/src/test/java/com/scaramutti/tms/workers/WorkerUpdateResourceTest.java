@@ -418,9 +418,9 @@ class WorkerUpdateResourceTest {
         .then().statusCode(200);
 
         var rows = fixtures.workerAuditRows(id);
-        assertEquals(List.of("firstName", "lastName", "documentType", "documentNumber", "phone",
+        assertEquals(List.of("firstName", "paternalLastName", "documentType", "documentNumber", "phone",
             "role", "hireDate"), rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
-        assertEquals(List.of("Nombre", "Apellido", "Tipo de documento", "Número de documento",
+        assertEquals(List.of("Nombre", "Apellido paterno", "Tipo de documento", "Número de documento",
             "Teléfono", "Cargo", "Fecha de ingreso"),
             rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldLabel).toList());
         assertEquals(List.of("Juan", "Pérez", "ZTDOC00", "ZTESTE040", "987654321", "operator",
@@ -461,8 +461,8 @@ class WorkerUpdateResourceTest {
     }
 
     /**
-     * Mientras la edicion reciba un solo apellido: el mismo de la fila deja las partes como estan, y
-     * un materno puesto por SQL no se pierde.
+     * Sin paterno, el mismo apellido de la fila deja las partes como estan: un materno puesto por SQL
+     * no se pierde, y el apellido no deja rastro.
      */
     @Test
     void update_withTheSameLastName_keepsAMaternalSetBySql() {
@@ -489,6 +489,11 @@ class WorkerUpdateResourceTest {
         .then().statusCode(200).body("lastName", equalTo("Rojas Vega"));
 
         assertEquals("Rojas Vega|Rojas Vega|nulo", fixtures.workerSurnames(id));
+        var rows = fixtures.workerAuditRows(id);
+        assertEquals(List.of("paternalLastName", "maternalLastName"),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
+        assertEquals(java.util.Arrays.asList("Rojas Vega", null),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::newValue).toList());
     }
 
     /** Cambiar solo la caja del apellido es otro apellido: se copia al paterno y queda en el rastro. */
@@ -501,7 +506,7 @@ class WorkerUpdateResourceTest {
         .then().statusCode(200).body("lastName", equalTo("pérez"));
 
         assertEquals("pérez|pérez|nulo", fixtures.workerSurnames(id));
-        assertEquals(List.of("lastName"), auditFieldNames(id));
+        assertEquals(List.of("paternalLastName"), auditFieldNames(id));
     }
 
     /**
@@ -523,6 +528,232 @@ class WorkerUpdateResourceTest {
 
         assertEquals(200, updated.statusCode());
         assertSameAsTheNextGet(updated, id, lastName, paternalLastName, maternalLastName, fullName);
+    }
+
+    // ---------- los apellidos por partes ----------
+
+    /** El cuerpo con los apellidos que se pasen, y lo demas igual a lo que siembra seedWorker. */
+    private String bodyWithSurnames(String surnamesJson, String documentNumber) {
+        String surnames = surnamesJson.isEmpty() ? "" : surnamesJson + ",";
+        return "{\"firstName\":\"Juan\"," + surnames + "\"documentTypeId\":" + documentTypeId()
+            + ",\"documentNumber\":\"" + documentNumber + "\",\"role\":\"operator\",\"hireDate\":\"2024-03-01\"}";
+    }
+
+    /** Con paterno se guardan las partes: una fila de rastro por parte que cambio, ninguna del apellido entero. */
+    @Test
+    void update_withBothSurnames_storesEachPart_andAuditsEachOneThatChanged() {
+        int id = seedWorker("ZTESTE220", "operator");
+
+        Response updated = put(adminToken())
+            .body(bodyWithSurnames("\"paternalLastName\":\"Rojas\",\"maternalLastName\":\"Vega\"", "ZTESTE220"))
+        .when().put("/workers/" + id);
+
+        assertEquals(200, updated.statusCode());
+        assertSameAsTheNextGet(updated, id, "Rojas Vega", "Rojas", "Vega", "Juan Rojas Vega");
+        assertEquals("Rojas Vega|Rojas|Vega", fixtures.workerSurnames(id));
+        var rows = fixtures.workerAuditRows(id);
+        assertEquals(List.of("paternalLastName", "maternalLastName"),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
+        assertEquals(List.of("Apellido paterno", "Apellido materno"),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldLabel).toList());
+        assertEquals(java.util.Arrays.asList("Pérez", null),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::oldValue).toList());
+        assertEquals(List.of("Rojas", "Vega"), rows.stream().map(WarehouseTestData.WorkerAuditRow::newValue).toList());
+    }
+
+    /** Es un reemplazo: con paterno y sin materno, el materno se borra, y el rastro lo anota nulo. */
+    @ParameterizedTest(name = "materno [{0}] -> se borra")
+    @ValueSource(strings = {
+        "",
+        ",\"maternalLastName\":null",
+        ",\"maternalLastName\":\"\"",
+        ",\"maternalLastName\":\"   \"",
+    })
+    void update_withAPaternalAndNoMaternal_erasesTheMaternal(String maternal) {
+        int id = seedWorker("ZTESTE221", "operator");
+        fixtures.setWorkerMaternalLastName(id, "Núñez");
+
+        put(adminToken()).body(bodyWithSurnames("\"paternalLastName\":\"Pérez\"" + maternal, "ZTESTE221"))
+        .when().put("/workers/" + id)
+        .then().statusCode(200).body("maternalLastName", nullValue());
+
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        var rows = fixtures.workerAuditRows(id);
+        assertEquals(List.of("maternalLastName"),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
+        assertEquals("Núñez", rows.get(0).oldValue());
+        assertNull(rows.get(0).newValue(), "sin materno es nulo en el rastro, no un texto vacio");
+    }
+
+    /**
+     * Con paterno, el apellido entero que venga al lado se valida pero no se usa: ni el guardado ni
+     * otro deciden, y el materno que no viene se borra.
+     */
+    @ParameterizedTest(name = "lastName [{0}] al lado del paterno")
+    @ValueSource(strings = {"Pérez Núñez", "Otro Distinto"})
+    void update_withAPaternal_ignoresTheLastNameThatComesWithIt(String lastName) {
+        int id = seedWorker("ZTESTE222", "operator");
+        fixtures.setWorkerMaternalLastName(id, "Núñez");
+
+        put(adminToken())
+            .body(bodyWithSurnames("\"lastName\":\"" + lastName + "\",\"paternalLastName\":\"Rojas\"", "ZTESTE222"))
+        .when().put("/workers/" + id)
+        .then().statusCode(200).body("lastName", equalTo("Rojas"));
+
+        assertEquals("Rojas|Rojas|nulo", fixtures.workerSurnames(id));
+        assertEquals(List.of("paternalLastName", "maternalLastName"), auditFieldNames(id));
+    }
+
+    /** Pero se valida: un apellido entero fuera de la regla da 400 aunque venga un paterno. */
+    @Test
+    void update_withAPaternal_stillValidatesTheLastName() {
+        int id = seedWorker("ZTESTE227", "operator");
+
+        put(adminToken()).body(bodyWithSurnames("\"lastName\":\"Juan2\",\"paternalLastName\":\"Rojas\"", "ZTESTE227"))
+        .when().put("/workers/" + id)
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("lastName"));
+
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+    }
+
+    /**
+     * Partir un apellido que la migracion copio entero, con el apellido de antes al lado: igual al
+     * guardado tampoco gana, y cada parte llega a su columna.
+     */
+    @Test
+    void update_splittingACopiedLastName_withTheSameLastNameNextToIt_storesTheParts() {
+        int id = fixtures.seedWorker("ZTESTE229", "Juan", "Pérez Huamán", "operator", true);
+        fixtures.setWorkerDocumentType(id, documentTypeId());
+        fixtures.setWorkerHireDate(id, LocalDate.of(2024, 3, 1));
+        String surnames = "\"lastName\":\"Pérez Huamán\","
+            + "\"paternalLastName\":\"Pérez\",\"maternalLastName\":\"Huamán\"";
+
+        put(adminToken()).body(bodyWithSurnames(surnames, "ZTESTE229"))
+        .when().put("/workers/" + id)
+        .then().statusCode(200);
+
+        assertEquals("Pérez Huamán|Pérez|Huamán", fixtures.workerSurnames(id));
+        var rows = fixtures.workerAuditRows(id);
+        assertEquals(List.of("paternalLastName", "maternalLastName"),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
+        assertEquals(java.util.Arrays.asList("Pérez Huamán", null),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::oldValue).toList());
+        assertEquals(List.of("Pérez", "Huamán"),
+            rows.stream().map(WarehouseTestData.WorkerAuditRow::newValue).toList());
+    }
+
+    /** Sin ninguno de los dos, o con materno y sin paterno, 400 en el paterno: la fila queda. */
+    @ParameterizedTest(name = "[{0}] -> 400 en el paterno")
+    @ValueSource(strings = {
+        "",
+        "\"maternalLastName\":\"Vega\"",
+        "\"lastName\":\"Pérez\",\"maternalLastName\":\"Vega\"",
+    })
+    void update_withoutThePaternalItNeeds_returns400_COM001_onThePaternal(String surnames) {
+        int id = seedWorker("ZTESTE223", "operator");
+
+        put(adminToken()).body(bodyWithSurnames(surnames, "ZTESTE223"))
+        .when().put("/workers/" + id)
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("paternalLastName"))
+            .body("errors.message", hasItem("Indica el apellido paterno."));
+
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals(List.of(), auditFieldNames(id));
+    }
+
+    /**
+     * Las partes que ya tiene, con espacios al borde o la tilde partida, no son un cambio: llegan
+     * recortadas y en NFC, asi que la fila queda igual y no deja rastro.
+     */
+    @Test
+    void update_resendingItsParts_withSpacesOrOutsideNfc_changesNothing() {
+        int id = seedWorker("ZTESTE224", "operator");
+        fixtures.setWorkerMaternalLastName(id, "Huamán");
+
+        put(adminToken()).body(bodyWithSurnames(
+                "\"paternalLastName\":\"  Pe\u0301rez \",\"maternalLastName\":\" Huama\u0301n  \"", "ZTESTE224"))
+        .when().put("/workers/" + id)
+        .then().statusCode(200);
+
+        assertEquals("P\u00e9rez Huam\u00e1n|P\u00e9rez|Huam\u00e1n", fixtures.workerSurnames(id));
+        assertEquals(List.of(), auditFieldNames(id));
+    }
+
+    /** Cada parte con su regla y su tope, como en el alta: 400 en su campo, y la fila queda. */
+    @ParameterizedTest(name = "{0} {1} -> 400")
+    @CsvSource({"paternalLastName, vacio", "paternalLastName, de espacios", "paternalLastName, con digito",
+        "paternalLastName, con arroba", "paternalLastName, sin letra", "paternalLastName, de 101",
+        "maternalLastName, con digito", "maternalLastName, con arroba", "maternalLastName, sin letra",
+        "maternalLastName, de 101"})
+    void update_withAPartOutsideItsRule_returns400_COM001_onItsField(String field, String kind) {
+        int id = seedWorker("ZTESTE225", "operator");
+        String value = switch (kind) {
+            case "vacio" -> "";
+            case "de espacios" -> "   ";
+            case "con digito" -> "Vega2";
+            case "con arroba" -> "Ana@";
+            case "sin letra" -> "' - '";
+            case "de 101" -> "A".repeat(101);
+            default -> throw new IllegalArgumentException(kind);
+        };
+        String surnames = field.equals("paternalLastName")
+            ? "\"paternalLastName\":\"" + value + "\""
+            : "\"paternalLastName\":\"Pérez\",\"maternalLastName\":\"" + value + "\"";
+
+        put(adminToken()).body(bodyWithSurnames(surnames, "ZTESTE225"))
+        .when().put("/workers/" + id)
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder(field));
+
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+    }
+
+    /** Las dos partes, como en el alta: el tope se mide antes del recorte. */
+    @ParameterizedTest(name = "{0} de cien con espacios al borde -> 400 COM-001")
+    @ValueSource(strings = {"paternalLastName", "maternalLastName"})
+    void update_aSurnamePartOfMaximumLengthSurroundedBySpaces_returns400_COM001(String part) {
+        int id = seedWorker("ZTESTE228", "operator");
+        String padded = "\" " + "A".repeat(100) + " \"";
+        String surnames = part.equals("paternalLastName")
+            ? "\"paternalLastName\":" + padded
+            : "\"paternalLastName\":\"Pérez\",\"maternalLastName\":" + padded;
+
+        put(adminToken()).body(bodyWithSurnames(surnames, "ZTESTE228"))
+        .when().put("/workers/" + id)
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder(part));
+
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+    }
+
+    /**
+     * Ida y vuelta: un alta con dos partes que juntas pasan de 100 se edita con esas mismas partes,
+     * sin cambios ni rastro.
+     */
+    @Test
+    void update_withPartsThatTogetherPassOneHundred_savesThemBackUnchanged() {
+        String paternal = "Aaaaa".repeat(12);
+        String maternal = "Bbbbb".repeat(12);
+        String surnames = "\"paternalLastName\":\"" + paternal + "\",\"maternalLastName\":\"" + maternal + "\"";
+        Response created = given().header("Authorization", "Bearer " + adminToken()).contentType("application/json")
+            .body(bodyWithSurnames(surnames, "ZTESTE226"))
+        .when().post("/workers");
+        assertEquals(201, created.statusCode());
+        int id = created.path("id");
+
+        put(adminToken()).body(bodyWithSurnames(surnames, "ZTESTE226"))
+        .when().put("/workers/" + id)
+        .then().statusCode(200).body("lastName", equalTo(paternal + " " + maternal));
+
+        assertEquals(paternal + " " + maternal + "|" + paternal + "|" + maternal, fixtures.workerSurnames(id));
+        assertEquals(List.of(), fixtures.workerAuditRows(id).stream()
+            .filter(row -> "FIELD_EDIT".equals(row.changeType())).toList());
     }
 
     /** Cambiar solo la caja ES un cambio: comparar ignorando mayusculas lo perderia. */
@@ -1338,7 +1569,7 @@ class WorkerUpdateResourceTest {
         assertEquals("Juan", fixtures.workerRowOf(id).firstName());
     }
 
-    /** El blanco lo frenan @NotBlank y la regla, que exige una letra; el nulo, solo @NotBlank. */
+    /** El blanco lo frena la regla, que exige una letra; el nombre, ademas, con @NotBlank. */
     @ParameterizedTest(name = "{0} en blanco -> 400 COM-001")
     @ValueSource(strings = {"firstName", "lastName"})
     void update_withABlankName_returns400_COM001(String field) {
@@ -1391,7 +1622,7 @@ class WorkerUpdateResourceTest {
         .then().statusCode(400)
             .body("code", equalTo("COM-001"))
             .body("errors.field", containsInAnyOrder(
-                "firstName", "lastName", "documentTypeId", "documentNumber", "role", "hireDate"));
+                "firstName", "paternalLastName", "documentTypeId", "documentNumber", "role", "hireDate"));
     }
 
     @Test
@@ -1522,7 +1753,7 @@ class WorkerUpdateResourceTest {
         assertEquals("Silva", row.lastName());
         assertEquals("ZTESTE112", row.documentNumber(),
             "sin recortar, el documento se leería como distinto del guardado y pediría motivo");
-        assertEquals(List.of("firstName", "lastName"), auditFieldNames(id),
+        assertEquals(List.of("firstName", "paternalLastName"), auditFieldNames(id),
             "el documento recortado es el mismo: no es un cambio");
     }
 

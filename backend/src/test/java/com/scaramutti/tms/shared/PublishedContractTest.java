@@ -313,42 +313,23 @@ class PublishedContractTest {
         assertEquals("string", contract.get(schema + "properties.fullName.type"));
     }
 
-    /** Los apellidos que solo recibe el alta; la edición sigue con el de antes, obligatorio. */
-    private static final Set<String> SURNAMES_ONLY_IN_THE_CREATION = Set.of("paternalLastName", "maternalLastName");
-
     /**
-     * La edición declara su propio objeto, no un allOf del alta: las propiedades y el required del
-     * alta, con las mismas definiciones, más {@code reason}; salvo el apellido: no lleva las dos
-     * partes y exige {@code lastName}. Las dos copias se cambian a mano; sin este caso, cambiar una
-     * sola no lo notaría nada del backend.
+     * La edición hereda el alta: un allOf de WorkerRequest y un objeto con solo {@code reason},
+     * texto o nulo hasta 500, sin otra regla. Sin copia no hay dos definiciones que se separen, y un
+     * campo nuevo del alta entra en la edición del contrato.
      */
     @Test
     void publishedContract_editsAWorkerWithTheCreationFieldsPlusTheReason() {
         JsonPath contract = publishedContract();
-        String creation = "components.schemas.WorkerRequest";
         String edit = "components.schemas.WorkerUpdateRequest";
-        assertEquals(contract.getMap(creation).keySet(), contract.getMap(edit).keySet(),
-            "la edición tiene las mismas claves de primer nivel que el alta: ni allOf ni otras");
-        assertEquals("object", contract.getString(edit + ".type"));
-        List<String> editRequired = contract.getList(edit + ".required");
-        assertTrue(editRequired.contains("lastName"), "la edición sigue exigiendo el apellido de antes");
-        assertEquals(contract.getList(creation + ".required"),
-            editRequired.stream().filter(field -> !field.equals("lastName")).toList());
-
-        Map<String, Object> creationProperties = contract.getMap(creation + ".properties");
-        Map<String, Object> editProperties = contract.getMap(edit + ".properties");
-        assertTrue(creationProperties.keySet().containsAll(SURNAMES_ONLY_IN_THE_CREATION),
-            "el alta recibe los dos apellidos");
-        Set<String> expected = new TreeSet<>(creationProperties.keySet());
-        expected.removeAll(SURNAMES_ONLY_IN_THE_CREATION);
-        expected.add("reason");
-        assertEquals(expected, new TreeSet<>(editProperties.keySet()));
-        for (String field : expected) {
-            if (!field.equals("reason")) {
-                assertEquals(creationProperties.get(field), editProperties.get(field), field);
-            }
-        }
-        Map<String, Object> reason = contract.getMap(edit + ".properties.reason");
+        assertEquals(Set.of("description", "allOf"), contract.getMap(edit).keySet(),
+            "la edición no declara propiedades ni required propios: los hereda del alta");
+        assertEquals(2, contract.getList(edit + ".allOf").size());
+        assertEquals(Map.of("$ref", "#/components/schemas/WorkerRequest"), contract.getMap(edit + ".allOf[0]"));
+        assertEquals(Set.of("type", "properties"), contract.getMap(edit + ".allOf[1]").keySet());
+        assertEquals("object", contract.getString(edit + ".allOf[1].type"));
+        assertEquals(Set.of("reason"), contract.getMap(edit + ".allOf[1].properties").keySet());
+        Map<String, Object> reason = contract.getMap(edit + ".allOf[1].properties.reason");
         assertEquals(Set.of("type", "maxLength", "example"), reason.keySet(),
             "reason es texto o nulo hasta 500, sin otra regla: su mínimo es condicional y lo mide el servidor");
         assertEquals(List.of("string", "null"), reason.get("type"));

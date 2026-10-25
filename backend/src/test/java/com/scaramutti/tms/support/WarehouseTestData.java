@@ -443,7 +443,7 @@ public class WarehouseTestData {
             .setParameter(1, firstName).setParameter(2, workerId).executeUpdate());
     }
 
-    /** El materno puesto por SQL, como hasta que la edicion lo reciba: el disparador recompone last_name. */
+    /** El materno puesto por SQL, sin pasar por la API: el disparador recompone last_name. */
     public void setWorkerMaternalLastName(int workerId, String maternalLastName) {
         QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
             "UPDATE public.workers SET maternal_last_name = ?1 WHERE id = ?2")

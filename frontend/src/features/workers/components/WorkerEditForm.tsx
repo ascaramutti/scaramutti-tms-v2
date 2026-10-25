@@ -66,7 +66,7 @@ function comparableBody(
   return JSON.stringify({
     ...body,
     firstName: body.firstName.normalize('NFC'),
-    lastName: body.lastName.normalize('NFC'),
+    lastName: body.lastName?.normalize('NFC'),
   })
 }
 

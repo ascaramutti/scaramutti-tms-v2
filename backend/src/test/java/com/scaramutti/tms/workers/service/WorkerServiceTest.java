@@ -180,7 +180,7 @@ class WorkerServiceTest {
     }
 
     private UpdateWorkerCommand updateCommand(WorkerDriverProfileCommand driver) {
-        return new UpdateWorkerCommand(5, "Juan", "Pérez", 1, "45678912", null, "operator",
+        return new UpdateWorkerCommand(5, "Juan", "Pérez", null, null, 1, "45678912", null, "operator",
             java.time.LocalDate.of(2024, 3, 1), driver, null);
     }
 
