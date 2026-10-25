@@ -121,7 +121,7 @@ export function WorkerEditPage() {
           return true
         }}
         onSaved={(saved) => {
-          toast.success(`Se guardaron los cambios de ${saved.firstName} ${saved.lastName}.`)
+          toast.success(`Se guardaron los cambios de ${saved.fullName}.`)
           navigate(workerDetailPath(saved.id))
         }}
         onCancel={() => navigate(workerDetailPath(id))}
@@ -161,7 +161,7 @@ function Shell({ id, worker, notFound = false, children }: ShellProps) {
       </BackLink>
       <PageHeader
         title="Editar trabajador"
-        description={worker ? `${worker.firstName} ${worker.lastName}` : undefined}
+        description={worker?.fullName}
         action={worker ? <WorkerStatusBadge isActive={worker.isActive} /> : undefined}
         divider
       />

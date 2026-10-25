@@ -994,13 +994,15 @@ describe('WorkerCreatePage', () => {
   describe('al guardar', () => {
     it('lleva a la ficha del creado y lo avisa', async () => {
       const user = userEvent.setup()
+      // El aviso dice el nombre que devuelve el servidor, que no es la unión de las partes a propósito.
+      server.use(createWorkerCapture({}, fakeWorkerDetail({ id: 57, hasUser: false, fullName: 'Ana Lucía Torres Ruiz' })))
       const { router } = renderPage()
       await listo()
       await llenarValido(user)
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
       await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(57)))
-      expect(toast.success).toHaveBeenCalledWith('Se dio de alta a Ana Torres Ruiz.')
+      expect(toast.success).toHaveBeenCalledWith('Se dio de alta a Ana Lucía Torres Ruiz.')
     })
 
     it('invalida el padrón, los combobox de almacén (por prefijo) y los conductores, y nada más', async () => {

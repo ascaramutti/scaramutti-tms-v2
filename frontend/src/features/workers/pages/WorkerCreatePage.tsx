@@ -66,7 +66,7 @@ export function WorkerCreatePage() {
         roles={roles.data}
         roleOptions={assignableRoles(roles.data, level)}
         onCreated={(created) => {
-          toast.success(`Se dio de alta a ${created.firstName} ${created.lastName}.`)
+          toast.success(`Se dio de alta a ${created.fullName}.`)
           navigate(workerDetailPath(created.id))
         }}
         onCancel={() => navigate(WORKERS_BASE)}

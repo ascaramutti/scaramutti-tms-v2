@@ -79,7 +79,7 @@ export function WorkerDetailPage() {
   return (
     <Shell>
       <PageHeader
-        title={`${data.firstName} ${data.lastName}`}
+        title={data.fullName}
         description={data.role.description}
         divider
         action={

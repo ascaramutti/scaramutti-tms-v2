@@ -58,7 +58,7 @@ export function WorkerField({
         id={id}
         label={label}
         ariaLabel={ariaLabel}
-        placeholder="Busca por nombre o apellido…"
+        placeholder="Busca por nombre o apellidos…"
         options={options}
         selected={selected ? toOption(selected) : null}
         onQueryChange={setQuery}
