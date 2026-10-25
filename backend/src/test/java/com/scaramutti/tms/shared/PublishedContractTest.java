@@ -313,6 +313,36 @@ class PublishedContractTest {
         assertEquals("string", contract.get(schema + "properties.fullName.type"));
     }
 
+    /**
+     * La edición declara su propio objeto, no un allOf del alta: las propiedades del alta, con el
+     * mismo required y las mismas definiciones, más {@code reason}. Las dos copias se cambian a
+     * mano; sin este caso, cambiar una sola no lo notaría nada del backend.
+     */
+    @Test
+    void publishedContract_editsAWorkerWithTheCreationFieldsPlusTheReason() {
+        JsonPath contract = publishedContract();
+        String creation = "components.schemas.WorkerRequest";
+        String edit = "components.schemas.WorkerUpdateRequest";
+        assertEquals(contract.getMap(creation).keySet(), contract.getMap(edit).keySet(),
+            "la edición tiene las mismas claves de primer nivel que el alta: ni allOf ni otras");
+        assertEquals("object", contract.getString(edit + ".type"));
+        assertEquals(contract.getList(creation + ".required"), contract.getList(edit + ".required"));
+
+        Map<String, Object> creationProperties = contract.getMap(creation + ".properties");
+        Map<String, Object> editProperties = contract.getMap(edit + ".properties");
+        Set<String> expected = new TreeSet<>(creationProperties.keySet());
+        expected.add("reason");
+        assertEquals(expected, new TreeSet<>(editProperties.keySet()));
+        for (String field : creationProperties.keySet()) {
+            assertEquals(creationProperties.get(field), editProperties.get(field), field);
+        }
+        Map<String, Object> reason = contract.getMap(edit + ".properties.reason");
+        assertEquals(Set.of("type", "maxLength", "example"), reason.keySet(),
+            "reason es texto o nulo hasta 500, sin otra regla: su mínimo es condicional y lo mide el servidor");
+        assertEquals(List.of("string", "null"), reason.get("type"));
+        assertEquals(500, reason.get("maxLength"));
+    }
+
     /** Cuántas veces aparece una referencia en todo el documento. */
     private static long refsTo(Object node, String ref) {
         if (node instanceof Map<?, ?> map) {

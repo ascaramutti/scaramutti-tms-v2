@@ -1165,7 +1165,15 @@ export type WorkerDriverProfileRequest = {
  * donde el contrato dice que es libre.
  *
  */
-export type WorkerUpdateRequest = WorkerRequest & {
+export type WorkerUpdateRequest = {
+    firstName: string;
+    lastName: string;
+    documentTypeId: number;
+    documentNumber: string;
+    phone?: string | null;
+    role: string;
+    hireDate: string;
+    driver?: WorkerDriverProfileRequest | null;
     reason?: string | null;
 };
 
