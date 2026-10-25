@@ -70,7 +70,8 @@ function problemCodeOf(error: unknown): string | undefined {
 /** Los campos que el backend puede nombrar en un 400 de forma, en el orden del formulario. */
 const WORKER_FIELDS: readonly WorkerField[] = [
   'firstName',
-  'lastName',
+  'paternalLastName',
+  'maternalLastName',
   'documentTypeId',
   'documentNumber',
   'role',

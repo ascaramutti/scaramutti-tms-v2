@@ -53,6 +53,9 @@ function trabajador(overrides: Partial<WorkerDetailResponse> = {}): WorkerDetail
     id: ID,
     firstName: 'Juan',
     lastName: 'Pérez Huamán',
+    paternalLastName: 'Pérez',
+    maternalLastName: 'Huamán',
+    fullName: 'Juan Pérez Huamán',
     documentType: CE,
     documentNumber: 'X1234567',
     phone: '987654321',
@@ -110,13 +113,13 @@ function renderPage(worker: WorkerDetailResponse | null, role: UserRole = 'gener
   return { router, queryClient, container: vista.container }
 }
 
-const listo = () => screen.findByLabelText('Nombre')
+const listo = () => screen.findByLabelText('Nombres')
 const cargo = () => screen.getByLabelText('Cargo')
 const guardar = () => screen.getByRole('button', { name: 'Guardar' })
 
-/** Sin un cambio real Guardar no se habilita: los casos que no miden eso cambian el apellido. */
+/** Sin un cambio real Guardar no se habilita: casi todos los casos que no miden eso cambian el apellido paterno. */
 async function cambiarApellido(user: ReturnType<typeof userEvent.setup>) {
-  await user.type(screen.getByLabelText('Apellido'), 'a')
+  await user.type(screen.getByLabelText('Apellido paterno'), 'a')
 }
 
 function capturar() {
@@ -138,8 +141,9 @@ describe('WorkerEditPage', () => {
 
       expect(screen.getByRole('heading', { level: 1, name: 'Editar trabajador' })).toBeInTheDocument()
       expect(screen.getByText('Juan Pérez Huamán')).toBeInTheDocument()
-      expect(screen.getByLabelText('Nombre')).toHaveValue('Juan')
-      expect(screen.getByLabelText('Apellido')).toHaveValue('Pérez Huamán')
+      expect(screen.getByLabelText('Nombres')).toHaveValue('Juan')
+      expect(screen.getByLabelText('Apellido paterno')).toHaveValue('Pérez')
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveValue('Huamán')
       expect(screen.getByLabelText('Tipo de documento')).toHaveValue(String(CE.id))
       expect(screen.getByLabelText('Número de documento')).toHaveValue('X1234567')
       expect(screen.getByLabelText('Teléfono (opcional)')).toHaveValue('987654321')
@@ -167,7 +171,7 @@ describe('WorkerEditPage', () => {
       renderPage(null)
       expect(await screen.findByText('Este trabajador no existe')).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Volver a trabajadores' })).toBeInTheDocument()
-      expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nombres')).not.toBeInTheDocument()
       // Sin trabajador no hay ficha: el enlace de arriba también lleva a la búsqueda.
       expect(screen.getByRole('link', { name: 'Volver a trabajadores' })).toHaveAttribute('href', WORKERS_BASE)
       expect(screen.queryByRole('link', { name: 'Volver a la ficha' })).not.toBeInTheDocument()
@@ -228,7 +232,7 @@ describe('WorkerEditPage', () => {
       })
       expect(screen.getByLabelText('Cargando trabajador')).toBeInTheDocument()
       expect(screen.queryByRole('alert')).not.toBeInTheDocument()
-      expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nombres')).not.toBeInTheDocument()
       expect(await listo()).toBeInTheDocument()
     })
 
@@ -245,7 +249,7 @@ describe('WorkerEditPage', () => {
     it('sobre un cargo de su nivel no ofrece el formulario', async () => {
       renderPage(trabajador({ role: rol('operations_manager'), driver: null }), 'general_manager')
       expect(await screen.findByText('No puedes modificar a un trabajador de tu nivel o superior.')).toBeInTheDocument()
-      expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nombres')).not.toBeInTheDocument()
     })
 
     it('el admin edita a cualquiera, también a otro admin', async () => {
@@ -285,7 +289,8 @@ describe('WorkerEditPage', () => {
       expect(cargo()).toHaveAccessibleDescription(MOTIVO)
       expect(within(cargo()).getAllByRole('option').map((option) => option.getAttribute('value'))).toEqual(['', 'admin'])
       // El resto del formulario sigue abierto.
-      for (const campo of ['Nombre', 'Apellido', 'Tipo de documento', 'Número de documento', 'Fecha de ingreso', 'Teléfono (opcional)']) {
+      const abiertos = ['Nombres', 'Apellido paterno', 'Apellido materno (opcional)', 'Tipo de documento', 'Número de documento']
+      for (const campo of [...abiertos, 'Fecha de ingreso', 'Teléfono (opcional)']) {
         expect(screen.getByLabelText(campo)).toBeEnabled()
       }
     })
@@ -300,7 +305,7 @@ describe('WorkerEditPage', () => {
 
       await waitFor(() => expect(sink.bodies).toHaveLength(1))
       expect(sink.ids).toEqual([TRABAJADOR_DE_LA_SESION])
-      expect(sink.bodies?.[0]).toMatchObject({ lastName: 'Pérez Huamána', role: 'admin' })
+      expect(sink.bodies?.[0]).toMatchObject({ paternalLastName: 'Péreza', maternalLastName: 'Huamán', role: 'admin' })
     })
 
     it('a quien no es admin, con su trabajador en un cargo menor, también le queda fijo', async () => {
@@ -340,21 +345,70 @@ describe('WorkerEditPage', () => {
   })
 
   describe('lo que viaja', () => {
-    /** Es un reemplazo: lo que no viaja se borra. Cambiar solo el apellido reenvía todo lo demás. */
-    it('editar solo el apellido reenvía el teléfono y la licencia tal como estaban', async () => {
+    /** Una ficha de antes trae el apellido entero en el paterno: quien edita lo reparte en los dos campos. */
+    it('un apellido copiado entero se parte en el paterno y el materno', async () => {
+      const user = userEvent.setup()
+      const sink = capturar()
+      renderPage(trabajador({ paternalLastName: 'Pérez Huamán', maternalLastName: null }))
+      await listo()
+      expect(screen.getByLabelText('Apellido paterno')).toHaveValue('Pérez Huamán')
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveValue('')
+      await user.clear(screen.getByLabelText('Apellido paterno'))
+      await user.type(screen.getByLabelText('Apellido paterno'), 'Pérez')
+      await user.type(screen.getByLabelText('Apellido materno (opcional)'), 'Huamán')
+      await user.click(guardar())
+
+      await waitFor(() => expect(sink.bodies).toHaveLength(1))
+      expect(sink.bodies?.[0]).toMatchObject({ paternalLastName: 'Pérez', maternalLastName: 'Huamán' })
+      expect(sink.bodies?.[0]).not.toHaveProperty('lastName')
+    })
+
+    /** Cada parte se mide sola: dos que juntas pasan de 100 se guardan sin acortarse. */
+    it('una ficha con dos partes que juntas pasan de 100 se edita sin acortarlas', async () => {
+      const user = userEvent.setup()
+      const sink = capturar()
+      const [paterno, materno] = ['P'.repeat(60), 'M'.repeat(60)]
+      const lastName = `${paterno} ${materno}`
+      renderPage(trabajador({ lastName, paternalLastName: paterno, maternalLastName: materno, fullName: `Juan ${lastName}` }))
+      await listo()
+      await user.type(screen.getByLabelText('Nombres'), 'o')
+      await user.click(guardar())
+
+      await waitFor(() => expect(sink.bodies).toHaveLength(1))
+      expect(sink.bodies?.[0]).toMatchObject({ paternalLastName: paterno, maternalLastName: materno })
+      expect(sink.bodies?.[0]).not.toHaveProperty('lastName')
+    })
+
+    /** Es un reemplazo: el materno que se borra viaja nulo, y el backend lo borra. */
+    it('borrar el materno lo manda como null, con su clave', async () => {
       const user = userEvent.setup()
       const sink = capturar()
       renderPage(trabajador())
       await listo()
-      await user.clear(screen.getByLabelText('Apellido'))
-      await user.type(screen.getByLabelText('Apellido'), 'Quispe')
+      await user.clear(screen.getByLabelText('Apellido materno (opcional)'))
+      await user.click(guardar())
+
+      await waitFor(() => expect(sink.bodies).toHaveLength(1))
+      expect(sink.bodies?.[0]).toHaveProperty('maternalLastName', null)
+      expect(sink.bodies?.[0]).toMatchObject({ paternalLastName: 'Pérez' })
+    })
+
+    /** Es un reemplazo: lo que no viaja se borra. Cambiar solo el paterno reenvía todo lo demás. */
+    it('editar solo el paterno reenvía el materno, el teléfono y la licencia tal como estaban', async () => {
+      const user = userEvent.setup()
+      const sink = capturar()
+      renderPage(trabajador())
+      await listo()
+      await user.clear(screen.getByLabelText('Apellido paterno'))
+      await user.type(screen.getByLabelText('Apellido paterno'), 'Quispe')
       await user.click(guardar())
 
       await waitFor(() => expect(sink.bodies).toHaveLength(1))
       expect(sink.ids).toEqual([ID])
       expect(sink.bodies?.[0]).toEqual({
         firstName: 'Juan',
-        lastName: 'Quispe',
+        paternalLastName: 'Quispe',
+        maternalLastName: 'Huamán',
         documentTypeId: CE.id,
         documentNumber: 'X1234567',
         phone: '987654321',
@@ -377,7 +431,7 @@ describe('WorkerEditPage', () => {
 
       await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(ID)))
       expect(sink.bodies).toHaveLength(1)
-      expect(toast.success).toHaveBeenCalledWith('Se guardaron los cambios de Juan Pérez Huamána.')
+      expect(toast.success).toHaveBeenCalledWith('Se guardaron los cambios de Juan Péreza Huamán.')
     })
 
     it('una licencia apagada aparece precargada con un cargo que la exige, y viaja', async () => {
@@ -522,18 +576,20 @@ describe('WorkerEditPage', () => {
       const user = userEvent.setup()
       renderPage(trabajador())
       await listo()
-      await user.type(screen.getByLabelText('Nombre'), 'o')
+      await user.type(screen.getByLabelText('Nombres'), 'o')
       expect(guardar()).toBeEnabled()
 
-      await user.type(screen.getByLabelText('Nombre'), '{Backspace}')
+      await user.type(screen.getByLabelText('Nombres'), '{Backspace}')
       expect(guardar()).toBeDisabled()
     })
 
     it.each([
-      ['espacios en los bordes del nombre', 'Nombre', ' José Juan '],
-      ['espacios en los bordes del apellido', 'Apellido', ' Pérez Huamán '],
-      ['la tilde del apellido escrita como letra más marca', 'Apellido', 'Pe\u0301rez Huama\u0301n'],
-      ['la tilde del nombre escrita como letra más marca', 'Nombre', 'Jose\u0301 Juan'],
+      ['espacios en los bordes del nombre', 'Nombres', ' José Juan '],
+      ['espacios en los bordes del paterno', 'Apellido paterno', ' Pérez '],
+      ['la tilde del paterno escrita como letra más marca', 'Apellido paterno', 'Pe\u0301rez'],
+      ['espacios en los bordes del materno', 'Apellido materno (opcional)', ' Huamán '],
+      ['la tilde del materno escrita como letra más marca', 'Apellido materno (opcional)', 'Huama\u0301n'],
+      ['la tilde del nombre escrita como letra más marca', 'Nombres', 'Jose\u0301 Juan'],
       ['espacios en los bordes del número', 'Número de documento', ' X1234567 '],
     ])('%s no cuentan como cambio', async (_caso, campo, valor) => {
       const user = userEvent.setup()
@@ -544,6 +600,27 @@ describe('WorkerEditPage', () => {
       await user.paste(valor)
 
       expect(guardar()).toBeDisabled()
+    })
+
+    it('un materno guardado como nulo abre vacío y no cuenta como cambio', async () => {
+      renderPage(trabajador({ lastName: 'Pérez', maternalLastName: null, fullName: 'Juan Pérez' }))
+      await listo()
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveValue('')
+      expect(guardar()).toBeDisabled()
+    })
+
+    /** La ficha de antes más común: sin materno. Abre vacío, y al guardar otro cambio el materno viaja nulo. */
+    it('una ficha con el materno nulo guarda otro cambio y el materno viaja null', async () => {
+      const user = userEvent.setup()
+      const sink = capturar()
+      renderPage(trabajador({ lastName: 'Pérez', maternalLastName: null, fullName: 'Juan Pérez' }))
+      await listo()
+      await user.type(screen.getByLabelText('Nombres'), 'o')
+      await user.click(guardar())
+
+      await waitFor(() => expect(sink.bodies).toHaveLength(1))
+      expect(sink.bodies?.[0]).toHaveProperty('maternalLastName', null)
+      expect(sink.bodies?.[0]).toMatchObject({ firstName: 'Juano', paternalLastName: 'Pérez' })
     })
 
     it('un teléfono guardado como nulo abre vacío y no cuenta como cambio', async () => {
@@ -686,7 +763,7 @@ describe('WorkerEditPage', () => {
       await user.selectOptions(cargo(), 'Encargado de Almacén')
 
       const aviso = screen.getByText(/cambian sus permisos/)
-      expect(aviso.compareDocumentPosition(screen.getByLabelText('Nombre'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
+      expect(aviso.compareDocumentPosition(screen.getByLabelText('Nombres'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     })
 
     it('sin usuario, cambiar el cargo no avisa nada', async () => {
@@ -699,6 +776,22 @@ describe('WorkerEditPage', () => {
   })
 
   describe('errores del backend', () => {
+    it.each([
+      ['paternalLastName', 'Apellido paterno'],
+      ['maternalLastName', 'Apellido materno (opcional)'],
+    ])('un 400 de forma que nombra %s pone el mensaje en su campo y lo enfoca', async (campo, etiqueta) => {
+      const user = userEvent.setup()
+      server.use(updateWorkerValidation([{ field: campo, message: 'Apellido raro' }]))
+      renderPage(trabajador())
+      await listo()
+      // El cambio va en Nombres: así el foco no arranca en el campo que el caso espera.
+      await user.type(screen.getByLabelText('Nombres'), 'o')
+      await user.click(guardar())
+
+      await waitFor(() => expect(screen.getByLabelText(etiqueta)).toHaveAccessibleDescription('Apellido raro'))
+      await waitFor(() => expect(screen.getByLabelText(etiqueta)).toHaveFocus())
+    })
+
     it('WRK-006 se avisa sin campo y el formulario queda como estaba', async () => {
       const user = userEvent.setup()
       server.use(updateWorkerProblem('WRK-006', 403))
@@ -711,7 +804,7 @@ describe('WorkerEditPage', () => {
         expect(toast.error).toHaveBeenCalledWith('No puedes modificar a un trabajador de tu nivel o superior.'),
       )
       expect(router.state.location.pathname).toBe(workerEditPath(ID))
-      expect(screen.getByLabelText('Apellido')).toHaveValue('Pérez Huamána')
+      expect(screen.getByLabelText('Apellido paterno')).toHaveValue('Péreza')
     })
 
     it('WRK-001 al guardar dice que no existe y vuelve a la búsqueda', async () => {
@@ -804,7 +897,12 @@ describe('WorkerEditPage', () => {
   describe('al guardar', () => {
     it('vuelve a la ficha con lo devuelto y refresca el padrón, los conductores y los viajes', async () => {
       const user = userEvent.setup()
-      const devuelto = trabajador({ lastName: 'Quispe', updatedAt: '2026-10-03T15:00:00Z' })
+      const devuelto = trabajador({
+        lastName: 'Péreza Huamán',
+        paternalLastName: 'Péreza',
+        fullName: 'Juan Péreza Huamán',
+        updatedAt: '2026-10-03T15:00:00Z',
+      })
       const sink: { ids?: number[]; bodies?: WorkerUpdateRequest[] } = {}
       server.use(updateWorkerCapture(sink, devuelto))
       const { router, queryClient } = renderPage(trabajador())
@@ -850,6 +948,18 @@ describe('WorkerEditPage', () => {
   })
 
   describe('accesibilidad', () => {
+    it('sin violaciones con los errores de las partes a la vista', async () => {
+      const user = userEvent.setup()
+      const { container } = renderPage(trabajador())
+      await listo()
+      await user.clear(screen.getByLabelText('Apellido paterno'))
+      await user.type(screen.getByLabelText('Apellido materno (opcional)'), '2')
+      await user.click(guardar())
+      await screen.findByText('Indica el apellido paterno.')
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveAttribute('aria-invalid', 'true')
+      expect(await axe(container)).toHaveNoViolations()
+    })
+
     it('sin violaciones al abrir y con el motivo y el aviso de usuario a la vista', async () => {
       const user = userEvent.setup()
       const { container } = renderPage(trabajador({ role: rol('sales'), driver: null, hasUser: true }))

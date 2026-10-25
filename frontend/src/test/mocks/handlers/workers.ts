@@ -301,6 +301,12 @@ export function getWorkerEmpty() {
 
 // ----- Edición (`PUT /workers/{id}`) -----
 
+/** El nombre del cuerpo y lo que el backend compone con sus partes. */
+function namesOf({ firstName, paternalLastName = '', maternalLastName = null }: WorkerUpdateRequest) {
+  const lastName = maternalLastName ? `${paternalLastName} ${maternalLastName}` : paternalLastName
+  return { firstName, lastName, paternalLastName, maternalLastName, fullName: `${firstName} ${lastName}` }
+}
+
 /** Guarda el id y el cuerpo de cada envío; responde la ficha dada o la del cuerpo. */
 export function updateWorkerCapture(
   sink: { ids?: number[]; bodies?: WorkerUpdateRequest[] },
@@ -314,9 +320,7 @@ export function updateWorkerCapture(
     sink.ids = [...(sink.ids ?? []), Number(params.id)]
     sink.bodies = [...(sink.bodies ?? []), body]
     if (ms) await delay(ms)
-    return HttpResponse.json(
-      response ?? fakeWorkerDetail({ id: Number(params.id), firstName: body.firstName, lastName: body.lastName }),
-    )
+    return HttpResponse.json(response ?? fakeWorkerDetail({ id: Number(params.id), ...namesOf(body) }))
   })
 }
 
