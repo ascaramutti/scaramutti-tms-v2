@@ -9,13 +9,13 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 /**
- * El cuerpo de la edicion: los mismos campos del alta mas el motivo.
+ * El cuerpo de la edicion: los campos del alta, salvo las dos partes del apellido, mas el motivo.
  *
  * <p>Es un REEMPLAZO y no un parche. Un campo opcional que no viene queda VACIO: omitir el
  * telefono lo borra. Quien lea esto buscando por que no hay comprobaciones de nulo antes de
  * asignar, la respuesta es esa.
  *
- * <p>Repite los ocho campos del alta en vez de heredarlos, y no es un descuido: un record no
+ * <p>Repite ocho de los diez campos del alta en vez de heredarlos, y no es un descuido: un record no
  * hereda, y anidar el cuerpo del alta cambiaria la forma del JSON que el contrato declara. Es el
  * molde del modulo de operaciones, que tiene el mismo par. El riesgo conocido es que las dos
  * formas se separen sin que nada deje de compilar, y por eso hay un caso que compara los

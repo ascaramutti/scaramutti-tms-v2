@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.RecordComponent;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -13,11 +14,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * El cuerpo de la edicion repite el del alta, campo por campo y anotacion por anotacion.
+ * La edicion repite el cuerpo del alta campo por campo y anotacion por anotacion, menos el apellido.
  *
  * <p>Este caso existe porque el javadoc del cuerpo de edicion afirmaba que existia y NO existia.
- * La afirmacion importaba: el contrato declara el cuerpo de edicion como el del alta mas el
- * motivo, y un record no hereda, asi que las dos formas pueden separarse sin que nada deje de
+ * La afirmacion importaba: el contrato declara la edicion como el alta mas el motivo, menos el
+ * apellido, y un record no hereda, asi que las dos formas pueden separarse sin que nada deje de
  * compilar. Un campo nuevo del alta obliga a decidir si entra en la edicion de la spec runtime
  * (PublishedContractTest); si entra, el cliente generado lo manda y la edicion lo ignora.
  *
@@ -60,16 +61,47 @@ class WorkerUpdateRequestTest {
         return annotation.toString().replace("jakarta.validation.constraints.", "");
     }
 
+    /** Los apellidos que solo recibe el alta; la edicion sigue con el de antes, obligatorio. */
+    private static final List<String> SOLO_EN_EL_ALTA = List.of("paternalLastName", "maternalLastName");
+
+    private static String nombreDe(String firma) {
+        return firma.split(" ")[1];
+    }
+
+    private List<String> sinLosCampos(List<String> firmas, List<String> campos) {
+        return firmas.stream().filter(firma -> !campos.contains(nombreDe(firma))).toList();
+    }
+
     @Test
     void theUpdateBody_repeatsEveryComponentOfTheCreateBody_plusTheReason() {
-        List<String> alta = firmaDe(WorkerRequest.class);
-        List<String> edicion = firmaDe(WorkerUpdateRequest.class);
+        List<String> todoElAlta = firmaDe(WorkerRequest.class);
+        assertTrue(todoElAlta.stream().map(WorkerUpdateRequestTest::nombreDe).toList().containsAll(SOLO_EN_EL_ALTA),
+            "el alta recibe los dos apellidos");
+        List<String> soloDelAlta = new ArrayList<>(SOLO_EN_EL_ALTA);
+        soloDelAlta.add("lastName");
+        List<String> alta = sinLosCampos(todoElAlta, soloDelAlta);
+        List<String> edicion = sinLosCampos(firmaDe(WorkerUpdateRequest.class), List.of("lastName"));
 
         // Se compara contra la lista del ALTA, no contra un pedazo de la propia lista de la
         // edicion: una comparacion que saca su valor esperado del valor medido no mide nada.
         assertEquals(alta.size() + 1, edicion.size(), "la edicion es el alta mas un solo campo");
         assertEquals(alta, edicion.subList(0, alta.size()),
             "los campos compartidos, con sus anotaciones, tienen que ser identicos y en el mismo orden");
+    }
+
+    /** El apellido de antes: el mismo en los dos cuerpos, salvo que la edicion lo sigue exigiendo. */
+    @Test
+    void theLastName_isTheSameInBothBodies_butTheUpdateStillRequiresIt() {
+        String alta = firmaDelCampo(WorkerRequest.class, "lastName");
+        String edicion = firmaDelCampo(WorkerUpdateRequest.class, "lastName");
+
+        assertTrue(edicion.contains("@NotBlank(") && !alta.contains("@NotBlank("),
+            "solo la edicion exige el apellido de antes: " + alta + " / " + edicion);
+        assertEquals(alta, edicion.replaceFirst("@NotBlank\\([^)]*\\) ", ""));
+    }
+
+    private String firmaDelCampo(Class<?> record, String campo) {
+        return firmaDe(record).stream().filter(firma -> nombreDe(firma).equals(campo)).findFirst().orElseThrow();
     }
 
     /** Y el campo de mas es el motivo, con su maximo y sin minimo. */

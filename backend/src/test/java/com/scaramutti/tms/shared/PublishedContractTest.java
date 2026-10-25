@@ -313,10 +313,14 @@ class PublishedContractTest {
         assertEquals("string", contract.get(schema + "properties.fullName.type"));
     }
 
+    /** Los apellidos que solo recibe el alta; la edición sigue con el de antes, obligatorio. */
+    private static final Set<String> SURNAMES_ONLY_IN_THE_CREATION = Set.of("paternalLastName", "maternalLastName");
+
     /**
-     * La edición declara su propio objeto, no un allOf del alta: las propiedades del alta, con el
-     * mismo required y las mismas definiciones, más {@code reason}. Las dos copias se cambian a
-     * mano; sin este caso, cambiar una sola no lo notaría nada del backend.
+     * La edición declara su propio objeto, no un allOf del alta: las propiedades y el required del
+     * alta, con las mismas definiciones, más {@code reason}; salvo el apellido: no lleva las dos
+     * partes y exige {@code lastName}. Las dos copias se cambian a mano; sin este caso, cambiar una
+     * sola no lo notaría nada del backend.
      */
     @Test
     void publishedContract_editsAWorkerWithTheCreationFieldsPlusTheReason() {
@@ -326,21 +330,56 @@ class PublishedContractTest {
         assertEquals(contract.getMap(creation).keySet(), contract.getMap(edit).keySet(),
             "la edición tiene las mismas claves de primer nivel que el alta: ni allOf ni otras");
         assertEquals("object", contract.getString(edit + ".type"));
-        assertEquals(contract.getList(creation + ".required"), contract.getList(edit + ".required"));
+        List<String> editRequired = contract.getList(edit + ".required");
+        assertTrue(editRequired.contains("lastName"), "la edición sigue exigiendo el apellido de antes");
+        assertEquals(contract.getList(creation + ".required"),
+            editRequired.stream().filter(field -> !field.equals("lastName")).toList());
 
         Map<String, Object> creationProperties = contract.getMap(creation + ".properties");
         Map<String, Object> editProperties = contract.getMap(edit + ".properties");
+        assertTrue(creationProperties.keySet().containsAll(SURNAMES_ONLY_IN_THE_CREATION),
+            "el alta recibe los dos apellidos");
         Set<String> expected = new TreeSet<>(creationProperties.keySet());
+        expected.removeAll(SURNAMES_ONLY_IN_THE_CREATION);
         expected.add("reason");
         assertEquals(expected, new TreeSet<>(editProperties.keySet()));
-        for (String field : creationProperties.keySet()) {
-            assertEquals(creationProperties.get(field), editProperties.get(field), field);
+        for (String field : expected) {
+            if (!field.equals("reason")) {
+                assertEquals(creationProperties.get(field), editProperties.get(field), field);
+            }
         }
         Map<String, Object> reason = contract.getMap(edit + ".properties.reason");
         assertEquals(Set.of("type", "maxLength", "example"), reason.keySet(),
             "reason es texto o nulo hasta 500, sin otra regla: su mínimo es condicional y lo mide el servidor");
         assertEquals(List.of("string", "null"), reason.get("type"));
         assertEquals(500, reason.get("maxLength"));
+    }
+
+    /**
+     * El alta publica los dos apellidos con la regla del nombre (el materno, además, vacío), y
+     * ninguno obligatorio: con el apellido de antes alcanza, y cuál tiene que venir lo mide el
+     * servidor. El cliente generado sale de estas definiciones.
+     */
+    @Test
+    void publishedContract_takesBothSurnamesInTheCreation() {
+        JsonPath contract = publishedContract();
+        String properties = "components.schemas.WorkerRequest.properties.";
+        assertEquals(Set.of("type", "minLength", "maxLength", "pattern", "example"),
+            contract.getMap(properties + "paternalLastName").keySet());
+        assertEquals(Set.of("type", "maxLength", "pattern", "example"),
+            contract.getMap(properties + "maternalLastName").keySet(), "el materno entra vacío: sin minLength");
+        String namePattern = contract.getString(properties + "firstName.pattern");
+        assertEquals(namePattern, contract.getString(properties + "paternalLastName.pattern"));
+        assertEquals("^ *$|" + namePattern, contract.getString(properties + "maternalLastName.pattern"));
+        assertEquals("string", contract.get(properties + "paternalLastName.type"));
+        assertEquals(List.of("string", "null"), contract.get(properties + "maternalLastName.type"));
+        assertEquals(1, contract.getInt(properties + "paternalLastName.minLength"));
+        assertEquals(100, contract.getInt(properties + "paternalLastName.maxLength"));
+        assertEquals(100, contract.getInt(properties + "maternalLastName.maxLength"));
+        List<String> required = contract.getList("components.schemas.WorkerRequest.required");
+        for (String field : List.of("lastName", "paternalLastName", "maternalLastName")) {
+            assertFalse(required.contains(field), field + " no puede ser obligatorio");
+        }
     }
 
     /** Cuántas veces aparece una referencia en todo el documento. */

@@ -12,6 +12,8 @@ import java.time.LocalDate;
 public record CreateWorkerCommand(
     String firstName,
     String lastName,
+    String paternalLastName,
+    String maternalLastName,
     Integer documentTypeId,
     String documentNumber,
     String phone,

@@ -1401,10 +1401,12 @@ paths:
         `dispatcher` y `sales`): la del escolta y la del ayudante con licencia
         existen, pero no se ofrecen ni se asignan como conductor en los viajes.
 
-        Normalización: `firstName`, `lastName`, `documentNumber`,
-        `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
-        bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
-        `firstName` y `lastName` pasan además a NFC antes de validarse.
+        Normalización: `firstName`, `lastName`, `paternalLastName`,
+        `maternalLastName`, `documentNumber`, `driver.licenseNumber` y
+        `driver.licenseCategory` sin espacios en los bordes (un materno que
+        queda vacío se guarda nulo); sin cambio de mayúsculas; `phone` y `role`
+        tal cual llegan. Los nombres y los apellidos pasan además a NFC antes
+        de validarse.
 
         Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
         WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;
@@ -1519,11 +1521,13 @@ paths:
       summary: Actualizar un trabajador y su ficha de conductor
       description: |
         Reemplaza los datos editables con las mismas validaciones, normalización
-        y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
-        que no viene queda VACÍO (omitir `phone` lo borra). `isActive`,
-        `createdAt` y `createdBy` no cambian aunque el cuerpo intente mandarlos;
-        `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
-        cuerpo no cambia nada. Un trabajador inactivo también se edita.
+        y códigos que el alta, salvo el apellido: la edición exige `lastName` y
+        no lee `paternalLastName` ni `maternalLastName`. Es un REEMPLAZO y no un
+        parche: un campo opcional que no viene queda VACÍO (omitir `phone` lo
+        borra). `isActive`, `createdAt` y `createdBy` no cambian aunque el
+        cuerpo intente mandarlos; `updatedAt` y `updatedBy` se ponen con la
+        sesión, incluso cuando el cuerpo no cambia nada. Un trabajador inactivo
+        también se edita.
 
         Unicidad contra los demás: guardar el propio número de documento o la
         propia licencia sin cambios es `200`, no `409`.
@@ -4876,7 +4880,7 @@ components:
         isActive:        { type: boolean }
 
     # -------- Workers: trabajador ----------------------------------------------
-    # WorkerUpdateRequest repite las propiedades de este schema: un cambio acá se decide también allá.
+    # WorkerUpdateRequest repite este schema salvo el apellido: un cambio acá se decide también allá.
     WorkerRequest:
       type: object
       description: |
@@ -4885,15 +4889,26 @@ components:
         como enum: la lista vive en la base). `hireDate` es un día calendario
         (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
         nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
-        `firstName` y `lastName`: al menos una letra latina (letra de script
-        latino según la versión de Unicode del backend, 15.0), más espacios,
-        apóstrofo y guion; se pasan a NFC antes de
-        validarse (pasados 400 caracteres no se normalizan: se rechazan por
-        largo tal como llegan) y se guardan recortados.
-      required: [firstName, lastName, documentTypeId, documentNumber, role, hireDate]
+        `firstName`, `lastName`, `paternalLastName` y `maternalLastName` (este,
+        además, puede venir vacío: abajo): al menos una letra latina (letra de
+        script latino según la versión de Unicode del backend, 15.0), más
+        espacios, apóstrofo y guion; se pasan a NFC antes de validarse (pasados
+        400 caracteres no se normalizan: se rechazan por largo tal como llegan)
+        y se guardan recortados.
+
+        Los apellidos: con `paternalLastName` se guardan el paterno y el
+        materno, y `lastName`, si viene, se valida pero no se usa. Sin paterno,
+        un `lastName` solo (el cuerpo de antes) se guarda entero como paterno,
+        sin materno. Sin ninguno de los dos, o con materno y sin paterno → `400
+        COM-001` en `paternalLastName`. `maternalLastName` ausente, nulo, vacío
+        o solo de espacios es "sin materno" y se guarda nulo. Una parte fuera de
+        su regla o de más de 100 caracteres → `400 COM-001` en su campo.
+      required: [firstName, documentTypeId, documentNumber, role, hireDate]
       properties:
         firstName:      { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Juan' }
         lastName:       { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez Huamán' }
+        paternalLastName: { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez' }
+        maternalLastName: { type: [string, 'null'], maxLength: 100, pattern: '^ *$|^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Huamán' }
         documentTypeId: { type: integer, format: int32, example: 1 }
         documentNumber: { type: string, minLength: 1, maxLength: 20, example: '45678912' }
         phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }
@@ -4922,14 +4937,15 @@ components:
     WorkerUpdateRequest:
       type: object
       description: |
-        Edición: los mismos campos del alta más `reason`. El mínimo de `reason`
-        NO se declara acá a propósito: es condicional (obligatorio solo cuando
-        `documentNumber` cambia) y lo mide el servidor, que es lo único que
-        permite devolver `WRK-009` en vez de un error de forma y no exigirlo
-        donde el contrato dice que es libre.
+        Edición: los campos del alta más `reason`, salvo el apellido: exige
+        `lastName` y no lleva `paternalLastName` ni `maternalLastName`. El
+        mínimo de `reason` NO se declara acá a propósito: es condicional
+        (obligatorio solo cuando `documentNumber` cambia) y lo mide el servidor,
+        que es lo único que permite devolver `WRK-009` en vez de un error de
+        forma y no exigirlo donde el contrato dice que es libre.
       # Copia de las propiedades de WorkerRequest más `reason`, no un allOf: el alta y la
-      # edición se cambian cada una en su schema. En la runtime, PublishedContractTest mide
-      # que la copia siga igual.
+      # edición se cambian cada una en su schema. En la runtime, y fuera del apellido (la edición
+      # exige `lastName` y no lleva las dos partes), PublishedContractTest mide que la copia siga igual.
       required: [firstName, lastName, documentTypeId, documentNumber, role, hireDate]
       properties:
         firstName:      { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Juan' }

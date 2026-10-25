@@ -1127,16 +1127,27 @@ export type WorkerDriverProfileResponse = {
  * como enum: la lista vive en la base). `hireDate` es un día calendario
  * (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
  * nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
- * `firstName` y `lastName`: al menos una letra latina (letra de script
- * latino según la versión de Unicode del backend, 15.0), más espacios,
- * apóstrofo y guion; se pasan a NFC antes de
- * validarse (pasados 400 caracteres no se normalizan: se rechazan por
- * largo tal como llegan) y se guardan recortados.
+ * `firstName`, `lastName`, `paternalLastName` y `maternalLastName` (este,
+ * además, puede venir vacío: abajo): al menos una letra latina (letra de
+ * script latino según la versión de Unicode del backend, 15.0), más
+ * espacios, apóstrofo y guion; se pasan a NFC antes de validarse (pasados
+ * 400 caracteres no se normalizan: se rechazan por largo tal como llegan)
+ * y se guardan recortados.
+ *
+ * Los apellidos: con `paternalLastName` se guardan el paterno y el
+ * materno, y `lastName`, si viene, se valida pero no se usa. Sin paterno,
+ * un `lastName` solo (el cuerpo de antes) se guarda entero como paterno,
+ * sin materno. Sin ninguno de los dos, o con materno y sin paterno → `400
+ * COM-001` en `paternalLastName`. `maternalLastName` ausente, nulo, vacío
+ * o solo de espacios es "sin materno" y se guarda nulo. Una parte fuera de
+ * su regla o de más de 100 caracteres → `400 COM-001` en su campo.
  *
  */
 export type WorkerRequest = {
     firstName: string;
-    lastName: string;
+    lastName?: string;
+    paternalLastName?: string;
+    maternalLastName?: string | null;
     documentTypeId: number;
     documentNumber: string;
     phone?: string | null;
@@ -1158,11 +1169,12 @@ export type WorkerDriverProfileRequest = {
 };
 
 /**
- * Edición: los mismos campos del alta más `reason`. El mínimo de `reason`
- * NO se declara acá a propósito: es condicional (obligatorio solo cuando
- * `documentNumber` cambia) y lo mide el servidor, que es lo único que
- * permite devolver `WRK-009` en vez de un error de forma y no exigirlo
- * donde el contrato dice que es libre.
+ * Edición: los campos del alta más `reason`, salvo el apellido: exige
+ * `lastName` y no lleva `paternalLastName` ni `maternalLastName`. El
+ * mínimo de `reason` NO se declara acá a propósito: es condicional
+ * (obligatorio solo cuando `documentNumber` cambia) y lo mide el servidor,
+ * que es lo único que permite devolver `WRK-009` en vez de un error de
+ * forma y no exigirlo donde el contrato dice que es libre.
  *
  */
 export type WorkerUpdateRequest = {

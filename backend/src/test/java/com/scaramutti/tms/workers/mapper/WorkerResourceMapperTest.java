@@ -26,7 +26,7 @@ class WorkerResourceMapperTest {
 
     private WorkerRequest request(String firstName, String lastName, String documentNumber,
             String phone, String role, WorkerDriverProfileRequest driver) {
-        return new WorkerRequest(firstName, lastName, 1, documentNumber, phone, role,
+        return new WorkerRequest(firstName, lastName, null, null, 1, documentNumber, phone, role,
             LocalDate.of(2024, 3, 1), driver);
     }
 
@@ -43,6 +43,19 @@ class WorkerResourceMapperTest {
 
         assertNull(command.driver(),
             "sin ficha en el cuerpo, el servicio tiene que recibir null y no un objeto vacio");
+    }
+
+    /** Las partes del apellido llegan recortadas, y un materno de espacios, nulo: la base no guarda el vacio. */
+    @Test
+    void theSurnameParts_arriveTrimmed_andABlankMaternalAsNull() {
+        CreateWorkerCommand withBoth = mapper.toCreateWorkerCommand(new WorkerRequest(
+            "Juan", null, "  Pérez  ", "  Huamán  ", 1, "45678912", null, "operator", LocalDate.of(2024, 3, 1), null));
+        assertEquals("Pérez", withBoth.paternalLastName());
+        assertEquals("Huamán", withBoth.maternalLastName());
+
+        CreateWorkerCommand blankMaternal = mapper.toCreateWorkerCommand(new WorkerRequest(
+            "Juan", null, "Pérez", "   ", 1, "45678912", null, "operator", LocalDate.of(2024, 3, 1), null));
+        assertNull(blankMaternal.maternalLastName());
     }
 
     @Test

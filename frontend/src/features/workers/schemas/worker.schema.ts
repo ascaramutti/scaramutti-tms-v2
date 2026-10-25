@@ -273,6 +273,8 @@ export function toWorkerUpdateRequest(
   const { driver, ...request } = toWorkerRequest(values, roles)
   return {
     ...request,
+    // En el alta el apellido entero ya es opcional; la edición lo sigue exigiendo.
+    lastName: values.lastName.trim(),
     ...(driver && { driver: withoutStatus(driver) }),
     reason: documentNumberChanged(values.documentNumber, original) ? values.reason.trim() : null,
   }
