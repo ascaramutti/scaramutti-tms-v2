@@ -11,9 +11,9 @@ import static java.lang.annotation.ElementType.TYPE;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
 
 /**
- * El alta trae el apellido paterno, o solo el apellido de antes ({@code lastName}), que se guarda
- * entero como paterno. Es de clase porque mira tres campos; sin ninguno de los dos, o con materno
- * y sin paterno, el error va al paterno, que es el campo que el cuerpo tiene que traer.
+ * El alta y la edicion traen el apellido paterno, o solo el apellido de antes ({@code lastName}).
+ * Es de clase porque mira tres campos; sin ninguno de los dos, o con materno y sin paterno, el
+ * error va al paterno, que es el campo que el cuerpo tiene que traer.
  */
 @Documented
 @Constraint(validatedBy = SurnamesGivenValidator.class)

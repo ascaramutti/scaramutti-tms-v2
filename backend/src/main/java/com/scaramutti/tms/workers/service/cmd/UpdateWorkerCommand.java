@@ -13,6 +13,8 @@ public record UpdateWorkerCommand(
     Integer workerId,
     String firstName,
     String lastName,
+    String paternalLastName,
+    String maternalLastName,
     Integer documentTypeId,
     String documentNumber,
     String phone,

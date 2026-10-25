@@ -116,7 +116,7 @@ class WorkerResourceMapperTest {
 
     private com.scaramutti.tms.workers.dto.WorkerUpdateRequest updateRequest(
             String firstName, String lastName, String documentNumber, String reason) {
-        return new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(firstName, lastName, 1,
+        return new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(firstName, lastName, null, null, 1,
             documentNumber, null, "operator", LocalDate.of(2024, 3, 1), null, reason);
     }
 
@@ -134,6 +134,20 @@ class WorkerResourceMapperTest {
         assertEquals("juan Carlos", command.firstName());
         assertEquals("PÉREZ huamán", command.lastName());
         assertEquals("45678912", command.documentNumber());
+    }
+
+    /** Las partes de la edicion, como las del alta: recortadas, y un materno de espacios, nulo. */
+    @Test
+    void toUpdateWorkerCommand_trimsTheSurnameParts_andABlankMaternalArrivesAsNull() {
+        LocalDate hired = LocalDate.of(2024, 3, 1);
+        var withBoth = mapper.toUpdateWorkerCommand(8, new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(
+            "Juan", null, "  Pérez  ", "  Huamán  ", 1, "45678912", null, "operator", hired, null, null));
+        assertEquals("Pérez", withBoth.paternalLastName());
+        assertEquals("Huamán", withBoth.maternalLastName());
+
+        var blankMaternal = mapper.toUpdateWorkerCommand(8, new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(
+            "Juan", null, "Pérez", "   ", 1, "45678912", null, "operator", hired, null, null));
+        assertNull(blankMaternal.maternalLastName());
     }
 
     /** El id viene de la RUTA y no del cuerpo: es lo que impide editar a otro. */

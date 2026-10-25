@@ -1052,13 +1052,19 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * Actualizar un trabajador y su ficha de conductor
  *
  * Reemplaza los datos editables con las mismas validaciones, normalización
- * y códigos que el alta, salvo el apellido: la edición exige `lastName` y
- * no lee `paternalLastName` ni `maternalLastName`. Es un REEMPLAZO y no un
- * parche: un campo opcional que no viene queda VACÍO (omitir `phone` lo
- * borra). `isActive`, `createdAt` y `createdBy` no cambian aunque el
- * cuerpo intente mandarlos; `updatedAt` y `updatedBy` se ponen con la
- * sesión, incluso cuando el cuerpo no cambia nada. Un trabajador inactivo
- * también se edita.
+ * y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
+ * que no viene queda VACÍO (omitir `phone` lo borra). `isActive`,
+ * `createdAt` y `createdBy` no cambian aunque el cuerpo intente mandarlos;
+ * `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
+ * cuerpo no cambia nada. Un trabajador inactivo también se edita.
+ *
+ * Los apellidos, como en el alta salvo un `lastName` solo: con
+ * `paternalLastName` se guardan el paterno y el materno (un materno que no
+ * viene se borra), y `lastName`, si viene, se valida pero no se usa. Sin
+ * paterno, un `lastName` igual al guardado deja las partes como están, y
+ * uno distinto se guarda entero como paterno, sin materno. Sin ninguno de
+ * los dos, o con materno y sin paterno → `400 COM-001` en
+ * `paternalLastName`.
  *
  * Unicidad contra los demás: guardar el propio número de documento o la
  * propia licencia sin cambios es `200`, no `409`.
@@ -1074,7 +1080,9 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  *
  * Cada campo efectivamente cambiado deja UNA fila de auditoría con el
  * valor anterior y el nuevo; los campos que se reenvían sin cambios no
- * dejan ninguna. El cargo se guarda por su nombre de sistema y el tipo de
+ * dejan ninguna. El apellido se anota por parte (`paternalLastName` y
+ * `maternalLastName`, el materno vacío como nulo), nunca como `lastName`.
+ * El cargo se guarda por su nombre de sistema y el tipo de
  * documento por su código, nunca por su id ni por su nombre visible: un
  * renombre dejaría el historial mintiendo.
  *

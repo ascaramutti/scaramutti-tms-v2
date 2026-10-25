@@ -1137,10 +1137,12 @@ export type WorkerDriverProfileResponse = {
  * Los apellidos: con `paternalLastName` se guardan el paterno y el
  * materno, y `lastName`, si viene, se valida pero no se usa. Sin paterno,
  * un `lastName` solo (el cuerpo de antes) se guarda entero como paterno,
- * sin materno. Sin ninguno de los dos, o con materno y sin paterno → `400
- * COM-001` en `paternalLastName`. `maternalLastName` ausente, nulo, vacío
- * o solo de espacios es "sin materno" y se guarda nulo. Una parte fuera de
- * su regla o de más de 100 caracteres → `400 COM-001` en su campo.
+ * sin materno; en la edición, si es igual al guardado, deja las partes
+ * como están (`updateWorker`). Sin ninguno de los dos, o con materno y
+ * sin paterno → `400 COM-001` en `paternalLastName`. `maternalLastName`
+ * ausente, nulo, vacío o solo de espacios es "sin materno", como si no
+ * viniera (con paterno, se guarda nulo). Una parte fuera de su regla o
+ * de más de 100 caracteres → `400 COM-001` en su campo.
  *
  */
 export type WorkerRequest = {
@@ -1169,23 +1171,14 @@ export type WorkerDriverProfileRequest = {
 };
 
 /**
- * Edición: los campos del alta más `reason`, salvo el apellido: exige
- * `lastName` y no lleva `paternalLastName` ni `maternalLastName`. El
- * mínimo de `reason` NO se declara acá a propósito: es condicional
- * (obligatorio solo cuando `documentNumber` cambia) y lo mide el servidor,
- * que es lo único que permite devolver `WRK-009` en vez de un error de
- * forma y no exigirlo donde el contrato dice que es libre.
+ * Edición: los mismos campos del alta más `reason`. El mínimo de `reason`
+ * NO se declara acá a propósito: es condicional (obligatorio solo cuando
+ * `documentNumber` cambia) y lo mide el servidor, que es lo único que
+ * permite devolver `WRK-009` en vez de un error de forma y no exigirlo
+ * donde el contrato dice que es libre.
  *
  */
-export type WorkerUpdateRequest = {
-    firstName: string;
-    lastName: string;
-    documentTypeId: number;
-    documentNumber: string;
-    phone?: string | null;
-    role: string;
-    hireDate: string;
-    driver?: WorkerDriverProfileRequest | null;
+export type WorkerUpdateRequest = WorkerRequest & {
     reason?: string | null;
 };
 

@@ -110,8 +110,11 @@ class PersonNamesTest {
         assertSame(marks, created.paternalLastName());
         assertSame(marks, created.maternalLastName());
 
-        WorkerUpdateRequest updated = new WorkerUpdateRequest(marks, marks, 1, "X1", null, "operator", hired, null, null);
+        WorkerUpdateRequest updated =
+            new WorkerUpdateRequest(marks, marks, marks, marks, 1, "X1", null, "operator", hired, null, null);
         assertSame(marks, updated.firstName());
         assertSame(marks, updated.lastName());
+        assertSame(marks, updated.paternalLastName());
+        assertSame(marks, updated.maternalLastName());
     }
 }

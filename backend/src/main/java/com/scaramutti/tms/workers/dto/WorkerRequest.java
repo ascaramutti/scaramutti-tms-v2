@@ -56,7 +56,7 @@ public record WorkerRequest(
 
     @Valid
     @Schema(nullable = true) WorkerDriverProfileRequest driver
-) {
+) implements WorkerSurnamesBody {
     public WorkerRequest {
         firstName = PersonNames.toNfc(firstName);
         lastName = PersonNames.toNfc(lastName);

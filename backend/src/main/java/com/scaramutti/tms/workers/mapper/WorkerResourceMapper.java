@@ -72,7 +72,7 @@ public interface WorkerResourceMapper {
         WorkerDriverProfileRequest workerDriverProfileRequest);
 
     /**
-     * El cuerpo de la edicion al command. Recorta el nombre, el apellido y el documento, como
+     * El cuerpo de la edicion al command. Recorta el nombre, los apellidos y el documento, como
      * el alta, y ademas el MOTIVO: diez espacios no son una justificacion, y al llegar nulo el
      * servicio los trata como ausentes, que es lo que el caso de negocio quiere.
      *
@@ -82,6 +82,10 @@ public interface WorkerResourceMapper {
     @Mapping(target = "workerId",       source = "workerId")
     @Mapping(target = "firstName",      source = "workerUpdateRequest.firstName",      qualifiedByName = "trimToNull")
     @Mapping(target = "lastName",       source = "workerUpdateRequest.lastName",       qualifiedByName = "trimToNull")
+    @Mapping(target = "paternalLastName", source = "workerUpdateRequest.paternalLastName",
+             qualifiedByName = "trimToNull")
+    @Mapping(target = "maternalLastName", source = "workerUpdateRequest.maternalLastName",
+             qualifiedByName = "trimToNull")
     @Mapping(target = "documentNumber", source = "workerUpdateRequest.documentNumber", qualifiedByName = "trimToNull")
     @Mapping(target = "reason",         source = "workerUpdateRequest.reason",         qualifiedByName = "trimToNull")
     UpdateWorkerCommand toUpdateWorkerCommand(Integer workerId, WorkerUpdateRequest workerUpdateRequest);

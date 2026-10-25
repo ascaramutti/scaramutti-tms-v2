@@ -1521,13 +1521,19 @@ paths:
       summary: Actualizar un trabajador y su ficha de conductor
       description: |
         Reemplaza los datos editables con las mismas validaciones, normalización
-        y códigos que el alta, salvo el apellido: la edición exige `lastName` y
-        no lee `paternalLastName` ni `maternalLastName`. Es un REEMPLAZO y no un
-        parche: un campo opcional que no viene queda VACÍO (omitir `phone` lo
-        borra). `isActive`, `createdAt` y `createdBy` no cambian aunque el
-        cuerpo intente mandarlos; `updatedAt` y `updatedBy` se ponen con la
-        sesión, incluso cuando el cuerpo no cambia nada. Un trabajador inactivo
-        también se edita.
+        y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
+        que no viene queda VACÍO (omitir `phone` lo borra). `isActive`,
+        `createdAt` y `createdBy` no cambian aunque el cuerpo intente mandarlos;
+        `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
+        cuerpo no cambia nada. Un trabajador inactivo también se edita.
+
+        Los apellidos, como en el alta salvo un `lastName` solo: con
+        `paternalLastName` se guardan el paterno y el materno (un materno que no
+        viene se borra), y `lastName`, si viene, se valida pero no se usa. Sin
+        paterno, un `lastName` igual al guardado deja las partes como están, y
+        uno distinto se guarda entero como paterno, sin materno. Sin ninguno de
+        los dos, o con materno y sin paterno → `400 COM-001` en
+        `paternalLastName`.
 
         Unicidad contra los demás: guardar el propio número de documento o la
         propia licencia sin cambios es `200`, no `409`.
@@ -1543,7 +1549,9 @@ paths:
 
         Cada campo efectivamente cambiado deja UNA fila de auditoría con el
         valor anterior y el nuevo; los campos que se reenvían sin cambios no
-        dejan ninguna. El cargo se guarda por su nombre de sistema y el tipo de
+        dejan ninguna. El apellido se anota por parte (`paternalLastName` y
+        `maternalLastName`, el materno vacío como nulo), nunca como `lastName`.
+        El cargo se guarda por su nombre de sistema y el tipo de
         documento por su código, nunca por su id ni por su nombre visible: un
         renombre dejaría el historial mintiendo.
 
@@ -4880,7 +4888,6 @@ components:
         isActive:        { type: boolean }
 
     # -------- Workers: trabajador ----------------------------------------------
-    # WorkerUpdateRequest repite este schema salvo el apellido: un cambio acá se decide también allá.
     WorkerRequest:
       type: object
       description: |
@@ -4899,10 +4906,12 @@ components:
         Los apellidos: con `paternalLastName` se guardan el paterno y el
         materno, y `lastName`, si viene, se valida pero no se usa. Sin paterno,
         un `lastName` solo (el cuerpo de antes) se guarda entero como paterno,
-        sin materno. Sin ninguno de los dos, o con materno y sin paterno → `400
-        COM-001` en `paternalLastName`. `maternalLastName` ausente, nulo, vacío
-        o solo de espacios es "sin materno" y se guarda nulo. Una parte fuera de
-        su regla o de más de 100 caracteres → `400 COM-001` en su campo.
+        sin materno; en la edición, si es igual al guardado, deja las partes
+        como están (`updateWorker`). Sin ninguno de los dos, o con materno y
+        sin paterno → `400 COM-001` en `paternalLastName`. `maternalLastName`
+        ausente, nulo, vacío o solo de espacios es "sin materno", como si no
+        viniera (con paterno, se guarda nulo). Una parte fuera de su regla o
+        de más de 100 caracteres → `400 COM-001` en su campo.
       required: [firstName, documentTypeId, documentNumber, role, hireDate]
       properties:
         firstName:      { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Juan' }
@@ -4935,31 +4944,17 @@ components:
             - type: 'null'
 
     WorkerUpdateRequest:
-      type: object
       description: |
-        Edición: los campos del alta más `reason`, salvo el apellido: exige
-        `lastName` y no lleva `paternalLastName` ni `maternalLastName`. El
-        mínimo de `reason` NO se declara acá a propósito: es condicional
-        (obligatorio solo cuando `documentNumber` cambia) y lo mide el servidor,
-        que es lo único que permite devolver `WRK-009` en vez de un error de
-        forma y no exigirlo donde el contrato dice que es libre.
-      # Copia de las propiedades de WorkerRequest más `reason`, no un allOf: el alta y la
-      # edición se cambian cada una en su schema. En la runtime, y fuera del apellido (la edición
-      # exige `lastName` y no lleva las dos partes), PublishedContractTest mide que la copia siga igual.
-      required: [firstName, lastName, documentTypeId, documentNumber, role, hireDate]
-      properties:
-        firstName:      { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Juan' }
-        lastName:       { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez Huamán' }
-        documentTypeId: { type: integer, format: int32, example: 1 }
-        documentNumber: { type: string, minLength: 1, maxLength: 20, example: '45678912' }
-        phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }
-        role:           { type: string, minLength: 1, maxLength: 50, example: 'driver' }
-        hireDate:       { type: string, format: date, example: '2026-09-01' }
-        driver:
-          anyOf:
-            - $ref: '#/components/schemas/WorkerDriverProfileRequest'
-            - type: 'null'
-        reason:         { type: [string, 'null'], maxLength: 500, example: 'Corrección del DNI mal digitado en el alta' }
+        Edición: los mismos campos del alta más `reason`. El mínimo de `reason`
+        NO se declara acá a propósito: es condicional (obligatorio solo cuando
+        `documentNumber` cambia) y lo mide el servidor, que es lo único que
+        permite devolver `WRK-009` en vez de un error de forma y no exigirlo
+        donde el contrato dice que es libre.
+      allOf:
+        - $ref: '#/components/schemas/WorkerRequest'
+        - type: object
+          properties:
+            reason: { type: [string, 'null'], maxLength: 500, example: 'Corrección del DNI mal digitado en el alta' }
 
     WorkerDetailResponse:
       type: object

@@ -1,5 +1,6 @@
 package com.scaramutti.tms.workers.dto;
 
+import com.scaramutti.tms.workers.validation.SurnamesGiven;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -9,13 +10,14 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 /**
- * El cuerpo de la edicion: los campos del alta, salvo las dos partes del apellido, mas el motivo.
+ * El cuerpo de la edicion: los campos del alta mas el motivo.
  *
  * <p>Es un REEMPLAZO y no un parche. Un campo opcional que no viene queda VACIO: omitir el
  * telefono lo borra. Quien lea esto buscando por que no hay comprobaciones de nulo antes de
- * asignar, la respuesta es esa.
+ * asignar, la respuesta es esa. Hay dos excepciones: el estado de la ficha de conductor, que si no
+ * viene se conserva, y los apellidos sin paterno, que decide el servicio con el apellido de antes.
  *
- * <p>Repite ocho de los diez campos del alta en vez de heredarlos, y no es un descuido: un record no
+ * <p>Repite los campos del alta en vez de heredarlos, y no es un descuido: un record no
  * hereda, y anidar el cuerpo del alta cambiaria la forma del JSON que el contrato declara. Es el
  * molde del modulo de operaciones, que tiene el mismo par. El riesgo conocido es que las dos
  * formas se separen sin que nada deje de compilar, y por eso hay un caso que compara los
@@ -30,9 +32,13 @@ import java.time.LocalDate;
  * <p>{@code isActive}, {@code createdAt} y {@code createdBy} no son componentes de este record,
  * que es como se impide que el cuerpo los mueva. Mismo criterio que el alta.
  */
+@SurnamesGiven
 public record WorkerUpdateRequest(
     @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String firstName,
-    @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String lastName,
+    @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String lastName,
+    @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String paternalLastName,
+    @Size(max = 100) @Pattern(regexp = PersonNames.MATERNAL_PATTERN, message = PersonNames.MESSAGE)
+    String maternalLastName,
     @NotNull Integer documentTypeId,
     @NotBlank @Size(max = 20) String documentNumber,
     @Pattern(regexp = "^\\d{9}$") String phone,
@@ -40,12 +46,14 @@ public record WorkerUpdateRequest(
     @NotNull LocalDate hireDate,
     @Valid WorkerDriverProfileRequest driver,
     @Size(max = 500) String reason
-) {
+) implements WorkerSurnamesBody {
     /** El piso del motivo, medido en el servicio por lo que explica el javadoc de arriba. */
     public static final int MIN_REASON_LENGTH = 10;
 
     public WorkerUpdateRequest {
         firstName = PersonNames.toNfc(firstName);
         lastName = PersonNames.toNfc(lastName);
+        paternalLastName = PersonNames.toNfc(paternalLastName);
+        maternalLastName = PersonNames.toNfc(maternalLastName);
     }
 }
