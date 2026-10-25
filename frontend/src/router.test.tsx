@@ -458,8 +458,9 @@ describe('router - URL viejas y la raíz del dominio', () => {
         getWorkerOk(creado),
       )
       const router = goTo('admin', `${WORKERS_BASE}/nuevo`)
-      await user.type(await screen.findByLabelText('Nombre'), 'Ana')
-      await user.type(screen.getByLabelText('Apellido'), 'Torres Ruiz')
+      await user.type(await screen.findByLabelText('Nombres'), 'Ana')
+      await user.type(screen.getByLabelText('Apellido paterno'), 'Torres')
+      await user.type(screen.getByLabelText('Apellido materno (opcional)'), 'Ruiz')
       await user.type(screen.getByLabelText('Número de documento'), '45678912')
       await user.selectOptions(screen.getByLabelText('Cargo'), 'Conductor')
       await user.type(screen.getByLabelText('N.° de licencia'), 'Q12345678')

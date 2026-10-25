@@ -21,7 +21,9 @@ export const REASON_MAX_LENGTH = 500
 
 export interface WorkerFormValues {
   firstName: string
-  lastName: string
+  paternalLastName: string
+  /** Vacío es "sin materno": viaja como `null`. */
+  maternalLastName: string
   documentTypeId: number | null
   documentNumber: string
   /** Vacío es "sin teléfono": viaja como `null`. */
@@ -66,12 +68,14 @@ export function sendsDriver(values: Pick<WorkerFormValues, 'hasLicense'>, profil
 }
 
 /**
- * Nombre y apellido: al menos una letra latina, más espacios, apóstrofo y guion, la misma regla que
+ * Nombres y apellidos: al menos una letra latina, más espacios, apóstrofo y guion, la misma regla que
  * exige el backend. Letra latina es letra de script latino: quedan afuera los números romanos, los
  * rellenos invisibles y las letras de otros alfabetos que se parecen a las nuestras. Se miden y
  * viajan en NFC: una tilde pegada como letra más marca entra; una marca que NFC no compone, no.
  */
 export const PERSON_NAME = /^[' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|[' -])*$/u
+/** El materno puede quedar vacío: es "sin materno". El mismo patrón que publica el contrato. */
+export const MATERNAL_NAME = new RegExp(`^ *$|${PERSON_NAME.source}`, 'u')
 const PERSON_NAME_MESSAGE = 'Solo letras, espacios, apóstrofo o guion.'
 
 /**
@@ -111,15 +115,21 @@ export function buildWorkerFormSchema({ documentTypes, roles, today = todayInLim
         // Pasado el tope la regla no se mide: sobre un texto gigante desbordaría la pila. Sin cortar
         // la validación, para que el resto del formulario siga avisando en la misma vuelta.
         .refine((value) => value.length > WORKER_NAME_MAX_LENGTH || PERSON_NAME.test(value), PERSON_NAME_MESSAGE),
-      lastName: z
+      paternalLastName: z
         .string()
         .trim()
         .overwrite(toNfc)
-        .min(1, 'Indica el apellido.')
+        .min(1, 'Indica el apellido paterno.')
         .max(WORKER_NAME_MAX_LENGTH, 'Máximo 100 caracteres.')
         // Pasado el tope la regla no se mide: sobre un texto gigante desbordaría la pila. Sin cortar
         // la validación, para que el resto del formulario siga avisando en la misma vuelta.
         .refine((value) => value.length > WORKER_NAME_MAX_LENGTH || PERSON_NAME.test(value), PERSON_NAME_MESSAGE),
+      maternalLastName: z
+        .string()
+        .trim()
+        .overwrite(toNfc)
+        .max(WORKER_NAME_MAX_LENGTH, 'Máximo 100 caracteres.')
+        .refine((value) => value.length > WORKER_NAME_MAX_LENGTH || MATERNAL_NAME.test(value), PERSON_NAME_MESSAGE),
       documentTypeId: z
         .number()
         .int()
@@ -199,7 +209,8 @@ export function workerCreateDefaults(
 ): WorkerFormValues {
   return {
     firstName: '',
-    lastName: '',
+    paternalLastName: '',
+    maternalLastName: '',
     documentTypeId: documentTypes[0]?.id ?? null,
     documentNumber: '',
     phone: '',
@@ -219,7 +230,8 @@ export function workerCreateDefaults(
 export function workerEditDefaults(worker: WorkerDetailResponse): WorkerFormValues {
   return {
     firstName: worker.firstName,
-    lastName: worker.lastName,
+    paternalLastName: worker.paternalLastName,
+    maternalLastName: worker.maternalLastName ?? '',
     documentTypeId: worker.documentType.id,
     documentNumber: worker.documentNumber,
     phone: worker.phone ?? '',
@@ -235,11 +247,15 @@ export function workerEditDefaults(worker: WorkerDetailResponse): WorkerFormValu
   }
 }
 
-/** El cuerpo del request. Sin licencia, la clave `driver` no viaja. */
+/**
+ * El cuerpo del request. Sin licencia, la clave `driver` no viaja. Los apellidos van por partes y
+ * sin `lastName`: el backend lo valida aunque no lo use, y uno de más de 100 daría 400.
+ */
 export function toWorkerRequest(values: WorkerFormValues, roles: readonly RoleResponse[]): WorkerRequest {
   const request: WorkerRequest = {
     firstName: values.firstName.trim(),
-    lastName: values.lastName.trim(),
+    paternalLastName: values.paternalLastName.trim(),
+    maternalLastName: trimToNull(values.maternalLastName),
     documentTypeId: values.documentTypeId as number,
     documentNumber: values.documentNumber.trim(),
     phone: trimToNull(values.phone),

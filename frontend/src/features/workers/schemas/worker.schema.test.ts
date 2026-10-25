@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
   buildWorkerFormSchema,
+  MATERNAL_NAME,
   PERSON_NAME,
   toWorkerRequest,
   documentNumberChanged,
@@ -20,7 +21,7 @@ function valores(cambios: Partial<WorkerFormValues> = {}): WorkerFormValues {
   return {
     ...workerCreateDefaults([DNI, CE], () => HOY),
     firstName: 'Juan',
-    lastName: 'Pérez',
+    paternalLastName: 'Pérez',
     documentNumber: '45678912',
     role: 'operator',
     ...cambios,
@@ -48,11 +49,19 @@ describe('buildWorkerFormSchema', () => {
   it.each([
     ['firstName', ''],
     ['firstName', '   '],
-    ['lastName', ''],
-    ['lastName', '   '],
+    ['paternalLastName', ''],
+    ['paternalLastName', '   '],
     ['documentNumber', '   '],
   ] as const)('%s vacío se rechaza', (campo, valor) => {
     expect(errores({ [campo]: valor })[campo]).toBeDefined()
+  })
+
+  it('el paterno vacío pide el paterno', () => {
+    expect(errores({ paternalLastName: '' }).paternalLastName).toBe('Indica el apellido paterno.')
+  })
+
+  it.each([[''], ['   ']])('el materno "%s" es "sin materno" y se acepta', (valor) => {
+    expect(errores({ maternalLastName: valor })).toEqual({})
   })
 
   it('el tipo de documento es obligatorio', () => {
@@ -68,19 +77,20 @@ describe('buildWorkerFormSchema', () => {
   })
 
   it.each([['María José'], ["D'Angelo"], ['Pérez-Gómez'], ['Ñuñez Müller'], ['Šimić'], ['Łukasz'], ['Mª José'], ["'t Hooft"]])(
-    'nombre y apellido aceptan "%s"',
+    'nombres y apellidos aceptan "%s"',
     (valor) => {
-      expect(errores({ firstName: valor, lastName: valor })).toEqual({})
+      expect(errores({ firstName: valor, paternalLastName: valor, maternalLastName: valor })).toEqual({})
     },
   )
 
   it('una tilde escrita como letra más marca se acepta y sale en NFC', () => {
     const nfd = 'Jose\u0301'
-    const resultado = schema.safeParse(valores({ firstName: nfd, lastName: nfd }))
+    const resultado = schema.safeParse(valores({ firstName: nfd, paternalLastName: nfd, maternalLastName: nfd }))
 
     expect(resultado.success).toBe(true)
     expect(resultado.data?.firstName).toBe('Jos\u00e9')
-    expect(resultado.data?.lastName).toBe('Jos\u00e9')
+    expect(resultado.data?.paternalLastName).toBe('Jos\u00e9')
+    expect(resultado.data?.maternalLastName).toBe('Jos\u00e9')
   })
 
   it.each([
@@ -98,22 +108,27 @@ describe('buildWorkerFormSchema', () => {
     ['\u2160'],
     ['Juan \u2161'],
     ['Pe\u0303g\u0303a'],
-  ])('nombre y apellido rechazan "%s"', (valor) => {
-    expect(errores({ firstName: valor, lastName: valor })).toEqual({
+  ])('nombres y apellidos rechazan "%s"', (valor) => {
+    expect(errores({ firstName: valor, paternalLastName: valor, maternalLastName: valor })).toEqual({
       firstName: 'Solo letras, espacios, apóstrofo o guion.',
-      lastName: 'Solo letras, espacios, apóstrofo o guion.',
+      paternalLastName: 'Solo letras, espacios, apóstrofo o guion.',
+      maternalLastName: 'Solo letras, espacios, apóstrofo o guion.',
     })
   })
 
-  it('nombre y apellido llegan a 100, no a 101', () => {
-    expect(errores({ firstName: 'A'.repeat(100), lastName: 'B'.repeat(100) })).toEqual({})
+  it('nombres y apellidos llegan a 100, no a 101', () => {
+    const cien = { firstName: 'A'.repeat(100), paternalLastName: 'B'.repeat(100), maternalLastName: 'C'.repeat(100) }
+    expect(errores(cien)).toEqual({})
     expect(errores({ firstName: 'A'.repeat(101) }).firstName).toBe('Máximo 100 caracteres.')
-    expect(errores({ lastName: 'B'.repeat(101) }).lastName).toBe('Máximo 100 caracteres.')
+    expect(errores({ paternalLastName: 'B'.repeat(101) }).paternalLastName).toBe('Máximo 100 caracteres.')
+    expect(errores({ maternalLastName: 'C'.repeat(101) }).maternalLastName).toBe('Máximo 100 caracteres.')
   })
 
   /** El formulario recorta antes de medir: cien letras con espacios alrededor entran. */
-  it('nombre y apellido se miden ya recortados', () => {
-    expect(errores({ firstName: ' ' + 'A'.repeat(100) + ' ', lastName: ' ' + 'B'.repeat(100) + ' ' })).toEqual({})
+  it('nombres y apellidos se miden ya recortados', () => {
+    const conEspacios = (letra: string) => ' ' + letra.repeat(100) + ' '
+    const recortables = { firstName: conEspacios('A'), paternalLastName: conEspacios('B'), maternalLastName: conEspacios('C') }
+    expect(errores(recortables)).toEqual({})
   })
 
   /**
@@ -124,25 +139,31 @@ describe('buildWorkerFormSchema', () => {
   it('un nombre gigante avisa el largo sin lanzar', () => {
     const gigante = 'a'.repeat(9_000_000)
 
-    expect(errores({ firstName: gigante, lastName: gigante })).toEqual({
+    expect(errores({ firstName: gigante, paternalLastName: gigante, maternalLastName: gigante })).toEqual({
       firstName: 'Máximo 100 caracteres.',
-      lastName: 'Máximo 100 caracteres.',
+      paternalLastName: 'Máximo 100 caracteres.',
+      maternalLastName: 'Máximo 100 caracteres.',
     })
   })
 
   it('con 100 caracteres justos la regla se mide', () => {
-    expect(errores({ firstName: 'A'.repeat(99) + '1', lastName: 'B'.repeat(99) + '1' })).toEqual({
+    const conDigito = (letra: string) => letra.repeat(99) + '1'
+    expect(errores({ firstName: conDigito('A'), paternalLastName: conDigito('B'), maternalLastName: conDigito('C') })).toEqual({
       firstName: 'Solo letras, espacios, apóstrofo o guion.',
-      lastName: 'Solo letras, espacios, apóstrofo o guion.',
+      paternalLastName: 'Solo letras, espacios, apóstrofo o guion.',
+      maternalLastName: 'Solo letras, espacios, apóstrofo o guion.',
     })
   })
 
-  it('un nombre gigante no apaga las demás validaciones', () => {
-    expect(errores({ firstName: 'a'.repeat(9_000_000), documentNumber: '4567891' })).toEqual({
-      firstName: 'Máximo 100 caracteres.',
-      documentNumber: 'El número no tiene el formato de DNI.',
-    })
-  })
+  it.each([['firstName'], ['paternalLastName'], ['maternalLastName']] as const)(
+    'un nombre gigante no apaga las demás validaciones (%s)',
+    (campo) => {
+      expect(errores({ [campo]: 'a'.repeat(9_000_000), documentNumber: '4567891' })).toEqual({
+        [campo]: 'Máximo 100 caracteres.',
+        documentNumber: 'El número no tiene el formato de DNI.',
+      })
+    },
+  )
 
   /** Como en el backend: reordenar miles de marcas cuesta tiempo cuadrático, así que pasado 400 no se normaliza. */
   it('pasado 400 caracteres no se normaliza, y con 400 sí', () => {
@@ -151,7 +172,7 @@ describe('buildWorkerFormSchema', () => {
     const conCuatrocientos = 'a' + '\u0301'.repeat(399)
     const conCuatrocientosUno = 'a' + '\u0301'.repeat(400)
 
-    errores({ firstName: conCuatrocientos, lastName: conCuatrocientosUno })
+    errores({ firstName: conCuatrocientos, paternalLastName: conCuatrocientosUno, maternalLastName: conCuatrocientosUno })
     expect(normalizados()).toContain(conCuatrocientos)
     expect(normalizados()).not.toContain(conCuatrocientosUno)
   })
@@ -160,17 +181,23 @@ describe('buildWorkerFormSchema', () => {
   it('cien letras descompuestas en tres caracteres se normalizan y entran', () => {
     const cien = 'u\u0308\u0301'.repeat(100)
     expect(cien).toHaveLength(300)
-    expect(errores({ firstName: cien, lastName: cien })).toEqual({})
+    expect(errores({ firstName: cien, paternalLastName: cien, maternalLastName: cien })).toEqual({})
   })
 
   /** Los mismos casos que mide el backend contra su regla: así las dos quedan atadas al contrato. */
   it('los casos comunes entran o quedan afuera como en el backend', () => {
     const cases = JSON.parse(
       readFileSync(join(import.meta.dirname, '../../../../../backend/src/test/resources/workers/person-names.json'), 'utf8'),
-    ) as { accepted: string[]; rejected: string[] }
+    ) as { accepted: string[]; acceptedOnlyAsMaternal: string[]; rejected: string[] }
 
     for (const value of cases.accepted) expect(PERSON_NAME.test(value.normalize('NFC')), value).toBe(true)
     for (const value of cases.rejected) expect(PERSON_NAME.test(value.normalize('NFC')), value).toBe(false)
+    // El materno: los mismos más el vacío, que es "sin materno".
+    for (const value of cases.acceptedOnlyAsMaternal) expect(PERSON_NAME.test(value.normalize('NFC')), value).toBe(false)
+    for (const value of [...cases.accepted, ...cases.acceptedOnlyAsMaternal]) {
+      expect(MATERNAL_NAME.test(value.normalize('NFC')), value).toBe(true)
+    }
+    for (const value of cases.rejected) expect(MATERNAL_NAME.test(value.normalize('NFC')), value).toBe(false)
   })
 
   /** La regla corre antes que el tope: con clases que se solapan, un texto largo que falla tardaría. */
@@ -180,22 +207,28 @@ describe('buildWorkerFormSchema', () => {
     expect(performance.now() - start).toBeLessThan(2_000)
   })
 
-  /** El backend aplica la misma regla: el contrato publica este patrón para los dos campos. */
-  it('la regla de nombre es la que publica el contrato', () => {
+  /** El backend aplica la misma regla: el contrato la publica, también en el apellido de antes mientras siga en él. */
+  it('la regla de nombre y la del materno son las que publica el contrato', () => {
     const spec = readFileSync(
       join(import.meta.dirname, '../../../../../backend/src/main/resources/META-INF/openapi.yaml'),
       'utf8',
     )
     const worker = spec.slice(spec.indexOf('    WorkerRequest:'))
-    const patterns = [...worker.matchAll(/^ {8}(firstName|lastName): .*pattern: '((?:[^']|'')*)'/gm)].slice(0, 2)
+    const patterns = [...worker.matchAll(/^ {8}(firstName|lastName|paternalLastName|maternalLastName): .*pattern: '((?:[^']|'')*)'/gm)]
+      .slice(0, 4)
+      .map((match) => [match[1], match[2].replaceAll("''", "'")])
 
-    expect(patterns.map((match) => match[1])).toEqual(['firstName', 'lastName'])
-    for (const match of patterns) expect(match[2].replaceAll("''", "'")).toBe(PERSON_NAME.source)
+    expect(patterns).toEqual([
+      ['firstName', PERSON_NAME.source],
+      ['lastName', PERSON_NAME.source],
+      ['paternalLastName', PERSON_NAME.source],
+      ['maternalLastName', MATERNAL_NAME.source],
+    ])
   })
 
   it('el tope de 100 se mide ya normalizado', () => {
     const cienEnNfc = 'A'.repeat(99) + 'e\u0301'
-    expect(errores({ firstName: cienEnNfc, lastName: cienEnNfc })).toEqual({})
+    expect(errores({ firstName: cienEnNfc, paternalLastName: cienEnNfc, maternalLastName: cienEnNfc })).toEqual({})
   })
 
   it('el número sigue el patrón y el largo del tipo elegido', () => {
@@ -318,14 +351,21 @@ describe('workerCreateDefaults', () => {
 })
 
 describe('toWorkerRequest', () => {
-  it('recorta los textos y manda el teléfono vacío como null, sin licencia', () => {
+  it('recorta los textos y manda el teléfono y el materno vacíos como null, sin licencia', () => {
     const cuerpo = toWorkerRequest(
-      valores({ firstName: ' Juan ', lastName: ' Pérez ', documentNumber: ' 45678912 ', phone: '  ' }),
+      valores({
+        firstName: ' Juan ',
+        paternalLastName: ' Pérez ',
+        maternalLastName: '  ',
+        documentNumber: ' 45678912 ',
+        phone: '  ',
+      }),
       ROLES,
     )
     expect(cuerpo).toEqual({
       firstName: 'Juan',
-      lastName: 'Pérez',
+      paternalLastName: 'Pérez',
+      maternalLastName: null,
       documentTypeId: DNI.id,
       documentNumber: '45678912',
       phone: null,
@@ -333,6 +373,13 @@ describe('toWorkerRequest', () => {
       hireDate: HOY,
     })
     expect(cuerpo).not.toHaveProperty('driver')
+  })
+
+  /** El backend valida un `lastName` aunque no lo use: uno compuesto de más de 100 daría 400. */
+  it('los apellidos viajan por partes, recortados, y sin el apellido entero', () => {
+    const cuerpo = toWorkerRequest(valores({ paternalLastName: ' Pérez ', maternalLastName: ' Huamán ' }), ROLES)
+    expect(cuerpo).toMatchObject({ paternalLastName: 'Pérez', maternalLastName: 'Huamán' })
+    expect(cuerpo).not.toHaveProperty('lastName')
   })
 
   it('con un cargo que la exige, la licencia viaja con la categoría vacía como null', () => {
@@ -387,7 +434,8 @@ describe('la edición', () => {
     const activo = fakeWorkerDetail({ phone: null, driver: fakeDriverProfile({ licenseCategory: null, status: 'MAINTENANCE' }) })
     expect(workerEditDefaults(activo)).toEqual({
       firstName: activo.firstName,
-      lastName: activo.lastName,
+      paternalLastName: 'Torres',
+      maternalLastName: 'Ruiz',
       documentTypeId: activo.documentType.id,
       documentNumber: activo.documentNumber,
       phone: '',
@@ -398,6 +446,7 @@ describe('la edición', () => {
       reason: '',
     })
     expect(workerEditDefaults(fakeWorkerDetail({ driver: fakeDriverProfile({ isActive: false }) })).hasLicense).toBe(false)
+    expect(workerEditDefaults(fakeWorkerDetail({ maternalLastName: null })).maternalLastName).toBe('')
     expect(workerEditDefaults(fakeWorkerDetail({ driver: null })).driver).toEqual({
       licenseNumber: '',
       licenseCategory: '',
