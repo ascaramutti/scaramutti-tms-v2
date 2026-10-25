@@ -34,9 +34,9 @@ public interface WorkerResourceMapper {
     ListWorkersQuery toListWorkersQuery(String q, Boolean isActive);
 
     /**
-     * El cuerpo del alta al command. Recorta los TRES textos que el contrato declara
-     * normalizados, y no les cambia la caja: el nombre de una persona se guarda como lo
-     * escribieron.
+     * El cuerpo del alta al command. Recorta los textos que el contrato declara normalizados, y
+     * no les cambia la caja: el nombre de una persona se guarda como lo escribieron. Un materno
+     * vacio o de espacios llega nulo, que es como la base guarda "sin materno".
      *
      * <p>El telefono NO se recorta, porque su formato ya exige nueve digitos exactos y
      * cualquier espacio lo rechaza el borde. El cargo tampoco: es el nombre de sistema de una
@@ -50,6 +50,8 @@ public interface WorkerResourceMapper {
      */
     @Mapping(target = "firstName",      source = "firstName",      qualifiedByName = "trimToNull")
     @Mapping(target = "lastName",       source = "lastName",       qualifiedByName = "trimToNull")
+    @Mapping(target = "paternalLastName", source = "paternalLastName", qualifiedByName = "trimToNull")
+    @Mapping(target = "maternalLastName", source = "maternalLastName", qualifiedByName = "trimToNull")
     @Mapping(target = "documentNumber", source = "documentNumber", qualifiedByName = "trimToNull")
     CreateWorkerCommand toCreateWorkerCommand(WorkerRequest workerRequest);
 
@@ -70,9 +72,9 @@ public interface WorkerResourceMapper {
         WorkerDriverProfileRequest workerDriverProfileRequest);
 
     /**
-     * El cuerpo de la edicion al command. Recorta los mismos tres textos que el alta y ademas el
-     * MOTIVO: diez espacios no son una justificacion, y al llegar nulo el servicio los trata como
-     * ausentes, que es lo que el caso de negocio quiere.
+     * El cuerpo de la edicion al command. Recorta el nombre, el apellido y el documento, como
+     * el alta, y ademas el MOTIVO: diez espacios no son una justificacion, y al llegar nulo el
+     * servicio los trata como ausentes, que es lo que el caso de negocio quiere.
      *
      * <p>El id viaja aparte porque viene de la ruta y no del cuerpo: es lo que impide que alguien
      * edite a un trabajador mandando el id de otro adentro del JSON.

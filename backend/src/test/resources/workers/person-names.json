@@ -1,5 +1,5 @@
 {
-  "_": "Casos comunes de la regla de nombre: los lee el test del backend contra PersonNames.PATTERN y el del formulario contra el patron que publica el contrato. Los signos van en cualquier posicion, asi que '-Ana' entra.",
+  "_": "Casos comunes de la regla de nombre: los lee el test del backend contra PersonNames.PATTERN y el del formulario contra el patron que publica el contrato. Los signos van en cualquier posicion, asi que '-Ana' entra. acceptedOnlyAsMaternal entra solo en el materno (PersonNames.MATERNAL_PATTERN), que es opcional.",
   "accepted": [
     "Mar\u00eda Jos\u00e9",
     "D'Angelo",
@@ -11,6 +11,11 @@
     "'t Hooft",
     "Jose\u0301",
     "-Ana"
+  ],
+  "acceptedOnlyAsMaternal": [
+    "",
+    " ",
+    "   "
   ],
   "rejected": [
     "6564565",
@@ -29,6 +34,8 @@
     "Juan \u2161",
     "Pe\u0303g\u0303a",
     "\u0301Ana",
-    "Juan\tCarlos"
+    "Juan\tCarlos",
+    "\t",
+    "\u00a0"
   ]
 }

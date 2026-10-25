@@ -205,8 +205,13 @@ public class WorkerService {
     private Worker newWorker(CreateWorkerCommand createWorkerCommand, Role role, Integer currentUserId) {
         Worker worker = new Worker();
         worker.firstName = createWorkerCommand.firstName();
-        // Mientras el alta reciba un solo apellido, entero es el paterno: la copia de la migracion.
-        worker.assignSurnames(createWorkerCommand.lastName(), null);
+        // Con paterno, las partes; sin el, el apellido de antes entero es el paterno, como en la
+        // migracion. Que venga uno de los dos lo exige el borde.
+        if (createWorkerCommand.paternalLastName() != null) {
+            worker.assignSurnames(createWorkerCommand.paternalLastName(), createWorkerCommand.maternalLastName());
+        } else {
+            worker.assignSurnames(createWorkerCommand.lastName(), null);
+        }
         worker.documentTypeId = createWorkerCommand.documentTypeId();
         worker.documentNumber = createWorkerCommand.documentNumber();
         worker.phone = createWorkerCommand.phone();

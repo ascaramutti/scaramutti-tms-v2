@@ -3,7 +3,7 @@ package com.scaramutti.tms.workers.dto;
 import java.text.Normalizer;
 
 /**
- * La regla del nombre y el apellido de un trabajador, compartida por el alta y la edicion.
+ * La regla del nombre y los apellidos de un trabajador, compartida por el alta y la edicion.
  *
  * <p>Se pasa a NFC en el constructor del record, antes de que corra Bean Validation: una tilde
  * que llega como letra mas marca combinante no es letra y la regla la rechazaria. El recorte
@@ -18,6 +18,12 @@ public final class PersonNames {
      * asi la expresion no retrocede. Una marca que NFC no compone queda suelta y se rechaza.
      */
     public static final String PATTERN = "^[' -]*[\\p{IsLatin}&&\\p{L}][[\\p{IsLatin}&&\\p{L}]' -]*$";
+
+    /**
+     * El materno, ademas, puede venir vacio o solo con espacios: es opcional, y el mapper lo deja
+     * nulo. Nulo tambien entra, como en toda regla de Bean Validation.
+     */
+    public static final String MATERNAL_PATTERN = "^ *$|" + PATTERN;
 
     public static final String MESSAGE = "Solo letras, espacios, apóstrofo o guion.";
 

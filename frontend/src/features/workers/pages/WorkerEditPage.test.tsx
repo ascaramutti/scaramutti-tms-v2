@@ -531,6 +531,7 @@ describe('WorkerEditPage', () => {
 
     it.each([
       ['espacios en los bordes del nombre', 'Nombre', ' José Juan '],
+      ['espacios en los bordes del apellido', 'Apellido', ' Pérez Huamán '],
       ['la tilde del apellido escrita como letra más marca', 'Apellido', 'Pe\u0301rez Huama\u0301n'],
       ['la tilde del nombre escrita como letra más marca', 'Nombre', 'Jose\u0301 Juan'],
       ['espacios en los bordes del número', 'Número de documento', ' X1234567 '],

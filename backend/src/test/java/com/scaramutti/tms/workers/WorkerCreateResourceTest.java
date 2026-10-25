@@ -11,6 +11,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.sql.Connection;
@@ -20,6 +21,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 import static com.scaramutti.tms.support.LockWaiters.UNTIL_IT_ARRIVES_MILLIS;
 import static com.scaramutti.tms.support.LockWaiters.awaitWaiters;
@@ -416,7 +418,10 @@ class WorkerCreateResourceTest {
         .then().statusCode(400).body("code", equalTo("COM-001"));
     }
 
-    /** Un solo caso fija los seis obligatorios: sacarle la anotacion a cualquiera muere aca. */
+    /**
+     * Un solo caso fija los seis obligatorios: sacarle la anotacion a cualquiera muere aca. El
+     * apellido sale como el paterno, que es el que falta cuando no viene ninguno.
+     */
     @Test
     void create_withAnEmptyJsonObject_reportsTheSixRequiredFields() {
         post(adminToken()).body("{}")
@@ -424,7 +429,7 @@ class WorkerCreateResourceTest {
         .then().statusCode(400)
             .body("code", equalTo("COM-001"))
             .body("errors.field", containsInAnyOrder(
-                "firstName", "lastName", "documentTypeId", "documentNumber", "role", "hireDate"));
+                "firstName", "paternalLastName", "documentTypeId", "documentNumber", "role", "hireDate"));
     }
 
     @ParameterizedTest(name = "{0} invalido -> 400 COM-001")
@@ -634,6 +639,176 @@ class WorkerCreateResourceTest {
 
         assertEquals("Jos\u00e9", fixtures.workerRowOf(id).firstName());
         assertEquals("P\u00e9rez", fixtures.workerRowOf(id).lastName());
+    }
+
+    // ---------- los apellidos ------------------------------------------------------
+
+    /** El cuerpo minimo con los apellidos que se le pasan (JSON sin llaves; vacio, ninguno). */
+    private String bodyWithSurnames(String surnames, String documentNumber) {
+        return String.format("""
+            {"firstName":"Juan",%s"documentTypeId":%d,"documentNumber":"%s",
+             "role":"operator","hireDate":"2024-03-01"}""",
+            surnames.isEmpty() ? "" : surnames + ",", documentTypeId(), documentNumber);
+    }
+
+    @Test
+    void create_withBothSurnames_storesEachPart_andComposesTheSurname() {
+        Response created = post(adminToken())
+            .body(bodyWithSurnames("\"paternalLastName\":\"Pérez\",\"maternalLastName\":\"Huamán\"", "ZTESTC201"))
+        .when().post("/workers");
+
+        assertEquals(201, created.statusCode());
+        int id = created.path("id");
+        assertSameAsTheNextGet(created, id, "Pérez Huamán", "Pérez", "Huamán", "Juan Pérez Huamán");
+        assertEquals("Pérez Huamán|Pérez|Huamán", fixtures.workerSurnames(id));
+    }
+
+    /** Con paterno, el apellido de antes que viene al lado no se guarda: mandan las partes. */
+    @Test
+    void create_withAPaternal_ignoresTheLastNameThatComesWithIt() {
+        Response created = post(adminToken())
+            .body(bodyWithSurnames("\"lastName\":\"Otro Apellido\",\"paternalLastName\":\"Pérez\"", "ZTESTC202"))
+        .when().post("/workers");
+
+        assertEquals(201, created.statusCode());
+        int id = created.path("id");
+        assertSameAsTheNextGet(created, id, "Pérez", "Pérez", null, "Juan Pérez");
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+    }
+
+    /** El cuerpo de antes, con un materno vacio al lado: el apellido entero es el paterno. */
+    @Test
+    void create_withOnlyTheLastName_andABlankMaternal_copiesTheLastNameToThePaternal() {
+        Response created = post(adminToken())
+            .body(bodyWithSurnames("\"lastName\":\"Pérez Huamán\",\"maternalLastName\":\"  \"", "ZTESTC203"))
+        .when().post("/workers");
+
+        assertEquals(201, created.statusCode());
+        assertEquals("Pérez Huamán|Pérez Huamán|nulo", fixtures.workerSurnames(created.path("id")));
+    }
+
+    @Test
+    void create_withNeitherSurname_returns400_COM001_onThePaternal() {
+        post(adminToken()).body(bodyWithSurnames("", "ZTESTC204"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("paternalLastName"))
+            .body("errors.message", hasItem("Indica el apellido paterno."));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC204"));
+    }
+
+    /** Un materno sin paterno no se guarda como si fuera el unico apellido, venga o no el de antes. */
+    @ParameterizedTest(name = "{0} -> 400 en el paterno")
+    @ValueSource(strings = {
+        "\"maternalLastName\":\"Huamán\"",
+        "\"lastName\":\"Pérez\",\"maternalLastName\":\"Huamán\"",
+    })
+    void create_withAMaternalButNoPaternal_returns400_COM001_onThePaternal(String surnames) {
+        post(adminToken()).body(bodyWithSurnames(surnames, "ZTESTC205"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("paternalLastName"));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC205"));
+    }
+
+    @Test
+    void create_withAPaternal_stillValidatesTheLastName() {
+        post(adminToken())
+            .body(bodyWithSurnames("\"lastName\":\"Juan2\",\"paternalLastName\":\"Pérez\"", "ZTESTC206"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("lastName"));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC206"));
+    }
+
+    static Stream<String> partsOutsideTheRule() {
+        return Stream.of("   ", "", "Pérez2", "Ana@", "A".repeat(101));
+    }
+
+    @ParameterizedTest(name = "paterno [{0}] -> 400 COM-001")
+    @MethodSource("partsOutsideTheRule")
+    void create_withAPaternalOutsideTheRule_returns400_COM001(String paternal) {
+        post(adminToken()).body(bodyWithSurnames("\"paternalLastName\":\"" + paternal + "\"", "ZTESTC207"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("paternalLastName"));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC207"));
+    }
+
+    /** El materno vacio de las cuatro formas se guarda nulo y la ficha lo manda nulo, con su clave. */
+    @ParameterizedTest(name = "materno [{0}] -> nulo")
+    @ValueSource(strings = {
+        "",
+        ",\"maternalLastName\":null",
+        ",\"maternalLastName\":\"\"",
+        ",\"maternalLastName\":\"   \"",
+    })
+    void create_aBlankOrAbsentMaternal_isStoredAsNull(String maternal) {
+        Response created = post(adminToken())
+            .body(bodyWithSurnames("\"paternalLastName\":\"Pérez\"" + maternal, "ZTESTC208"))
+        .when().post("/workers");
+
+        assertEquals(201, created.statusCode());
+        int id = created.path("id");
+        assertSameAsTheNextGet(created, id, "Pérez", "Pérez", null, "Juan Pérez");
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+    }
+
+    static Stream<String> maternalsOutsideTheRule() {
+        return Stream.of("Huamán2", "Ana@", "' - '", "A".repeat(101));
+    }
+
+    @ParameterizedTest(name = "materno [{0}] -> 400 COM-001")
+    @MethodSource("maternalsOutsideTheRule")
+    void create_withAMaternalOutsideTheRule_returns400_COM001(String maternal) {
+        post(adminToken())
+            .body(bodyWithSurnames(
+                "\"paternalLastName\":\"Pérez\",\"maternalLastName\":\"" + maternal + "\"", "ZTESTC209"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("maternalLastName"));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC209"));
+    }
+
+    /** Cada parte se valida en NFC (una tilde partida no es letra) y se guarda recortada. */
+    @Test
+    void create_theSurnameParts_areValidatedInNfc_andStoredTrimmed() {
+        Response created = post(adminToken()).body(bodyWithSurnames(
+                "\"paternalLastName\":\"  Pe\u0301rez \",\"maternalLastName\":\" Huama\u0301n  \"", "ZTESTC210"))
+        .when().post("/workers");
+
+        assertEquals(201, created.statusCode());
+        int id = created.path("id");
+        assertSameAsTheNextGet(created, id,
+            "P\u00e9rez Huam\u00e1n", "P\u00e9rez", "Huam\u00e1n", "Juan P\u00e9rez Huam\u00e1n");
+        assertEquals("P\u00e9rez Huam\u00e1n|P\u00e9rez|Huam\u00e1n", fixtures.workerSurnames(id));
+    }
+
+    /** Las dos partes, como el nombre: el tope se mide antes del recorte. */
+    @ParameterizedTest(name = "{0} de cien con espacios al borde -> 400 COM-001")
+    @ValueSource(strings = {"paternalLastName", "maternalLastName"})
+    void create_aSurnamePartOfMaximumLengthSurroundedBySpaces_returns400_COM001(String part) {
+        String padded = "\" " + "A".repeat(100) + " \"";
+        String surnames = part.equals("paternalLastName")
+            ? "\"paternalLastName\":" + padded
+            : "\"paternalLastName\":\"Pérez\",\"maternalLastName\":" + padded;
+        post(adminToken()).body(bodyWithSurnames(surnames, "ZTESTC211"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder(part));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC211"));
     }
 
     // ---------- validaciones de negocio -------------------------------------------

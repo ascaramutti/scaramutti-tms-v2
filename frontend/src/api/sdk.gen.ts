@@ -959,10 +959,12 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * la del escolta y la del ayudante con licencia existen, pero no se ofrecen
  * ni se asignan como conductor en los viajes.
  *
- * Normalización: `firstName`, `lastName`, `documentNumber`,
- * `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
- * bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
- * `firstName` y `lastName` pasan además a NFC antes de validarse.
+ * Normalización: `firstName`, `lastName`, `paternalLastName`,
+ * `maternalLastName`, `documentNumber`, `driver.licenseNumber` y
+ * `driver.licenseCategory` sin espacios en los bordes (un materno que
+ * queda vacío se guarda nulo); sin cambio de mayúsculas; `phone` y `role`
+ * tal cual llegan. Los nombres y los apellidos pasan además a NFC antes
+ * de validarse.
  *
  * Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
  * WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;
@@ -1050,11 +1052,13 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * Actualizar un trabajador y su ficha de conductor
  *
  * Reemplaza los datos editables con las mismas validaciones, normalización
- * y códigos que el alta. Es un REEMPLAZO y no un parche: un campo opcional
- * que no viene queda VACÍO (omitir `phone` lo borra). `isActive`,
- * `createdAt` y `createdBy` no cambian aunque el cuerpo intente mandarlos;
- * `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
- * cuerpo no cambia nada. Un trabajador inactivo también se edita.
+ * y códigos que el alta, salvo el apellido: la edición exige `lastName` y
+ * no lee `paternalLastName` ni `maternalLastName`. Es un REEMPLAZO y no un
+ * parche: un campo opcional que no viene queda VACÍO (omitir `phone` lo
+ * borra). `isActive`, `createdAt` y `createdBy` no cambian aunque el
+ * cuerpo intente mandarlos; `updatedAt` y `updatedBy` se ponen con la
+ * sesión, incluso cuando el cuerpo no cambia nada. Un trabajador inactivo
+ * también se edita.
  *
  * Unicidad contra los demás: guardar el propio número de documento o la
  * propia licencia sin cambios es `200`, no `409`.
