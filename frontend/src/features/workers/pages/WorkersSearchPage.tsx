@@ -62,7 +62,7 @@ export function WorkersSearchPage() {
     <div className="mx-auto max-w-[1024px] space-y-6 px-6 py-8">
       <PageHeader
         title="Trabajadores"
-        description="Busca por nombre, apellido o documento para ver quién está en el padrón."
+        description="Busca por nombre, apellidos o documento para ver quién está en el padrón."
         divider
         action={
           <Link to={`${WORKERS_BASE}/nuevo`} className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>

@@ -55,7 +55,8 @@ function trabajador(overrides: Partial<WorkerDetailResponse> = {}): WorkerDetail
     lastName: 'Pérez Huamán',
     paternalLastName: 'Pérez',
     maternalLastName: 'Huamán',
-    fullName: 'Juan Pérez Huamán',
+    // No es la unión de las partes, a propósito: la pantalla muestra el del servidor y no lo arma.
+    fullName: 'Juan Carlos Pérez Huamán',
     documentType: CE,
     documentNumber: 'X1234567',
     phone: '987654321',
@@ -140,7 +141,7 @@ describe('WorkerEditPage', () => {
       await listo()
 
       expect(screen.getByRole('heading', { level: 1, name: 'Editar trabajador' })).toBeInTheDocument()
-      expect(screen.getByText('Juan Pérez Huamán')).toBeInTheDocument()
+      expect(screen.getByText('Juan Carlos Pérez Huamán')).toBeInTheDocument()
       expect(screen.getByLabelText('Nombres')).toHaveValue('Juan')
       expect(screen.getByLabelText('Apellido paterno')).toHaveValue('Pérez')
       expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveValue('Huamán')
@@ -423,7 +424,9 @@ describe('WorkerEditPage', () => {
 
     it('un cambio guarda, avisa y vuelve a la ficha', async () => {
       const user = userEvent.setup()
-      const sink = capturar()
+      const sink: { ids?: number[]; bodies?: WorkerUpdateRequest[] } = {}
+      // El aviso dice el nombre que devuelve el servidor, que no es la unión de las partes a propósito.
+      server.use(updateWorkerCapture(sink, trabajador({ paternalLastName: 'Péreza', fullName: 'Juan Carlos Péreza Huamán' })))
       const { router } = renderPage(trabajador())
       await listo()
       await cambiarApellido(user)
@@ -431,7 +434,7 @@ describe('WorkerEditPage', () => {
 
       await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(ID)))
       expect(sink.bodies).toHaveLength(1)
-      expect(toast.success).toHaveBeenCalledWith('Se guardaron los cambios de Juan Péreza Huamán.')
+      expect(toast.success).toHaveBeenCalledWith('Se guardaron los cambios de Juan Carlos Péreza Huamán.')
     })
 
     it('una licencia apagada aparece precargada con un cargo que la exige, y viaja', async () => {
