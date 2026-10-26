@@ -52,7 +52,6 @@ function trabajador(overrides: Partial<WorkerDetailResponse> = {}): WorkerDetail
   return fakeWorkerDetail({
     id: ID,
     firstName: 'Juan',
-    lastName: 'Pérez Huamán',
     paternalLastName: 'Pérez',
     maternalLastName: 'Huamán',
     // No es la unión de las partes, a propósito: la pantalla muestra el del servidor y no lo arma.
@@ -369,8 +368,7 @@ describe('WorkerEditPage', () => {
       const user = userEvent.setup()
       const sink = capturar()
       const [paterno, materno] = ['P'.repeat(60), 'M'.repeat(60)]
-      const lastName = `${paterno} ${materno}`
-      renderPage(trabajador({ lastName, paternalLastName: paterno, maternalLastName: materno, fullName: `Juan ${lastName}` }))
+      renderPage(trabajador({ paternalLastName: paterno, maternalLastName: materno, fullName: `Juan ${paterno} ${materno}` }))
       await listo()
       await user.type(screen.getByLabelText('Nombres'), 'o')
       await user.click(guardar())
@@ -606,7 +604,7 @@ describe('WorkerEditPage', () => {
     })
 
     it('un materno guardado como nulo abre vacío y no cuenta como cambio', async () => {
-      renderPage(trabajador({ lastName: 'Pérez', maternalLastName: null, fullName: 'Juan Pérez' }))
+      renderPage(trabajador({ maternalLastName: null, fullName: 'Juan Pérez' }))
       await listo()
       expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveValue('')
       expect(guardar()).toBeDisabled()
@@ -616,7 +614,7 @@ describe('WorkerEditPage', () => {
     it('una ficha con el materno nulo guarda otro cambio y el materno viaja null', async () => {
       const user = userEvent.setup()
       const sink = capturar()
-      renderPage(trabajador({ lastName: 'Pérez', maternalLastName: null, fullName: 'Juan Pérez' }))
+      renderPage(trabajador({ maternalLastName: null, fullName: 'Juan Pérez' }))
       await listo()
       await user.type(screen.getByLabelText('Nombres'), 'o')
       await user.click(guardar())
@@ -901,7 +899,6 @@ describe('WorkerEditPage', () => {
     it('vuelve a la ficha con lo devuelto y refresca el padrón, los conductores y los viajes', async () => {
       const user = userEvent.setup()
       const devuelto = trabajador({
-        lastName: 'Péreza Huamán',
         paternalLastName: 'Péreza',
         fullName: 'Juan Péreza Huamán',
         updatedAt: '2026-10-03T15:00:00Z',

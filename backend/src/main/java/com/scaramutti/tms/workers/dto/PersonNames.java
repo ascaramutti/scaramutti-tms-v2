@@ -27,6 +27,9 @@ public final class PersonNames {
 
     public static final String MESSAGE = "Solo letras, espacios, apóstrofo o guion.";
 
+    /** El paterno es el apellido que el alta y la edicion tienen que traer. */
+    public static final String PATERNAL_MISSING = "Indica el apellido paterno.";
+
     private PersonNames() {
     }
 

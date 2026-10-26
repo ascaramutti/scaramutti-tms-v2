@@ -49,7 +49,6 @@ public interface WorkerResourceMapper {
      * comportamiento del modulo de clientes y esta medido como caso propio.
      */
     @Mapping(target = "firstName",      source = "firstName",      qualifiedByName = "trimToNull")
-    @Mapping(target = "lastName",       source = "lastName",       qualifiedByName = "trimToNull")
     @Mapping(target = "paternalLastName", source = "paternalLastName", qualifiedByName = "trimToNull")
     @Mapping(target = "maternalLastName", source = "maternalLastName", qualifiedByName = "trimToNull")
     @Mapping(target = "documentNumber", source = "documentNumber", qualifiedByName = "trimToNull")
@@ -81,7 +80,6 @@ public interface WorkerResourceMapper {
      */
     @Mapping(target = "workerId",       source = "workerId")
     @Mapping(target = "firstName",      source = "workerUpdateRequest.firstName",      qualifiedByName = "trimToNull")
-    @Mapping(target = "lastName",       source = "workerUpdateRequest.lastName",       qualifiedByName = "trimToNull")
     @Mapping(target = "paternalLastName", source = "workerUpdateRequest.paternalLastName",
              qualifiedByName = "trimToNull")
     @Mapping(target = "maternalLastName", source = "workerUpdateRequest.maternalLastName",

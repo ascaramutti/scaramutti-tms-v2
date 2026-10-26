@@ -1127,28 +1127,24 @@ export type WorkerDriverProfileResponse = {
  * como enum: la lista vive en la base). `hireDate` es un día calendario
  * (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
  * nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
- * `firstName`, `lastName`, `paternalLastName` y `maternalLastName` (este,
- * además, puede venir vacío: abajo): al menos una letra latina (letra de
+ * `firstName`, `paternalLastName` y `maternalLastName` (este, además,
+ * puede venir vacío: abajo): al menos una letra latina (letra de
  * script latino según la versión de Unicode del backend, 15.0), más
  * espacios, apóstrofo y guion; se pasan a NFC antes de validarse (pasados
  * 400 caracteres no se normalizan: se rechazan por largo tal como llegan)
  * y se guardan recortados.
  *
- * Los apellidos: con `paternalLastName` se guardan el paterno y el
- * materno, y `lastName`, si viene, se valida pero no se usa. Sin paterno,
- * un `lastName` solo (el cuerpo de antes) se guarda entero como paterno,
- * sin materno; en la edición, si es igual al guardado, deja las partes
- * como están (`updateWorker`). Sin ninguno de los dos, o con materno y
- * sin paterno → `400 COM-001` en `paternalLastName`. `maternalLastName`
- * ausente, nulo, vacío o solo de espacios es "sin materno", como si no
- * viniera (con paterno, se guarda nulo). Una parte fuera de su regla o
- * de más de 100 caracteres → `400 COM-001` en su campo.
+ * Los apellidos: `paternalLastName` es obligatorio (ausente o en blanco →
+ * `400 COM-001` en su campo); `maternalLastName` ausente, nulo, vacío o
+ * solo de espacios es "sin materno" y se guarda nulo. Una parte fuera de
+ * su regla o de más de 100 caracteres → `400 COM-001` en su campo. El
+ * apellido de antes en un solo campo, `lastName`, ya no es parte del
+ * cuerpo: si viene, se ignora.
  *
  */
 export type WorkerRequest = {
     firstName: string;
-    lastName?: string;
-    paternalLastName?: string;
+    paternalLastName: string;
     maternalLastName?: string | null;
     documentTypeId: number;
     documentNumber: string;
@@ -1194,14 +1190,12 @@ export type WorkerUpdateRequest = WorkerRequest & {
  * (`createdAt`, `updatedAt`); `hireDate` es día calendario.
  * `fullName` une nombres, paterno y materno con un espacio, sin el
  * materno si es nulo, y recorta los espacios de los extremos;
- * `maternalLastName` es nulo si el trabajador no tiene materno, y
- * `lastName` son los dos apellidos juntos.
+ * `maternalLastName` es nulo si el trabajador no tiene materno.
  *
  */
 export type WorkerDetailResponse = {
     id: number;
     firstName: string;
-    lastName: string;
     paternalLastName: string;
     maternalLastName: string | null;
     fullName: string;

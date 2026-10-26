@@ -557,7 +557,7 @@ describe('fin de sesión', () => {
       http.post(`${API}/workers/:id/deactivate`, async ({ params }) => {
         await baja.abierta
         return HttpResponse.json(
-          fakeWorkerDetail({ id: Number(params.id), firstName: 'Ficha', lastName: 'de-Ana', isActive: false }),
+          fakeWorkerDetail({ id: Number(params.id), firstName: 'Ficha', paternalLastName: 'de-Ana', isActive: false }),
         )
       }),
     )
@@ -733,7 +733,7 @@ describe('fin de sesión', () => {
       http.post(`${API}/workers/:id/deactivate`, async ({ params }) => {
         await baja.abierta
         return HttpResponse.json(
-          fakeWorkerDetail({ id: Number(params.id), firstName: 'Ficha', lastName: 'de-Beto', isActive: false }),
+          fakeWorkerDetail({ id: Number(params.id), firstName: 'Ficha', paternalLastName: 'de-Beto', isActive: false }),
         )
       }),
     )

@@ -83,7 +83,7 @@ class WorkerEditOrderedLockTest {
     /** El cuerpo que reenvia la ficha de un actor sembrado, con el cargo pedido. */
     private String actorBody(String seededRole, String suffix, String newRole) {
         return """
-            {"firstName":"Actor","lastName":"%s","documentTypeId":%d,"documentNumber":"ZTESTA%s",
+            {"firstName":"Actor","paternalLastName":"%s","documentTypeId":%d,"documentNumber":"ZTESTA%s",
              "role":"%s","hireDate":"2024-03-01"}""".formatted(
                 seededRole.replace('_', ' '), documentTypeId(), suffix, newRole);
     }
@@ -172,7 +172,7 @@ class WorkerEditOrderedLockTest {
             }
             Future<String> response = executor.submit(() ->
                 edit(token, target, """
-                    {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTJ004",
+                    {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTJ004",
                      "role":"assistant","hireDate":"2024-03-01"}""".formatted(documentTypeId())));
             assertEquals("409 WRK-013", response.get(30, TimeUnit.SECONDS));
             holder.rollback();
@@ -188,7 +188,7 @@ class WorkerEditOrderedLockTest {
     void update_byASessionWhoseUserNoLongerExists_returns403_COM003() {
         int target = seedTarget();
         assertEquals("403 COM-003", edit(fabricateTokenForUser(999999, "ztestghost", "admin"), target, """
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTJ004",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTJ004",
              "role":"assistant","hireDate":"2024-03-01"}""".formatted(documentTypeId())));
         assertEquals(fixtures.roleIdOf("operator"), fixtures.workerRowOf(target).roleId(), "el destino no se movio");
     }
@@ -216,7 +216,7 @@ class WorkerEditOrderedLockTest {
         }
         int spare = fixtures.seedWorker("ZTESTJ011", "Juan", "Pérez", "operator", true);
         String editBody = """
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTJ012",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTJ012",
              "role":"%s","hireDate":"2024-03-01","reason":"Correccion del documento"%s}"""
             .formatted(documentTypeId(), targetRole, driver);
         String actorToken = fabricateTokenForUser(actor.userId(), "ztestuserK5", actorRole);

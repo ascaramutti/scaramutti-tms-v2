@@ -74,15 +74,18 @@ class WorkerUpdateRequestTest {
             "los campos compartidos, con sus anotaciones, tienen que ser identicos y en el mismo orden");
     }
 
-    /** La regla de clase, la de cual apellido tiene que venir, tambien es la misma en los dos. */
+    /**
+     * Las reglas de clase tambien son las mismas en los dos. Hoy ninguno lleva una: que venga el
+     * paterno lo exige su propia anotacion, que el caso de arriba compara.
+     */
     @Test
     void theUpdateBody_carriesTheClassRulesOfTheCreateBody() {
         List<String> alta = reglasDeClaseDe(WorkerRequest.class);
 
-        assertTrue(alta.stream().anyMatch(regla -> regla.contains("SurnamesGiven")), "el alta lleva la regla: " + alta);
+        assertEquals(List.of(), alta, "el alta no lleva reglas de clase");
         assertEquals(alta, reglasDeClaseDe(WorkerUpdateRequest.class));
         assertEquals(List.of(WorkerRequest.class.getInterfaces()), List.of(WorkerUpdateRequest.class.getInterfaces()),
-            "la regla lee los dos cuerpos por la misma interfaz");
+            "los dos cuerpos implementan las mismas interfaces (hoy, ninguna)");
     }
 
     private List<String> reglasDeClaseDe(Class<?> record) {

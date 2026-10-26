@@ -216,7 +216,7 @@ class WorkersSchemaMigrationTest {
      */
     private int insertWorker(Connection connection, String documentNumber, boolean withHireDate)
             throws SQLException {
-        String columns = "first_name, last_name, document_type_id, document_number, role_id"
+        String columns = "first_name, paternal_last_name, document_type_id, document_number, role_id"
             + (withHireDate ? ", hire_date" : "");
         String values = "'ZTEST', 'Migracion', " + anyDocumentTypeId(connection) + ", '"
             + documentNumber + "', " + roleId(connection, "operator")

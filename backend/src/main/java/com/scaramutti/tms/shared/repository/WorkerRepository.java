@@ -61,6 +61,14 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
+     * Las columnas que mapea {@link Worker}, nombradas: un {@code w.*} traeria tambien la de antes
+     * del apellido, y el dia que se borre, el plan preparado de esa consulta cambiaria de forma.
+     */
+    private static final String WORKER_COLUMNS = "w.id, w.first_name, w.paternal_last_name, w.maternal_last_name, "
+        + "w.document_type_id, w.document_number, w.phone, w.role_id, w.hire_date, w.is_active, "
+        + "w.created_by, w.updated_by, w.created_at, w.updated_at";
+
+    /**
      * Listado (sin paginar) de {@code public.workers} para el combobox "quien recibe" del
      * retiro y para la busqueda del padron (GET /workers). {@code q} es multi-palabra (molde
      * suppliers/products): cada palabra debe matchear en alguna de las columnas buscadas, los
@@ -88,7 +96,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             params.put("isActive", isActive);
         }
         String where = conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions) + " ";
-        String sql = "SELECT w.* FROM public.workers w " + where + "ORDER BY " + fullNameOrder("w");
+        String sql = "SELECT " + WORKER_COLUMNS + " FROM public.workers w " + where + "ORDER BY " + fullNameOrder("w");
 
         Query query = getEntityManager().createNativeQuery(sql, Worker.class);
         params.forEach(query::setParameter);
@@ -115,11 +123,11 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
      * <p>{@code hasUser} es verdadero tambien con el usuario inactivo: desactivar un
      * trabajador apaga la cuenta y no la borra, y la pantalla necesita saber que sigue ahi.
      *
-     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y seis: leerlas por
+     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y cinco: leerlas por
      * numero es el modo de falla obvio el dia que alguien agregue una en el medio.
      */
     public Optional<WorkerDetailRow> findDetailById(Integer workerId) {
-        String sql = "SELECT w.id AS w_id, w.first_name AS w_first_name, w.last_name AS w_last_name, "
+        String sql = "SELECT w.id AS w_id, w.first_name AS w_first_name, "
             + "w.paternal_last_name AS w_paternal_last_name, w.maternal_last_name AS w_maternal_last_name, "
             + fullNameExpression("w") + " AS w_full_name, "
             + "w.document_number AS w_document_number, w.phone AS w_phone, w.hire_date AS w_hire_date, "
@@ -162,7 +170,6 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
         return new WorkerDetailRow(
             intOf(row, "w_id"),
             (String) row.get("w_first_name"),
-            (String) row.get("w_last_name"),
             (String) row.get("w_paternal_last_name"),
             (String) row.get("w_maternal_last_name"),
             (String) row.get("w_full_name"),
@@ -230,7 +237,6 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     public record WorkerDetailRow(
         Integer id,
         String firstName,
-        String lastName,
         String paternalLastName,
         String maternalLastName,
         String fullName,

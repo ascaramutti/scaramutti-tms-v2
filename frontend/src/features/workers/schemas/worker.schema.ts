@@ -248,8 +248,7 @@ export function workerEditDefaults(worker: WorkerDetailResponse): WorkerFormValu
 }
 
 /**
- * El cuerpo del request. Sin licencia, la clave `driver` no viaja. Los apellidos van por partes y
- * sin `lastName`: el backend lo valida aunque no lo use, y uno de más de 100 daría 400.
+ * El cuerpo del request. Sin licencia, la clave `driver` no viaja. Los apellidos van por partes.
  */
 export function toWorkerRequest(values: WorkerFormValues, roles: readonly RoleResponse[]): WorkerRequest {
   const request: WorkerRequest = {

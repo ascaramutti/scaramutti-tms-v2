@@ -1,6 +1,5 @@
 package com.scaramutti.tms.workers.dto;
 
-import com.scaramutti.tms.workers.validation.SurnamesGiven;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -25,15 +24,12 @@ import java.time.LocalDate;
  * <p>Lo que el servidor pone y este cuerpo no puede mover: si esta activo, cuando se creo,
  * quien lo creo, cuando se modifico y quien. No estan aca, y por eso no hay nada que ignorar.
  */
-@SurnamesGiven
 public record WorkerRequest(
     @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
     @Schema(example = "Juan") String firstName,
 
-    @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
-    @Schema(example = "Pérez Huamán") String lastName,
-
-    @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
+    @NotBlank(message = PersonNames.PATERNAL_MISSING) @Size(max = 100)
+    @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
     @Schema(example = "Pérez") String paternalLastName,
 
     @Size(max = 100) @Pattern(regexp = PersonNames.MATERNAL_PATTERN, message = PersonNames.MESSAGE)
@@ -56,10 +52,9 @@ public record WorkerRequest(
 
     @Valid
     @Schema(nullable = true) WorkerDriverProfileRequest driver
-) implements WorkerSurnamesBody {
+) {
     public WorkerRequest {
         firstName = PersonNames.toNfc(firstName);
-        lastName = PersonNames.toNfc(lastName);
         paternalLastName = PersonNames.toNfc(paternalLastName);
         maternalLastName = PersonNames.toNfc(maternalLastName);
     }

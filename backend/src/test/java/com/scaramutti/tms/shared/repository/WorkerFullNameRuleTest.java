@@ -17,8 +17,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * El nombre completo tiene una regla escrita dos veces, en {@link Worker#fullName()} y en
  * {@link WorkerRepository#fullNameExpression}. Cada fila sintetica se graba como la graba la
  * aplicacion, con {@link Worker#assignSurnames}, y las dos reglas tienen que dar el nombre esperado,
- * igual que la de la imagen anterior sobre {@code last_name}. Reemplaza al caso que fijaba el texto
- * de la expresion: ese pasaba con cualquier regla mientras no cambiara la cadena.
+ * igual que la de la imagen anterior sobre {@code last_name}, que la entidad ya no manda: la compone el
+ * disparador al insertar. Reemplaza al caso que fijaba el texto de la expresion.
  */
 @QuarkusTest
 class WorkerFullNameRuleTest {
@@ -55,7 +55,6 @@ class WorkerFullNameRuleTest {
             worker.hireDate = LocalDate.of(2024, 3, 1);
             entityManager.persist(worker);
             entityManager.flush();
-            String lastNameInMemory = worker.lastName;
             Object[] row = (Object[]) entityManager.createNativeQuery("SELECT w.last_name, "
                     + WorkerRepository.fullNameExpression("w") + ", trim(w.first_name || ' ' || w.last_name) "
                     + "FROM public.workers w WHERE w.id = :id")
@@ -67,7 +66,8 @@ class WorkerFullNameRuleTest {
             assertEquals(fullName, reread.fullName(), "la regla Java sobre la fila releida");
             assertEquals(fullName, row[1], "la regla SQL");
             assertEquals(fullName, row[2], "la regla de la imagen anterior, sobre last_name");
-            assertEquals(row[0], lastNameInMemory, "last_name, compuesto por assignSurnames y por el disparador");
+            assertEquals(maternal == null ? paternal : paternal + " " + maternal, row[0],
+                "last_name, compuesto por el disparador con las partes");
         } finally {
             transaction.rollback();
         }

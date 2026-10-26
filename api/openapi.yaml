@@ -1401,8 +1401,8 @@ paths:
         `dispatcher` y `sales`): la del escolta y la del ayudante con licencia
         existen, pero no se ofrecen ni se asignan como conductor en los viajes.
 
-        Normalización: `firstName`, `lastName`, `paternalLastName`,
-        `maternalLastName`, `documentNumber`, `driver.licenseNumber` y
+        Normalización: `firstName`, `paternalLastName`, `maternalLastName`,
+        `documentNumber`, `driver.licenseNumber` y
         `driver.licenseCategory` sin espacios en los bordes (un materno que
         queda vacío se guarda nulo); sin cambio de mayúsculas; `phone` y `role`
         tal cual llegan. Los nombres y los apellidos pasan además a NFC antes
@@ -1527,13 +1527,8 @@ paths:
         `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
         cuerpo no cambia nada. Un trabajador inactivo también se edita.
 
-        Los apellidos, como en el alta salvo un `lastName` solo: con
-        `paternalLastName` se guardan el paterno y el materno (un materno que no
-        viene se borra), y `lastName`, si viene, se valida pero no se usa. Sin
-        paterno, un `lastName` igual al guardado deja las partes como están, y
-        uno distinto se guarda entero como paterno, sin materno. Sin ninguno de
-        los dos, o con materno y sin paterno → `400 COM-001` en
-        `paternalLastName`.
+        Los apellidos, como en el alta: se guardan el paterno y el materno, y un
+        materno que no viene se borra.
 
         Unicidad contra los demás: guardar el propio número de documento o la
         propia licencia sin cambios es `200`, no `409`.
@@ -1550,7 +1545,7 @@ paths:
         Cada campo efectivamente cambiado deja UNA fila de auditoría con el
         valor anterior y el nuevo; los campos que se reenvían sin cambios no
         dejan ninguna. El apellido se anota por parte (`paternalLastName` y
-        `maternalLastName`, el materno vacío como nulo), nunca como `lastName`.
+        `maternalLastName`, el materno vacío como nulo).
         El cargo se guarda por su nombre de sistema y el tipo de
         documento por su código, nunca por su id ni por su nombre visible: un
         renombre dejaría el historial mintiendo.
@@ -4896,26 +4891,22 @@ components:
         como enum: la lista vive en la base). `hireDate` es un día calendario
         (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
         nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
-        `firstName`, `lastName`, `paternalLastName` y `maternalLastName` (este,
-        además, puede venir vacío: abajo): al menos una letra latina (letra de
+        `firstName`, `paternalLastName` y `maternalLastName` (este, además,
+        puede venir vacío: abajo): al menos una letra latina (letra de
         script latino según la versión de Unicode del backend, 15.0), más
         espacios, apóstrofo y guion; se pasan a NFC antes de validarse (pasados
         400 caracteres no se normalizan: se rechazan por largo tal como llegan)
         y se guardan recortados.
 
-        Los apellidos: con `paternalLastName` se guardan el paterno y el
-        materno, y `lastName`, si viene, se valida pero no se usa. Sin paterno,
-        un `lastName` solo (el cuerpo de antes) se guarda entero como paterno,
-        sin materno; en la edición, si es igual al guardado, deja las partes
-        como están (`updateWorker`). Sin ninguno de los dos, o con materno y
-        sin paterno → `400 COM-001` en `paternalLastName`. `maternalLastName`
-        ausente, nulo, vacío o solo de espacios es "sin materno", como si no
-        viniera (con paterno, se guarda nulo). Una parte fuera de su regla o
-        de más de 100 caracteres → `400 COM-001` en su campo.
-      required: [firstName, documentTypeId, documentNumber, role, hireDate]
+        Los apellidos: `paternalLastName` es obligatorio (ausente o en blanco →
+        `400 COM-001` en su campo); `maternalLastName` ausente, nulo, vacío o
+        solo de espacios es "sin materno" y se guarda nulo. Una parte fuera de
+        su regla o de más de 100 caracteres → `400 COM-001` en su campo. El
+        apellido de antes en un solo campo, `lastName`, ya no es parte del
+        cuerpo: si viene, se ignora.
+      required: [firstName, paternalLastName, documentTypeId, documentNumber, role, hireDate]
       properties:
         firstName:      { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Juan' }
-        lastName:       { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez Huamán' }
         paternalLastName: { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez' }
         maternalLastName: { type: [string, 'null'], maxLength: 100, pattern: '^ *$|^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Huamán' }
         documentTypeId: { type: integer, format: int32, example: 1 }
@@ -4970,13 +4961,11 @@ components:
         (`createdAt`, `updatedAt`); `hireDate` es día calendario.
         `fullName` une nombres, paterno y materno con un espacio, sin el
         materno si es nulo, y recorta los espacios de los extremos;
-        `maternalLastName` es nulo si el trabajador no tiene materno, y
-        `lastName` son los dos apellidos juntos.
-      required: [id, firstName, lastName, paternalLastName, maternalLastName, fullName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
+        `maternalLastName` es nulo si el trabajador no tiene materno.
+      required: [id, firstName, paternalLastName, maternalLastName, fullName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
       properties:
         id:             { type: integer, format: int32, example: 8 }
         firstName:      { type: string, example: 'Juan' }
-        lastName:       { type: string, example: 'Pérez Huamán' }
         paternalLastName: { type: string, example: 'Pérez' }
         maternalLastName: { type: [string, 'null'], example: 'Huamán' }
         fullName:       { type: string, example: 'Juan Pérez Huamán' }

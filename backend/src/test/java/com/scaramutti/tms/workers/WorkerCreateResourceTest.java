@@ -35,6 +35,7 @@ import static com.scaramutti.tms.support.WorkerDetailNames.assertSameAsTheNextGe
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.everyItem;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
@@ -95,14 +96,14 @@ class WorkerCreateResourceTest {
      */
     private String body(String documentNumber, String role) {
         return String.format("""
-            {"firstName":"Juan","lastName":"Pérez Huamán","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez Huamán","documentTypeId":%d,
              "documentNumber":"%s","role":"%s","hireDate":"2024-03-01"}""",
             documentTypeId(), documentNumber, role);
     }
 
     private String bodyWithDriver(String documentNumber, String role, String driverJson) {
         return String.format("""
-            {"firstName":"Juan","lastName":"Pérez Huamán","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez Huamán","documentTypeId":%d,
              "documentNumber":"%s","role":"%s","hireDate":"2024-03-01","driver":%s}""",
             documentTypeId(), documentNumber, role, driverJson);
     }
@@ -114,9 +115,9 @@ class WorkerCreateResourceTest {
     // ---------- camino feliz -----------------------------------------------------
 
     @Test
-    void create_withTheFullBody_returns201WithTheEighteenKeys() {
+    void create_withTheFullBody_returns201WithTheSeventeenKeys() {
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez Huamán","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez Huamán","documentTypeId":%d,
              "documentNumber":"ZTESTC001","phone":"987654321","role":"operator",
              "hireDate":"2024-03-01"}""".formatted(documentTypeId()))
         .when().post("/workers")
@@ -125,12 +126,12 @@ class WorkerCreateResourceTest {
             // El conjunto ENTERO de claves: un campo de mas, que es como se filtra un dato sin
             // querer, tambien hace fallar el caso.
             .body("keySet()", containsInAnyOrder(
-                "id", "firstName", "lastName", "paternalLastName", "maternalLastName", "fullName",
+                "id", "firstName", "paternalLastName", "maternalLastName", "fullName",
                 "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
                 "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
             .body("id", notNullValue())
             .body("firstName", equalTo("Juan"))
-            .body("lastName", equalTo("Pérez Huamán"))
+            .body("paternalLastName", equalTo("Pérez Huamán"))
             .body("documentNumber", equalTo("ZTESTC001"))
             .body("phone", equalTo("987654321"))
             .body("documentType.code", equalTo("ZTDOC00"))
@@ -143,15 +144,14 @@ class WorkerCreateResourceTest {
             .body("driver", nullValue());
     }
 
-    /** El alta copia el apellido entero al paterno, y responde las partes que da el GET siguiente. */
+    /** El alta responde las partes que da el GET siguiente. */
     @Test
     void create_respondsWithTheSurnamesAndTheFullNameOfTheNextGet() {
         Response created = post(adminToken()).body(bodyWithDriver("ZTESTC191", "operator", "null"))
         .when().post("/workers");
 
         assertEquals(201, created.statusCode());
-        assertSameAsTheNextGet(created, created.path("id"),
-            "Pérez Huamán", "Pérez Huamán", null, "Juan Pérez Huamán");
+        assertSameAsTheNextGet(created, created.path("id"), "Pérez Huamán", null, "Juan Pérez Huamán");
     }
 
     /**
@@ -162,7 +162,7 @@ class WorkerCreateResourceTest {
     @Test
     void create_withTheRealDniType_returns201() {
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTEST001",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTEST001",
              "role":"operator","hireDate":"2024-03-01"}"""
             .formatted(fixtures.dniDocumentTypeId()))
         .when().post("/workers")
@@ -185,7 +185,7 @@ class WorkerCreateResourceTest {
     @Test
     void create_withPhoneExplicitlyNull_returns201() {
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC003",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC003",
              "phone":null,"role":"operator","hireDate":"2024-03-01"}"""
             .formatted(documentTypeId()))
         .when().post("/workers")
@@ -197,7 +197,7 @@ class WorkerCreateResourceTest {
     void create_withAFutureHireDate_returns201() {
         String future = LocalDate.now().plusYears(1).toString();
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC004",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC004",
              "role":"operator","hireDate":"%s"}"""
             .formatted(documentTypeId(), future))
         .when().post("/workers")
@@ -212,14 +212,14 @@ class WorkerCreateResourceTest {
     @Test
     void create_trimsTheBordersWithoutChangingCase() {
         post(adminToken()).body("""
-            {"firstName":"  juan Carlos  ","lastName":" PÉREZ huamán ","documentTypeId":%d,
+            {"firstName":"  juan Carlos  ","paternalLastName":" PÉREZ huamán ","documentTypeId":%d,
              "documentNumber":" ZTESTC010 ","role":"driver","hireDate":"2024-03-01",
              "driver":{"licenseNumber":" ztestl010 ","licenseCategory":"  a-IIIc  "}}"""
             .formatted(documentTypeId()))
         .when().post("/workers")
         .then().statusCode(201)
             .body("firstName", equalTo("juan Carlos"))
-            .body("lastName", equalTo("PÉREZ huamán"))
+            .body("paternalLastName", equalTo("PÉREZ huamán"))
             .body("documentNumber", equalTo("ZTESTC010"))
             .body("driver.licenseNumber", equalTo("ztestl010"))
             .body("driver.licenseCategory", equalTo("a-IIIc"));
@@ -435,7 +435,7 @@ class WorkerCreateResourceTest {
     @ParameterizedTest(name = "{0} invalido -> 400 COM-001")
     @CsvSource({
         "firstName,      '\"firstName\":\"   \"'",
-        "lastName,       '\"lastName\":\"   \"'",
+        "paternalLastName, '\"paternalLastName\":\"   \"'",
         "documentNumber, '\"documentNumber\":\"   \"'",
         "role,           '\"role\":\"   \"'",
     })
@@ -450,7 +450,7 @@ class WorkerCreateResourceTest {
     }
 
     @ParameterizedTest(name = "{0} demasiado largo -> 400 COM-001")
-    @CsvSource({"firstName, 101", "lastName, 101", "documentNumber, 21", "role, 51"})
+    @CsvSource({"firstName, 101", "paternalLastName, 101", "documentNumber, 21", "role, 51"})
     void create_withATextOverItsMaximum_returns400_COM001(String field, int length) {
         String tooLong = "A".repeat(length);
         post(adminToken()).body(bodyOverriding("\"" + field + "\":\"" + tooLong + "\"", "ZTESTC041"))
@@ -532,18 +532,18 @@ class WorkerCreateResourceTest {
     /** El cuerpo valido con UN campo reemplazado; el resto queda igual. */
     private String bodyOverriding(String override, String documentNumber) {
         return String.format("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"%s",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"%s",
              "role":"operator","hireDate":"2024-03-01",%s}""",
             documentTypeId(), documentNumber, override);
     }
 
     // ---------- la regla del nombre ------------------------------------------------
 
-    private String bodyNamed(String firstName, String lastName, String documentNumber) {
+    private String bodyNamed(String firstName, String paternalLastName, String documentNumber) {
         return String.format("""
-            {"firstName":"%s","lastName":"%s","documentTypeId":%d,"documentNumber":"%s",
+            {"firstName":"%s","paternalLastName":"%s","documentTypeId":%d,"documentNumber":"%s",
              "role":"operator","hireDate":"2024-03-01"}""",
-            firstName, lastName, documentTypeId(), documentNumber);
+            firstName, paternalLastName, documentTypeId(), documentNumber);
     }
 
     @ParameterizedTest(name = "{0} -> 201")
@@ -553,25 +553,25 @@ class WorkerCreateResourceTest {
         .when().post("/workers")
         .then().statusCode(201)
             .body("firstName", equalTo(name))
-            .body("lastName", equalTo(name));
+            .body("paternalLastName", equalTo(name));
     }
 
     @ParameterizedTest(name = "{0} = {1} -> 400 COM-001")
     @CsvSource({
         "firstName, 6564565", "firstName, Juan2", "firstName, Ana@", "firstName, Ana_",
         "firstName, Ana.",    "firstName, <b>",   "firstName, \u0301Ana",
-        "lastName,  6564565", "lastName,  Juan2", "lastName,  Ana@", "lastName,  Ana_",
-        "lastName,  Ana.",    "lastName,  <b>",   "lastName,  \u0301Ana",
+        "paternalLastName, 6564565", "paternalLastName, Juan2", "paternalLastName, Ana@", "paternalLastName, Ana_",
+        "paternalLastName, Ana.",    "paternalLastName, <b>",   "paternalLastName, \u0301Ana",
         "firstName, \u3164",  "firstName, Ju\u0430n", "firstName, \uD835\uDC09uan",
         "firstName, \u2160",  "firstName, Pe\u0303g\u0303a",
-        "lastName,  \u3164",  "lastName,  Ju\u0430n", "lastName,  \uD835\uDC09uan",
-        "lastName,  \u2160",  "lastName,  Pe\u0303g\u0303a",
-        "firstName, Juan \u2161", "lastName,  Juan \u2161",
+        "paternalLastName, \u3164",  "paternalLastName, Ju\u0430n", "paternalLastName, \uD835\uDC09uan",
+        "paternalLastName, \u2160",  "paternalLastName, Pe\u0303g\u0303a",
+        "firstName, Juan \u2161", "paternalLastName, Juan \u2161",
     })
     void create_withANameOutsideTheRule_returns400_COM001(String field, String value) {
         String firstName = field.equals("firstName") ? value : "Juan";
-        String lastName = field.equals("lastName") ? value : "Pérez";
-        post(adminToken()).body(bodyNamed(firstName, lastName, "ZTESTC161"))
+        String paternalLastName = field.equals("paternalLastName") ? value : "Pérez";
+        post(adminToken()).body(bodyNamed(firstName, paternalLastName, "ZTESTC161"))
         .when().post("/workers")
         .then().statusCode(400)
             .body("code", equalTo("COM-001"))
@@ -659,11 +659,11 @@ class WorkerCreateResourceTest {
 
         assertEquals(201, created.statusCode());
         int id = created.path("id");
-        assertSameAsTheNextGet(created, id, "Pérez Huamán", "Pérez", "Huamán", "Juan Pérez Huamán");
+        assertSameAsTheNextGet(created, id, "Pérez", "Huamán", "Juan Pérez Huamán");
         assertEquals("Pérez Huamán|Pérez|Huamán", fixtures.workerSurnames(id));
     }
 
-    /** Con paterno, el apellido de antes que viene al lado no se guarda: mandan las partes. */
+    /** El apellido de antes en un solo campo ya no es parte del cuerpo: al lado del paterno, no se guarda. */
     @Test
     void create_withAPaternal_ignoresTheLastNameThatComesWithIt() {
         Response created = post(adminToken())
@@ -672,19 +672,25 @@ class WorkerCreateResourceTest {
 
         assertEquals(201, created.statusCode());
         int id = created.path("id");
-        assertSameAsTheNextGet(created, id, "Pérez", "Pérez", null, "Juan Pérez");
+        assertSameAsTheNextGet(created, id, "Pérez", null, "Juan Pérez");
         assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
     }
 
-    /** El cuerpo de antes, con un materno vacio al lado: el apellido entero es el paterno. */
-    @Test
-    void create_withOnlyTheLastName_andABlankMaternal_copiesTheLastNameToThePaternal() {
-        Response created = post(adminToken())
-            .body(bodyWithSurnames("\"lastName\":\"Pérez Huamán\",\"maternalLastName\":\"  \"", "ZTESTC203"))
-        .when().post("/workers");
+    /** El cuerpo de antes, solo con el apellido entero, ya no da de alta: falta el paterno. */
+    @ParameterizedTest(name = "{0} -> 400 en el paterno")
+    @ValueSource(strings = {
+        "\"lastName\":\"Pérez Huamán\"",
+        "\"lastName\":\"Pérez Huamán\",\"maternalLastName\":\"  \"",
+    })
+    void create_withOnlyTheLastName_returns400_COM001_onThePaternal(String surnames) {
+        post(adminToken()).body(bodyWithSurnames(surnames, "ZTESTC203"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.field", containsInAnyOrder("paternalLastName"))
+            .body("errors.message", hasItem("Indica el apellido paterno."));
 
-        assertEquals(201, created.statusCode());
-        assertEquals("Pérez Huamán|Pérez Huamán|nulo", fixtures.workerSurnames(created.path("id")));
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC203"));
     }
 
     @Test
@@ -715,16 +721,15 @@ class WorkerCreateResourceTest {
         assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC205"));
     }
 
+    /** Tampoco su regla: un apellido de antes que no la cumple, al lado del paterno, no frena el alta. */
     @Test
-    void create_withAPaternal_stillValidatesTheLastName() {
-        post(adminToken())
+    void create_withAPaternal_ignoresALastNameOutsideTheRule() {
+        Response created = post(adminToken())
             .body(bodyWithSurnames("\"lastName\":\"Juan2\",\"paternalLastName\":\"Pérez\"", "ZTESTC206"))
-        .when().post("/workers")
-        .then().statusCode(400)
-            .body("code", equalTo("COM-001"))
-            .body("errors.field", containsInAnyOrder("lastName"));
+        .when().post("/workers");
 
-        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC206"));
+        assertEquals(201, created.statusCode());
+        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(created.path("id")));
     }
 
     static Stream<String> partsOutsideTheRule() {
@@ -738,9 +743,23 @@ class WorkerCreateResourceTest {
         .when().post("/workers")
         .then().statusCode(400)
             .body("code", equalTo("COM-001"))
-            .body("errors.field", containsInAnyOrder("paternalLastName"));
+            .body("errors.field", hasItem("paternalLastName"))
+            .body("errors.field", everyItem(equalTo("paternalLastName")));
 
         assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC207"));
+    }
+
+    /** Un paterno en blanco tambien pide el paterno, no solo la regla de letras: lo frena su @NotBlank. */
+    @ParameterizedTest(name = "paterno [{0}] -> pide el paterno")
+    @ValueSource(strings = {"", "   "})
+    void create_withABlankPaternal_saysToGiveThePaternal(String paternal) {
+        post(adminToken()).body(bodyWithSurnames("\"paternalLastName\":\"" + paternal + "\"", "ZTESTC212"))
+        .when().post("/workers")
+        .then().statusCode(400)
+            .body("code", equalTo("COM-001"))
+            .body("errors.message", hasItem("Indica el apellido paterno."));
+
+        assertEquals(0, fixtures.countWorkersByDocumentNumber("ZTESTC212"));
     }
 
     /** El materno vacio de las cuatro formas se guarda nulo y la ficha lo manda nulo, con su clave. */
@@ -758,7 +777,7 @@ class WorkerCreateResourceTest {
 
         assertEquals(201, created.statusCode());
         int id = created.path("id");
-        assertSameAsTheNextGet(created, id, "Pérez", "Pérez", null, "Juan Pérez");
+        assertSameAsTheNextGet(created, id, "Pérez", null, "Juan Pérez");
         assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
     }
 
@@ -789,8 +808,7 @@ class WorkerCreateResourceTest {
 
         assertEquals(201, created.statusCode());
         int id = created.path("id");
-        assertSameAsTheNextGet(created, id,
-            "P\u00e9rez Huam\u00e1n", "P\u00e9rez", "Huam\u00e1n", "Juan P\u00e9rez Huam\u00e1n");
+        assertSameAsTheNextGet(created, id, "P\u00e9rez", "Huam\u00e1n", "Juan P\u00e9rez Huam\u00e1n");
         assertEquals("P\u00e9rez Huam\u00e1n|P\u00e9rez|Huam\u00e1n", fixtures.workerSurnames(id));
     }
 
@@ -816,7 +834,7 @@ class WorkerCreateResourceTest {
     @Test
     void create_withANonexistentDocumentType_returns400_WRK003() {
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":999999,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":999999,
              "documentNumber":"ZTESTC050","role":"operator","hireDate":"2024-03-01"}""")
         .when().post("/workers")
         .then().statusCode(400).body("code", equalTo("WRK-003"));
@@ -830,7 +848,7 @@ class WorkerCreateResourceTest {
         int retired = fixtures.seedDocumentType("ZTDOC80", "ZTEST retirado", 20, null, false);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTC051","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(retired))
         .when().post("/workers")
@@ -843,7 +861,7 @@ class WorkerCreateResourceTest {
         int shortType = fixtures.seedDocumentType("ZTDOC81", "ZTEST corto", 9, null, true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTC0001","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(shortType))
         .when().post("/workers")
@@ -855,7 +873,7 @@ class WorkerCreateResourceTest {
         int shortType = fixtures.seedDocumentType("ZTDOC82", "ZTEST justo", 9, null, true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTC052","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(shortType))
         .when().post("/workers")
@@ -867,7 +885,7 @@ class WorkerCreateResourceTest {
         int patterned = fixtures.seedDocumentType("ZTDOC83", "ZTEST patron", 9, "^ZTEST[A-Z0-9]{4}$", true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTEST-053","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(patterned))
         .when().post("/workers")
@@ -879,7 +897,7 @@ class WorkerCreateResourceTest {
         int patterned = fixtures.seedDocumentType("ZTDOC84", "ZTEST patron ok", 9, "^ZTEST[A-Z0-9]{4}$", true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTC054","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(patterned))
         .when().post("/workers")
@@ -892,7 +910,7 @@ class WorkerCreateResourceTest {
         int noPattern = fixtures.seedDocumentType("ZTDOC85", "ZTEST sin patron", 20, null, true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTC055","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(noPattern))
         .when().post("/workers")
@@ -910,7 +928,7 @@ class WorkerCreateResourceTest {
         int unanchored = fixtures.seedDocumentType("ZTDOC86", "ZTEST sin anclas", 20, "ZTEST\\d{3}", true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTEST123XX","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(unanchored))
         .when().post("/workers")
@@ -958,7 +976,7 @@ class WorkerCreateResourceTest {
         int otherType = fixtures.seedDocumentType("ZTDOC87", "ZTEST otro tipo", 20, null, true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTC061","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(otherType))
         .when().post("/workers")
@@ -1165,7 +1183,7 @@ class WorkerCreateResourceTest {
     @Test
     void order_invalidFieldBeatsANonexistentRole() {
         post(adminToken()).body("""
-            {"lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC100",
+            {"paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC100",
              "role":"no_existe","hireDate":"2024-03-01"}"""
             .formatted(documentTypeId()))
         .when().post("/workers")
@@ -1175,7 +1193,7 @@ class WorkerCreateResourceTest {
     @Test
     void order_nonexistentRoleBeatsAnInvalidDocumentType() {
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":999999,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":999999,
              "documentNumber":"ZTESTC101","role":"no_existe","hireDate":"2024-03-01"}""")
         .when().post("/workers")
         .then().statusCode(400).body("code", equalTo("WRK-005"));
@@ -1186,7 +1204,7 @@ class WorkerCreateResourceTest {
         int actorUserId = fixtures.seedActorUser("finance_manager", "70");
 
         post(fabricateTokenForUser(actorUserId, "ztestuser70", "finance_manager")).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":999999,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":999999,
              "documentNumber":"ZTESTC102","role":"sales","hireDate":"2024-03-01"}""")
         .when().post("/workers")
         .then().statusCode(403).body("code", equalTo("WRK-006"));
@@ -1315,7 +1333,7 @@ class WorkerCreateResourceTest {
         int actorUserId = fixtures.seedActorUser("general_manager", "65");
 
         post(fabricateTokenForUser(actorUserId, "ztestuser65", "general_manager")).body("""
-            {"id":999999,"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"id":999999,"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTC120","role":"operator","hireDate":"2024-03-01",
              "isActive":false,"hasUser":true,"createdAt":"2000-01-01T00:00:00Z",
              "updatedAt":"2000-01-01T00:00:00Z","createdBy":{"id":1},"updatedBy":{"id":1}}"""
@@ -1453,7 +1471,7 @@ class WorkerCreateResourceTest {
     @Test
     void create_withAPhone_storesItInTheRow() {
         int id = post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC007",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTC007",
              "phone":"912345678","role":"operator","hireDate":"2024-03-01"}"""
             .formatted(documentTypeId()))
             .when().post("/workers").then().statusCode(201)
@@ -1472,7 +1490,7 @@ class WorkerCreateResourceTest {
     @Test
     void order_invalidDocumentTypeBeatsAProfileMismatch() {
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":999999,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":999999,
              "documentNumber":"ZTESTC106","role":"operator","hireDate":"2024-03-01",
              "driver":{"licenseNumber":"ZTESTL106"}}""")
         .when().post("/workers")
@@ -1484,7 +1502,7 @@ class WorkerCreateResourceTest {
         int patterned = fixtures.seedDocumentType("ZTDOC88", "ZTEST patron", 9, "^ZTEST[A-Z0-9]{4}$", true);
 
         post(adminToken()).body("""
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTEST-107","role":"operator","hireDate":"2024-03-01",
              "driver":{"licenseNumber":"ZTESTL107"}}""".formatted(patterned))
         .when().post("/workers")
@@ -1622,7 +1640,7 @@ class WorkerCreateResourceTest {
         try (Connection uncommitted = dataSource.getConnection()) {
             uncommitted.setAutoCommit(false);
             try (PreparedStatement insert = uncommitted.prepareStatement(
-                "INSERT INTO public.workers (first_name, last_name, document_type_id, "
+                "INSERT INTO public.workers (first_name, paternal_last_name, document_type_id, "
                     + "document_number, role_id, hire_date, is_active, created_at, updated_at) "
                     + "VALUES ('Zz', 'Carrera', ?, 'ZTEST901', ?, DATE '2024-03-01', true, now(), now())")) {
                 insert.setInt(1, documentTypeId);

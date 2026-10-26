@@ -72,7 +72,7 @@ class WorkerActorRowLockTest {
 
     private String workerBody(String firstName, String documentNumber, String role, String extra) {
         return """
-            {"firstName":"%s","lastName":"%s","documentTypeId":%d,"documentNumber":"%s",
+            {"firstName":"%s","paternalLastName":"%s","documentTypeId":%d,"documentNumber":"%s",
              "role":"%s","hireDate":"2024-03-01"%s}"""
             .formatted(firstName, "Actor".equals(firstName) ? role : "Pérez", documentTypeId(), documentNumber,
                 role, extra);

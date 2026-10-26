@@ -959,8 +959,8 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * la del escolta y la del ayudante con licencia existen, pero no se ofrecen
  * ni se asignan como conductor en los viajes.
  *
- * Normalización: `firstName`, `lastName`, `paternalLastName`,
- * `maternalLastName`, `documentNumber`, `driver.licenseNumber` y
+ * Normalización: `firstName`, `paternalLastName`, `maternalLastName`,
+ * `documentNumber`, `driver.licenseNumber` y
  * `driver.licenseCategory` sin espacios en los bordes (un materno que
  * queda vacío se guarda nulo); sin cambio de mayúsculas; `phone` y `role`
  * tal cual llegan. Los nombres y los apellidos pasan además a NFC antes
@@ -1058,13 +1058,8 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
  * cuerpo no cambia nada. Un trabajador inactivo también se edita.
  *
- * Los apellidos, como en el alta salvo un `lastName` solo: con
- * `paternalLastName` se guardan el paterno y el materno (un materno que no
- * viene se borra), y `lastName`, si viene, se valida pero no se usa. Sin
- * paterno, un `lastName` igual al guardado deja las partes como están, y
- * uno distinto se guarda entero como paterno, sin materno. Sin ninguno de
- * los dos, o con materno y sin paterno → `400 COM-001` en
- * `paternalLastName`.
+ * Los apellidos, como en el alta: se guardan el paterno y el materno, y un
+ * materno que no viene se borra.
  *
  * Unicidad contra los demás: guardar el propio número de documento o la
  * propia licencia sin cambios es `200`, no `409`.
@@ -1081,7 +1076,7 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * Cada campo efectivamente cambiado deja UNA fila de auditoría con el
  * valor anterior y el nuevo; los campos que se reenvían sin cambios no
  * dejan ninguna. El apellido se anota por parte (`paternalLastName` y
- * `maternalLastName`, el materno vacío como nulo), nunca como `lastName`.
+ * `maternalLastName`, el materno vacío como nulo).
  * El cargo se guarda por su nombre de sistema y el tipo de
  * documento por su código, nunca por su id ni por su nombre visible: un
  * renombre dejaría el historial mintiendo.

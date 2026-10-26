@@ -4,13 +4,15 @@ import { describe, expect, it } from 'vitest'
 
 /**
  * La guarda del nombre completo: lo compone el servidor (nombres, paterno y materno si lo tiene,
- * recortado) y la SPA lo muestra como llega en `fullName`. Armarlo a mano sería otra copia de la regla,
- * sin test contra la del servidor, que mostraría otro nombre el día que ella cambie. Mide el texto,
- * línea por línea: se le escapan, entre otras, una composición en dos líneas o con `join` o `concat`.
+ * recortado) y la SPA lo muestra como llega en `fullName`. Armarlo a mano, o unir solo los apellidos
+ * ("Torres null" sin materno), sería otra copia de la regla, sin test contra la del servidor. Mide el
+ * texto por línea: se le escapan, entre otras, una composición en dos líneas o con `join` o `concat`.
  */
 
 const NOMBRES = /\bfirstName\b/
 const APELLIDO = /\b(?:lastName|paternalLastName|maternalLastName)\b/
+const PATERNO = /\bpaternalLastName\b/
+const MATERNO = /\bmaternalLastName\b/
 
 /**
  * Los huecos de una plantilla o de un texto de JSX: un `{...}` sin delante un `=` (el valor de un
@@ -19,12 +21,17 @@ const APELLIDO = /\b(?:lastName|paternalLastName|maternalLastName)\b/
  */
 const HUECO = /(?<!=\s*|[\w$)\]][([]\s*)\{([^{}]*)\}/g
 
-/** Los nombres y un apellido en huecos distintos, o en una línea con un `+`. */
-function compone(linea: string): boolean {
-  if (!NOMBRES.test(linea) || !APELLIDO.test(linea)) return false
+/** Una parte de cada lado en huecos distintos, o las dos en una línea con un `+`. */
+function une(linea: string, uno: RegExp, otro: RegExp): boolean {
+  if (!uno.test(linea) || !otro.test(linea)) return false
   if (linea.includes('+')) return true
   const huecos = [...linea.matchAll(HUECO)].map((hueco) => hueco[1])
-  return huecos.some((con, i) => NOMBRES.test(con) && huecos.some((otro, j) => j !== i && APELLIDO.test(otro)))
+  return huecos.some((con, i) => uno.test(con) && huecos.some((resto, j) => j !== i && otro.test(resto)))
+}
+
+/** Los nombres con un apellido, o los dos apellidos entre sí. */
+function compone(linea: string): boolean {
+  return une(linea, NOMBRES, APELLIDO) || une(linea, PATERNO, MATERNO)
 }
 
 const SRC = join(import.meta.dirname, '..')
@@ -80,6 +87,8 @@ describe('el nombre completo lo compone el servidor', () => {
     '<p>Responsable ({worker.firstName} {worker.paternalLastName})</p>',
     "worker.firstName + ' ' + worker.lastName",
     "(worker.firstName ?? '') + ' ' + (worker.paternalLastName ?? '')",
+    '`${worker.paternalLastName} ${worker.maternalLastName}`',
+    '<dd>{worker.maternalLastName}, {worker.paternalLastName}</dd>',
   ])('reconoce una composición: %s', (linea) => {
     expect(compone(linea)).toBe(true)
   })
@@ -92,7 +101,9 @@ describe('el nombre completo lo compone el servidor', () => {
     "f({ firstName: 'Ana' }, { lastName: 'Torres' })",
     "{ firstName: 'Ana', paternalLastName: 'Torres', maternalLastName: null }",
     'title={data.fullName}',
-    '`${worker.paternalLastName} ${worker.maternalLastName}`',
+    '`${uno.firstName} y ${otro.firstName}`',
+    '`${uno.paternalLastName} y ${otro.paternalLastName}`',
+    '`${uno.maternalLastName} y ${otro.maternalLastName}`',
   ])('no confunde con una composición: %s', (linea) => {
     expect(compone(linea)).toBe(false)
   })
