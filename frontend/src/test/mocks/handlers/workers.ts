@@ -19,7 +19,6 @@ export function fakeWorkerDetail(overrides: Partial<WorkerDetailResponse> = {}):
   return {
     id: 1,
     firstName: 'Ana',
-    lastName: 'Torres Ruiz',
     paternalLastName: 'Torres',
     maternalLastName: 'Ruiz',
     fullName: 'Ana Torres Ruiz',
@@ -301,10 +300,10 @@ export function getWorkerEmpty() {
 
 // ----- Edición (`PUT /workers/{id}`) -----
 
-/** El nombre del cuerpo y lo que el backend compone con sus partes. */
-function namesOf({ firstName, paternalLastName = '', maternalLastName = null }: WorkerUpdateRequest) {
-  const lastName = maternalLastName ? `${paternalLastName} ${maternalLastName}` : paternalLastName
-  return { firstName, lastName, paternalLastName, maternalLastName, fullName: `${firstName} ${lastName}` }
+/** El nombre del cuerpo y el completo, que el backend compone con sus partes. */
+function namesOf({ firstName, paternalLastName, maternalLastName = null }: WorkerUpdateRequest) {
+  const surnames = maternalLastName ? `${paternalLastName} ${maternalLastName}` : paternalLastName
+  return { firstName, paternalLastName, maternalLastName, fullName: `${firstName} ${surnames}` }
 }
 
 /** Guarda el id y el cuerpo de cada envío; responde la ficha dada o la del cuerpo. */

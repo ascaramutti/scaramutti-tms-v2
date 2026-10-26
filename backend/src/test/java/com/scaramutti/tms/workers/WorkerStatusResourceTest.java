@@ -864,7 +864,7 @@ class WorkerStatusResourceTest {
         .when().post("/workers/" + id + "/" + operation);
 
         assertEquals(200, response.statusCode());
-        assertSameAsTheNextGet(response, id, "Diaz Núñez", "Diaz", "Núñez", "Rosa Diaz Núñez");
+        assertSameAsTheNextGet(response, id, "Diaz", "Núñez", "Rosa Diaz Núñez");
     }
 
     // ---------- cabeceras de cache ----------

@@ -337,9 +337,9 @@ class PublishedContractTest {
     }
 
     /**
-     * El alta publica los dos apellidos con la regla del nombre (el materno, además, vacío), y
-     * ninguno obligatorio: con el apellido de antes alcanza, y cuál tiene que venir lo mide el
-     * servidor. El cliente generado sale de estas definiciones.
+     * El alta publica los dos apellidos con la regla del nombre (el materno, además, vacío), el
+     * paterno obligatorio, y ya no el apellido de antes, ni en el cuerpo ni en la ficha. El cliente
+     * generado sale de estas definiciones.
      */
     @Test
     void publishedContract_takesBothSurnamesInTheCreation() {
@@ -358,9 +358,15 @@ class PublishedContractTest {
         assertEquals(100, contract.getInt(properties + "paternalLastName.maxLength"));
         assertEquals(100, contract.getInt(properties + "maternalLastName.maxLength"));
         List<String> required = contract.getList("components.schemas.WorkerRequest.required");
-        for (String field : List.of("lastName", "paternalLastName", "maternalLastName")) {
-            assertFalse(required.contains(field), field + " no puede ser obligatorio");
-        }
+        assertTrue(required.contains("paternalLastName"), "el paterno es obligatorio");
+        assertFalse(required.contains("maternalLastName"), "el materno no puede ser obligatorio");
+        assertFalse(required.contains("lastName"), "el apellido de antes no es obligatorio en el alta");
+        assertFalse(contract.getList("components.schemas.WorkerDetailResponse.required").contains("lastName"),
+            "ni lo exige la ficha");
+        assertFalse(contract.getMap("components.schemas.WorkerRequest.properties").containsKey("lastName"),
+            "el apellido de antes ya no es parte del cuerpo");
+        assertFalse(contract.getMap("components.schemas.WorkerDetailResponse.properties").containsKey("lastName"),
+            "ni de la ficha");
     }
 
     /** Cuántas veces aparece una referencia en todo el documento. */

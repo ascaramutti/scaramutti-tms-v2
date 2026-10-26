@@ -74,7 +74,7 @@ class WorkerActorFromDatabaseTest {
 
     private String body(String documentNumber, String phone) {
         return """
-            {"firstName":"Juan","lastName":"Pérez","documentTypeId":%d,"documentNumber":"%s",
+            {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"%s",
              %s"role":"operator","hireDate":"2024-03-01"}"""
             .formatted(documentTypeId(), documentNumber, phone == null ? "" : "\"phone\":\"" + phone + "\",");
     }

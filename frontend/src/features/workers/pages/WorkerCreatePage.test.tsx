@@ -871,7 +871,7 @@ describe('WorkerCreatePage', () => {
         hireDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       })
       expect(sink.body).not.toHaveProperty('driver')
-      // El backend valida un apellido entero aunque no lo use: uno compuesto de más de 100 daría 400.
+      // Ni el apellido de antes en un solo campo, que el backend ya no lee.
       expect(sink.body).not.toHaveProperty('lastName')
     })
 

@@ -132,7 +132,7 @@ class WorkerSurnamesMigrationTest {
     }
 
     /**
-     * El alta de cuando la aplicacion deje de escribir {@code last_name}: sin materno, sin espacio al
+     * El alta de la aplicacion, que ya no escribe {@code last_name}: sin materno, sin espacio al
      * final, y sin recortar las partes, que llegan recortadas.
      */
     @ParameterizedTest(name = "paterno \"{0}\", materno \"{1}\"")

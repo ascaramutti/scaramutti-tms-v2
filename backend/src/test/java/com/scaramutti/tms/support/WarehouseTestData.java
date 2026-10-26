@@ -233,9 +233,9 @@ public class WarehouseTestData {
      * <p>La fecha de ingreso es fija y no "hoy": una fecha móvil hace que un caso que la
      * compare falle un día al año.
      */
-    public int seedWorker(String documentNumber, String firstName, String lastName, String roleName,
+    public int seedWorker(String documentNumber, String firstName, String paternalLastName, String roleName,
             boolean isActive) {
-        return seedWorker(documentNumber, firstName, lastName, null, roleName, isActive);
+        return seedWorker(documentNumber, firstName, paternalLastName, null, roleName, isActive);
     }
 
     /** El mismo trabajador con los dos apellidos; el materno nulo es el de arriba. */

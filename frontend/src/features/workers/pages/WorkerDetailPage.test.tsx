@@ -165,13 +165,12 @@ describe('WorkerDetailPage', () => {
     }
   })
 
-  /** En estos casos `lastName` o `fullName` dicen otra cosa a propósito: la ficha no lee `lastName` ni arma el nombre. */
+  /** El título es el `fullName` y la fila, las partes: la ficha no arma el nombre. */
   describe('el nombre, con materno y sin él', () => {
     it('con materno: el título es el nombre completo del servidor y la fila trae las tres partes', async () => {
       await renderWorker(
         fakeWorkerDetail({
           firstName: 'Ana María',
-          lastName: 'Torres',
           paternalLastName: 'Torres',
           maternalLastName: 'Ruiz',
           fullName: 'Ana María Torres Ruiz',
@@ -187,7 +186,7 @@ describe('WorkerDetailPage', () => {
 
     it('sin materno: el nombre completo con el paterno solo, y la raya larga en el materno', async () => {
       await renderWorker(
-        fakeWorkerDetail({ lastName: 'Torres Ruiz', paternalLastName: 'Torres', maternalLastName: null, fullName: 'Ana Torres' }),
+        fakeWorkerDetail({ paternalLastName: 'Torres', maternalLastName: null, fullName: 'Ana Torres' }),
       )
 
       expect(screen.getByRole('heading', { level: 1, name: 'Ana Torres' })).toBeInTheDocument()
@@ -201,8 +200,8 @@ describe('WorkerDetailPage', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'Ana Lucía Torres Ruiz' })).toBeInTheDocument()
     })
 
-    it('el paterno en blanco de una ficha vieja lleva la raya larga, aunque `lastName` traiga otro', async () => {
-      await renderWorker(fakeWorkerDetail({ lastName: 'Torres', paternalLastName: '', maternalLastName: null, fullName: 'Ana' }))
+    it('el paterno en blanco de una ficha vieja lleva la raya larga', async () => {
+      await renderWorker(fakeWorkerDetail({ paternalLastName: '', maternalLastName: null, fullName: 'Ana' }))
 
       expect(within(par('Apellido paterno')).getByRole('definition')).toHaveTextContent(/^\u2014$/)
       expect(within(par('Apellido materno')).getByRole('definition')).toHaveTextContent(/^\u2014$/)
@@ -565,7 +564,6 @@ describe('WorkerDetailPage', () => {
       return fakeWorkerDetail({
         id: 42,
         firstName: 'Juan',
-        lastName: 'Quispe',
         paternalLastName: 'Quispe',
         maternalLastName: null,
         fullName: 'Juan Carlos Quispe',
@@ -795,7 +793,7 @@ describe('WorkerDetailPage', () => {
 
     it('al confirmar invalida las búsquedas y los viajes, y siembra la ficha con lo devuelto', async () => {
       const user = userEvent.setup()
-      const devuelto = trabajador({ isActive: false, lastName: 'Quispe Devuelto' })
+      const devuelto = trabajador({ isActive: false, paternalLastName: 'Quispe Devuelto' })
       server.use(changeWorkerStatusCapture('deactivate', {}, devuelto))
       const { queryClient } = await abrirComo(trabajador())
       queryClient.setQueryData(workerKeys.search({ q: 'juan', isActive: true }), [])

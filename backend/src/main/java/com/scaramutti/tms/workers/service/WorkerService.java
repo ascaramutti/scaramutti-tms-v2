@@ -205,13 +205,7 @@ public class WorkerService {
     private Worker newWorker(CreateWorkerCommand createWorkerCommand, Role role, Integer currentUserId) {
         Worker worker = new Worker();
         worker.firstName = createWorkerCommand.firstName();
-        // Con paterno, las partes; sin el, el apellido de antes entero es el paterno, como en la
-        // migracion. Que venga uno de los dos lo exige el borde.
-        if (createWorkerCommand.paternalLastName() != null) {
-            worker.assignSurnames(createWorkerCommand.paternalLastName(), createWorkerCommand.maternalLastName());
-        } else {
-            worker.assignSurnames(createWorkerCommand.lastName(), null);
-        }
+        worker.assignSurnames(createWorkerCommand.paternalLastName(), createWorkerCommand.maternalLastName());
         worker.documentTypeId = createWorkerCommand.documentTypeId();
         worker.documentNumber = createWorkerCommand.documentNumber();
         worker.phone = createWorkerCommand.phone();
@@ -628,20 +622,9 @@ public class WorkerService {
     private void applyWorkerChanges(Worker worker, UpdateWorkerCommand command, Role newRole,
             DocumentType newDocumentType, WorkerFieldChanges changes, Integer currentUserId) {
         changes.compare(WorkerAuditField.FIRST_NAME, worker.firstName, command.firstName());
-        // Con paterno, las partes del cuerpo: un materno que no viene se borra, como todo en un
-        // reemplazo. Sin el, el apellido de antes igual al de la fila deja las partes como estan, y
-        // otro es la copia de la migracion, entero al paterno. Que venga uno de los dos lo exige el borde.
-        String paternal = worker.paternalLastName;
-        String maternal = worker.maternalLastName;
-        if (command.paternalLastName() != null) {
-            paternal = command.paternalLastName();
-            maternal = command.maternalLastName();
-        } else if (!Objects.equals(worker.lastName, command.lastName())) {
-            paternal = command.lastName();
-            maternal = null;
-        }
-        changes.compare(WorkerAuditField.PATERNAL_LAST_NAME, worker.paternalLastName, paternal);
-        changes.compare(WorkerAuditField.MATERNAL_LAST_NAME, worker.maternalLastName, maternal);
+        // Un materno que no viene se borra, como todo en un reemplazo.
+        changes.compare(WorkerAuditField.PATERNAL_LAST_NAME, worker.paternalLastName, command.paternalLastName());
+        changes.compare(WorkerAuditField.MATERNAL_LAST_NAME, worker.maternalLastName, command.maternalLastName());
         changes.compare(WorkerAuditField.DOCUMENT_TYPE,
             documentTypeRepository.findByIdOptional(worker.documentTypeId)
                 .map(type -> type.code).orElse(null), newDocumentType.code);
@@ -652,7 +635,7 @@ public class WorkerService {
             String.valueOf(worker.hireDate), String.valueOf(command.hireDate()));
 
         worker.firstName = command.firstName();
-        worker.assignSurnames(paternal, maternal);
+        worker.assignSurnames(command.paternalLastName(), command.maternalLastName());
         worker.documentTypeId = command.documentTypeId();
         worker.documentNumber = command.documentNumber();
         worker.phone = command.phone();

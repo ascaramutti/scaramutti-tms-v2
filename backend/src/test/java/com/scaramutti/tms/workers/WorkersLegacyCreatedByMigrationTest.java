@@ -97,7 +97,7 @@ class WorkersLegacyCreatedByMigrationTest {
         inRollback(connection -> {
             runMigration(connection);
             int bornLater = intOf(connection,
-                "INSERT INTO public.workers (first_name, last_name, document_type_id, document_number, role_id,"
+                "INSERT INTO public.workers (first_name, paternal_last_name, document_type_id, document_number, role_id,"
                     + " hire_date) VALUES ('ZTEST', 'Legacy', " + documentTypeId(connection) + ", 'ZTESTLEG6', "
                     + roleId(connection, "operator") + ", DATE '2024-01-01') RETURNING id");
 
@@ -126,7 +126,7 @@ class WorkersLegacyCreatedByMigrationTest {
     private int insertWorker(Connection connection, String documentNumber, Integer createdBy, Integer updatedBy)
             throws SQLException {
         return intOf(connection,
-            "INSERT INTO public.workers (first_name, last_name, document_type_id, document_number, role_id,"
+            "INSERT INTO public.workers (first_name, paternal_last_name, document_type_id, document_number, role_id,"
                 + " hire_date, created_by, updated_by) VALUES ('ZTEST', 'Legacy', " + documentTypeId(connection)
                 + ", '" + documentNumber + "', " + roleId(connection, "operator") + ", DATE '2024-01-01', "
                 + (createdBy == null ? "NULL" : createdBy) + ", " + (updatedBy == null ? "NULL" : updatedBy)

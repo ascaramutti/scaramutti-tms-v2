@@ -37,14 +37,7 @@ public class Worker {
     @Column(name = "first_name", nullable = false)
     public String firstName;
 
-    /**
-     * Los apellidos juntos, como los guardaba la columna de siempre: el paterno y, si hay, un
-     * espacio y el materno. La leen la ficha, la edicion (que la compara con el cuerpo) y la imagen
-     * anterior. Esta columna y las dos de las partes las escribe solo {@link #assignSurnames}.
-     */
-    @Column(name = "last_name", nullable = false)
-    public String lastName;
-
+    /** Las dos columnas de los apellidos las escribe solo {@link #assignSurnames}. */
     @Column(name = "paternal_last_name", nullable = false)
     public String paternalLastName;
 
@@ -109,15 +102,14 @@ public class Worker {
     }
 
     /**
-     * El unico que escribe los apellidos. Deja {@code lastName} compuesto como lo compone el
-     * disparador de la base, asi la fila que se graba ya esta de acuerdo y el disparador no cambia
-     * nada: si la cambiara, sin {@code @DynamicUpdate} la siguiente escritura de la entidad en la
-     * misma sesion mandaria el {@code lastName} viejo, y el disparador lo copiaria al paterno.
+     * El unico que escribe los apellidos. La columna de antes, {@code last_name}, ya no se mapea:
+     * la compone el disparador de la base al insertar y cuando cambian las partes, y ninguna consulta
+     * de esta imagen la nombra (el alta la recibe en el {@code RETURNING *} que suma el driver). Como
+     * el UPDATE no la nombra, nunca la manda vieja.
      */
     public void assignSurnames(String paternal, String maternal) {
         paternalLastName = paternal;
         maternalLastName = maternal;
-        lastName = joinedSurnames(paternal, maternal);
     }
 
     /** Como {@code concat_ws(' ', ...)}: un espacio entre cada parte, sin las nulas. */

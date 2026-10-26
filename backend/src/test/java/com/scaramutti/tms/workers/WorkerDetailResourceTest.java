@@ -54,7 +54,7 @@ class WorkerDetailResourceTest {
     // ---------- la ficha completa ------------------------------------------------
 
     @Test
-    void get_returnsTheEighteenFieldsOfTheContract() {
+    void get_returnsTheSeventeenFieldsOfTheContract() {
         int id = fixtures.seedWorker("ZTESTB001", "Juan", "Pérez Huamán", "driver", true);
         fixtures.setWorkerPhone(id, "987654321");
         fixtures.setWorkerHireDate(id, LocalDate.of(2024, 3, 1));
@@ -67,12 +67,12 @@ class WorkerDetailResourceTest {
             // El conjunto ENTERO de claves y no campo por campo: asi un campo de mas, que es
             // como se filtra un dato sin querer, tambien hace fallar el caso.
             .body("keySet()", containsInAnyOrder(
-                "id", "firstName", "lastName", "paternalLastName", "maternalLastName", "fullName",
+                "id", "firstName", "paternalLastName", "maternalLastName", "fullName",
                 "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
                 "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
             .body("id", equalTo(id))
             .body("firstName", equalTo("Juan"))
-            .body("lastName", equalTo("Pérez Huamán"))
+            .body("paternalLastName", equalTo("Pérez Huamán"))
             .body("documentNumber", equalTo("ZTESTB001"))
             .body("phone", equalTo("987654321"))
             .body("isActive", equalTo(true))
@@ -90,7 +90,6 @@ class WorkerDetailResourceTest {
         given().header("Authorization", "Bearer " + adminToken())
         .when().get("/workers/" + id)
         .then().statusCode(200)
-            .body("lastName", equalTo("Diaz Núñez"))
             .body("paternalLastName", equalTo("Diaz"))
             .body("maternalLastName", equalTo("Núñez"))
             .body("fullName", equalTo("Rosa Diaz Núñez"));

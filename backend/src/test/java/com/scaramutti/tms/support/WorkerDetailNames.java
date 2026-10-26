@@ -9,6 +9,7 @@ import java.util.Map;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -19,16 +20,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 public final class WorkerDetailNames {
 
     private static final List<String> KEYS =
-        List.of("lastName", "paternalLastName", "maternalLastName", "fullName");
+        List.of("paternalLastName", "maternalLastName", "fullName");
 
     private WorkerDetailNames() {
     }
 
-    /** La respuesta trae esos cuatro valores, y el GET siguiente tambien. */
-    public static void assertSameAsTheNextGet(Response written, int workerId, String lastName,
+    /** La respuesta trae esos tres valores, y el GET siguiente tambien. */
+    public static void assertSameAsTheNextGet(Response written, int workerId,
             String paternalLastName, String maternalLastName, String fullName) {
         Map<String, Object> wanted = new LinkedHashMap<>();
-        wanted.put("lastName", lastName);
         wanted.put("paternalLastName", paternalLastName);
         wanted.put("maternalLastName", maternalLastName);
         wanted.put("fullName", fullName);
@@ -47,6 +47,7 @@ public final class WorkerDetailNames {
             assertTrue(body.containsKey(key), "la ficha no trae la clave " + key);
             names.put(key, body.get(key));
         }
+        assertFalse(body.containsKey("lastName"), "la ficha ya no trae el apellido de antes en un solo campo");
         return names;
     }
 }

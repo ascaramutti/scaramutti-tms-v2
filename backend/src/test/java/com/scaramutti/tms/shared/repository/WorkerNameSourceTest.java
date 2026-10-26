@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
@@ -97,5 +98,46 @@ class WorkerNameSourceTest {
             "Hay nombres de trabajador armados o escritos fuera de Worker.java y WorkerRepository.java."
                 + " Usar Worker.fullName(), WorkerRepository.fullNameExpression o fullNameOrder, y"
                 + " Worker.assignSurnames para escribir los apellidos");
+    }
+
+    /**
+     * Ninguna consulta de esta imagen nombra la columna de antes del apellido, ni con un comodin sobre
+     * {@code workers} (sin alias, con {@code w} o con el que le da el archivo), cuyo plan preparado
+     * cambiaria el dia que se borre. Mide cada linea sin mayusculas: marca de mas un {@code w.*} de otra
+     * tabla; se le escapan lo partido en dos lineas y el {@code RETURNING *} que el driver suma al alta.
+     */
+    @Test
+    void theOldSurnameColumn_isNotNamedByThisImage() throws IOException {
+        Pattern aliasOfWorkers =
+            Pattern.compile("(?i)\\b(?:FROM|JOIN)\\s+(?:public\\.)?workers\\s+(?:AS\\s+)?(\\w+)");
+        List<String> findings = new ArrayList<>();
+        int fileCount = 0;
+        try (Stream<Path> tree = Stream.concat(Files.walk(PRODUCTION_SOURCES), Files.walk(GENERATED_SOURCES))) {
+            for (Path source : tree.filter(p -> p.toString().endsWith(".java")).toList()) {
+                fileCount++;
+                List<String> lines = Files.readAllLines(source, StandardCharsets.UTF_8).stream()
+                    .map(line -> isComment(line) ? "" : line)
+                    .toList();
+                List<String> forms = new ArrayList<>(List.of("\\blast_name\\b", "\\bw\\.\\*", "\\bworkers\\.\\*",
+                    "SELECT\\s+\\*\\s+FROM\\s+(?:public\\.)?workers\\b",
+                    "(?:INSERT\\s+INTO|UPDATE)\\s+(?:public\\.)?workers\\b.*RETURNING\\s+\\*"));
+                for (String line : lines) {
+                    Matcher alias = aliasOfWorkers.matcher(line);
+                    while (alias.find()) {
+                        forms.add("\\b" + alias.group(1) + "\\.\\*");
+                    }
+                }
+                Pattern oldColumn = Pattern.compile("(?i)" + String.join("|", forms));
+                for (int i = 0; i < lines.size(); i++) {
+                    if (oldColumn.matcher(lines.get(i)).find()) {
+                        findings.add(source + ":" + (i + 1));
+                    }
+                }
+            }
+        }
+
+        assertTrue(fileCount > 50,
+            "El barrido leyo solo " + fileCount + " archivos: el alcance quedo mal derivado");
+        assertEquals(List.of(), findings, "Hay codigo que lee la columna de antes del apellido");
     }
 }

@@ -24,9 +24,9 @@ class WorkerResourceMapperTest {
 
     private final WorkerResourceMapper mapper = Mappers.getMapper(WorkerResourceMapper.class);
 
-    private WorkerRequest request(String firstName, String lastName, String documentNumber,
+    private WorkerRequest request(String firstName, String paternalLastName, String documentNumber,
             String phone, String role, WorkerDriverProfileRequest driver) {
-        return new WorkerRequest(firstName, lastName, null, null, 1, documentNumber, phone, role,
+        return new WorkerRequest(firstName, paternalLastName, null, 1, documentNumber, phone, role,
             LocalDate.of(2024, 3, 1), driver);
     }
 
@@ -49,12 +49,12 @@ class WorkerResourceMapperTest {
     @Test
     void theSurnameParts_arriveTrimmed_andABlankMaternalAsNull() {
         CreateWorkerCommand withBoth = mapper.toCreateWorkerCommand(new WorkerRequest(
-            "Juan", null, "  Pérez  ", "  Huamán  ", 1, "45678912", null, "operator", LocalDate.of(2024, 3, 1), null));
+            "Juan", "  Pérez  ", "  Huamán  ", 1, "45678912", null, "operator", LocalDate.of(2024, 3, 1), null));
         assertEquals("Pérez", withBoth.paternalLastName());
         assertEquals("Huamán", withBoth.maternalLastName());
 
         CreateWorkerCommand blankMaternal = mapper.toCreateWorkerCommand(new WorkerRequest(
-            "Juan", null, "Pérez", "   ", 1, "45678912", null, "operator", LocalDate.of(2024, 3, 1), null));
+            "Juan", "Pérez", "   ", 1, "45678912", null, "operator", LocalDate.of(2024, 3, 1), null));
         assertNull(blankMaternal.maternalLastName());
     }
 
@@ -86,7 +86,7 @@ class WorkerResourceMapperTest {
             request("  juan Carlos  ", " PÉREZ huamán ", "  45678912  ", null, "operator", null));
 
         assertEquals("juan Carlos", command.firstName());
-        assertEquals("PÉREZ huamán", command.lastName());
+        assertEquals("PÉREZ huamán", command.paternalLastName());
         assertEquals("45678912", command.documentNumber());
     }
 
@@ -115,8 +115,8 @@ class WorkerResourceMapperTest {
     // ---------- el cuerpo de la EDICION ----------
 
     private com.scaramutti.tms.workers.dto.WorkerUpdateRequest updateRequest(
-            String firstName, String lastName, String documentNumber, String reason) {
-        return new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(firstName, lastName, null, null, 1,
+            String firstName, String paternalLastName, String documentNumber, String reason) {
+        return new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(firstName, paternalLastName, null, 1,
             documentNumber, null, "operator", LocalDate.of(2024, 3, 1), null, reason);
     }
 
@@ -132,7 +132,7 @@ class WorkerResourceMapperTest {
             updateRequest("  juan Carlos  ", " PÉREZ huamán ", "  45678912  ", null));
 
         assertEquals("juan Carlos", command.firstName());
-        assertEquals("PÉREZ huamán", command.lastName());
+        assertEquals("PÉREZ huamán", command.paternalLastName());
         assertEquals("45678912", command.documentNumber());
     }
 
@@ -141,12 +141,12 @@ class WorkerResourceMapperTest {
     void toUpdateWorkerCommand_trimsTheSurnameParts_andABlankMaternalArrivesAsNull() {
         LocalDate hired = LocalDate.of(2024, 3, 1);
         var withBoth = mapper.toUpdateWorkerCommand(8, new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(
-            "Juan", null, "  Pérez  ", "  Huamán  ", 1, "45678912", null, "operator", hired, null, null));
+            "Juan", "  Pérez  ", "  Huamán  ", 1, "45678912", null, "operator", hired, null, null));
         assertEquals("Pérez", withBoth.paternalLastName());
         assertEquals("Huamán", withBoth.maternalLastName());
 
         var blankMaternal = mapper.toUpdateWorkerCommand(8, new com.scaramutti.tms.workers.dto.WorkerUpdateRequest(
-            "Juan", null, "Pérez", "   ", 1, "45678912", null, "operator", hired, null, null));
+            "Juan", "Pérez", "   ", 1, "45678912", null, "operator", hired, null, null));
         assertNull(blankMaternal.maternalLastName());
     }
 

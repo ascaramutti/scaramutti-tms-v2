@@ -207,20 +207,19 @@ describe('buildWorkerFormSchema', () => {
     expect(performance.now() - start).toBeLessThan(2_000)
   })
 
-  /** El backend aplica la misma regla: el contrato la publica, también en el apellido de antes mientras siga en él. */
+  /** El backend aplica la misma regla: el contrato la publica. */
   it('la regla de nombre y la del materno son las que publica el contrato', () => {
     const spec = readFileSync(
       join(import.meta.dirname, '../../../../../backend/src/main/resources/META-INF/openapi.yaml'),
       'utf8',
     )
     const worker = spec.slice(spec.indexOf('    WorkerRequest:'))
-    const patterns = [...worker.matchAll(/^ {8}(firstName|lastName|paternalLastName|maternalLastName): .*pattern: '((?:[^']|'')*)'/gm)]
-      .slice(0, 4)
+    const patterns = [...worker.matchAll(/^ {8}(firstName|paternalLastName|maternalLastName): .*pattern: '((?:[^']|'')*)'/gm)]
+      .slice(0, 3)
       .map((match) => [match[1], match[2].replaceAll("''", "'")])
 
     expect(patterns).toEqual([
       ['firstName', PERSON_NAME.source],
-      ['lastName', PERSON_NAME.source],
       ['paternalLastName', PERSON_NAME.source],
       ['maternalLastName', MATERNAL_NAME.source],
     ])
@@ -375,7 +374,7 @@ describe('toWorkerRequest', () => {
     expect(cuerpo).not.toHaveProperty('driver')
   })
 
-  /** El backend valida un `lastName` aunque no lo use: uno compuesto de más de 100 daría 400. */
+  /** Sin el apellido de antes en un solo campo, que el backend ya no lee. */
   it('los apellidos viajan por partes, recortados, y sin el apellido entero', () => {
     const cuerpo = toWorkerRequest(valores({ paternalLastName: ' Pérez ', maternalLastName: ' Huamán ' }), ROLES)
     expect(cuerpo).toMatchObject({ paternalLastName: 'Pérez', maternalLastName: 'Huamán' })

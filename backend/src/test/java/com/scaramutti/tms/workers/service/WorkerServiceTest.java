@@ -125,7 +125,7 @@ class WorkerServiceTest {
     // ---------- el alta: lo que por HTTP no se alcanza ---------------------------
 
     private CreateWorkerCommand createCommand() {
-        return new CreateWorkerCommand("Juan", "Pérez", null, null, 1, "45678912", null, "operator",
+        return new CreateWorkerCommand("Juan", "Pérez", null, 1, "45678912", null, "operator",
             java.time.LocalDate.of(2024, 3, 1), null);
     }
 
@@ -180,7 +180,7 @@ class WorkerServiceTest {
     }
 
     private UpdateWorkerCommand updateCommand(WorkerDriverProfileCommand driver) {
-        return new UpdateWorkerCommand(5, "Juan", "Pérez", null, null, 1, "45678912", null, "operator",
+        return new UpdateWorkerCommand(5, "Juan", "Pérez", null, 1, "45678912", null, "operator",
             java.time.LocalDate.of(2024, 3, 1), driver, null);
     }
 
@@ -361,7 +361,7 @@ class WorkerServiceTest {
             com.scaramutti.tms.workers.WorkersError.ROLE_OUT_OF_RANK.toException())
             .when(workerRankPolicy).assertCanActOn(role);
 
-        CreateWorkerCommand command = new CreateWorkerCommand("Juan", "Pérez", null, null, 1, "45678912",
+        CreateWorkerCommand command = new CreateWorkerCommand("Juan", "Pérez", null, 1, "45678912",
             null, "sales", java.time.LocalDate.of(2024, 3, 1), null);
 
         ApiException thrown = org.junit.jupiter.api.Assertions.assertThrows(
@@ -405,7 +405,7 @@ class WorkerServiceTest {
         when(documentTypeRepository.findByIdOptional(1)).thenReturn(java.util.Optional.of(documentType));
         when(currentUser.requireId()).thenReturn(7);
 
-        CreateWorkerCommand command = new CreateWorkerCommand("Juan", "Pérez", null, null, 1, "45678912",
+        CreateWorkerCommand command = new CreateWorkerCommand("Juan", "Pérez", null, 1, "45678912",
             null, "assistant", java.time.LocalDate.of(2024, 3, 1), null);
 
         // El detalle se relee al final; con el repositorio mockeado devuelve vacio y sale
@@ -438,7 +438,7 @@ class WorkerServiceTest {
     }
 
     private CreateWorkerCommand createDriverCommand() {
-        return new CreateWorkerCommand("Juan", "Pérez", null, null, 1, "45678912", null, "driver",
+        return new CreateWorkerCommand("Juan", "Pérez", null, 1, "45678912", null, "driver",
             java.time.LocalDate.of(2024, 3, 1),
             new com.scaramutti.tms.workers.service.cmd.WorkerDriverProfileCommand(
                 "Q12345678", null, null));
