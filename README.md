@@ -46,7 +46,7 @@ Módulos del backend (vertical por dominio): `auth`, `clients`, `quotations`, `o
 docker compose up -d
 ```
 
-Levanta PostgreSQL 16 vacío en `localhost:5432`. El schema NO se aplica a mano: lo crea Flyway al arrancar el backend (paso 2), ejecutando la cadena de `backend/src/main/resources/db/migration/` (`V001` = baseline con los schemas `public` y `cotizaciones`; `V002+` agrega `almacen`, `V007+` agrega `operaciones`, `V010` amplía `public` para el padrón de trabajadores y `V011` completa sus datos). Reglas de la cadena en el `README.md` de esa carpeta.
+Levanta PostgreSQL 16 vacío en `localhost:5432`. El schema NO se aplica a mano: lo crea Flyway al arrancar el backend (paso 2), ejecutando la cadena de `backend/src/main/resources/db/migration/` (`V001` = baseline con los schemas `public` y `cotizaciones`; `V002+` agrega `almacen`, `V007+` agrega `operaciones`, `V010` amplía `public` para el padrón de trabajadores, `V011` completa sus datos, `V012` hace que el rol de cada cuenta siga el cargo de su trabajador, `V013` borra las columnas que repetían el cargo, `V014` borra las tablas de viajes de la v1 y `V015` da al apellido paterno y al materno una columna propia a cada uno). Reglas de la cadena en el `README.md` de esa carpeta.
 
 Credenciales locales (definidas en `docker-compose.yml`):
 - DB: `scaramutti_tms_dev`
