@@ -74,6 +74,9 @@ paths:
         cualquiera de las tres, `401 AUTH-002`, con el mismo cuerpo en los tres
         casos.
 
+        El refresh emitido lleva la versión de las sesiones de la cuenta (ver
+        `refreshToken`).
+
         Orden: `400 COM-001` → `401 AUTH-001` → `401 AUTH-002` → `200`.
       security: []
       requestBody:
@@ -153,11 +156,22 @@ paths:
       operationId: refreshToken
       summary: Renovar token de acceso
       description: |
-        La cuenta tiene que ser utilizable, igual que en el ingreso: si no, o si
-        la cuenta del token ya no existe, `401 AUTH-002`.
+        Renueva la sesión con un refresh emitido por `login`, `refreshToken` o
+        `changePassword`. La cuenta tiene que ser utilizable, igual que en el
+        ingreso: si no, o si la cuenta del token ya no existe, `401 AUTH-002`.
+
+        Revocación: el refresh lleva la versión de las sesiones de la cuenta y
+        se compara por igualdad con la actual. Cambiar la propia contraseña sube
+        la versión: un refresh anterior responde `401 AUTH-003`, también si se
+        emitió en el mismo segundo. Un refresh sin la versión (emitido antes de
+        que existiera), o con ella nula, cuenta como la inicial y renueva hasta
+        el primer cambio; una versión que no es un entero sin decimales, `401
+        AUTH-003`. El token de acceso vigente no se revoca: vale hasta su
+        vencimiento (`expiresAt`) y 60 s más de tolerancia de reloj.
 
         Orden: `400 COM-001` → `401 AUTH-009` o `AUTH-003` (vencido, mal
-        formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `200`.
+        formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `401 AUTH-003`
+        (versión) → `200`.
       security: []
       requestBody:
         required: true
@@ -179,7 +193,7 @@ paths:
               schema: { $ref: '#/components/schemas/LoginResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
-          description: Refresh token inválido o expirado, o cuenta no utilizable
+          description: Refresh vencido, inválido o revocado, o cuenta no utilizable
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -204,6 +218,16 @@ paths:
                     instance: '/api/v1/auth/refresh'
                     code: 'AUTH-003'
                     traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+                refreshTokenRevoked:
+                  summary: Refresh emitido antes de un cambio de la propia contraseña
+                  value:
+                    type: 'urn:tms:error:auth-003'
+                    title: 'Invalid refresh token'
+                    status: 401
+                    detail: 'Refresh token inválido o revocado'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-003'
+                    traceId: '7e3c4d5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f'
                 accountNotUsableOnRefresh:
                   summary: La cuenta dejó de ser utilizable desde el ingreso
                   value:
@@ -219,21 +243,46 @@ paths:
     post:
       tags: [Auth]
       operationId: changePassword
-      summary: Cambiar contraseña del usuario actual
+      summary: Cambiar la contraseña de la cuenta de la sesión
       description: |
-        La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
-        `401 AUTH-002`, sin cambio. Se mira antes que la contraseña actual.
+        Cambia la contraseña de la cuenta de la sesión y responde con una
+        **sesión nueva**: quien la cambia sigue trabajando con esos tokens, y
+        los refresh emitidos antes dejan de renovar (`401 AUTH-003` en
+        `refreshToken`).
 
-        Orden: `401` (token) → `400 COM-001` → `404 AUTH-005` → `401 AUTH-002`
-        → `400 AUTH-004` → `204`.
+        La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
+        `401 AUTH-002`, sin cambio, también con la actual equivocada (gana
+        sobre `AUTH-004`). Si la actual verifica, la fila de la cuenta se toma y
+        se decide contra la confirmada: si otra escritura cambió la contraseña en
+        el medio, responde `400 AUTH-004` en vez de pisarla. Si otra operación
+        retiene la fila, o una de sus tablas mientras el cambio la toma, la lee
+        o la escribe, más allá del tope de espera, `409 AUTH-010`, sin cambio:
+        se reintenta. La tabla de cuentas ya tomada en `ACCESS EXCLUSIVE` al
+        llegar el pedido (una migración) lo hace esperar, como al ingreso.
+
+        Orden (el `409 AUTH-010` no entra en la cadena): `401` (token) → `400
+        COM-001` → `404 AUTH-005` → `401 AUTH-002` → `400 AUTH-004` → `200`.
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
       responses:
-        '204':
-          description: Contraseña actualizada
+        '200':
+          description: Contraseña cambiada; la sesión nueva
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo trae los tokens de la sesión nueva (RFC 6749, §5.1)'
+              schema: { type: string }
+            Pragma:
+              description: 'Siempre `no-cache`: lo pide RFC 6749 (§5.1) junto al `no-store`'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es el de la cuenta del token, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
         '400':
           description: 'Validación de contraseña fallida (también una que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto) o contraseña actual incorrecta'
           content:
@@ -301,13 +350,13 @@ paths:
                     code: 'AUTH-002'
                     traceId: '4b9c2d6e-8f3a-4b1c-9d4e-7f2a5b8c1d3e'
         '404':
-          description: El usuario del token ya no existe
+          description: La cuenta del token ya no existe
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
               examples:
                 userNotFound:
-                  summary: El usuario referenciado por el token fue eliminado
+                  summary: La cuenta referenciada por el token no existe
                   value:
                     type: 'urn:tms:error:auth-005'
                     title: 'User not found'
@@ -316,12 +365,28 @@ paths:
                     instance: '/api/v1/auth/change-password'
                     code: 'AUTH-005'
                     traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+        '409':
+          description: 'Conflicto transitorio: otra operación retuvo la fila de la cuenta, o una de sus tablas mientras el cambio la tomaba, la leía o la escribía, más allá del tope; se reintenta'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                accountBusyOnPasswordChange:
+                  summary: La cuenta está siendo modificada por otra operación
+                  value:
+                    type: 'urn:tms:error:auth-010'
+                    title: 'Account busy'
+                    status: 409
+                    detail: 'La cuenta está siendo modificada por otra operación'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-010'
+                    traceId: '3e4f5a6b-7c8d-4e9f-8a0b-1c2d3e4f5a6b'
 
   /auth/me:
     get:
       tags: [Auth]
       operationId: getCurrentUser
-      summary: Obtener datos del usuario autenticado
+      summary: Obtener la cuenta de la sesión
       description: |
         La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
         `401 AUTH-002`.
@@ -377,13 +442,13 @@ paths:
                     code: 'AUTH-002'
                     traceId: '4b9c2d6e-8f3a-4b1c-9d4e-7f2a5b8c1d3e'
         '404':
-          description: El usuario del token ya no existe
+          description: La cuenta del token ya no existe
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
               examples:
                 userNotFound:
-                  summary: El usuario referenciado por el token fue eliminado
+                  summary: La cuenta referenciada por el token no existe
                   value:
                     type: 'urn:tms:error:auth-005'
                     title: 'User not found'
@@ -3803,7 +3868,7 @@ components:
           type: string
           minLength: 200
           maxLength: 4096
-          description: 'JWT firmado emitido previamente por /auth/login o /auth/refresh.'
+          description: 'JWT firmado emitido previamente por /auth/login, /auth/refresh o /auth/change-password.'
 
     ChangePasswordRequest:
       type: object
@@ -3852,9 +3917,9 @@ components:
 
     SessionUser:
       description: |
-        El usuario de la sesión (login, refresh y /auth/me): el de UserResponse más el id de su
-        trabajador, para reconocer la ficha propia. Los autores embebidos en otras respuestas
-        (UserResponse o UserRef) no lo traen.
+        El usuario de la sesión (login, refresh, change-password y /auth/me): el de UserResponse
+        más el id de su trabajador, para reconocer la ficha propia. Los autores embebidos en otras
+        respuestas (UserResponse o UserRef) no lo traen.
       allOf:
         - $ref: '#/components/schemas/UserResponse'
         - type: object

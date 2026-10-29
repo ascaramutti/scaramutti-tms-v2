@@ -30,4 +30,16 @@ public final class CacheHeaders {
             .header("Pragma", "no-cache")
             .build();
     }
+
+    /**
+     * Los tokens de una sesion que sale de otra: el par de los tokens y el {@code Vary}, porque el
+     * cuerpo depende de quien llama (el usuario y los tokens son los de la cuenta del token).
+     */
+    public static <T> RestResponse<T> callerTokensNotStored(RestResponse.ResponseBuilder<T> builder) {
+        return builder
+            .header("Cache-Control", "no-store")
+            .header("Pragma", "no-cache")
+            .header("Vary", "Authorization")
+            .build();
+    }
 }

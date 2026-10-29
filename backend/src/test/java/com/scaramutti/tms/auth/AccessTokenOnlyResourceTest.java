@@ -1,5 +1,6 @@
 package com.scaramutti.tms.auth;
 
+import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.support.HermeticTestData;
 import com.scaramutti.tms.support.TestAuth;
@@ -88,13 +89,13 @@ class AccessTokenOnlyResourceTest {
 
     /**
      * La contraseña nueva es la misma: si la regla fallara, admin seguiría entrando con la suya
-     * aunque la corrida se cortara. El hash cambiaría igual (otra sal), y eso es lo que se mide; el
-     * cierre restaura el hash exacto desde la base.
+     * aunque la corrida se cortara. El hash cambiaría igual (otra sal) y la versión subiría, y eso es lo
+     * que se mide; el cierre restaura los dos desde la base.
      */
     @Test
     void refreshTokenAsCredential_onChangePassword_returns401AndThePasswordStaysTheSame() {
         String refreshToken = adminSession().getString("refreshToken");
-        String hashBefore = adminPasswordHash();
+        String credentialsBefore = adminCredentials();
         try {
             expectTokenInvalid(given().header("Authorization", "Bearer " + refreshToken)
                 .contentType(ContentType.JSON)
@@ -102,9 +103,9 @@ class AccessTokenOnlyResourceTest {
                     + "\",\"newPassword\":\"" + TestAuth.ADMIN_PASSWORD + "\"}")
                 .when().post("/auth/change-password").then());
 
-            assertEquals(hashBefore, adminPasswordHash());
+            assertEquals(credentialsBefore, adminCredentials());
         } finally {
-            restoreAdminPasswordHash(hashBefore);
+            restoreAdminCredentials(credentialsBefore);
         }
     }
 
@@ -225,13 +226,20 @@ class AccessTokenOnlyResourceTest {
             .body("code", equalTo("AUTH-008"));
     }
 
-    private String adminPasswordHash() {
-        return QuarkusTransaction.requiringNew().call(() ->
-            userRepository.findByUsername(TestAuth.ADMIN_USERNAME).orElseThrow().passwordHash);
+    /** El hash y la version de las sesiones de admin: cambiar la clave mueve los dos. */
+    private String adminCredentials() {
+        return QuarkusTransaction.requiringNew().call(() -> {
+            User admin = userRepository.findByUsername(TestAuth.ADMIN_USERNAME).orElseThrow();
+            return admin.passwordHash + "|" + admin.sessionVersion;
+        });
     }
 
-    private void restoreAdminPasswordHash(String hash) {
-        QuarkusTransaction.requiringNew().run(() ->
-            userRepository.findByUsername(TestAuth.ADMIN_USERNAME).orElseThrow().passwordHash = hash);
+    private void restoreAdminCredentials(String credentials) {
+        String[] parts = credentials.split("\\|");
+        QuarkusTransaction.requiringNew().run(() -> {
+            User admin = userRepository.findByUsername(TestAuth.ADMIN_USERNAME).orElseThrow();
+            admin.passwordHash = parts[0];
+            admin.sessionVersion = Integer.valueOf(parts[1]);
+        });
     }
 }

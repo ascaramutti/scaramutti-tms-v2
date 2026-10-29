@@ -51,6 +51,16 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
     }
 
     /**
+     * El hash de la cuenta como valor suelto y SIN cargarla: el cambio de clave lo verifica antes de
+     * tomar la fila, y con la cuenta ya en memoria la toma de despues falla (la guarda de lo cargado).
+     */
+    public Optional<String> findPasswordHashByUserId(Integer userId) {
+        return getEntityManager()
+            .createQuery("SELECT u.passwordHash FROM User u WHERE u.id = :userId", String.class)
+            .setParameter("userId", userId).getResultStream().findFirst();
+    }
+
+    /**
      * Si la cuenta esta hoy habilitada para escribir con alguno de esos roles, como valor suelto y
      * SIN cargarla, por el mismo motivo que el metodo de arriba: se pregunta ANTES de bloquear, y
      * una cuenta en memoria haria que la validacion de despues leyera la copia vieja.

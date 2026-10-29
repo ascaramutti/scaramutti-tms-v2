@@ -20,7 +20,6 @@ import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
-import jakarta.ws.rs.core.Response;
 import org.jboss.resteasy.reactive.RestResponse;
 
 @Path("/auth")
@@ -58,9 +57,10 @@ public class AuthResource {
     @POST
     @Path("/change-password")
     @Authenticated
-    public Response changePassword(@Valid @NotNull ChangePasswordRequest changePasswordRequest) {
-        authService.changePassword(authResourceMapper.toChangePasswordCommand(currentUser.requireId(), changePasswordRequest));
-        return Response.noContent().build();
+    public RestResponse<LoginResponse> changePassword(@Valid @NotNull ChangePasswordRequest changePasswordRequest) {
+        LoginResponse loginResponse = authService.changePassword(
+            authResourceMapper.toChangePasswordCommand(currentUser.requireId(), changePasswordRequest));
+        return CacheHeaders.callerTokensNotStored(RestResponse.ResponseBuilder.ok(loginResponse));
     }
 
     /** Misma segunda capa que {@code changePassword}: ver el comentario de ese metodo. */

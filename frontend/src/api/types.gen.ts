@@ -60,7 +60,7 @@ export type LoginResponse = {
 
 export type RefreshRequest = {
     /**
-     * JWT firmado emitido previamente por /auth/login o /auth/refresh.
+     * JWT firmado emitido previamente por /auth/login, /auth/refresh o /auth/change-password.
      */
     refreshToken: string;
 };
@@ -95,9 +95,9 @@ export type UserResponse = UserRef & {
 };
 
 /**
- * El usuario de la sesión (login, refresh y /auth/me): el de UserResponse más el id de su
- * trabajador, para reconocer la ficha propia. Los autores embebidos en otras respuestas
- * (UserResponse o UserRef) no lo traen.
+ * El usuario de la sesión (login, refresh, change-password y /auth/me): el de UserResponse
+ * más el id de su trabajador, para reconocer la ficha propia. Los autores embebidos en otras
+ * respuestas (UserResponse o UserRef) no lo traen.
  *
  */
 export type SessionUser = UserResponse & {
@@ -1893,7 +1893,7 @@ export type RefreshTokenErrors = {
      */
     400: Problem;
     /**
-     * Refresh token inválido o expirado, o cuenta no utilizable
+     * Refresh vencido, inválido o revocado, o cuenta no utilizable
      */
     401: Problem;
 };
@@ -1926,18 +1926,22 @@ export type ChangePasswordErrors = {
      */
     401: Problem;
     /**
-     * El usuario del token ya no existe
+     * La cuenta del token ya no existe
      */
     404: Problem;
+    /**
+     * Conflicto transitorio: otra operación retuvo la fila de la cuenta, o una de sus tablas mientras el cambio la tomaba, la leía o la escribía, más allá del tope; se reintenta
+     */
+    409: Problem;
 };
 
 export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
 
 export type ChangePasswordResponses = {
     /**
-     * Contraseña actualizada
+     * Contraseña cambiada; la sesión nueva
      */
-    204: void;
+    200: LoginResponse;
 };
 
 export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
@@ -1955,7 +1959,7 @@ export type GetCurrentUserErrors = {
      */
     401: Problem;
     /**
-     * El usuario del token ya no existe
+     * La cuenta del token ya no existe
      */
     404: Problem;
 };

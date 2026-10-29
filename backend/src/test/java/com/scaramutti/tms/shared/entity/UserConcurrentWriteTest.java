@@ -5,6 +5,7 @@ import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import jakarta.persistence.EntityManager;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,23 +14,18 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * Dos escrituras sin coordinar sobre la MISMA fila de usuario no se pisan.
- *
- * <p>La baja de un trabajador le apaga la cuenta; el cambio de contrasena le cambia el hash. Son
- * dos transacciones distintas, sin bloqueo entre ellas, y con escritura de columnas completas la
- * que llegue segunda pisaria lo que la primera acababa de guardar: una de las dos se pierde sin
- * ningun error, y si la que se pierde es la baja, la cuenta sigue encendida con una fila de rastro
- * que afirma que se apago.
- *
- * <p>Lo que lo evita es que la entidad escriba SOLO las columnas que cada transaccion cambio. Esa
- * decision vive en una anotacion de una linea, y este caso es lo unico que la sostiene: sin el,
- * borrarla no rompe nada.
+ * Dos escrituras sin coordinar sobre la MISMA fila de usuario no se pisan. La baja de un trabajador
+ * apaga la cuenta leyendola sin tomar su fila: con columnas completas, si el cambio de contrasena
+ * confirma mientras tanto, la baja pisaria su hash y su version, y la revocacion se desharia sin
+ * error. Lo evita que la entidad escriba solo lo que cada una cambio, una anotacion de una linea que
+ * solo este caso sostiene.
  */
 @QuarkusTest
 class UserConcurrentWriteTest {
 
     @Inject UserRepository userRepository;
     @Inject WarehouseTestData fixtures;
+    @Inject EntityManager entityManager;
 
     @BeforeEach
     @AfterEach
@@ -60,5 +56,27 @@ class UserConcurrentWriteTest {
         assertEquals("hash-nuevo-de-la-otra-operacion",
             QuarkusTransaction.requiringNew().call(() -> userRepository.findById(userId).passwordHash),
             "y el hash de esta tampoco");
+    }
+
+    /**
+     * La direccion que se da hoy: la baja lee la cuenta sin tomarla, el cambio de contrasena confirma
+     * el hash y la version, y la baja escribe despues. Ni la baja ni la revocacion se pierden.
+     */
+    @Test
+    void aDeactivationThatReadBeforeAPasswordChange_keepsTheHashAndTheVersionOfTheChange() {
+        int workerId = fixtures.seedWorker("ZTESTW709", "Ana", "Silva", "sales", true);
+        int userId = fixtures.seedUserFor(workerId, "ztestuser709", "sales");
+
+        QuarkusTransaction.requiringNew().run(() -> {
+            userRepository.findById(userId).isActive = false;
+            QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
+                    "UPDATE public.users SET password_hash = 'hash-del-cambio', session_version = 1 WHERE id = ?1")
+                .setParameter(1, userId).executeUpdate());
+        });
+
+        assertEquals("false|hash-del-cambio|1", QuarkusTransaction.requiringNew().call(() -> {
+            User user = userRepository.findById(userId);
+            return user.isActive + "|" + user.passwordHash + "|" + user.sessionVersion;
+        }), "la baja, el hash y la version del cambio");
     }
 }

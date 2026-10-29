@@ -26,7 +26,9 @@ public enum AuthError implements ApiError {
     TOKEN_INVALID          ("AUTH-008", 401, "Token invalid",
         "El token de acceso es inválido o está mal formado"),
     REFRESH_TOKEN_EXPIRED  ("AUTH-009", 401, "Refresh token expired",
-        "El refresh token expiró. Volver a hacer login.");
+        "El refresh token expiró. Volver a hacer login."),
+    ACCOUNT_BUSY           ("AUTH-010", 409, "Account busy",
+        "La cuenta está siendo modificada por otra operación");
 
     private final String code;
     private final int status;
