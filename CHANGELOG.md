@@ -9,6 +9,32 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.10.1] - 2026-10-29
+
+Dependencias al día: Quarkus 3.33.4.1, el release de emergencia de la LTS, surefire 3.6.1, el
+grupo menor del frontend y follow-redirects 1.16.2: PRs #292, #291, #277 y #296. Sin migraciones
+ni configuración, y el contrato no cambia: volver a 2.10.0 es cambiar las imágenes. `npm audit`
+queda con un solo paquete marcado, happy-dom, de desarrollo.
+
+### Security
+
+- Quarkus de 3.33.4 a 3.33.4.1, release de emergencia de la LTS: sube Netty a 4.1.139, con arreglos
+  en el manejo de HTTP, Vert.x a 4.5.35 y Hibernate Validator a 9.1.5. Las librerías de Flyway, del
+  driver de PostgreSQL, de Hibernate ORM, de SmallRye JWT y del pool siguen en las mismas versiones
+  (#292).
+- zod de 4.6.5 a 4.6.7 cierra GHSA-mrhx-c7xc-m3w5; entre las herramientas de desarrollo, vite de
+  8.3.2 a 8.3.5, `@vitest/ui` de 5.0.3 a 5.0.5 y source-map-js de 1.2.1 a 1.2.2 cierran los suyos
+  (#277).
+- follow-redirects de 1.16.0 a 1.16.2, que trae axios, cierra GHSA-q3jh-wrc6-jgq8 y
+  GHSA-8r9p-f939-6h3c; no entra en el bundle (#296).
+
+### Changed
+
+- surefire de 3.6.0 a 3.6.1, el plugin que corre los tests del backend (#291).
+- El resto del grupo menor del frontend: react y react-dom de 19.3.0 a 19.3.1, react-hook-form de
+  7.89.0 a 7.91.0, @tanstack/react-query de 5.104.1 a 5.104.5, lucide-react de 1.50.0 a 1.61.0,
+  eslint de 10.11.0 a 10.13.0 y typescript-eslint de 8.71.0 a 8.72.0, entre otros (#277).
+
 ## [2.10.0] - 2026-10-28
 
 El apellido paterno y el materno del trabajador, cada uno en su columna y en su campo, y las
