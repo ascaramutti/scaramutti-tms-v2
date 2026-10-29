@@ -8,6 +8,7 @@ import com.scaramutti.tms.auth.dto.SessionUserResponse;
 import com.scaramutti.tms.auth.mapper.AuthResourceMapper;
 import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.AuthService;
+import com.scaramutti.tms.shared.util.CacheHeaders;
 import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.PermitAll;
 import jakarta.inject.Inject;
@@ -20,6 +21,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import org.jboss.resteasy.reactive.RestResponse;
 
 @Path("/auth")
 @Produces(MediaType.APPLICATION_JSON)
@@ -33,15 +35,17 @@ public class AuthResource {
     @POST
     @Path("/login")
     @PermitAll
-    public LoginResponse login(@Valid @NotNull LoginRequest loginRequest) {
-        return authService.login(authResourceMapper.toLoginCommand(loginRequest));
+    public RestResponse<LoginResponse> login(@Valid @NotNull LoginRequest loginRequest) {
+        LoginResponse loginResponse = authService.login(authResourceMapper.toLoginCommand(loginRequest));
+        return CacheHeaders.tokensNotStored(RestResponse.ResponseBuilder.ok(loginResponse));
     }
 
     @POST
     @Path("/refresh")
     @PermitAll
-    public LoginResponse refresh(@Valid @NotNull RefreshRequest refreshRequest) {
-        return authService.refresh(authResourceMapper.toRefreshCommand(refreshRequest));
+    public RestResponse<LoginResponse> refresh(@Valid @NotNull RefreshRequest refreshRequest) {
+        LoginResponse loginResponse = authService.refresh(authResourceMapper.toRefreshCommand(refreshRequest));
+        return CacheHeaders.tokensNotStored(RestResponse.ResponseBuilder.ok(loginResponse));
     }
 
     /**
@@ -63,7 +67,8 @@ public class AuthResource {
     @GET
     @Path("/me")
     @Authenticated
-    public SessionUserResponse me() {
-        return authService.findUserById(currentUser.requireId());
+    public RestResponse<SessionUserResponse> me() {
+        SessionUserResponse sessionUserResponse = authService.findUserById(currentUser.requireId());
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(sessionUserResponse));
     }
 }

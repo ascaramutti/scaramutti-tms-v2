@@ -116,6 +116,26 @@ class DriversResourceTest {
             "ZTEST Aaa debe venir antes que ZZTEST Ultimo (nombre ASC); ids=" + ids);
     }
 
+    /** El orden y el nombre de los conductores son los de los trabajadores: nombres, paterno y materno. */
+    @Test
+    void listDrivers_orderedByFirstNameThenPaternalThenMaternal_withoutMaternalFirst() {
+        int otherPaternal = fixtures.seedDriver("ZTEST Orden", "Ztordenb");
+        int maternalZeta = fixtures.seedDriver("ZTEST Orden", "Ztordena", "Zeta");
+        int twoWordPaternal = fixtures.seedDriver("ZTEST Orden", "Ztordena Beta");
+        int withoutMaternal = fixtures.seedDriver("ZTEST Orden", "Ztordena");
+        int maternalAlfa = fixtures.seedDriver("ZTEST Orden", "Ztordena", "Alfa");
+        List<Integer> seeded = List.of(otherPaternal, maternalZeta, twoWordPaternal, withoutMaternal, maternalAlfa);
+
+        List<Integer> ids = given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/drivers")
+        .then().statusCode(200)
+            .body("find { it.id == " + maternalAlfa + " }.fullName", equalTo("ZTEST Orden Ztordena Alfa"))
+            .extract().jsonPath().getList("id", Integer.class);
+
+        assertEquals(List.of(withoutMaternal, maternalAlfa, maternalZeta, twoWordPaternal, otherPaternal),
+            ids.stream().filter(seeded::contains).toList());
+    }
+
     // ---------- isActive filter --------------------------------------------------
 
     @Test

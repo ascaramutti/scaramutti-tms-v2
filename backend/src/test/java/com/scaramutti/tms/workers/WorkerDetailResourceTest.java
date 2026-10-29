@@ -3,6 +3,7 @@ package com.scaramutti.tms.workers;
 import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,13 +14,17 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * Integration tests de GET /workers/{id}.
@@ -49,7 +54,7 @@ class WorkerDetailResourceTest {
     // ---------- la ficha completa ------------------------------------------------
 
     @Test
-    void get_returnsTheFifteenFieldsOfTheContract() {
+    void get_returnsTheSeventeenFieldsOfTheContract() {
         int id = fixtures.seedWorker("ZTESTB001", "Juan", "Pérez Huamán", "driver", true);
         fixtures.setWorkerPhone(id, "987654321");
         fixtures.setWorkerHireDate(id, LocalDate.of(2024, 3, 1));
@@ -62,17 +67,70 @@ class WorkerDetailResourceTest {
             // El conjunto ENTERO de claves y no campo por campo: asi un campo de mas, que es
             // como se filtra un dato sin querer, tambien hace fallar el caso.
             .body("keySet()", containsInAnyOrder(
-                "id", "firstName", "lastName", "documentType", "documentNumber", "phone",
-                "role", "hireDate", "isActive", "createdAt", "createdBy", "updatedAt",
-                "updatedBy", "driver", "hasUser"))
+                "id", "firstName", "paternalLastName", "maternalLastName", "fullName",
+                "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
+                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
             .body("id", equalTo(id))
             .body("firstName", equalTo("Juan"))
-            .body("lastName", equalTo("Pérez Huamán"))
+            .body("paternalLastName", equalTo("Pérez Huamán"))
             .body("documentNumber", equalTo("ZTESTB001"))
             .body("phone", equalTo("987654321"))
             .body("isActive", equalTo(true))
             .body("createdAt", notNullValue())
             .body("updatedAt", notNullValue());
+    }
+
+    // ---------- los apellidos y el nombre completo ---------------------------------
+
+    /** Cada parte en su clave: el paterno y el materno son palabras distintas, cruzarlos se nota. */
+    @Test
+    void get_workerWithMaternal_carriesEachSurnameAndTheFullName() {
+        int id = fixtures.seedWorker("ZTESTB092", "Rosa", "Diaz", "Núñez", "operator", true);
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("paternalLastName", equalTo("Diaz"))
+            .body("maternalLastName", equalTo("Núñez"))
+            .body("fullName", equalTo("Rosa Diaz Núñez"));
+    }
+
+    /**
+     * Sin materno la clave viaja con nulo, no vacia ni ausente: {@code nullValue()} pasa tambien
+     * sin la clave, por eso se afirma aparte. El nombre, igual que antes y sin espacio al final.
+     */
+    @Test
+    void get_workerWithoutMaternal_sendsTheMaternalKeyAsNull_andTheFullNameWithoutTrailingSpace() {
+        int id = fixtures.seedWorker("ZTESTB093", "Pedro", "Rios", "operator", true);
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("$", hasKey("maternalLastName"))
+            .body("maternalLastName", nullValue())
+            .body("paternalLastName", equalTo("Rios"))
+            .body("fullName", equalTo("Pedro Rios"));
+    }
+
+    /**
+     * La ficha compone el nombre en SQL y el listado en Java: con espacios delante de los nombres,
+     * puestos por SQL, las dos los recortan y la misma persona se llama igual.
+     */
+    @Test
+    void get_fullName_isTheOneTheListGives() {
+        int id = fixtures.seedWorker("ZTESTB094", "Rosa", "Diaz", "Ztmaternoficha", "operator", true);
+        fixtures.setWorkerFirstName(id, "  Rosa");
+
+        String fromTheList = given().header("Authorization", "Bearer " + adminToken())
+            .queryParam("q", "ztmaternoficha")
+        .when().get("/workers")
+        .then().statusCode(200)
+            .extract().path("find { it.id == " + id + " }.fullName");
+
+        assertEquals("Rosa Diaz Ztmaternoficha", fromTheList, "el listado");
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200).body("fullName", equalTo(fromTheList));
     }
 
     /** El rol viaja entero: el formulario necesita el nivel y la modalidad del cargo actual. */
@@ -421,6 +479,59 @@ class WorkerDetailResourceTest {
             .body("code", equalTo("WRK-001"))
             .body("status", equalTo(404))
             .body("detail", equalTo("Trabajador no encontrado"));
+    }
+
+    // ---------- cabeceras de cache -----------------------------------------------
+
+    /**
+     * La ficha trae el documento y no la leen todos los roles: ninguna cache la guarda, y cada
+     * cabecera sale una sola vez.
+     */
+    @Test
+    void get_sendsNoStoreAndVaryOnce() {
+        int id = fixtures.seedWorker("ZTESTB090", "Juan", "Perez", "operator", true);
+
+        Response response = given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id);
+
+        assertEquals(200, response.statusCode());
+        assertEquals(id, response.jsonPath().getInt("id"));
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /**
+     * El HEAD lo contesta el framework con el mismo metodo: las mismas cabeceras y el Content-Type
+     * del GET. Con un Response sin tipo, el HEAD pierde el charset que lleva el GET.
+     */
+    @Test
+    void get_head_sendsNoStoreAndVaryOnceWithTheContentTypeOfTheGet() {
+        int id = fixtures.seedWorker("ZTESTB091", "Juan", "Perez", "operator", true);
+        String token = adminToken();
+        String getContentType = given().header("Authorization", "Bearer " + token)
+        .when().get("/workers/" + id)
+        .then().statusCode(200).extract().contentType();
+
+        Response response = given().header("Authorization", "Bearer " + token)
+        .when().head("/workers/" + id);
+
+        assertEquals(200, response.statusCode());
+        assertEquals(getContentType, response.contentType());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /** Las cabeceras van en el exito y no en un filtro: el 404 del servicio sale sin ellas. */
+    @Test
+    void get_idThatDoesNotExist_returns404WithoutCacheHeaders() {
+        Response response = given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/999999999");
+
+        assertEquals(404, response.statusCode());
+        assertEquals("WRK-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "Pragma");
     }
 
 }

@@ -47,7 +47,7 @@ export function WorkerSearchBar({
               value={query}
               onChange={(event) => onQueryChange(event.target.value)}
               maxLength={REGISTRY_SEARCH_MAX_LENGTH}
-              placeholder="Nombre, apellido o documento"
+              placeholder="Nombre, apellidos o documento"
               aria-describedby={showHint ? 'q-hint' : undefined}
               className={cn(inputClasses, 'pl-9 pr-3 placeholder:text-fg-subtle')}
             />

@@ -7,8 +7,11 @@ import java.time.OffsetDateTime;
 
 /**
  * Un trabajador completo. No reusa la respuesta del listado: esa tiene cuatro campos para un
- * combobox y esta tiene quince, con el documento y el telefono, que el combobox nunca muestra
- * y por eso el detalle lo leen menos roles.
+ * combobox y esta tiene diecisiete, entre ellos el documento, que el combobox nunca muestra y por
+ * eso el detalle lo leen menos roles.
+ *
+ * <p>Sin materno, {@code maternalLastName} viaja nulo, nunca vacio; {@code fullName} lo compone la
+ * consulta, con {@code WorkerRepository.fullNameExpression}.
  *
  * <p>{@code hasUser} no es una columna: se deriva de que exista una fila de usuario apuntando
  * a este trabajador. Es verdadero tambien cuando ese usuario esta inactivo, porque desactivar
@@ -22,7 +25,9 @@ import java.time.OffsetDateTime;
 public record WorkerDetailResponse(
     @Schema(example = "8") Integer id,
     @Schema(example = "Juan") String firstName,
-    @Schema(example = "Pérez Huamán") String lastName,
+    @Schema(example = "Pérez") String paternalLastName,
+    @Schema(example = "Huamán", nullable = true) String maternalLastName,
+    @Schema(example = "Juan Pérez Huamán") String fullName,
     DocumentTypeResponse documentType,
     @Schema(example = "45678912") String documentNumber,
     @Schema(example = "987654321", nullable = true) String phone,

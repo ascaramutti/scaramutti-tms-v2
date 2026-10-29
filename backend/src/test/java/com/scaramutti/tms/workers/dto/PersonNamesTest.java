@@ -63,6 +63,31 @@ class PersonNamesTest {
         return PersonNames.toNfc(value).matches(PersonNames.PATTERN);
     }
 
+    /** El materno sigue la misma regla, y ademas entra vacio o de espacios, que el mapper deja nulo. */
+    @Test
+    void theSharedCases_matchTheMaternalPattern() throws Exception {
+        JsonNode cases;
+        try (var in = getClass().getResourceAsStream("/workers/person-names.json")) {
+            cases = new ObjectMapper().readTree(in);
+        }
+        for (String list : new String[] {"accepted", "acceptedOnlyAsMaternal"}) {
+            for (JsonNode accepted : cases.get(list)) {
+                assertTrue(matchesTheMaternalRule(accepted.asText()), "deberia entrar: [" + accepted.asText() + "]");
+            }
+        }
+        for (JsonNode rejected : cases.get("rejected")) {
+            assertFalse(matchesTheMaternalRule(rejected.asText()), "deberia quedar afuera: " + rejected.asText());
+        }
+        for (JsonNode blank : cases.get("acceptedOnlyAsMaternal")) {
+            assertFalse(matchesTheRule(blank.asText()),
+                "el nombre y el paterno no entran vacios: [" + blank.asText() + "]");
+        }
+    }
+
+    private static boolean matchesTheMaternalRule(String value) {
+        return PersonNames.toNfc(value).matches(PersonNames.MATERNAL_PATTERN);
+    }
+
     /**
      * La regla corre sobre el valor entero, antes que el largo. Con clases que se solapan, un
      * texto largo que falla al final retrocede en tiempo cuadratico; la forma elegida es lineal.
@@ -79,12 +104,15 @@ class PersonNamesTest {
         String marks = "a" + "\u0301\u0316".repeat(40_000);
         LocalDate hired = LocalDate.of(2024, 3, 1);
 
-        WorkerRequest created = new WorkerRequest(marks, marks, 1, "X1", null, "operator", hired, null);
+        WorkerRequest created = new WorkerRequest(marks, marks, marks, 1, "X1", null, "operator", hired, null);
         assertSame(marks, created.firstName());
-        assertSame(marks, created.lastName());
+        assertSame(marks, created.paternalLastName());
+        assertSame(marks, created.maternalLastName());
 
-        WorkerUpdateRequest updated = new WorkerUpdateRequest(marks, marks, 1, "X1", null, "operator", hired, null, null);
+        WorkerUpdateRequest updated =
+            new WorkerUpdateRequest(marks, marks, marks, 1, "X1", null, "operator", hired, null, null);
         assertSame(marks, updated.firstName());
-        assertSame(marks, updated.lastName());
+        assertSame(marks, updated.paternalLastName());
+        assertSame(marks, updated.maternalLastName());
     }
 }

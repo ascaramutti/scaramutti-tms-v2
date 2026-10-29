@@ -164,6 +164,11 @@ describe('WithdrawalCreatePage', () => {
     })
   })
 
+  it('la ayuda del trabajador nombra los apellidos', () => {
+    renderRegistro()
+    expect(screen.getByLabelText('Recibido por')).toHaveAttribute('placeholder', 'Busca por nombre o apellidos…')
+  })
+
   it('el combobox de trabajador no ofrece crear al vuelo', async () => {
     server.use(workersSearchPage([]))
     const user = userEvent.setup()

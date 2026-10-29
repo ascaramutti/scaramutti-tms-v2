@@ -15,6 +15,7 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.util.StringJoiner;
 
 /**
  * Trabajador de {@code public.workers}.
@@ -36,8 +37,13 @@ public class Worker {
     @Column(name = "first_name", nullable = false)
     public String firstName;
 
-    @Column(name = "last_name", nullable = false)
-    public String lastName;
+    /** Las dos columnas de los apellidos las escribe solo {@link #assignSurnames}. */
+    @Column(name = "paternal_last_name", nullable = false)
+    public String paternalLastName;
+
+    /** Nulo si no tiene: la base rechaza el materno vacio o de espacios. */
+    @Column(name = "maternal_last_name")
+    public String maternalLastName;
 
     @Column(name = "document_type_id", nullable = false)
     public Integer documentTypeId;
@@ -85,10 +91,33 @@ public class Worker {
     @Column(name = "updated_at", nullable = false)
     public OffsetDateTime updatedAt;
 
+    /**
+     * El nombre completo: nombres, paterno y materno, con un espacio entre cada uno y sin el
+     * materno si no tiene, recortado. Es la regla de {@code WorkerRepository.fullNameExpression}
+     * en Java; todo nombre de un trabajador que arma el backend sale de una de las dos.
+     */
     public String fullName() {
         String first = firstName != null ? firstName : "";
-        String last = lastName != null ? lastName : "";
-        return (first + " " + last).trim();
+        return (first + " " + joinedSurnames(paternalLastName, maternalLastName)).trim();
+    }
+
+    /**
+     * El unico que escribe los apellidos. La columna de antes, {@code last_name}, ya no se mapea:
+     * la compone el disparador de la base al insertar y cuando cambian las partes, y ninguna consulta
+     * de esta imagen la nombra (el alta la recibe en el {@code RETURNING *} que suma el driver). Como
+     * el UPDATE no la nombra, nunca la manda vieja.
+     */
+    public void assignSurnames(String paternal, String maternal) {
+        paternalLastName = paternal;
+        maternalLastName = maternal;
+    }
+
+    /** Como {@code concat_ws(' ', ...)}: un espacio entre cada parte, sin las nulas. */
+    private static String joinedSurnames(String paternal, String maternal) {
+        StringJoiner surnames = new StringJoiner(" ");
+        if (paternal != null) surnames.add(paternal);
+        if (maternal != null) surnames.add(maternal);
+        return surnames.toString();
     }
 
     /**

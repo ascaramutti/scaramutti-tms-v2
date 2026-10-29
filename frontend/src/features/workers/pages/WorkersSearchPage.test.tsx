@@ -73,6 +73,12 @@ describe('WorkersSearchPage', () => {
     expect(screen.getByRole('heading', { level: 1, name: /^trabajadores$/i })).toBeInTheDocument()
   })
 
+  it('la ayuda del encabezado nombra los apellidos', () => {
+    server.use(workersSearchPage([]))
+    renderPage()
+    expect(screen.getByText('Busca por nombre, apellidos o documento para ver quién está en el padrón.')).toBeInTheDocument()
+  })
+
   it('al abrir no busca ni muestra el vacío', async () => {
     const sink: ProductsCaptureSink = {}
     server.use(workersSearchCapture(sink, [ANA]))
@@ -567,7 +573,7 @@ describe('WorkersSearchPage', () => {
       expect(campo()).toHaveAttribute('aria-describedby', 'q-hint')
       // El id tiene que existir: una referencia colgada deja al lector sin instrucción.
       expect(campo()).toHaveAccessibleDescription(/ingresa al menos 3 caracteres/i)
-      expect(campo()).toHaveAttribute('placeholder', 'Nombre, apellido o documento')
+      expect(campo()).toHaveAttribute('placeholder', 'Nombre, apellidos o documento')
 
       await user.type(campo(), 'ana')
 

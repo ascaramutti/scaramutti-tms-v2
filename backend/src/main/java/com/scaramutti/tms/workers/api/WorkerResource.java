@@ -1,6 +1,7 @@
 package com.scaramutti.tms.workers.api;
 
 import com.scaramutti.tms.shared.dto.WorkerResponse;
+import com.scaramutti.tms.shared.util.CacheHeaders;
 import com.scaramutti.tms.workers.dto.WorkerDetailResponse;
 import com.scaramutti.tms.workers.dto.WorkerRequest;
 import com.scaramutti.tms.workers.dto.WorkerUpdateRequest;
@@ -21,7 +22,7 @@ import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
-import org.jboss.resteasy.reactive.ResponseStatus;
+import org.jboss.resteasy.reactive.RestResponse;
 
 import java.util.List;
 
@@ -51,20 +52,22 @@ public class WorkerResource {
 
     @GET
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager", "warehouse_keeper"})
-    public List<WorkerResponse> listWorkers(
+    public RestResponse<List<WorkerResponse>> listWorkers(
         @QueryParam("q")        @Size(min = 3, max = 200) String q,
         @QueryParam("isActive")                          Boolean isActive
     ) {
-        return workerService.listWorkers(
+        List<WorkerResponse> workers = workerService.listWorkers(
             workerResourceMapper.toListWorkersQuery(q, isActive)
         );
+        // El encargado de almacen no busca por documento: el cuerpo depende de quien pregunta.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(workers));
     }
 
     /**
      * El detalle de un trabajador. Lo leen CUATRO roles y no los cinco del listado, y el
-     * discriminante es el NUMERO DE DOCUMENTO: es el unico dato de la ficha que ninguna otra
-     * respuesta expone a los roles que quedan afuera. El telefono no sirve de motivo, medido:
-     * el catalogo de conductores ya lo publica y lo leen tambien el despacho y ventas.
+     * discriminante es el NUMERO DE DOCUMENTO, que el listado no trae. El telefono no sirve de
+     * motivo, medido: el de los conductores ya lo publica su catalogo, que leen tambien el
+     * despacho y ventas.
      *
      * <p>Sin regla de organigrama: la lectura es plana. Quien puede abrir esta pantalla ve
      * cualquier ficha, incluso la de alguien de cargo superior; el organigrama gobierna
@@ -73,8 +76,9 @@ public class WorkerResource {
     @GET
     @Path("/{id}")
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
-    public WorkerDetailResponse getWorker(@PathParam("id") Integer id) {
-        return workerService.getWorker(id);
+    public RestResponse<WorkerDetailResponse> getWorker(@PathParam("id") Integer id) {
+        // El cuerpo no cambia con el rol, pero trae el documento, que no todos los roles leen.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(workerService.getWorker(id)));
     }
 
     /**
@@ -91,11 +95,14 @@ public class WorkerResource {
      */
     @POST
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
-    @ResponseStatus(201)
-    public WorkerDetailResponse createWorker(@Valid @NotNull WorkerRequest workerRequest) {
-        return workerService.createWorker(
+    public RestResponse<WorkerDetailResponse> createWorker(@Valid @NotNull WorkerRequest workerRequest) {
+        WorkerDetailResponse workerDetailResponse = workerService.createWorker(
             workerResourceMapper.toCreateWorkerCommand(workerRequest)
         );
+        // Un 201 no lo guarda ninguna cache por defecto, pero trae la ficha del detalle, con el
+        // documento: sale con sus mismas cabeceras.
+        return CacheHeaders.notStored(
+            RestResponse.ResponseBuilder.create(RestResponse.Status.CREATED, workerDetailResponse));
     }
 
 
@@ -112,13 +119,15 @@ public class WorkerResource {
     @PUT
     @Path("/{id}")
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
-    public WorkerDetailResponse updateWorker(
+    public RestResponse<WorkerDetailResponse> updateWorker(
         @PathParam("id") Integer id,
         @Valid @NotNull WorkerUpdateRequest workerUpdateRequest
     ) {
-        return workerService.updateWorker(
+        WorkerDetailResponse workerDetailResponse = workerService.updateWorker(
             workerResourceMapper.toUpdateWorkerCommand(id, workerUpdateRequest)
         );
+        // Mismo cuerpo que el detalle, con sus mismas cabeceras.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(workerDetailResponse));
     }
 
     /**
@@ -131,8 +140,8 @@ public class WorkerResource {
     @Path("/{id}/deactivate")
     @Consumes(MediaType.WILDCARD)
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
-    public WorkerDetailResponse deactivateWorker(@PathParam("id") Integer id) {
-        return workerService.deactivateWorker(id);
+    public RestResponse<WorkerDetailResponse> deactivateWorker(@PathParam("id") Integer id) {
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(workerService.deactivateWorker(id)));
     }
 
     /** Reactivar. Sin cuerpo, por lo mismo que desactivar. */
@@ -140,8 +149,8 @@ public class WorkerResource {
     @Path("/{id}/reactivate")
     @Consumes(MediaType.WILDCARD)
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
-    public WorkerDetailResponse reactivateWorker(@PathParam("id") Integer id) {
-        return workerService.reactivateWorker(id);
+    public RestResponse<WorkerDetailResponse> reactivateWorker(@PathParam("id") Integer id) {
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(workerService.reactivateWorker(id)));
     }
 
 }

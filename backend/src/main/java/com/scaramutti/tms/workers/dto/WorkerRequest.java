@@ -28,8 +28,12 @@ public record WorkerRequest(
     @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
     @Schema(example = "Juan") String firstName,
 
-    @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
-    @Schema(example = "Pérez Huamán") String lastName,
+    @NotBlank(message = PersonNames.PATERNAL_MISSING) @Size(max = 100)
+    @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE)
+    @Schema(example = "Pérez") String paternalLastName,
+
+    @Size(max = 100) @Pattern(regexp = PersonNames.MATERNAL_PATTERN, message = PersonNames.MESSAGE)
+    @Schema(nullable = true, example = "Huamán") String maternalLastName,
 
     @NotNull
     @Schema(example = "1") Integer documentTypeId,
@@ -51,6 +55,7 @@ public record WorkerRequest(
 ) {
     public WorkerRequest {
         firstName = PersonNames.toNfc(firstName);
-        lastName = PersonNames.toNfc(lastName);
+        paternalLastName = PersonNames.toNfc(paternalLastName);
+        maternalLastName = PersonNames.toNfc(maternalLastName);
     }
 }

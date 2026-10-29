@@ -82,14 +82,15 @@ function renderPage({ role = 'operations_manager' as UserRole, position }: { rol
   return { router, queryClient, container: vista.container, unmount: vista.unmount }
 }
 
-const listo = () => screen.findByLabelText('Nombre')
+const listo = () => screen.findByLabelText('Nombres')
 const cargo = () => screen.getByLabelText('Cargo')
 const invalidada = (queryClient: QueryClient, key: readonly unknown[]) =>
   queryClient.getQueryState(key)?.isInvalidated
 
 async function llenarValido(user: ReturnType<typeof userEvent.setup>, cargoVisible = 'Operador') {
-  await user.type(screen.getByLabelText('Nombre'), 'Juan')
-  await user.type(screen.getByLabelText('Apellido'), 'Pérez Huamán')
+  await user.type(screen.getByLabelText('Nombres'), 'Juan')
+  await user.type(screen.getByLabelText('Apellido paterno'), 'Pérez')
+  await user.type(screen.getByLabelText('Apellido materno (opcional)'), 'Huamán')
   await user.type(screen.getByLabelText('Número de documento'), '45678912')
   await user.selectOptions(cargo(), cargoVisible)
 }
@@ -129,7 +130,16 @@ describe('WorkerCreatePage', () => {
       renderPage()
       await listo()
 
-      const rotulos = ['Nombre', 'Apellido', 'Tipo de documento', 'Número de documento', 'Cargo', 'Fecha de ingreso', 'Teléfono (opcional)']
+      const rotulos = [
+        'Nombres',
+        'Apellido paterno',
+        'Apellido materno (opcional)',
+        'Tipo de documento',
+        'Número de documento',
+        'Cargo',
+        'Fecha de ingreso',
+        'Teléfono (opcional)',
+      ]
       const campos = rotulos.map((rotulo) => screen.getByLabelText(rotulo))
       for (let i = 1; i < campos.length; i++) {
         expect(campos[i - 1].compareDocumentPosition(campos[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
@@ -141,7 +151,7 @@ describe('WorkerCreatePage', () => {
       await listo()
 
       expect(screen.getByLabelText('Tipo de documento')).toHaveValue(String(DNI.id))
-      expect(screen.getByLabelText('Nombre')).toHaveValue('')
+      expect(screen.getByLabelText('Nombres')).toHaveValue('')
       expect(screen.getByLabelText('Número de documento')).toHaveValue('')
       expect(screen.getByLabelText('Teléfono (opcional)')).toHaveValue('')
       expect(cargo()).toHaveValue('')
@@ -209,7 +219,7 @@ describe('WorkerCreatePage', () => {
       renderPage()
 
       expect(await screen.findByRole('alert', {}, { timeout: 4000 })).toHaveTextContent('Error interno del servidor')
-      expect(screen.queryByLabelText('Nombre')).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Nombres')).not.toBeInTheDocument()
 
       server.resetHandlers()
       await user.click(screen.getByRole('button', { name: /reintentar/i }))
@@ -222,12 +232,12 @@ describe('WorkerCreatePage', () => {
       const user = userEvent.setup()
       renderPage()
       await listo()
-      await user.click(screen.getByLabelText('Nombre'))
+      await user.click(screen.getByLabelText('Nombres'))
       await user.tab()
 
-      expect(screen.getByLabelText('Nombre')).toHaveAccessibleDescription('Indica el nombre.')
-      expect(screen.getByLabelText('Apellido')).toHaveAttribute('aria-invalid', 'false')
-      expect(screen.queryByText('Indica el apellido.')).not.toBeInTheDocument()
+      expect(screen.getByLabelText('Nombres')).toHaveAccessibleDescription('Indica el nombre.')
+      expect(screen.getByLabelText('Apellido paterno')).toHaveAttribute('aria-invalid', 'false')
+      expect(screen.queryByText('Indica el apellido paterno.')).not.toBeInTheDocument()
       expect(screen.queryByText('Elige el cargo.')).not.toBeInTheDocument()
     })
 
@@ -235,15 +245,19 @@ describe('WorkerCreatePage', () => {
       const user = userEvent.setup()
       renderPage()
       await listo()
-      await user.type(screen.getByLabelText('Nombre'), 'Juan2')
+      await user.type(screen.getByLabelText('Nombres'), 'Juan2')
       // Mientras escribe por primera vez no hay aviso: sale al dejar el campo.
-      expect(screen.getByLabelText('Nombre')).toHaveAttribute('aria-invalid', 'false')
+      expect(screen.getByLabelText('Nombres')).toHaveAttribute('aria-invalid', 'false')
       expect(screen.queryByText('Solo letras, espacios, apóstrofo o guion.')).not.toBeInTheDocument()
-      await user.type(screen.getByLabelText('Apellido'), 'Ana@')
+      await user.type(screen.getByLabelText('Apellido paterno'), 'Ana@')
+      await user.type(screen.getByLabelText('Apellido materno (opcional)'), 'Vega2')
       await user.tab()
 
-      expect(screen.getByLabelText('Nombre')).toHaveAccessibleDescription('Solo letras, espacios, apóstrofo o guion.')
-      expect(screen.getByLabelText('Apellido')).toHaveAccessibleDescription('Solo letras, espacios, apóstrofo o guion.')
+      expect(screen.getByLabelText('Nombres')).toHaveAccessibleDescription('Solo letras, espacios, apóstrofo o guion.')
+      expect(screen.getByLabelText('Apellido paterno')).toHaveAccessibleDescription('Solo letras, espacios, apóstrofo o guion.')
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveAccessibleDescription(
+        'Solo letras, espacios, apóstrofo o guion.',
+      )
     })
 
     it.each([['Cancelar'], ['Guardar']])(
@@ -252,10 +266,10 @@ describe('WorkerCreatePage', () => {
         const user = userEvent.setup()
         renderPage()
         await listo()
-        await user.click(screen.getByLabelText('Nombre'))
+        await user.click(screen.getByLabelText('Nombres'))
         await user.pointer({ keys: '[MouseLeft>]', target: screen.getByRole('button', { name: boton }) })
 
-        expect(screen.getByLabelText('Nombre')).toHaveFocus()
+        expect(screen.getByLabelText('Nombres')).toHaveFocus()
         expect(screen.queryByText('Indica el nombre.')).not.toBeInTheDocument()
         // En mousedown y no en pointerdown: cancelar este último no evita el foco en el navegador.
         expect(fireEvent.mouseDown(screen.getByRole('button', { name: boton }))).toBe(false)
@@ -268,10 +282,10 @@ describe('WorkerCreatePage', () => {
       renderPage()
       await listo()
       await user.selectOptions(cargo(), 'Ayudante')
-      await user.click(screen.getByLabelText('Nombre'))
+      await user.click(screen.getByLabelText('Nombres'))
       await user.pointer({ keys: '[MouseLeft>]', target: screen.getByText('Tiene licencia') })
 
-      expect(screen.getByLabelText('Nombre')).toHaveFocus()
+      expect(screen.getByLabelText('Nombres')).toHaveFocus()
       expect(screen.queryByText('Indica el nombre.')).not.toBeInTheDocument()
       expect(fireEvent.mouseDown(screen.getByText('Tiene licencia'))).toBe(false)
       expect(fireEvent.mouseDown(screen.getByRole('checkbox', { name: 'Tiene licencia' }))).toBe(false)
@@ -343,7 +357,7 @@ describe('WorkerCreatePage', () => {
       const user = userEvent.setup()
       const { router } = renderPage()
       await listo()
-      await user.click(screen.getByLabelText('Nombre'))
+      await user.click(screen.getByLabelText('Nombres'))
       await user.click(screen.getByRole('button', { name: 'Cancelar' }))
 
       expect(router.state.location.pathname).toBe(WORKERS_BASE)
@@ -355,13 +369,13 @@ describe('WorkerCreatePage', () => {
       server.use(createWorkerCapture(sink))
       renderPage()
       await listo()
-      await user.click(screen.getByLabelText('Nombre'))
+      await user.click(screen.getByLabelText('Nombres'))
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
       expect(await screen.findByText('Indica el nombre.')).toBeInTheDocument()
-      expect(screen.getByText('Indica el apellido.')).toBeInTheDocument()
+      expect(screen.getByText('Indica el apellido paterno.')).toBeInTheDocument()
       expect(screen.getByText('Elige el cargo.')).toBeInTheDocument()
-      expect(screen.getByLabelText('Nombre')).toHaveFocus()
+      expect(screen.getByLabelText('Nombres')).toHaveFocus()
       expect(sink.calls).toBe(0)
     })
 
@@ -372,7 +386,7 @@ describe('WorkerCreatePage', () => {
       screen.getByRole('button', { name: 'Guardar' }).focus()
       await user.keyboard('{Enter}')
       expect(await screen.findByText('Indica el nombre.')).toBeInTheDocument()
-      expect(screen.getByLabelText('Nombre')).toHaveFocus()
+      expect(screen.getByLabelText('Nombres')).toHaveFocus()
 
       screen.getByRole('button', { name: 'Cancelar' }).focus()
       await user.keyboard('{Enter}')
@@ -407,8 +421,8 @@ describe('WorkerCreatePage', () => {
       await user.selectOptions(screen.getByLabelText('Tipo de documento'), 'Carné de extranjería')
       await waitFor(() => expect(screen.getByLabelText('Número de documento')).toHaveAttribute('aria-invalid', 'false'))
       // Solo el número: los campos que nadie tocó siguen sin error.
-      expect(screen.getByLabelText('Nombre')).toHaveAttribute('aria-invalid', 'false')
-      expect(screen.getByLabelText('Apellido')).toHaveAttribute('aria-invalid', 'false')
+      expect(screen.getByLabelText('Nombres')).toHaveAttribute('aria-invalid', 'false')
+      expect(screen.getByLabelText('Apellido paterno')).toHaveAttribute('aria-invalid', 'false')
       await user.selectOptions(screen.getByLabelText('Tipo de documento'), 'DNI')
       await waitFor(() =>
         expect(screen.getByLabelText('Número de documento')).toHaveAccessibleDescription(
@@ -503,7 +517,7 @@ describe('WorkerCreatePage', () => {
       const user = userEvent.setup()
       renderPage()
       await listo()
-      await user.type(screen.getByLabelText('Nombre'), 'Juan')
+      await user.type(screen.getByLabelText('Nombres'), 'Juan')
       await user.selectOptions(cargo(), 'Conductor')
       await user.type(screen.getByLabelText('N.° de licencia'), 'Q12345678')
       await user.type(screen.getByLabelText('Categoría (opcional)'), 'A-IIIb')
@@ -512,7 +526,7 @@ describe('WorkerCreatePage', () => {
 
       expect(screen.getByLabelText('N.° de licencia')).toHaveValue('Q12345678')
       expect(screen.getByLabelText('Categoría (opcional)')).toHaveValue('A-IIIb')
-      expect(screen.getByLabelText('Nombre')).toHaveValue('Juan')
+      expect(screen.getByLabelText('Nombres')).toHaveValue('Juan')
     })
 
     it('de un cargo que la exige a uno opcional, con licencia escrita, la casilla nace marcada', async () => {
@@ -604,7 +618,7 @@ describe('WorkerCreatePage', () => {
   })
 
   describe('validaciones', () => {
-    it('exige nombre, apellido, número y cargo, y no envía', async () => {
+    it('exige nombres, apellido paterno, número y cargo, y no envía', async () => {
       const user = userEvent.setup()
       const sink: { body?: WorkerRequest; calls?: number } = {}
       server.use(createWorkerCapture(sink))
@@ -612,8 +626,9 @@ describe('WorkerCreatePage', () => {
       await listo()
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
-      expect(await screen.findByLabelText('Nombre')).toHaveAccessibleDescription('Indica el nombre.')
-      expect(screen.getByLabelText('Apellido')).toHaveAccessibleDescription('Indica el apellido.')
+      expect(await screen.findByLabelText('Nombres')).toHaveAccessibleDescription('Indica el nombre.')
+      expect(screen.getByLabelText('Apellido paterno')).toHaveAccessibleDescription('Indica el apellido paterno.')
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveAttribute('aria-invalid', 'false')
       expect(screen.getByLabelText('Número de documento')).toHaveAccessibleDescription('Indica el número de documento.')
       expect(cargo()).toHaveAccessibleDescription('Elige el cargo.')
       expect(sink.calls).toBe(0)
@@ -623,10 +638,10 @@ describe('WorkerCreatePage', () => {
       const user = userEvent.setup()
       renderPage()
       await listo()
-      await user.type(screen.getByLabelText('Nombre'), 'Juan')
+      await user.type(screen.getByLabelText('Nombres'), 'Juan')
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
-      await waitFor(() => expect(screen.getByLabelText('Apellido')).toHaveFocus())
+      await waitFor(() => expect(screen.getByLabelText('Apellido paterno')).toHaveFocus())
     })
 
     it('el número se valida con el patrón del tipo elegido', async () => {
@@ -724,7 +739,7 @@ describe('WorkerCreatePage', () => {
       await user.selectOptions(cargo(), 'Conductor')
 
       const campos = screen.getAllByRole('textbox')
-      expect(campos).toHaveLength(6)
+      expect(campos).toHaveLength(7)
       for (const campo of campos) expect(campo).not.toHaveAttribute('maxLength')
       expect(screen.getByLabelText('Teléfono (opcional)')).toHaveAttribute('type', 'tel')
     })
@@ -732,8 +747,9 @@ describe('WorkerCreatePage', () => {
     // En jsdom un tope nativo no corta un input tel: para el teléfono esta fila mide el aviso, y
     // el tope lo mide la de arriba por el atributo.
     it.each([
-      ['Nombre', 'A'.repeat(101), 'Máximo 100 caracteres.'],
-      ['Apellido', 'B'.repeat(101), 'Máximo 100 caracteres.'],
+      ['Nombres', 'A'.repeat(101), 'Máximo 100 caracteres.'],
+      ['Apellido paterno', 'B'.repeat(101), 'Máximo 100 caracteres.'],
+      ['Apellido materno (opcional)', 'C'.repeat(101), 'Máximo 100 caracteres.'],
       ['Teléfono (opcional)', '9876543210', 'El teléfono debe tener 9 dígitos.'],
     ])('pegar un %s largo no lo corta: avisa en el campo y no envía', async (campo, valor, aviso) => {
       const user = userEvent.setup()
@@ -846,7 +862,8 @@ describe('WorkerCreatePage', () => {
       await waitFor(() => expect(sink.calls).toBe(1))
       expect(sink.body).toEqual({
         firstName: 'Juan',
-        lastName: 'Pérez Huamán',
+        paternalLastName: 'Pérez',
+        maternalLastName: 'Huamán',
         documentTypeId: 1,
         documentNumber: '45678912',
         phone: null,
@@ -854,6 +871,24 @@ describe('WorkerCreatePage', () => {
         hireDate: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
       })
       expect(sink.body).not.toHaveProperty('driver')
+      // Ni el apellido de antes en un solo campo, que el backend ya no lee.
+      expect(sink.body).not.toHaveProperty('lastName')
+    })
+
+    it.each([[''], ['   ']])('el materno "%s" viaja como null, con su clave', async (materno) => {
+      const user = userEvent.setup()
+      const sink: { body?: WorkerRequest; calls?: number } = {}
+      server.use(createWorkerCapture(sink))
+      renderPage()
+      await listo()
+      await llenarValido(user)
+      await user.clear(screen.getByLabelText('Apellido materno (opcional)'))
+      if (materno) await user.type(screen.getByLabelText('Apellido materno (opcional)'), materno)
+      await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      await waitFor(() => expect(sink.calls).toBe(1))
+      expect(sink.body).toHaveProperty('maternalLastName', null)
+      expect(sink.body).toMatchObject({ paternalLastName: 'Pérez' })
     })
 
     /** El alta siempre crea la licencia disponible: no se elige y viaja igual. */
@@ -926,8 +961,8 @@ describe('WorkerCreatePage', () => {
       renderPage()
       await listo()
       await llenarValido(user)
-      await user.clear(screen.getByLabelText('Nombre'))
-      await user.click(screen.getByLabelText('Nombre'))
+      await user.clear(screen.getByLabelText('Nombres'))
+      await user.click(screen.getByLabelText('Nombres'))
       await user.paste('Jose\u0301')
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
@@ -959,13 +994,15 @@ describe('WorkerCreatePage', () => {
   describe('al guardar', () => {
     it('lleva a la ficha del creado y lo avisa', async () => {
       const user = userEvent.setup()
+      // El aviso dice el nombre que devuelve el servidor, que no es la unión de las partes a propósito.
+      server.use(createWorkerCapture({}, fakeWorkerDetail({ id: 57, hasUser: false, fullName: 'Ana Lucía Torres Ruiz' })))
       const { router } = renderPage()
       await listo()
       await llenarValido(user)
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
       await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(57)))
-      expect(toast.success).toHaveBeenCalledWith('Se dio de alta a Ana Torres Ruiz.')
+      expect(toast.success).toHaveBeenCalledWith('Se dio de alta a Ana Lucía Torres Ruiz.')
     })
 
     it('invalida el padrón, los combobox de almacén (por prefijo) y los conductores, y nada más', async () => {
@@ -1032,7 +1069,9 @@ describe('WorkerCreatePage', () => {
 
       expect(await screen.findByRole('button', { name: 'Guardando…' })).toBeDisabled()
       expect(screen.getByRole('button', { name: 'Guardando…' }).closest('form')).toHaveAttribute('aria-busy', 'true')
-      expect(screen.getByLabelText('Nombre')).toBeDisabled()
+      expect(screen.getByLabelText('Nombres')).toBeDisabled()
+      expect(screen.getByLabelText('Apellido paterno')).toBeDisabled()
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toBeDisabled()
       expect(screen.getByLabelText('N.° de licencia')).toBeDisabled()
       expect(screen.getByRole('button', { name: 'Cancelar' })).toBeDisabled()
       expect(screen.queryByRole('link', { name: 'Volver a trabajadores' })).not.toBeInTheDocument()
@@ -1070,7 +1109,7 @@ describe('WorkerCreatePage', () => {
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
       await waitFor(() => expect(screen.getByLabelText(campo)).toHaveAccessibleDescription(texto))
-      expect(screen.getByLabelText('Nombre')).toHaveAttribute('aria-invalid', 'false')
+      expect(screen.getByLabelText('Nombres')).toHaveAttribute('aria-invalid', 'false')
       expect(screen.queryByText('detail del backend')).not.toBeInTheDocument()
     })
 
@@ -1138,7 +1177,7 @@ describe('WorkerCreatePage', () => {
 
       await waitFor(() => expect(toast.error).toHaveBeenCalledWith(texto))
       expect(router.state.location.pathname).toBe(NUEVO)
-      expect(screen.getByLabelText('Nombre')).toHaveValue('Juan')
+      expect(screen.getByLabelText('Nombres')).toHaveValue('Juan')
       expect(screen.getByRole('button', { name: 'Guardar' })).toBeEnabled()
       expect(screen.getByRole('button', { name: 'Cancelar' })).toBeEnabled()
       expect(screen.getByRole('link', { name: 'Volver a trabajadores' })).toHaveAttribute('href', WORKERS_BASE)
@@ -1160,7 +1199,7 @@ describe('WorkerCreatePage', () => {
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
 
       await waitFor(() => expect(screen.getByLabelText('N.° de licencia')).toHaveAccessibleDescription('Licencia rara'))
-      expect(screen.getByLabelText('Nombre')).toHaveAccessibleDescription('Nombre raro')
+      expect(screen.getByLabelText('Nombres')).toHaveAccessibleDescription('Nombre raro')
       expect(screen.getByLabelText('Categoría (opcional)')).toHaveAccessibleDescription('Categoría rara')
     })
 
@@ -1223,7 +1262,7 @@ describe('WorkerCreatePage', () => {
 
       await waitFor(() => expect(queryClient.getQueryState(workerKeys.roles())?.status).toBe('error'), { timeout: 4000 })
       expect(recarga.calls).toBe(2)
-      expect(screen.getByLabelText('Nombre')).toHaveValue('Juan')
+      expect(screen.getByLabelText('Nombres')).toHaveValue('Juan')
       expect(cargo()).toHaveAccessibleDescription('Este cargo ya no está vigente. Elige otro.')
     })
 
@@ -1287,10 +1326,10 @@ describe('WorkerCreatePage', () => {
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
       await waitFor(() => expect(screen.getByLabelText('Número de documento')).toHaveFocus())
 
-      await user.clear(screen.getByLabelText('Nombre'))
+      await user.clear(screen.getByLabelText('Nombres'))
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
       expect(await screen.findByText('Indica el nombre.')).toBeInTheDocument()
-      expect(screen.getByLabelText('Nombre')).toHaveFocus()
+      expect(screen.getByLabelText('Nombres')).toHaveFocus()
     })
 
     it('en el segundo intento, el foco va al campo del segundo error', async () => {
@@ -1309,7 +1348,9 @@ describe('WorkerCreatePage', () => {
     })
 
     it.each([
-      ['firstName', 'Nombre'],
+      ['firstName', 'Nombres'],
+      ['paternalLastName', 'Apellido paterno'],
+      ['maternalLastName', 'Apellido materno (opcional)'],
       ['hireDate', 'Fecha de ingreso'],
     ])('con el teléfono y %s marcados, el foco va al primero del formulario', async (campo, etiqueta) => {
       const user = userEvent.setup()
@@ -1329,6 +1370,43 @@ describe('WorkerCreatePage', () => {
     })
 
     it.each([
+      ['paternalLastName', 'Apellido paterno'],
+      ['maternalLastName', 'Apellido materno (opcional)'],
+    ])('con %s y el tipo de documento marcados, el foco va a la parte, que va antes', async (campo, etiqueta) => {
+      const user = userEvent.setup()
+      server.use(
+        createWorkerValidation([
+          { field: 'documentTypeId', message: 'Tipo raro' },
+          { field: campo, message: 'Parte rara' },
+        ]),
+      )
+      renderPage()
+      await listo()
+      await llenarValido(user)
+      await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      await waitFor(() => expect(screen.getByLabelText('Tipo de documento')).toHaveAccessibleDescription('Tipo raro'))
+      await waitFor(() => expect(screen.getByLabelText(etiqueta)).toHaveFocus())
+    })
+
+    it('con las dos partes marcadas, el foco va al paterno, que va primero', async () => {
+      const user = userEvent.setup()
+      server.use(
+        createWorkerValidation([
+          { field: 'maternalLastName', message: 'Materno raro' },
+          { field: 'paternalLastName', message: 'Paterno raro' },
+        ]),
+      )
+      renderPage()
+      await listo()
+      await llenarValido(user)
+      await user.click(screen.getByRole('button', { name: 'Guardar' }))
+
+      await waitFor(() => expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveAccessibleDescription('Materno raro'))
+      await waitFor(() => expect(screen.getByLabelText('Apellido paterno')).toHaveFocus())
+    })
+
+    it.each([
       ['una caída de red', createWorkerNetworkError()],
       ['un error sin campo', createWorkerProblem('COM-003', 403, 'detail del backend')],
     ])('tras %s, el foco vuelve a Guardar', async (_caso, handler) => {
@@ -1338,7 +1416,7 @@ describe('WorkerCreatePage', () => {
       await listo()
       await llenarValido(user)
       // Se envía con Enter desde un campo: el clic dejaría el foco en Guardar de antemano.
-      await user.type(screen.getByLabelText('Nombre'), '{Enter}')
+      await user.type(screen.getByLabelText('Nombres'), '{Enter}')
 
       await waitFor(() => expect(toast.error).toHaveBeenCalled())
       await waitFor(() => expect(screen.getByRole('button', { name: 'Guardar' })).toHaveFocus())
@@ -1367,7 +1445,7 @@ describe('WorkerCreatePage', () => {
       await waitFor(() =>
         expect(toast.error).toHaveBeenCalledWith('No se pudo dar de alta al trabajador. Intenta de nuevo.'),
       )
-      expect(screen.getByLabelText('Nombre')).toHaveValue('Juan')
+      expect(screen.getByLabelText('Nombres')).toHaveValue('Juan')
     })
   })
 
@@ -1378,9 +1456,23 @@ describe('WorkerCreatePage', () => {
 
       const grupo = screen.getByRole('group', { name: 'Datos del trabajador' })
       expect(grupo.className).toContain('min-w-0')
-      const grilla = screen.getByLabelText('Nombre').closest('.grid') as HTMLElement
+      const grilla = screen.getByLabelText('Número de documento').closest('.grid') as HTMLElement
       expect(grilla.className).toContain('grid-cols-1')
       expect(grilla.className).toContain('sm:grid-cols-2')
+    })
+
+    it('las tres partes del nombre van en una fila de tres desde el ancho chico, antes del documento', async () => {
+      renderPage()
+      await listo()
+
+      const fila = screen.getByLabelText('Nombres').closest('.grid') as HTMLElement
+      expect(fila.className).toContain('grid-cols-1')
+      expect(fila.className).toContain('sm:grid-cols-3')
+      expect(fila.className).toContain('sm:col-span-2')
+      expect(fila).toContainElement(screen.getByLabelText('Apellido paterno'))
+      expect(fila).toContainElement(screen.getByLabelText('Apellido materno (opcional)'))
+      expect(fila).not.toContainElement(screen.getByLabelText('Tipo de documento'))
+      expect(fila.compareDocumentPosition(screen.getByLabelText('Tipo de documento')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
     it('la licencia sigue la misma grilla y cada leyenda va dentro de su tarjeta', async () => {
@@ -1431,8 +1523,10 @@ describe('WorkerCreatePage', () => {
       await listo()
       await user.selectOptions(cargo(), 'Ayudante')
       await user.click(screen.getByRole('checkbox', { name: 'Tiene licencia' }))
+      await user.type(screen.getByLabelText('Apellido materno (opcional)'), 'Vega2')
       await user.click(screen.getByRole('button', { name: 'Guardar' }))
       await screen.findByText('Indica el nombre.')
+      expect(screen.getByLabelText('Apellido materno (opcional)')).toHaveAttribute('aria-invalid', 'true')
       expect(await axe(container)).toHaveNoViolations()
     })
 

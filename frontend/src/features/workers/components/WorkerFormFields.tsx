@@ -31,10 +31,15 @@ export function WorkerFormFields({ documentTypes, roleOptions, roleLockedReason,
     <Card as="fieldset" padding="md" className="min-w-0">
       <legend className="float-left w-full text-sm font-semibold text-fg">Datos del trabajador</legend>
       <div className="clear-both grid grid-cols-1 gap-4 pt-4 sm:grid-cols-2">
-        <TextField id="trabajador-first-name" label="Nombre" error={errors.firstName?.message}
-          disabled={disabled} register={register('firstName')} />
-        <TextField id="trabajador-last-name" label="Apellido" error={errors.lastName?.message}
-          disabled={disabled} register={register('lastName')} />
+        {/* Las tres partes del nombre en una fila, antes del documento: se leen como un solo dato. */}
+        <div className="grid grid-cols-1 gap-4 sm:col-span-2 sm:grid-cols-3">
+          <TextField id="trabajador-first-name" label="Nombres" error={errors.firstName?.message}
+            disabled={disabled} register={register('firstName')} />
+          <TextField id="trabajador-paternal-last-name" label="Apellido paterno"
+            error={errors.paternalLastName?.message} disabled={disabled} register={register('paternalLastName')} />
+          <TextField id="trabajador-maternal-last-name" label="Apellido materno (opcional)"
+            error={errors.maternalLastName?.message} disabled={disabled} register={register('maternalLastName')} />
+        </div>
         <SelectField<WorkerFormValues>
           id="trabajador-doc-type"
           label="Tipo de documento"

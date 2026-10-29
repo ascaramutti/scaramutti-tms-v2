@@ -91,7 +91,7 @@ class WarehouseWithdrawalServiceTest {
         Worker w = new Worker();
         w.id = WORKER_ID;
         w.firstName = "Juan";
-        w.lastName = "Perez";
+        w.assignSurnames("Perez", null);
         Role role = new Role();
         role.description = "Operador";
         w.role = role;

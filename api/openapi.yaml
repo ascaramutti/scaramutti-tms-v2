@@ -109,6 +109,13 @@ paths:
       responses:
         '200':
           description: Login exitoso
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo trae los tokens de la sesión (RFC 6749, §5.1)'
+              schema: { type: string }
+            Pragma:
+              description: 'Siempre `no-cache`: lo pide RFC 6749 (§5.1) junto al `no-store`'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/LoginResponse' }
@@ -176,6 +183,13 @@ paths:
       responses:
         '200':
           description: Token renovado
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo trae los tokens de la sesión (RFC 6749, §5.1)'
+              schema: { type: string }
+            Pragma:
+              description: 'Siempre `no-cache`: lo pide RFC 6749 (§5.1) junto al `no-store`'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/LoginResponse' }
@@ -286,6 +300,13 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo son los datos de la cuenta de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es el de la cuenta del token, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SessionUser' }
@@ -1324,16 +1345,17 @@ paths:
       description: |
         Catálogo compartido `public.workers`. **Solo búsqueda rápida — SIN
         creación al vuelo** (regla del dueño 2026-07-04: trabajadores y unidades
-        de flota nunca se crean desde almacén). Sin paginar — plantilla chica.
-        `q` es multi-palabra case-insensitive (≥ 3 caracteres): cada palabra
-        debe matchear en el nombre o el apellido y, **solo para los cuatro roles
+        de flota nunca se crean desde almacén). Sin paginar (plantilla chica),
+        ordenada por nombres, apellido paterno y materno (entre dos con los mismos
+        nombres y paterno, primero el que no tiene materno). `q` es multi-palabra
+        case-insensitive (≥ 3 caracteres): cada palabra debe matchear en los
+        nombres, el apellido paterno o el materno y, **solo para los cuatro roles
         que mantienen el padrón**, también en el número de documento. Para el
-        encargado de almacén la búsqueda sigue siendo por nombre y apellido: ese
+        encargado de almacén la búsqueda sigue siendo por nombres y apellidos: ese
         número no viaja en esta respuesta, y buscarlo permitiría confirmarlo
         probando prefijos. (Esta última frase NO se porta a la spec runtime a
-        propósito: ese documento se sirve sin sesión y no tiene por qué
-        describir el ataque que la guarda cierra.) Para no filtrar, OMITIR el
-        parámetro.
+        propósito: ese documento se sirve sin sesión y no tiene por qué describir
+        el ataque que la guarda cierra.) Para no filtrar, OMITIR el parámetro.
         Operaciones NO lo consume: para asignar un viaje necesita conductores
         (`GET /drivers`), no la planilla completa. El detalle completo de un
         trabajador es `GET /workers/{id}`.
@@ -1341,12 +1363,19 @@ paths:
       parameters:
         - name: q
           in: query
-          description: Búsqueda libre por nombre y apellido; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          description: Búsqueda libre por nombres, apellido paterno o materno; los cuatro roles que mantienen el padrón buscan además por número de documento. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
           schema: { type: string, minLength: 3, maxLength: 200 }
         - { name: isActive, in: query, schema: { type: boolean } }
       responses:
         '200':
           description: Trabajadores
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo depende del rol de quien pregunta'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo depende del rol (el encargado de almacén no busca por documento), así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema:
@@ -1372,10 +1401,12 @@ paths:
         `dispatcher` y `sales`): la del escolta y la del ayudante con licencia
         existen, pero no se ofrecen ni se asignan como conductor en los viajes.
 
-        Normalización: `firstName`, `lastName`, `documentNumber`,
-        `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
-        bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
-        `firstName` y `lastName` pasan además a NFC antes de validarse.
+        Normalización: `firstName`, `paternalLastName`, `maternalLastName`,
+        `documentNumber`, `driver.licenseNumber` y
+        `driver.licenseCategory` sin espacios en los bordes (un materno que
+        queda vacío se guarda nulo); sin cambio de mayúsculas; `phone` y `role`
+        tal cual llegan. Los nombres y los apellidos pasan además a NFC antes
+        de validarse.
 
         Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
         WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;
@@ -1426,6 +1457,13 @@ paths:
       responses:
         '201':
           description: Creado
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1453,9 +1491,8 @@ paths:
         desde la aplicación.
 
         Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
-        (el detalle expone documento y teléfono, que el combobox no muestra).
-        La lectura no aplica rango: cualquiera de los cuatro ve cualquier
-        detalle.
+        (el detalle expone el número de documento, que el listado no trae). La
+        lectura no aplica rango: cualquiera de los cuatro ve cualquier detalle.
 
         `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
         cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
@@ -1464,6 +1501,13 @@ paths:
       responses:
         '200':
           description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: la ficha trae el número de documento, que no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: no todos los roles leen la ficha, así que ninguna cache puede reusarla para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1483,6 +1527,9 @@ paths:
         `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
         cuerpo no cambia nada. Un trabajador inactivo también se edita.
 
+        Los apellidos, como en el alta: se guardan el paterno y el materno, y un
+        materno que no viene se borra.
+
         Unicidad contra los demás: guardar el propio número de documento o la
         propia licencia sin cambios es `200`, no `409`.
 
@@ -1497,7 +1544,9 @@ paths:
 
         Cada campo efectivamente cambiado deja UNA fila de auditoría con el
         valor anterior y el nuevo; los campos que se reenvían sin cambios no
-        dejan ninguna. El cargo se guarda por su nombre de sistema y el tipo de
+        dejan ninguna. El apellido se anota por parte (`paternalLastName` y
+        `maternalLastName`, el materno vacío como nulo).
+        El cargo se guarda por su nombre de sistema y el tipo de
         documento por su código, nunca por su id ni por su nombre visible: un
         renombre dejaría el historial mintiendo.
 
@@ -1564,6 +1613,13 @@ paths:
       responses:
         '200':
           description: Actualizado
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1618,6 +1674,13 @@ paths:
       responses:
         '200':
           description: Trabajador con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -1660,6 +1723,13 @@ paths:
       responses:
         '200':
           description: Trabajador con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es la ficha de `getWorker`, con el número de documento'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es la ficha de `getWorker`, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/WorkerDetailResponse' }
@@ -4821,15 +4891,24 @@ components:
         como enum: la lista vive en la base). `hireDate` es un día calendario
         (sin hora, sin zona); el backend no rechaza fechas futuras. `phone`:
         nueve dígitos o nulo. `driver` según la modalidad de ficha del rol.
-        `firstName` y `lastName`: al menos una letra latina (letra de script
-        latino según la versión de Unicode del backend, 15.0), más espacios,
-        apóstrofo y guion; se pasan a NFC antes de
-        validarse (pasados 400 caracteres no se normalizan: se rechazan por
-        largo tal como llegan) y se guardan recortados.
-      required: [firstName, lastName, documentTypeId, documentNumber, role, hireDate]
+        `firstName`, `paternalLastName` y `maternalLastName` (este, además,
+        puede venir vacío: abajo): al menos una letra latina (letra de
+        script latino según la versión de Unicode del backend, 15.0), más
+        espacios, apóstrofo y guion; se pasan a NFC antes de validarse (pasados
+        400 caracteres no se normalizan: se rechazan por largo tal como llegan)
+        y se guardan recortados.
+
+        Los apellidos: `paternalLastName` es obligatorio (ausente o en blanco →
+        `400 COM-001` en su campo); `maternalLastName` ausente, nulo, vacío o
+        solo de espacios es "sin materno" y se guarda nulo. Una parte fuera de
+        su regla o de más de 100 caracteres → `400 COM-001` en su campo. El
+        apellido de antes en un solo campo, `lastName`, ya no es parte del
+        cuerpo: si viene, se ignora.
+      required: [firstName, paternalLastName, documentTypeId, documentNumber, role, hireDate]
       properties:
         firstName:      { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Juan' }
-        lastName:       { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez Huamán' }
+        paternalLastName: { type: string, minLength: 1, maxLength: 100, pattern: '^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Pérez' }
+        maternalLastName: { type: [string, 'null'], maxLength: 100, pattern: '^ *$|^['' -]*(?=\p{L})\p{Script=Latin}(?:(?=\p{L})\p{Script=Latin}|['' -])*$', example: 'Huamán' }
         documentTypeId: { type: integer, format: int32, example: 1 }
         documentNumber: { type: string, minLength: 1, maxLength: 20, example: '45678912' }
         phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }
@@ -4880,11 +4959,16 @@ components:
         primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
         o reactivación desde la aplicación. Instantes en UTC
         (`createdAt`, `updatedAt`); `hireDate` es día calendario.
-      required: [id, firstName, lastName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
+        `fullName` une nombres, paterno y materno con un espacio, sin el
+        materno si es nulo, y recorta los espacios de los extremos;
+        `maternalLastName` es nulo si el trabajador no tiene materno.
+      required: [id, firstName, paternalLastName, maternalLastName, fullName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
       properties:
         id:             { type: integer, format: int32, example: 8 }
         firstName:      { type: string, example: 'Juan' }
-        lastName:       { type: string, example: 'Pérez Huamán' }
+        paternalLastName: { type: string, example: 'Pérez' }
+        maternalLastName: { type: [string, 'null'], example: 'Huamán' }
+        fullName:       { type: string, example: 'Juan Pérez Huamán' }
         documentType:   { $ref: '#/components/schemas/DocumentTypeResponse' }
         documentNumber: { type: string, example: '45678912' }
         phone:          { type: [string, 'null'], pattern: '^\d{9}$', example: '987654321' }

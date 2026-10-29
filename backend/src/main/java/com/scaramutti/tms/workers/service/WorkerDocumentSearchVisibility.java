@@ -16,7 +16,7 @@ import java.util.Set;
  * solo devolver la fila. Por eso la columna entra en la busqueda solo para los cuatro roles
  * que mantienen el padron, que ya pueden leer ese numero en la ficha completa.
  *
- * <p>Para el encargado de almacen la busqueda sigue siendo por nombre y apellido, que es lo
+ * <p>Para el encargado de almacen la busqueda sigue siendo por nombres y apellidos, que es lo
  * unico que su combobox necesita. Los roles del listado NO cambian: cambia que columnas mira
  * la busqueda.
  */

@@ -924,11 +924,13 @@ export const listDocumentTypes = <ThrowOnError extends boolean = false>(options?
  *
  * Catalogo compartido `public.workers`. Solo busqueda rapida, SIN creacion
  * al vuelo (trabajadores y unidades de flota nunca se crean desde almacen).
- * Sin paginar (plantilla chica). `q` es multi-palabra case-insensitive
- * (>= 3 caracteres): cada palabra debe matchear en el nombre o el apellido
+ * Sin paginar (plantilla chica), ordenada por nombres, apellido paterno y
+ * materno (entre dos con los mismos nombres y paterno, primero el que no
+ * tiene materno). `q` es multi-palabra case-insensitive (>= 3 caracteres): cada
+ * palabra debe matchear en los nombres, el apellido paterno o el materno
  * y, solo para los cuatro roles que mantienen el padron, tambien en el
  * numero de documento; para el encargado de almacen la busqueda sigue
- * siendo por nombre y apellido, porque ese numero no viaja en esta
+ * siendo por nombres y apellidos, porque ese numero no viaja en esta
  * respuesta. Para no filtrar, OMITIR el parametro. Operaciones NO lo
  * consume: para asignar un viaje necesita conductores (`GET /drivers`), no
  * la planilla completa.
@@ -957,10 +959,12 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * la del escolta y la del ayudante con licencia existen, pero no se ofrecen
  * ni se asignan como conductor en los viajes.
  *
- * Normalización: `firstName`, `lastName`, `documentNumber`,
- * `driver.licenseNumber` y `driver.licenseCategory` sin espacios en los
- * bordes; sin cambio de mayúsculas; `phone` y `role` tal cual llegan.
- * `firstName` y `lastName` pasan además a NFC antes de validarse.
+ * Normalización: `firstName`, `paternalLastName`, `maternalLastName`,
+ * `documentNumber`, `driver.licenseNumber` y
+ * `driver.licenseCategory` sin espacios en los bordes (un materno que
+ * queda vacío se guarda nulo); sin cambio de mayúsculas; `phone` y `role`
+ * tal cual llegan. Los nombres y los apellidos pasan además a NFC antes
+ * de validarse.
  *
  * Validaciones de negocio: rol inexistente o inactivo en `roles` → `400
  * WRK-005`; tipo de documento inexistente o inactivo → `400 WRK-003`;
@@ -1029,9 +1033,8 @@ export const createWorker = <ThrowOnError extends boolean = false>(options: Opti
  * desde la aplicación.
  *
  * Roles: los cuatro que mantienen el padrón; el resto → `403 COM-003`
- * (el detalle expone documento y teléfono, que el combobox no muestra).
- * La lectura no aplica rango: cualquiera de los cuatro ve cualquier
- * detalle.
+ * (el detalle expone el número de documento, que el listado no trae). La
+ * lectura no aplica rango: cualquiera de los cuatro ve cualquier detalle.
  *
  * `404` cubre dos casos: `id` numérico que no existe → `WRK-001` con
  * cuerpo `Problem`; `id` que no es un entero → `404` sin cuerpo, porque el
@@ -1055,6 +1058,9 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * `updatedAt` y `updatedBy` se ponen con la sesión, incluso cuando el
  * cuerpo no cambia nada. Un trabajador inactivo también se edita.
  *
+ * Los apellidos, como en el alta: se guardan el paterno y el materno, y un
+ * materno que no viene se borra.
+ *
  * Unicidad contra los demás: guardar el propio número de documento o la
  * propia licencia sin cambios es `200`, no `409`.
  *
@@ -1069,7 +1075,9 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  *
  * Cada campo efectivamente cambiado deja UNA fila de auditoría con el
  * valor anterior y el nuevo; los campos que se reenvían sin cambios no
- * dejan ninguna. El cargo se guarda por su nombre de sistema y el tipo de
+ * dejan ninguna. El apellido se anota por parte (`paternalLastName` y
+ * `maternalLastName`, el materno vacío como nulo).
+ * El cargo se guarda por su nombre de sistema y el tipo de
  * documento por su código, nunca por su id ni por su nombre visible: un
  * renombre dejaría el historial mintiendo.
  *

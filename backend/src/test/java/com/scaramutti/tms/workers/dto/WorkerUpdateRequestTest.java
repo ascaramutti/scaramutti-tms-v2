@@ -2,6 +2,8 @@ package com.scaramutti.tms.workers.dto;
 
 import org.junit.jupiter.api.Test;
 
+import jakarta.validation.Constraint;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.RecordComponent;
 import java.util.Arrays;
@@ -18,8 +20,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * <p>Este caso existe porque el javadoc del cuerpo de edicion afirmaba que existia y NO existia.
  * La afirmacion importaba: el contrato declara el cuerpo de edicion como el del alta mas el
  * motivo, y un record no hereda, asi que las dos formas pueden separarse sin que nada deje de
- * compilar. El dia que alguien sume un campo al alta, el contrato lo declara tambien en la
- * edicion, el cliente generado lo manda, y la edicion lo ignora en silencio.
+ * compilar. Como la spec hereda el alta (PublishedContractTest), un campo nuevo del alta entra en
+ * la edicion del contrato: si el record no lo suma, el cliente lo manda y la edicion lo ignora.
  *
  * <p>Compara tambien las ANOTACIONES, no solo los nombres: perder un limite de largo o el formato
  * del telefono al copiar es exactamente el error que esto ataja, y ninguno de los dos se ve en
@@ -70,6 +72,26 @@ class WorkerUpdateRequestTest {
         assertEquals(alta.size() + 1, edicion.size(), "la edicion es el alta mas un solo campo");
         assertEquals(alta, edicion.subList(0, alta.size()),
             "los campos compartidos, con sus anotaciones, tienen que ser identicos y en el mismo orden");
+    }
+
+    /**
+     * Las reglas de clase tambien son las mismas en los dos. Hoy ninguno lleva una: que venga el
+     * paterno lo exige su propia anotacion, que el caso de arriba compara.
+     */
+    @Test
+    void theUpdateBody_carriesTheClassRulesOfTheCreateBody() {
+        List<String> alta = reglasDeClaseDe(WorkerRequest.class);
+
+        assertEquals(List.of(), alta, "el alta no lleva reglas de clase");
+        assertEquals(alta, reglasDeClaseDe(WorkerUpdateRequest.class));
+        assertEquals(List.of(WorkerRequest.class.getInterfaces()), List.of(WorkerUpdateRequest.class.getInterfaces()),
+            "los dos cuerpos implementan las mismas interfaces (hoy, ninguna)");
+    }
+
+    private List<String> reglasDeClaseDe(Class<?> record) {
+        return Arrays.stream(record.getAnnotations())
+            .filter(a -> a.annotationType().isAnnotationPresent(Constraint.class))
+            .map(Annotation::toString).sorted().toList();
     }
 
     /** Y el campo de mas es el motivo, con su maximo y sin minimo. */

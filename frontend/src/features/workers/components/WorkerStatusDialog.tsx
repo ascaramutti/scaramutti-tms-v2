@@ -36,7 +36,7 @@ export function WorkerStatusDialog({ worker, onClose, onNotFound }: WorkerStatus
   useEffect(() => {
     if (error && !changeStatus.isPending) confirmButton.current?.focus()
   }, [error, changeStatus.isPending])
-  const name = `${worker.firstName} ${worker.lastName}`
+  const name = worker.fullName
   const copy = COPY[action]
 
   function confirm() {

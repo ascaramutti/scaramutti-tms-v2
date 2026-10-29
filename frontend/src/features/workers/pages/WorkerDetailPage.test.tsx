@@ -137,8 +137,9 @@ describe('WorkerDetailPage', () => {
     const datos = screen.getByRole('heading', { level: 2, name: 'Datos del trabajador' }).closest('section') as HTMLElement
     const rotulos = within(datos).getAllByRole('term').map((dt) => dt.textContent)
     expect(rotulos).toEqual([
-      'Nombre',
-      'Apellido',
+      'Nombres',
+      'Apellido paterno',
+      'Apellido materno',
       'Tipo de documento',
       'Número de documento',
       'Cargo',
@@ -148,8 +149,9 @@ describe('WorkerDetailPage', () => {
       'Estado',
     ])
     const valores: Array<[string, string]> = [
-      ['Nombre', 'Ana'],
-      ['Apellido', 'Torres Ruiz'],
+      ['Nombres', 'Ana'],
+      ['Apellido paterno', 'Torres'],
+      ['Apellido materno', 'Ruiz'],
       ['Tipo de documento', 'Carné de extranjería'],
       ['Número de documento', '001234567'],
       ['Cargo', 'Jefe de Operaciones'],
@@ -161,6 +163,77 @@ describe('WorkerDetailPage', () => {
     for (const [rotulo, valor] of valores) {
       expect(within(par(rotulo)).getByRole('definition')).toHaveTextContent(new RegExp(`^${valor}$`))
     }
+  })
+
+  /** El título es el `fullName` y la fila, las partes: la ficha no arma el nombre. */
+  describe('el nombre, con materno y sin él', () => {
+    it('con materno: el título es el nombre completo del servidor y la fila trae las tres partes', async () => {
+      await renderWorker(
+        fakeWorkerDetail({
+          firstName: 'Ana María',
+          paternalLastName: 'Torres',
+          maternalLastName: 'Ruiz',
+          fullName: 'Ana María Torres Ruiz',
+        }),
+      )
+
+      expect(screen.getByRole('heading', { level: 1, name: 'Ana María Torres Ruiz' })).toBeInTheDocument()
+      const fila = screen.getByLabelText('Nombre')
+      expect(within(par('Nombres', fila)).getByRole('definition')).toHaveTextContent(/^Ana María$/)
+      expect(within(par('Apellido paterno', fila)).getByRole('definition')).toHaveTextContent(/^Torres$/)
+      expect(within(par('Apellido materno', fila)).getByRole('definition')).toHaveTextContent(/^Ruiz$/)
+    })
+
+    it('sin materno: el nombre completo con el paterno solo, y la raya larga en el materno', async () => {
+      await renderWorker(
+        fakeWorkerDetail({ paternalLastName: 'Torres', maternalLastName: null, fullName: 'Ana Torres' }),
+      )
+
+      expect(screen.getByRole('heading', { level: 1, name: 'Ana Torres' })).toBeInTheDocument()
+      expect(within(par('Apellido paterno')).getByRole('definition')).toHaveTextContent(/^Torres$/)
+      expect(within(par('Apellido materno')).getByRole('definition')).toHaveTextContent(/^\u2014$/)
+    })
+
+    it('el título es el nombre completo tal como llega, aunque las partes den otro', async () => {
+      await renderWorker(fakeWorkerDetail({ fullName: 'Ana Lucía Torres Ruiz' }))
+
+      expect(screen.getByRole('heading', { level: 1, name: 'Ana Lucía Torres Ruiz' })).toBeInTheDocument()
+    })
+
+    it('el paterno en blanco de una ficha vieja lleva la raya larga', async () => {
+      await renderWorker(fakeWorkerDetail({ paternalLastName: '', maternalLastName: null, fullName: 'Ana' }))
+
+      expect(within(par('Apellido paterno')).getByRole('definition')).toHaveTextContent(/^\u2014$/)
+      expect(within(par('Apellido materno')).getByRole('definition')).toHaveTextContent(/^\u2014$/)
+    })
+  })
+
+  it('la fila del nombre va primera en los datos, antes del documento y separada del encabezado', async () => {
+    await renderWorker(fakeWorkerDetail())
+
+    const datos = screen.getByRole('heading', { level: 2, name: 'Datos del trabajador' }).closest('section') as HTMLElement
+    const fila = within(datos).getByLabelText('Nombre')
+    const documento = within(datos).getByText('Tipo de documento', { selector: 'dt' })
+    expect(fila).not.toContainElement(documento)
+    expect(fila.compareDocumentPosition(documento) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(fila.className.split(/\s+/)).toEqual(expect.arrayContaining(['mt-4', 'sm:grid-cols-3']))
+  })
+
+  it('entre la fila del nombre y los demás datos queda el mismo espacio que entre sus filas', async () => {
+    await renderWorker(fakeWorkerDetail())
+
+    const grilla = screen.getByText('Tipo de documento', { selector: 'dt' }).closest('dl') as HTMLElement
+    expect(grilla.className.split(/\s+/)).toEqual(expect.arrayContaining(['mt-4', 'gap-4']))
+    expect(screen.getByLabelText('Nombre').className.split(/\s+/)).toContain('gap-4')
+  })
+
+  it('los rótulos y los valores de la fila del nombre se ven como los de los otros datos', async () => {
+    await renderWorker(fakeWorkerDetail())
+
+    const datos = screen.getByRole('heading', { level: 2, name: 'Datos del trabajador' }).closest('section') as HTMLElement
+    expect(within(datos).getAllByRole('term')).toHaveLength(10)
+    expect(new Set(within(datos).getAllByRole('term').map((dt) => dt.className)).size).toBe(1)
+    expect(new Set(within(datos).getAllByRole('definition').map((dd) => dd.className)).size).toBe(1)
   })
 
   it('el tipo de documento es su nombre y el cargo su nombre visible, no los de sistema', async () => {
@@ -390,7 +463,7 @@ describe('WorkerDetailPage', () => {
     it('los datos van en una columna en móvil y dos desde el ancho chico', async () => {
       await renderWorker(fakeWorkerDetail())
 
-      const lista = screen.getByText('Nombre', { selector: 'dt' }).closest('dl') as HTMLElement
+      const lista = screen.getByText('Tipo de documento', { selector: 'dt' }).closest('dl') as HTMLElement
       expect(lista.className).toContain('grid-cols-1')
       expect(lista.className).toContain('sm:grid-cols-2')
     })
@@ -483,9 +556,22 @@ describe('WorkerDetailPage', () => {
     const ALMACEN = { name: 'warehouse_keeper', description: 'Encargado de Almacén', level: 1, canLogin: true, driverProfile: 'NONE' } as const
     const ADMIN = { name: 'admin', description: 'Administrador', level: 4, canLogin: true, driverProfile: 'NONE' } as const
 
-    /** Un activo de nivel menor, sin usuario ni licencia salvo que se diga. */
+    /**
+     * Un activo de nivel menor, sin usuario ni licencia salvo que se diga. Su `fullName` no es la unión
+     * de las partes, a propósito: el diálogo y sus avisos dicen el del servidor.
+     */
     function trabajador(overrides: Partial<WorkerDetailResponse> = {}) {
-      return fakeWorkerDetail({ id: 42, firstName: 'Juan', lastName: 'Quispe', role: OPERADOR, driver: null, hasUser: false, ...overrides })
+      return fakeWorkerDetail({
+        id: 42,
+        firstName: 'Juan',
+        paternalLastName: 'Quispe',
+        maternalLastName: null,
+        fullName: 'Juan Carlos Quispe',
+        role: OPERADOR,
+        driver: null,
+        hasUser: false,
+        ...overrides,
+      })
     }
 
     /** Espera también los cargos: sin ellos no hay nivel y las acciones no se mostrarían por otra razón. */
@@ -622,7 +708,7 @@ describe('WorkerDetailPage', () => {
         const panel = await abrirDialogo(user, 'Desactivar')
 
         expect(within(panel).getByRole('heading', { name: 'Desactivar trabajador' })).toBeInTheDocument()
-        expect(within(panel).getByText('¿Desactivas a Juan Quispe?')).toBeInTheDocument()
+        expect(within(panel).getByText('¿Desactivas a Juan Carlos Quispe?')).toBeInTheDocument()
         if (arrastra) expect(within(panel).getByText(arrastra)).toBeInTheDocument()
         else expect(within(panel).queryByText(/Se desactiva también|queda deshabilitada/)).not.toBeInTheDocument()
         if (viajes) expect(within(panel).getByText(VIAJES)).toBeInTheDocument()
@@ -634,7 +720,7 @@ describe('WorkerDetailPage', () => {
       const user = userEvent.setup()
       await abrirComo(trabajador({ role: ALMACEN, hasUser: true, isActive: false }))
       const panel = await abrirDialogo(user, 'Reactivar')
-      expect(within(panel).getByText('¿Reactivas a Juan Quispe?')).toBeInTheDocument()
+      expect(within(panel).getByText('¿Reactivas a Juan Carlos Quispe?')).toBeInTheDocument()
       expect(
         within(panel).getByText('Su usuario sigue inactivo: reactivar al trabajador no le devuelve el acceso.'),
       ).toBeInTheDocument()
@@ -689,7 +775,7 @@ describe('WorkerDetailPage', () => {
       expect(sink.ids).toEqual([42])
       expect(estado()).toBe('Inactivo')
       expect(screen.getByRole('button', { name: 'Reactivar' })).toBeInTheDocument()
-      expect(toast.success).toHaveBeenCalledWith('Se desactivó a Juan Quispe.')
+      expect(toast.success).toHaveBeenCalledWith('Se desactivó a Juan Carlos Quispe.')
     })
 
     it('confirmar la reactivación la envía a su operación', async () => {
@@ -702,12 +788,12 @@ describe('WorkerDetailPage', () => {
 
       await waitFor(() => expect(estado()).toBe('Activo'))
       expect(sink.ids).toEqual([42])
-      expect(toast.success).toHaveBeenCalledWith('Se reactivó a Juan Quispe.')
+      expect(toast.success).toHaveBeenCalledWith('Se reactivó a Juan Carlos Quispe.')
     })
 
     it('al confirmar invalida las búsquedas y los viajes, y siembra la ficha con lo devuelto', async () => {
       const user = userEvent.setup()
-      const devuelto = trabajador({ isActive: false, lastName: 'Quispe Devuelto' })
+      const devuelto = trabajador({ isActive: false, paternalLastName: 'Quispe Devuelto' })
       server.use(changeWorkerStatusCapture('deactivate', {}, devuelto))
       const { queryClient } = await abrirComo(trabajador())
       queryClient.setQueryData(workerKeys.search({ q: 'juan', isActive: true }), [])
@@ -945,7 +1031,7 @@ describe('WorkerDetailPage', () => {
       expect(screen.queryByText('Este trabajador no existe')).not.toBeInTheDocument()
       expect(router.state.location.pathname).toBe(workerDetailPath(42))
 
-      server.use(getWorkerOk(fakeWorkerDetail({ firstName: 'Ana Recuperada' })))
+      server.use(getWorkerOk(fakeWorkerDetail({ firstName: 'Ana Recuperada', fullName: 'Ana Recuperada Torres Ruiz' })))
       await user.click(screen.getByRole('button', { name: /reintentar/i }))
       expect(await screen.findByRole('heading', { level: 1, name: 'Ana Recuperada Torres Ruiz' })).toBeInTheDocument()
     })

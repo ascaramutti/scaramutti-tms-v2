@@ -235,7 +235,7 @@ public class DevDataSeeder {
      * viejo.
      */
     private void ensureUser(String username, String legacyUsername, String password,
-                            String firstName, String lastName, String documentNumber,
+                            String firstName, String paternalLastName, String documentNumber,
                             Role role, boolean isActive, Integer documentTypeId) {
         var existing = userRepository.findByUsername(username);
         if (existing.isEmpty() && legacyUsername != null) {
@@ -247,12 +247,13 @@ public class DevDataSeeder {
             user.passwordHash = passwordService.hash(password);
             user.isActive = isActive;
             user.worker.firstName = firstName;
-            user.worker.lastName = lastName;
+            // Sin materno: uno puesto a mano en la base restaurada tambien es un nombre real.
+            user.worker.assignSurnames(paternalLastName, null);
             return;
         }
         Worker worker = new Worker();
         worker.firstName = firstName;
-        worker.lastName = lastName;
+        worker.assignSurnames(paternalLastName, null);
         worker.documentTypeId = documentTypeId;
         worker.documentNumber = documentNumber;
         worker.role = role;

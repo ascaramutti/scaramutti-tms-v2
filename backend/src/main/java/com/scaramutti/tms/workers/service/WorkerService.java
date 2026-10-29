@@ -205,7 +205,7 @@ public class WorkerService {
     private Worker newWorker(CreateWorkerCommand createWorkerCommand, Role role, Integer currentUserId) {
         Worker worker = new Worker();
         worker.firstName = createWorkerCommand.firstName();
-        worker.lastName = createWorkerCommand.lastName();
+        worker.assignSurnames(createWorkerCommand.paternalLastName(), createWorkerCommand.maternalLastName());
         worker.documentTypeId = createWorkerCommand.documentTypeId();
         worker.documentNumber = createWorkerCommand.documentNumber();
         worker.phone = createWorkerCommand.phone();
@@ -622,7 +622,9 @@ public class WorkerService {
     private void applyWorkerChanges(Worker worker, UpdateWorkerCommand command, Role newRole,
             DocumentType newDocumentType, WorkerFieldChanges changes, Integer currentUserId) {
         changes.compare(WorkerAuditField.FIRST_NAME, worker.firstName, command.firstName());
-        changes.compare(WorkerAuditField.LAST_NAME, worker.lastName, command.lastName());
+        // Un materno que no viene se borra, como todo en un reemplazo.
+        changes.compare(WorkerAuditField.PATERNAL_LAST_NAME, worker.paternalLastName, command.paternalLastName());
+        changes.compare(WorkerAuditField.MATERNAL_LAST_NAME, worker.maternalLastName, command.maternalLastName());
         changes.compare(WorkerAuditField.DOCUMENT_TYPE,
             documentTypeRepository.findByIdOptional(worker.documentTypeId)
                 .map(type -> type.code).orElse(null), newDocumentType.code);
@@ -633,7 +635,7 @@ public class WorkerService {
             String.valueOf(worker.hireDate), String.valueOf(command.hireDate()));
 
         worker.firstName = command.firstName();
-        worker.lastName = command.lastName();
+        worker.assignSurnames(command.paternalLastName(), command.maternalLastName());
         worker.documentTypeId = command.documentTypeId();
         worker.documentNumber = command.documentNumber();
         worker.phone = command.phone();

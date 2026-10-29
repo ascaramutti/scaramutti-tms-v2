@@ -4,9 +4,9 @@ package com.scaramutti.tms.workers.model;
  * Que campo cambio, con el nombre que se guarda y la etiqueta que se muestra.
  *
  * <p>Vive en un enum y no como literales adentro del servicio, a diferencia de lo que hacen
- * operaciones y almacen, por un motivo que este modulo si tiene: TRES endpoints escriben en esta
- * bitacora, no uno. El cambio de estado va a escribir sus propias filas sobre la misma tabla, y
- * dos copias de una etiqueta es exactamente como una etiqueta se separa de la otra.
+ * operaciones y almacen, por un motivo que este modulo si tiene: cuatro endpoints escriben en esta
+ * bitacora, y tres lo hacen campo por campo (la edicion, la baja y la reactivacion). Dos copias de
+ * una etiqueta es exactamente como una etiqueta se separa de la otra.
  *
  * <p>Y el desvio seria SILENCIOSO: el repositorio de la bitacora no tiene metodos de lectura a
  * proposito, asi que nada ni nadie mira estas filas hoy. Un nombre de campo mal escrito no lo
@@ -18,7 +18,8 @@ package com.scaramutti.tms.workers.model;
 public enum WorkerAuditField {
 
     FIRST_NAME              ("firstName",              "Nombre"),
-    LAST_NAME               ("lastName",               "Apellido"),
+    PATERNAL_LAST_NAME      ("paternalLastName",       "Apellido paterno"),
+    MATERNAL_LAST_NAME      ("maternalLastName",       "Apellido materno"),
     DOCUMENT_TYPE           ("documentType",           "Tipo de documento"),
     DOCUMENT_NUMBER         ("documentNumber",         "Número de documento"),
     PHONE                   ("phone",                  "Teléfono"),

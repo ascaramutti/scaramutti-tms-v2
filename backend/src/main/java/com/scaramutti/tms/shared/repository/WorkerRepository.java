@@ -39,31 +39,42 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
-     * El nombre completo de un trabajador, armado en SQL con el mismo criterio que
-     * {@link Worker#fullName()}: nombre, espacio, apellido.
-     *
-     * <p>Vive aca y no en otro repositorio porque el nombre es del trabajador, y existe
-     * como metodo y no como literal repetido porque lo componen el listado de conductores,
-     * la asignacion de recursos, los informes de viajes y el detalle de un trabajador: dos
-     * formas de armarlo harian que la misma persona se llame distinto segun por donde se la
-     * mire.
-     *
-     * <p>El alias es parametro porque una misma consulta puede necesitarlo mas de una vez
-     * sobre filas distintas de {@code public.workers}: el detalle lo compone para quien creo
-     * y para quien modifico en la misma sentencia.
+     * El nombre completo en SQL, con la regla de {@link Worker#fullName()}. Es un metodo y no un
+     * literal repetido porque lo componen los conductores, los viajes y su reporte, la asignacion
+     * de recursos, el kardex y el detalle (tres veces, de ahi el alias): dos formas de armarlo harian
+     * que la misma persona se llame distinto segun por donde se la mire. Los nombres van con
+     * {@code ||} y fuera del {@code concat_ws}: sin fila de trabajador (un LEFT JOIN que no
+     * encontro) da nulo, y el reporte de viajes rechaza esa fila por el nulo.
      */
     public static String fullNameExpression(String workersAlias) {
-        return "trim(" + workersAlias + ".first_name || ' ' || " + workersAlias + ".last_name)";
+        return "trim(" + workersAlias + ".first_name || ' ' || concat_ws(' ', "
+            + workersAlias + ".paternal_last_name, " + workersAlias + ".maternal_last_name))";
     }
+
+    /**
+     * El orden por nombre de los listados de trabajadores y de conductores: nombres, paterno y
+     * materno, y entre dos con los mismos nombres y paterno, el que no tiene materno primero.
+     */
+    public static String fullNameOrder(String workersAlias) {
+        return workersAlias + ".first_name ASC, " + workersAlias + ".paternal_last_name ASC, "
+            + workersAlias + ".maternal_last_name ASC NULLS FIRST";
+    }
+
+    /**
+     * Las columnas que mapea {@link Worker}, nombradas: un {@code w.*} traeria tambien la de antes
+     * del apellido, y el dia que se borre, el plan preparado de esa consulta cambiaria de forma.
+     */
+    private static final String WORKER_COLUMNS = "w.id, w.first_name, w.paternal_last_name, w.maternal_last_name, "
+        + "w.document_type_id, w.document_number, w.phone, w.role_id, w.hire_date, w.is_active, "
+        + "w.created_by, w.updated_by, w.created_at, w.updated_at";
 
     /**
      * Listado (sin paginar) de {@code public.workers} para el combobox "quien recibe" del
      * retiro y para la busqueda del padron (GET /workers). {@code q} es multi-palabra (molde
-     * suppliers/products): cada palabra debe matchear en alguna de las columnas buscadas;
-     * nulo = sin filtro. {@code isActive} nulo = ambos. Orden natural
-     * {@code first_name, last_name} ASC (el frontend reordena para presentacion, politica de
-     * catalogos). Query nativa para poder usar {@link MultiWordSearch}; devuelve entidades
-     * gestionadas.
+     * suppliers/products): cada palabra debe matchear en alguna de las columnas buscadas, los
+     * nombres, el paterno o el materno; nulo = sin filtro. {@code isActive} nulo = ambos. Orden
+     * por {@link #fullNameOrder}. Query nativa para poder usar {@link MultiWordSearch}; devuelve
+     * entidades gestionadas.
      *
      * <p>{@code includeDocumentNumber} decide si la busqueda mira tambien el numero de
      * documento. Es un parametro y no una constante porque no todos los que leen este listado
@@ -76,8 +87,8 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
         List<String> conditions = new ArrayList<>();
         if (q != null) {
             List<String> searchedColumns = includeDocumentNumber
-                ? List.of("first_name", "last_name", "document_number")
-                : List.of("first_name", "last_name");
+                ? List.of("first_name", "paternal_last_name", "maternal_last_name", "document_number")
+                : List.of("first_name", "paternal_last_name", "maternal_last_name");
             conditions.addAll(MultiWordSearch.conditions(q, searchedColumns, "qtok", params));
         }
         if (isActive != null) {
@@ -85,7 +96,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             params.put("isActive", isActive);
         }
         String where = conditions.isEmpty() ? "" : "WHERE " + String.join(" AND ", conditions) + " ";
-        String sql = "SELECT * FROM public.workers " + where + "ORDER BY first_name ASC, last_name ASC";
+        String sql = "SELECT " + WORKER_COLUMNS + " FROM public.workers w " + where + "ORDER BY " + fullNameOrder("w");
 
         Query query = getEntityManager().createNativeQuery(sql, Worker.class);
         params.forEach(query::setParameter);
@@ -112,11 +123,13 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
      * <p>{@code hasUser} es verdadero tambien con el usuario inactivo: desactivar un
      * trabajador apaga la cuenta y no la borra, y la pantalla necesita saber que sigue ahi.
      *
-     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y tres: leerlas por
+     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y cinco: leerlas por
      * numero es el modo de falla obvio el dia que alguien agregue una en el medio.
      */
     public Optional<WorkerDetailRow> findDetailById(Integer workerId) {
-        String sql = "SELECT w.id AS w_id, w.first_name AS w_first_name, w.last_name AS w_last_name, "
+        String sql = "SELECT w.id AS w_id, w.first_name AS w_first_name, "
+            + "w.paternal_last_name AS w_paternal_last_name, w.maternal_last_name AS w_maternal_last_name, "
+            + fullNameExpression("w") + " AS w_full_name, "
             + "w.document_number AS w_document_number, w.phone AS w_phone, w.hire_date AS w_hire_date, "
             + "w.is_active AS w_is_active, w.created_at AS w_created_at, w.updated_at AS w_updated_at, "
             + "dt.id AS dt_id, dt.code AS dt_code, dt.name AS dt_name, "
@@ -157,7 +170,9 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
         return new WorkerDetailRow(
             intOf(row, "w_id"),
             (String) row.get("w_first_name"),
-            (String) row.get("w_last_name"),
+            (String) row.get("w_paternal_last_name"),
+            (String) row.get("w_maternal_last_name"),
+            (String) row.get("w_full_name"),
             new DocumentTypeRow(
                 intOf(row, "dt_id"),
                 (String) row.get("dt_code"),
@@ -222,7 +237,9 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     public record WorkerDetailRow(
         Integer id,
         String firstName,
-        String lastName,
+        String paternalLastName,
+        String maternalLastName,
+        String fullName,
         DocumentTypeRow documentType,
         String documentNumber,
         String phone,

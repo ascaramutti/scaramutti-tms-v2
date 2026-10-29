@@ -205,6 +205,50 @@ class PublishedContractTest {
     }
 
     /**
+     * Las cabeceras de caché de la sesión: el ingreso y la renovación traen tokens ({@code no-store}
+     * y {@code Pragma}, sin {@code Vary}); {@code /auth/me}, los datos de la cuenta ({@code no-store}
+     * y {@code Vary}). El cliente generado no lleva cabeceras: sin este test, nada notaría que el
+     * contrato las perdió.
+     */
+    @Test
+    void publishedContract_declaresTheSessionResponsesNotStored() {
+        JsonPath contract = publishedContract();
+        for (String path : List.of("/auth/login", "/auth/refresh")) {
+            String headers = "paths.'" + path + "'.post.responses.'200'.headers.";
+            assertThat(path, contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+            assertThat(path, contract.getString(headers + "Pragma.description"), containsString("no-cache"));
+            assertThat(path, contract.get(headers + "Vary"), nullValue());
+        }
+        String me = "paths.'/auth/me'.get.responses.'200'.headers.";
+        assertThat(contract.getString(me + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(me + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(me + "Pragma"), nullValue());
+    }
+
+    /**
+     * Las cabeceras de caché de trabajadores: el listado depende del rol y la ficha trae el
+     * documento ({@code no-store} y {@code Vary}, sin {@code Pragma}), y las cuatro escrituras
+     * devuelven esa ficha. El cliente generado no lleva cabeceras: sin este test, nada notaría que
+     * el contrato las perdió.
+     */
+    @Test
+    void publishedContract_declaresTheWorkerResponsesNotStored() {
+        JsonPath contract = publishedContract();
+        for (String success : List.of(
+                "'/workers'.get.responses.'200'", "'/workers'.post.responses.'201'",
+                "'/workers/{id}'.get.responses.'200'", "'/workers/{id}'.put.responses.'200'",
+                "'/workers/{id}/deactivate'.post.responses.'200'",
+                "'/workers/{id}/reactivate'.post.responses.'200'")) {
+            String headers = "paths." + success + ".headers.";
+            assertThat(success, contract.getString(headers + "'Cache-Control'.description"),
+                containsString("no-store"));
+            assertThat(success, contract.getString(headers + "Vary.description"),
+                containsString("Authorization"));
+            assertThat(success, contract.get(headers + "Pragma"), nullValue());
+        }
+    }
+
+    /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
      * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.
@@ -250,6 +294,79 @@ class PublishedContractTest {
             assertEquals(72, contract.getInt(schema + ".maxLength"), field);
             assertTrue(contract.getString(schema + ".description").contains("72 bytes en UTF-8"), field);
         }
+    }
+
+    /**
+     * La ficha manda siempre las dos partes y el nombre, el materno nulo si no hay: el contrato los
+     * exige, y así el cliente generado no los tipa opcionales ni le quita el nulo al materno.
+     */
+    @Test
+    void publishedContract_requiresTheSurnamesAndTheFullNameOfTheWorkerDetail() {
+        JsonPath contract = publishedContract();
+        String schema = "components.schemas.WorkerDetailResponse.";
+        List<String> required = contract.getList(schema + "required");
+        for (String field : List.of("paternalLastName", "maternalLastName", "fullName")) {
+            assertTrue(required.contains(field), field + " no está en required");
+        }
+        assertEquals("string", contract.get(schema + "properties.paternalLastName.type"));
+        assertEquals(List.of("string", "null"), contract.get(schema + "properties.maternalLastName.type"));
+        assertEquals("string", contract.get(schema + "properties.fullName.type"));
+    }
+
+    /**
+     * La edición hereda el alta: un allOf de WorkerRequest y un objeto con solo {@code reason},
+     * texto o nulo hasta 500, sin otra regla. Sin copia no hay dos definiciones que se separen, y un
+     * campo nuevo del alta entra en la edición del contrato.
+     */
+    @Test
+    void publishedContract_editsAWorkerWithTheCreationFieldsPlusTheReason() {
+        JsonPath contract = publishedContract();
+        String edit = "components.schemas.WorkerUpdateRequest";
+        assertEquals(Set.of("description", "allOf"), contract.getMap(edit).keySet(),
+            "la edición no declara propiedades ni required propios: los hereda del alta");
+        assertEquals(2, contract.getList(edit + ".allOf").size());
+        assertEquals(Map.of("$ref", "#/components/schemas/WorkerRequest"), contract.getMap(edit + ".allOf[0]"));
+        assertEquals(Set.of("type", "properties"), contract.getMap(edit + ".allOf[1]").keySet());
+        assertEquals("object", contract.getString(edit + ".allOf[1].type"));
+        assertEquals(Set.of("reason"), contract.getMap(edit + ".allOf[1].properties").keySet());
+        Map<String, Object> reason = contract.getMap(edit + ".allOf[1].properties.reason");
+        assertEquals(Set.of("type", "maxLength", "example"), reason.keySet(),
+            "reason es texto o nulo hasta 500, sin otra regla: su mínimo es condicional y lo mide el servidor");
+        assertEquals(List.of("string", "null"), reason.get("type"));
+        assertEquals(500, reason.get("maxLength"));
+    }
+
+    /**
+     * El alta publica los dos apellidos con la regla del nombre (el materno, además, vacío), el
+     * paterno obligatorio, y ya no el apellido de antes, ni en el cuerpo ni en la ficha. El cliente
+     * generado sale de estas definiciones.
+     */
+    @Test
+    void publishedContract_takesBothSurnamesInTheCreation() {
+        JsonPath contract = publishedContract();
+        String properties = "components.schemas.WorkerRequest.properties.";
+        assertEquals(Set.of("type", "minLength", "maxLength", "pattern", "example"),
+            contract.getMap(properties + "paternalLastName").keySet());
+        assertEquals(Set.of("type", "maxLength", "pattern", "example"),
+            contract.getMap(properties + "maternalLastName").keySet(), "el materno entra vacío: sin minLength");
+        String namePattern = contract.getString(properties + "firstName.pattern");
+        assertEquals(namePattern, contract.getString(properties + "paternalLastName.pattern"));
+        assertEquals("^ *$|" + namePattern, contract.getString(properties + "maternalLastName.pattern"));
+        assertEquals("string", contract.get(properties + "paternalLastName.type"));
+        assertEquals(List.of("string", "null"), contract.get(properties + "maternalLastName.type"));
+        assertEquals(1, contract.getInt(properties + "paternalLastName.minLength"));
+        assertEquals(100, contract.getInt(properties + "paternalLastName.maxLength"));
+        assertEquals(100, contract.getInt(properties + "maternalLastName.maxLength"));
+        List<String> required = contract.getList("components.schemas.WorkerRequest.required");
+        assertTrue(required.contains("paternalLastName"), "el paterno es obligatorio");
+        assertFalse(required.contains("maternalLastName"), "el materno no puede ser obligatorio");
+        assertFalse(required.contains("lastName"), "el apellido de antes no es obligatorio en el alta");
+        assertFalse(contract.getList("components.schemas.WorkerDetailResponse.required").contains("lastName"),
+            "ni lo exige la ficha");
+        assertFalse(contract.getMap("components.schemas.WorkerRequest.properties").containsKey("lastName"),
+            "el apellido de antes ya no es parte del cuerpo");
+        assertFalse(contract.getMap("components.schemas.WorkerDetailResponse.properties").containsKey("lastName"),
+            "ni de la ficha");
     }
 
     /** Cuántas veces aparece una referencia en todo el documento. */

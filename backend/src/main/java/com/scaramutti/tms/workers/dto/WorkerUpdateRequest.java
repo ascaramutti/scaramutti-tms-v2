@@ -9,13 +9,14 @@ import jakarta.validation.constraints.Size;
 import java.time.LocalDate;
 
 /**
- * El cuerpo de la edicion: los mismos campos del alta mas el motivo.
+ * El cuerpo de la edicion: los campos del alta mas el motivo.
  *
  * <p>Es un REEMPLAZO y no un parche. Un campo opcional que no viene queda VACIO: omitir el
  * telefono lo borra. Quien lea esto buscando por que no hay comprobaciones de nulo antes de
- * asignar, la respuesta es esa.
+ * asignar, la respuesta es esa. La excepcion es el estado de la ficha de conductor, que si no viene
+ * se conserva.
  *
- * <p>Repite los ocho campos del alta en vez de heredarlos, y no es un descuido: un record no
+ * <p>Repite los campos del alta en vez de heredarlos, y no es un descuido: un record no
  * hereda, y anidar el cuerpo del alta cambiaria la forma del JSON que el contrato declara. Es el
  * molde del modulo de operaciones, que tiene el mismo par. El riesgo conocido es que las dos
  * formas se separen sin que nada deje de compilar, y por eso hay un caso que compara los
@@ -32,7 +33,10 @@ import java.time.LocalDate;
  */
 public record WorkerUpdateRequest(
     @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String firstName,
-    @NotBlank @Size(max = 100) @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String lastName,
+    @NotBlank(message = PersonNames.PATERNAL_MISSING) @Size(max = 100)
+    @Pattern(regexp = PersonNames.PATTERN, message = PersonNames.MESSAGE) String paternalLastName,
+    @Size(max = 100) @Pattern(regexp = PersonNames.MATERNAL_PATTERN, message = PersonNames.MESSAGE)
+    String maternalLastName,
     @NotNull Integer documentTypeId,
     @NotBlank @Size(max = 20) String documentNumber,
     @Pattern(regexp = "^\\d{9}$") String phone,
@@ -46,6 +50,7 @@ public record WorkerUpdateRequest(
 
     public WorkerUpdateRequest {
         firstName = PersonNames.toNfc(firstName);
-        lastName = PersonNames.toNfc(lastName);
+        paternalLastName = PersonNames.toNfc(paternalLastName);
+        maternalLastName = PersonNames.toNfc(maternalLastName);
     }
 }

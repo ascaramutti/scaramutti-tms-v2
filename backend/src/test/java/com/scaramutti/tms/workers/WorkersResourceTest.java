@@ -3,6 +3,7 @@ package com.scaramutti.tms.workers;
 import com.scaramutti.tms.support.WarehouseTestData;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,6 +13,8 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.List;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
 import static com.scaramutti.tms.support.TestAuth.login;
@@ -20,6 +23,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -72,10 +76,27 @@ class WorkersResourceTest {
         int id = fixtures.seedWorker("ZTESTW903", "Juan", "Perez", "operator", true);
         String token = adminToken();
 
-        // "juan perez": cada palabra matchea first_name O last_name (MultiWordSearch, AND de ORs)
+        // "juan perez": cada palabra matchea los nombres, el paterno o el materno (MultiWordSearch, AND de ORs)
         given().header("Authorization", "Bearer " + token).queryParam("q", "juan perez")
         .when().get("/workers")
         .then().statusCode(200).body("id", hasItem(id));
+    }
+
+    /**
+     * Cada palabra calza tambien en el materno, con su acento, y para quien no busca por documento
+     * igual: las dos listas de columnas lo llevan.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {"admin", "warehouse_keeper"})
+    void listWorkers_qMatchesTheMaternalWithItsAccent(String role) {
+        int id = fixtures.seedWorker("ZTESTW970", "Rosa", "Ztpaterno", "Ztmáterno", "operator", true);
+
+        given().header("Authorization", "Bearer " + fabricateAccessToken("ztest-" + role, role))
+            .queryParam("q", "ztmáterno")
+        .when().get("/workers")
+        .then().statusCode(200)
+            .body("id", hasItem(id))
+            .body("find { it.id == " + id + " }.fullName", equalTo("Rosa Ztpaterno Ztmáterno"));
     }
 
     @Test
@@ -150,13 +171,33 @@ class WorkersResourceTest {
         int alfa = fixtures.seedWorker("ZTESTW908", "Aaa", "Ztestord", "driver", true);
         String token = adminToken();
 
-        // q acota el universo a los 2 sembrados (last_name comun); orden por first_name: Aaa antes que Zzz
+        // q acota el universo a los 2 sembrados (paterno comun); orden por first_name: Aaa antes que Zzz
         List<Integer> ids = given().header("Authorization", "Bearer " + token).queryParam("q", "ztestord")
         .when().get("/workers")
         .then().statusCode(200).extract().jsonPath().getList("id", Integer.class);
 
         assertTrue(ids.indexOf(alfa) < ids.indexOf(zeta),
             "Aaa (first_name) debe venir antes que Zzz; ids=" + ids);
+    }
+
+    /**
+     * Nombres, paterno y materno, y entre dos con los mismos nombres y paterno, el que no tiene materno
+     * primero. El paterno de dos palabras va despues de los maternos de "Ztordena", y por los apellidos
+     * juntos quedaria entre ellos. Se siembran en otro orden que el esperado, para que el alta no lo de.
+     */
+    @Test
+    void listWorkers_orderedByFirstNameThenPaternalThenMaternal_withoutMaternalFirst() {
+        int otherPaternal = fixtures.seedWorker("ZTESTW980", "Aaa", "Ztordenb", null, "operator", true);
+        int maternalZeta = fixtures.seedWorker("ZTESTW981", "Aaa", "Ztordena", "Zeta", "operator", true);
+        int twoWordPaternal = fixtures.seedWorker("ZTESTW984", "Aaa", "Ztordena Beta", null, "operator", true);
+        int withoutMaternal = fixtures.seedWorker("ZTESTW982", "Aaa", "Ztordena", null, "operator", true);
+        int maternalAlfa = fixtures.seedWorker("ZTESTW983", "Aaa", "Ztordena", "Alfa", "operator", true);
+
+        List<Integer> ids = given().header("Authorization", "Bearer " + adminToken()).queryParam("q", "ztorden")
+        .when().get("/workers")
+        .then().statusCode(200).extract().jsonPath().getList("id", Integer.class);
+
+        assertEquals(List.of(withoutMaternal, maternalAlfa, maternalZeta, twoWordPaternal, otherPaternal), ids);
     }
 
     // ---------- roles ------------------------------------------------------------
@@ -274,6 +315,75 @@ class WorkersResourceTest {
         given().header("Authorization", "Bearer " + token).queryParam("q", "")
         .when().get("/workers")
         .then().statusCode(200).body("id", hasItem(id));
+    }
+
+    // ---------- cabeceras de cache -----------------------------------------------
+
+    /**
+     * El cuerpo depende del rol: ninguna cache lo guarda, y cada cabecera sale una sola vez. Sin
+     * Pragma, que es de los tokens.
+     */
+    @Test
+    void listWorkers_sendsNoStoreAndVaryOnce() {
+        Response response = given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers");
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /**
+     * El encargado de almacen buscando por documento, el pedido cuyo cuerpo cambia con el rol (a el
+     * no le encuentra a nadie): lo mismo.
+     */
+    @Test
+    void listWorkers_qByDocument_asWarehouseKeeper_sendsNoStoreAndVaryOnce() {
+        int id = fixtures.seedWorker("ZTESTW960", "Fabiola", "Quispe", "operator", true);
+
+        Response response = given().header("Authorization", "Bearer "
+                + fabricateAccessToken("ztest-wk", "warehouse_keeper"))
+            .queryParam("q", "ZTESTW960")
+        .when().get("/workers");
+
+        assertEquals(200, response.statusCode());
+        response.then().body("id", not(hasItem(id)));
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /**
+     * El HEAD lo contesta el framework con el mismo metodo: las mismas cabeceras y el Content-Type
+     * del GET. Con un Response sin tipo, el HEAD pierde el charset que lleva el GET.
+     */
+    @Test
+    void listWorkers_head_sendsNoStoreAndVaryOnceWithTheContentTypeOfTheGet() {
+        String token = adminToken();
+        String getContentType = given().header("Authorization", "Bearer " + token)
+        .when().get("/workers")
+        .then().statusCode(200).extract().contentType();
+
+        Response response = given().header("Authorization", "Bearer " + token)
+        .when().head("/workers");
+
+        assertEquals(200, response.statusCode());
+        assertEquals(getContentType, response.contentType());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /** Las cabeceras van en el exito y no en un filtro: un error sale sin ellas. */
+    @Test
+    void listWorkers_withAShortQ_returns400WithoutCacheHeaders() {
+        Response response = given().header("Authorization", "Bearer " + adminToken()).queryParam("q", "ab")
+        .when().get("/workers");
+
+        assertEquals(400, response.statusCode());
+        assertEquals("COM-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Vary", "Pragma");
     }
 
 }

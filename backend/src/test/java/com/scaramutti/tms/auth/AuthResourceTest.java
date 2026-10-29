@@ -7,6 +7,7 @@ import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
 import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
 import io.smallrye.jwt.build.Jwt;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -16,6 +17,8 @@ import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 
+import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
+import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -517,6 +520,112 @@ class AuthResourceTest {
         .then()
             .statusCode(400)
             .body("code", equalTo("COM-001"));
+    }
+
+    // ----- cabeceras de cache -----------------------------------------------
+
+    /**
+     * Los tokens no se guardan en ninguna cache (RFC 6749, §5.1): cada cabecera una sola vez, y sin
+     * Vary: el cuerpo del ingreso no depende de Authorization.
+     */
+    @Test
+    void login_sendsNoStoreAndPragmaOnce() {
+        Response response = given()
+            .contentType(ContentType.JSON)
+            .body("""
+                {"username":"sales","password":"Sales1234"}
+                """)
+        .when()
+            .post("/auth/login");
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Pragma", "no-cache");
+        assertNotSent(response, "Vary");
+    }
+
+    /** La renovación devuelve tokens nuevos: las mismas cabeceras que el ingreso. */
+    @Test
+    void refresh_sendsNoStoreAndPragmaOnce() {
+        String refreshToken = given()
+            .contentType(ContentType.JSON)
+            .body("""
+                {"username":"admin","password":"Admin1234"}
+                """)
+        .when()
+            .post("/auth/login")
+        .then()
+            .statusCode(200)
+            .extract().jsonPath().getString("refreshToken");
+
+        Response response = given()
+            .contentType(ContentType.JSON)
+            .body("{\"refreshToken\":\"" + refreshToken + "\"}")
+        .when()
+            .post("/auth/refresh");
+
+        assertEquals(200, response.statusCode());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Pragma", "no-cache");
+        assertNotSent(response, "Vary");
+    }
+
+    /** Sin tokens, pero con los datos de la cuenta del token: no-store, y Vary por la cuenta. */
+    @Test
+    void me_sendsNoStoreAndVaryOnce() {
+        Response response = given()
+            .header("Authorization", "Bearer " + login("admin", "Admin1234"))
+        .when()
+            .get("/auth/me");
+
+        assertEquals(200, response.statusCode());
+        assertEquals("admin", response.jsonPath().getString("username"));
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /**
+     * El HEAD lo contesta el framework con el mismo método: las mismas cabeceras y el Content-Type
+     * del GET. Con un Response sin tipo, el HEAD pierde el charset que lleva el GET.
+     */
+    @Test
+    void me_head_sendsNoStoreAndVaryOnceWithTheContentTypeOfTheGet() {
+        String token = login("admin", "Admin1234");
+        String getContentType = given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .get("/auth/me")
+        .then()
+            .statusCode(200)
+            .extract().contentType();
+
+        Response response = given()
+            .header("Authorization", "Bearer " + token)
+        .when()
+            .head("/auth/me");
+
+        assertEquals(200, response.statusCode());
+        assertEquals(getContentType, response.contentType());
+        assertSentOnce(response, "Cache-Control", "no-store");
+        assertSentOnce(response, "Vary", "Authorization");
+        assertNotSent(response, "Pragma");
+    }
+
+    /** Las cabeceras van en el éxito y no en un filtro: un error sale sin ellas. */
+    @Test
+    void login_withWrongPassword_returns401WithoutCacheHeaders() {
+        Response response = given()
+            .contentType(ContentType.JSON)
+            .body("""
+                {"username":"sales","password":"WRONG12345"}
+                """)
+        .when()
+            .post("/auth/login");
+
+        assertEquals(401, response.statusCode());
+        assertEquals("AUTH-001", response.jsonPath().getString("code"));
+        assertNotSent(response, "Cache-Control", "Pragma", "Vary");
     }
 
     // ----- helpers ----------------------------------------------------------

@@ -251,8 +251,14 @@ public class OperationsTestData {
     }
 
     /** Conductor activo, disponible, sin categoría ni teléfono. */
-    public int seedDriver(String firstName, String lastName) {
-        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true);
+    public int seedDriver(String firstName, String paternalLastName) {
+        return seedDriver(firstName, paternalLastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true);
+    }
+
+    /** El mismo conductor con los dos apellidos. */
+    public int seedDriver(String firstName, String paternalLastName, String maternalLastName) {
+        return seedDriver(firstName, paternalLastName, maternalLastName, null, null,
+            WarehouseTestData.STATUS_AVAILABLE, true, true, "driver");
     }
 
     /**
@@ -276,9 +282,9 @@ public class OperationsTestData {
      * Conductor con su trabajador asociado (de ahí sale el nombre y el teléfono del listado).
      * La licencia se genera única por corrida: la columna tiene índice UNIQUE en v1.
      */
-    public int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
+    public int seedDriver(String firstName, String paternalLastName, String phone, String licenseCategory,
             String statusName, boolean isActive) {
-        return seedDriver(firstName, lastName, phone, licenseCategory, statusName, isActive, true, "driver");
+        return seedDriver(firstName, paternalLastName, null, phone, licenseCategory, statusName, isActive, true, "driver");
     }
 
     /**
@@ -288,13 +294,14 @@ public class OperationsTestData {
      * asi el conductor no es asignable hoy. Cuando un empleado se va, el sistema anterior lo da de
      * baja como TRABAJADOR sin garantia de bajar tambien su fila de conductor.
      */
-    public int seedDriverWithInactiveWorker(String firstName, String lastName) {
-        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false, "driver");
+    public int seedDriverWithInactiveWorker(String firstName, String paternalLastName) {
+        return seedDriver(firstName, paternalLastName, null, null, null, WarehouseTestData.STATUS_AVAILABLE, true, false,
+            "driver");
     }
 
     /** La ficha de un trabajador de OTRO cargo que tambien la lleva: el escolta o el ayudante. */
-    public int seedDriverOfRole(String firstName, String lastName, String roleName, boolean isActive) {
-        return seedDriver(firstName, lastName, null, null, WarehouseTestData.STATUS_AVAILABLE, isActive, true,
+    public int seedDriverOfRole(String firstName, String paternalLastName, String roleName, boolean isActive) {
+        return seedDriver(firstName, paternalLastName, null, null, null, WarehouseTestData.STATUS_AVAILABLE, isActive, true,
             roleName);
     }
 
@@ -315,11 +322,11 @@ public class OperationsTestData {
             .setParameter(1, driverId).getSingleResult()).intValue());
     }
 
-    private int seedDriver(String firstName, String lastName, String phone, String licenseCategory,
-            String statusName, boolean isActive, boolean workerIsActive, String roleName) {
+    private int seedDriver(String firstName, String paternalLastName, String maternalLastName, String phone,
+            String licenseCategory, String statusName, boolean isActive, boolean workerIsActive, String roleName) {
         long n = SEQ.incrementAndGet();
         int workerId = warehouseFixtures.seedWorker(
-            "ZTESTD" + n, firstName, lastName, roleName, workerIsActive);
+            "ZTESTD" + n, firstName, paternalLastName, maternalLastName, roleName, workerIsActive);
         if (phone != null) {
             QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
                 "UPDATE public.workers SET phone = ?1 WHERE id = ?2")
