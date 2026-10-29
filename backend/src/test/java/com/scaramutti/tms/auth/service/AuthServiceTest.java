@@ -140,6 +140,19 @@ class AuthServiceTest {
         verify(tokenService, never()).createAccessToken(eq(user));
     }
 
+    @Test
+    void login_withTheWorkerInactive_throwsUserInactive() {
+        user.worker.isActive = false;
+        when(userRepository.findByUsername("sales")).thenReturn(Optional.of(user));
+        when(passwordService.matches("plain-password", "hashed-password")).thenReturn(true);
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> authService.login(new LoginCommand("sales", "plain-password")));
+
+        assertEquals(AuthError.USER_INACTIVE.code(), ex.code());
+        verify(tokenService, never()).createAccessToken(eq(user));
+    }
+
     // ============== refresh ==================================================
 
     @Test
@@ -230,6 +243,21 @@ class AuthServiceTest {
         assertEquals(AuthError.USER_INACTIVE.code(), ex.code());
     }
 
+    @Test
+    void refresh_withARoleThatDoesNotLogIn_throwsUserInactive() throws ParseException {
+        user.worker.role.canLogin = false;
+        JsonWebToken parsedToken = mockParsedToken("refresh");
+        when(parsedToken.getSubject()).thenReturn("100");
+        when(jwtParser.parse("valid.token")).thenReturn(parsedToken);
+        when(userRepository.findByIdOptional(100)).thenReturn(Optional.of(user));
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> authService.refresh(new RefreshCommand("valid.token")));
+
+        assertEquals(AuthError.USER_INACTIVE.code(), ex.code());
+        verify(tokenService, never()).createRefreshToken(eq(user));
+    }
+
     // ============== changePassword ===========================================
 
     @Test
@@ -267,6 +295,20 @@ class AuthServiceTest {
         verify(userRepository, never()).persist(user);
     }
 
+    @Test
+    void changePassword_withAnUnusableAccount_throwsUserInactive_beforeLookingAtTheCurrent() {
+        user.worker.role.canLogin = false;
+        when(userRepository.findByIdOptional(100)).thenReturn(Optional.of(user));
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> authService.changePassword(new ChangePasswordCommand(100, "wrong-current", "newpass")));
+
+        assertEquals(AuthError.USER_INACTIVE.code(), ex.code());
+        verify(passwordService, never()).matches(anyString(), anyString());
+        verify(passwordService, never()).hash(anyString());
+        verify(userRepository, never()).persist(user);
+    }
+
     // ============== findUserById =============================================
 
     @Test
@@ -287,6 +329,18 @@ class AuthServiceTest {
             () -> authService.findUserById(999));
 
         assertEquals(AuthError.USER_NOT_FOUND.code(), ex.code());
+    }
+
+    @Test
+    void findUserById_withAnUnusableAccount_throwsUserInactive() {
+        user.isActive = false;
+        when(userRepository.findByIdOptional(100)).thenReturn(Optional.of(user));
+
+        ApiException ex = assertThrows(ApiException.class,
+            () -> authService.findUserById(100));
+
+        assertEquals(AuthError.USER_INACTIVE.code(), ex.code());
+        verify(authServiceMapper, never()).toSessionUserResponse(user);
     }
 
     // ============== helpers ==================================================

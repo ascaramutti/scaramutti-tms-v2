@@ -576,9 +576,9 @@ public class WorkerService {
     }
 
     /**
-     * Una cuenta no puede quedar con un cargo que no inicia sesion: iniciaria igual, recibiria un
-     * token con un grupo que ningun endpoint acepta y el frontend no sabria donde llevarla. El
-     * camino para dejar a alguien sin acceso es darlo de baja, que apaga la cuenta y deja rastro.
+     * Una cuenta no puede quedar con un cargo que no inicia sesion: quedaria activa pero sin poder
+     * entrar ni renovar (401 AUTH-002), y nada en pantalla diria por que. El camino para dejar a
+     * alguien sin acceso es darlo de baja, que apaga la cuenta y deja rastro.
      *
      * <p>Solo aplica si el cargo cambia. Sin esa condicion, alguien que ya estuviera en ese estado
      * no se podria editar nunca mas, ni para corregirle una errata en el telefono.

@@ -661,8 +661,9 @@ class WorkerStatusResourceTest {
     // ---------- sesion viva ----------
 
     /**
-     * Tras desactivar, la cuenta no vuelve a entrar ni a renovar; el token que ya tenia sigue
-     * valiendo hasta que vence. El caso DOCUMENTA la ventana, no la niega. Y reactivar no la reabre.
+     * Tras desactivar, la cuenta no vuelve a entrar, ni a renovar, ni a leer su sesion; el token que
+     * ya tenia sigue valiendo hasta que vence donde no se mira la cuenta. El caso DOCUMENTA la
+     * ventana, no la niega. Y reactivar no la reabre.
      */
     @Test
     void deactivate_liveSession_refreshAndLoginFail_theAccessTokenStillAnswers_andReactivateDoesNotReopen() {
@@ -682,7 +683,9 @@ class WorkerStatusResourceTest {
         given().contentType("application/json").body(loginBody)
             .when().post("/auth/login").then().statusCode(401).body("code", equalTo("AUTH-002"));
         given().header("Authorization", "Bearer " + access)
-            .when().get("/auth/me").then().statusCode(200);
+            .when().get("/auth/me").then().statusCode(401).body("code", equalTo("AUTH-002"));
+        given().header("Authorization", "Bearer " + access)
+            .when().get("/clients").then().statusCode(200);
 
         post(adminToken(), id, REACTIVATE).statusCode(200);
         given().contentType("application/json").body(loginBody)
