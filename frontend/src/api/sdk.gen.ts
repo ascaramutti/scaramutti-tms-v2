@@ -20,6 +20,16 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 /**
  * Iniciar sesión
+ *
+ * Verifica la contraseña antes que la vigencia: con la clave equivocada
+ * responde `401 AUTH-001` aunque la cuenta no sea utilizable. Con la
+ * clave correcta, la cuenta tiene que ser **utilizable**: la cuenta
+ * activa, su trabajador activo y su cargo con `canLogin`. Si falla
+ * cualquiera de las tres, `401 AUTH-002`, con el mismo cuerpo en los tres
+ * casos.
+ *
+ * Orden: `400 COM-001` → `401 AUTH-001` → `401 AUTH-002` → `200`.
+ *
  */
 export const login = <ThrowOnError extends boolean = false>(options: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, LoginErrors, ThrowOnError> => (options.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
     responseType: 'json',
@@ -33,6 +43,13 @@ export const login = <ThrowOnError extends boolean = false>(options: Options<Log
 
 /**
  * Renovar token de acceso
+ *
+ * La cuenta tiene que ser utilizable, igual que en el ingreso: si no, o si
+ * la cuenta del token ya no existe, `401 AUTH-002`.
+ *
+ * Orden: `400 COM-001` → `401 AUTH-009` o `AUTH-003` (vencido, mal
+ * formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `200`.
+ *
  */
 export const refreshToken = <ThrowOnError extends boolean = false>(options: Options<RefreshTokenData, ThrowOnError>): RequestResult<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError> => (options.client ?? client).post<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError>({
     responseType: 'json',
@@ -46,6 +63,13 @@ export const refreshToken = <ThrowOnError extends boolean = false>(options: Opti
 
 /**
  * Cambiar contraseña del usuario actual
+ *
+ * La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
+ * `401 AUTH-002`, sin cambio. Se mira antes que la contraseña actual.
+ *
+ * Orden: `401` (token) → `400 COM-001` → `404 AUTH-005` → `401 AUTH-002`
+ * → `400 AUTH-004` → `204`.
+ *
  */
 export const changePassword = <ThrowOnError extends boolean = false>(options: Options<ChangePasswordData, ThrowOnError>): RequestResult<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError> => (options.client ?? client).post<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
     security: [{ scheme: 'bearer', type: 'http' }],
@@ -59,6 +83,12 @@ export const changePassword = <ThrowOnError extends boolean = false>(options: Op
 
 /**
  * Obtener datos del usuario autenticado
+ *
+ * La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
+ * `401 AUTH-002`.
+ *
+ * Orden: `401` (token) → `404 AUTH-005` → `401 AUTH-002` → `200`.
+ *
  */
 export const getCurrentUser = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserData, ThrowOnError>): RequestResult<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError> => (options?.client ?? client).get<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError>({
     responseType: 'json',
@@ -1155,7 +1185,8 @@ export const updateWorker = <ThrowOnError extends boolean = false>(options: Opti
  * ficha de conductor (`drivers.is_active`) y su usuario del sistema
  * (`users.is_active`), si existen: quien se fue no inicia sesión ni se
  * asigna a un viaje (la sesión abierta, si la hay, sigue hasta que venza
- * su access token; el refresco ya la frena). Idempotente: sobre un
+ * su access token donde no se mira la cuenta; la renovación, `/auth/me` y
+ * el cambio de contraseña ya la frenan). Idempotente: sobre un
  * inactivo responde `200` sin cambio, sin código de error, sin fila de
  * auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si llega uno,
  * o cualquier `Content-Type`, se ignora.

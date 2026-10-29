@@ -111,8 +111,9 @@ export function configureHttpClient(onSessionExpired: () => void): void {
 
       // No renuevan el ingreso (su 401 es de las credenciales o de la cuenta, y renovar ahí podía
       // pisar los tokens con los de una sesión vieja) ni la renovación (sería un bucle). Cambiar la
-      // contraseña sí: su 401 es siempre del token, porque la clave actual equivocada es un 400, y
-      // reintentar es seguro porque el servidor rechaza el token antes de escribir.
+      // contraseña sí: su 401 es del token o de una cuenta que ya no es utilizable (la clave actual
+      // equivocada es un 400), y renovar resuelve el primero y termina la sesión en el segundo.
+      // Reintentar es seguro porque el servidor rechaza antes de escribir.
       const isAuthEndpoint = isLoginOrRefresh(originalRequest?.url)
 
       if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {

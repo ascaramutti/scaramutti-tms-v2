@@ -49,8 +49,8 @@ public class AuthService {
             throw AuthError.INVALID_CREDENTIALS.toException();
         }
 
-        if (!user.isActive) {
-            LOG.warnf("Login fallido: usuario inactivo [username=%s, id=%d]", user.username, user.id);
+        if (!isUsable(user)) {
+            LOG.warnf("Login fallido: cuenta no utilizable [username=%s, id=%d]", user.username, user.id);
             throw AuthError.USER_INACTIVE.toException();
         }
 
@@ -74,7 +74,7 @@ public class AuthService {
         }
 
         User user = userRepository.findByIdOptional(userId)
-            .filter(u -> u.isActive)
+            .filter(AuthService::isUsable)
             .orElseThrow(AuthError.USER_INACTIVE::toException);
 
         return buildLoginResponse(user);
@@ -95,6 +95,7 @@ public class AuthService {
     public void changePassword(ChangePasswordCommand changePasswordCommand) {
         User user = userRepository.findByIdOptional(changePasswordCommand.userId())
             .orElseThrow(AuthError.USER_NOT_FOUND::toException);
+        requireUsable(user);
 
         verifyPasswordOrThrow(user, changePasswordCommand.currentPassword(), AuthError.WRONG_CURRENT_PASSWORD);
 
@@ -107,7 +108,23 @@ public class AuthService {
     public SessionUserResponse findUserById(Integer userId) {
         User user = userRepository.findByIdOptional(userId)
             .orElseThrow(AuthError.USER_NOT_FOUND::toException);
+        requireUsable(user);
         return authServiceMapper.toSessionUserResponse(user);
+    }
+
+    /**
+     * Cuenta utilizable: activa, con su trabajador activo y un cargo que inicia sesion. Un solo
+     * predicado para las cuatro operaciones de la sesion, asi no divergen; las tres causas dan el
+     * mismo error, cuyo detail ya muestra el ingreso.
+     */
+    private static boolean isUsable(User user) {
+        return user.isActive && user.worker.isActive && user.worker.role.canLogin;
+    }
+
+    private static void requireUsable(User user) {
+        if (!isUsable(user)) {
+            throw AuthError.USER_INACTIVE.toException();
+        }
     }
 
     private void verifyPasswordOrThrow(User user, String plainPassword, ApiError errorIfMismatch) {

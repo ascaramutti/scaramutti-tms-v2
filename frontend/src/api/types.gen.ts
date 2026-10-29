@@ -1864,7 +1864,7 @@ export type LoginErrors = {
      */
     400: Problem;
     /**
-     * Credenciales inválidas o usuario inactivo
+     * Credenciales inválidas, o cuenta no utilizable (cuenta inactiva, trabajador dado de baja o cargo que no inicia sesión), con el mismo cuerpo en los tres casos
      */
     401: Problem;
 };
@@ -1893,7 +1893,7 @@ export type RefreshTokenErrors = {
      */
     400: Problem;
     /**
-     * Refresh token inválido o expirado, o usuario inactivo
+     * Refresh token inválido o expirado, o cuenta no utilizable
      */
     401: Problem;
 };
@@ -1922,7 +1922,7 @@ export type ChangePasswordErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     * Token de acceso expirado o inválido, o cuenta no utilizable. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
@@ -1951,7 +1951,7 @@ export type GetCurrentUserData = {
 
 export type GetCurrentUserErrors = {
     /**
-     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     * Token de acceso expirado o inválido, o cuenta no utilizable. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
