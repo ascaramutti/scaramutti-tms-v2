@@ -9,6 +9,52 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.10.0] - 2026-10-28
+
+El apellido paterno y el materno del trabajador, cada uno en su columna y en su campo, y las
+respuestas de la sesión y de trabajadores marcadas para que ninguna caché las guarde: PRs #280 a
+#290. Una migración, la V015, que agrega columnas sin borrar datos: volver a 2.9.1 es cambiar las
+imágenes del backend y del frontend, con Flyway ignorando las migraciones futuras. El contrato
+retira `lastName` del trabajador: los cuerpos llevan `paternalLastName` y `maternalLastName`, y la
+ficha los devuelve junto con `fullName`.
+
+### Added
+
+- Migración V015: `workers` suma el apellido paterno y el materno. Copia el apellido de cada
+  trabajador entero al paterno y deja el materno vacío, sin partirlo, sin rastro y sin tocar
+  `updated_at`. `last_name` crece a 201 caracteres y un disparador la mantiene compuesta por las
+  dos partes. Toma `workers` en exclusivo sin hacer cola, reintenta hasta 30 segundos y, si no lo
+  logra, falla sin aplicar nada (#282).
+- El alta y la edición de trabajadores reciben el paterno, obligatorio, y el materno, opcional,
+  con las reglas del nombre; el materno vacío se guarda nulo y el historial anota cada parte que
+  cambió (#286, #287). La ficha devuelve las dos partes, el materno nulo si no tiene, y el nombre
+  completo (#284).
+- El formulario de trabajadores pide "Apellido paterno" y "Apellido materno (opcional)", y la ficha
+  muestra los dos. Su título, los avisos y el diálogo de desactivar muestran el nombre completo que
+  arma el servidor (#288, #289).
+
+### Changed
+
+- El nombre completo del trabajador (sesión, listado, conductores, kardex y viajes) sale de las dos
+  partes con una sola regla; sin materno, es el de antes. El listado busca y ordena por las partes
+  (#283).
+- El cuerpo de la edición se declaró aparte del alta para cambiarlos por separado; con los
+  apellidos vuelve a ser el del alta más `reason`, así que contra 2.9.1 no cambia (#285, #287).
+
+### Removed
+
+- El trabajador deja de exponer `lastName`. El alta y la edición lo ignoran si viene, y un cuerpo
+  que solo lo trae recibe `400 COM-001` en `paternalLastName`; la ficha ya no lo devuelve. La
+  columna `last_name` sigue en la base, compuesta por el disparador (#290).
+
+### Security
+
+- El ingreso y la renovación responden con `Cache-Control: no-store` y `Pragma: no-cache`, como pide
+  el estándar para las respuestas con tokens; `/auth/me`, con `Cache-Control: no-store` y
+  `Vary: Authorization` (#280).
+- El éxito de las seis operaciones de trabajadores responde con `Cache-Control: no-store` y
+  `Vary: Authorization`: el listado depende del rol y la ficha trae el número de documento (#281).
+
 ## [2.9.1] - 2026-10-20
 
 El refactor de los endpoints de viajes: respuestas tipadas y el par de cabeceras anti caché
