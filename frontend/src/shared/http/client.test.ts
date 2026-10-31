@@ -195,6 +195,84 @@ describe('http client interceptor (refresh-on-401)', () => {
     expect(tokenStorage.getAccessToken()).toBe('huerfano-access')
     expect(tokenStorage.getRefreshToken()).toBe('huerfano-refresh')
   })
+
+  /**
+   * Pide /auth/me con el access vencido; mientras la renovación vuelve, se guardan otros tokens (el
+   * cambio de contraseña, en esta pestaña o en otra). La renovación la suelta el test.
+   */
+  async function renovarMientrasSeReemplaza(
+    respuesta: () => Response,
+    reemplazar = () => tokenStorage.setTokens('access-del-cambio', 'refresh-del-cambio'),
+  ) {
+    tokenStorage.setTokens('access-de-antes', 'refresh-de-antes')
+    const conToken: string[] = []
+    let soltar!: () => void
+    const suelta = new Promise<void>((resolve) => (soltar = resolve))
+    let llegada = false
+    server.use(
+      http.get(`${API}/auth/me`, ({ request }) => {
+        const auth = request.headers.get('Authorization') ?? ''
+        conToken.push(auth)
+        return auth === 'Bearer access-del-cambio'
+          ? HttpResponse.json(FAKE_USER)
+          : HttpResponse.json({ status: 401 }, { status: 401 })
+      }),
+      http.post(`${API}/auth/refresh`, async () => {
+        llegada = true
+        await suelta
+        return respuesta()
+      }),
+    )
+    const pedido = getCurrentUser({ throwOnError: true })
+    await vi.waitFor(() => expect(llegada).toBe(true))
+    reemplazar()
+    soltar()
+    return { pedido, conToken }
+  }
+
+  it.each([
+    [
+      'sale bien',
+      () =>
+        HttpResponse.json({
+          token: 'access-renovado-de-antes',
+          refreshToken: 'refresh-renovado-de-antes',
+          expiresAt: '2027-01-01T00:00:00Z',
+          expiresIn: 3600,
+          user: FAKE_USER,
+        }),
+    ],
+    ['falla', () => HttpResponse.json({ status: 401, code: 'AUTH-003' }, { status: 401 })],
+  ])('con los tokens reemplazados mientras volvía, la renovación que %s no escribe y reintenta con el access guardado', async (_caso, respuesta) => {
+    const { pedido, conToken } = await renovarMientrasSeReemplaza(respuesta)
+    const { data } = await pedido
+
+    expect(data).toEqual(FAKE_USER)
+    expect(conToken).toEqual(['Bearer access-de-antes', 'Bearer access-del-cambio'])
+    expect(tokenStorage.getAccessToken()).toBe('access-del-cambio')
+    expect(tokenStorage.getRefreshToken()).toBe('refresh-del-cambio')
+    expect(onSessionExpired).not.toHaveBeenCalled()
+  })
+
+  it('con los tokens borrados mientras volvía (otra pestaña salió), la renovación que sale bien no los revive y la sesión termina', async () => {
+    const { pedido, conToken } = await renovarMientrasSeReemplaza(
+      () =>
+        HttpResponse.json({
+          token: 'access-renovado-de-antes',
+          refreshToken: 'refresh-renovado-de-antes',
+          expiresAt: '2027-01-01T00:00:00Z',
+          expiresIn: 3600,
+          user: FAKE_USER,
+        }),
+      () => tokenStorage.clear(),
+    )
+
+    await expect(pedido).rejects.toBeDefined()
+    expect(tokenStorage.getAccessToken()).toBeNull()
+    expect(tokenStorage.getRefreshToken()).toBeNull()
+    expect(onSessionExpired).toHaveBeenCalledTimes(1)
+    expect(conToken).toEqual(['Bearer access-de-antes'])
+  })
 })
 
 describe('la respuesta de una sesión que ya terminó', () => {

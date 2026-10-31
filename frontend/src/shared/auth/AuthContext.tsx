@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useMemo, type ReactNode } from 'react'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { hashKey, useQuery, useQueryClient, type QueryFilters } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { getCurrentUser } from '../../api'
 import type { SessionUser } from '../../api'
@@ -12,6 +12,7 @@ interface AuthContextValue {
   isLoading: boolean
   isAuthenticated: boolean
   setSession(accessToken: string, refreshToken: string | null, user: SessionUser): void
+  replaceSession(accessToken: string, refreshToken: string | null, user: SessionUser): void
   clearSession(): void
 }
 
@@ -48,6 +49,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [queryClient],
   )
 
+  // La sesión nueva del cambio de contraseña: la misma persona sigue adentro, así que no corre la
+  // rutina de fin de sesión ni abre otra generación. Lo que estaba en vuelo es suyo y se entrega
+  // (con otro cargo, las consultas se cortan y se vuelven a pedir: abajo).
+  const replaceSession = useCallback(
+    (accessToken: string, refreshToken: string | null, sessionUser: SessionUser) => {
+      const previousRole = queryClient.getQueryData<SessionUser | null>(currentUserQueryKey)?.role
+      // Como en el ingreso: la carga del usuario pedida con el token de antes no pisa al de la respuesta.
+      void queryClient.cancelQueries({ queryKey: currentUserQueryKey })
+      tokenStorage.setTokens(accessToken, refreshToken)
+      queryClient.setQueryData<SessionUser | null>(currentUserQueryKey, sessionUser)
+      // Con otro cargo, lo cargado puede tener la forma del anterior (el servidor responde según el
+      // cargo): se marca vencido, sin borrarlo, y lo que está en pantalla se vuelve a pedir. Antes se
+      // corta lo que está en vuelo: invalidar no corta una primera carga, que volvería como fresca.
+      if (previousRole && previousRole !== sessionUser.role) {
+        const currentUserHash = hashKey(currentUserQueryKey)
+        const others: QueryFilters = { predicate: (query) => query.queryHash !== currentUserHash }
+        void queryClient.cancelQueries(others).then(() => queryClient.invalidateQueries(others))
+      }
+    },
+    [queryClient],
+  )
+
   // Salir no recarga la página: sin la rutina, el que entra después en esta pestaña arranca con
   // la memoria del anterior. La comparte con la sesión expirada, que en el ingreso tampoco recarga.
   // Los avisos se cierran solo acá: al salir son del que sale; cuando la sesión expira en el
@@ -58,8 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient])
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, isLoading, isAuthenticated, setSession, clearSession }),
-    [user, isLoading, isAuthenticated, setSession, clearSession],
+    () => ({ user, isLoading, isAuthenticated, setSession, replaceSession, clearSession }),
+    [user, isLoading, isAuthenticated, setSession, replaceSession, clearSession],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
