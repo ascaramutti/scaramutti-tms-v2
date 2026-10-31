@@ -28,6 +28,9 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
  * cualquiera de las tres, `401 AUTH-002`, con el mismo cuerpo en los tres
  * casos.
  *
+ * El refresh emitido lleva la versión de las sesiones de la cuenta (ver
+ * `refreshToken`).
+ *
  * Orden: `400 COM-001` → `401 AUTH-001` → `401 AUTH-002` → `200`.
  *
  */
@@ -44,11 +47,22 @@ export const login = <ThrowOnError extends boolean = false>(options: Options<Log
 /**
  * Renovar token de acceso
  *
- * La cuenta tiene que ser utilizable, igual que en el ingreso: si no, o si
- * la cuenta del token ya no existe, `401 AUTH-002`.
+ * Renueva la sesión con un refresh emitido por `login`, `refreshToken` o
+ * `changePassword`. La cuenta tiene que ser utilizable, igual que en el
+ * ingreso: si no, o si la cuenta del token ya no existe, `401 AUTH-002`.
+ *
+ * Revocación: el refresh lleva la versión de las sesiones de la cuenta y
+ * se compara por igualdad con la actual. Cambiar la propia contraseña sube
+ * la versión: un refresh anterior responde `401 AUTH-003`, también si se
+ * emitió en el mismo segundo. Un refresh sin la versión (emitido antes de
+ * que existiera), o con ella nula, cuenta como la inicial y renueva hasta
+ * el primer cambio; una versión que no es un entero sin decimales, `401
+ * AUTH-003`. El token de acceso vigente no se revoca: vale hasta su
+ * vencimiento (`expiresAt`) y 60 s más de tolerancia de reloj.
  *
  * Orden: `400 COM-001` → `401 AUTH-009` o `AUTH-003` (vencido, mal
- * formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `200`.
+ * formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `401 AUTH-003`
+ * (versión) → `200`.
  *
  */
 export const refreshToken = <ThrowOnError extends boolean = false>(options: Options<RefreshTokenData, ThrowOnError>): RequestResult<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError> => (options.client ?? client).post<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError>({
@@ -62,16 +76,29 @@ export const refreshToken = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Cambiar contraseña del usuario actual
+ * Cambiar la contraseña de la cuenta de la sesión
+ *
+ * Cambia la contraseña de la cuenta de la sesión y responde con una
+ * **sesión nueva**: quien la cambia sigue trabajando con esos tokens, y
+ * los refresh emitidos antes dejan de renovar (`401 AUTH-003` en
+ * `refreshToken`).
  *
  * La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
- * `401 AUTH-002`, sin cambio. Se mira antes que la contraseña actual.
+ * `401 AUTH-002`, sin cambio, también con la actual equivocada (gana
+ * sobre `AUTH-004`). Si la actual verifica, la fila de la cuenta se toma y
+ * se decide contra la confirmada: si otra escritura cambió la contraseña en
+ * el medio, responde `400 AUTH-004` en vez de pisarla. Si otra operación
+ * retiene la fila, o una de sus tablas mientras el cambio la toma, la lee
+ * o la escribe, más allá del tope de espera, `409 AUTH-010`, sin cambio:
+ * se reintenta. La tabla de cuentas ya tomada en `ACCESS EXCLUSIVE` al
+ * llegar el pedido (una migración) lo hace esperar, como al ingreso.
  *
- * Orden: `401` (token) → `400 COM-001` → `404 AUTH-005` → `401 AUTH-002`
- * → `400 AUTH-004` → `204`.
+ * Orden (el `409 AUTH-010` no entra en la cadena): `401` (token) → `400
+ * COM-001` → `404 AUTH-005` → `401 AUTH-002` → `400 AUTH-004` → `200`.
  *
  */
 export const changePassword = <ThrowOnError extends boolean = false>(options: Options<ChangePasswordData, ThrowOnError>): RequestResult<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError> => (options.client ?? client).post<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
+    responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/auth/change-password',
     ...options,
@@ -82,7 +109,7 @@ export const changePassword = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Obtener datos del usuario autenticado
+ * Obtener la cuenta de la sesión
  *
  * La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
  * `401 AUTH-002`.

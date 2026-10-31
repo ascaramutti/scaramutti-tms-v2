@@ -150,12 +150,12 @@ class PasswordByteLimitTest {
     void login_withANulOrALoneSurrogate_returns400() {
         seedTestAccount();
         String seventyOne = "a".repeat(71);
-        changePassword(accessToken(TEST_USERNAME, TEST_PASSWORD), TEST_PASSWORD, seventyOne).then().statusCode(204);
+        changePassword(accessToken(TEST_USERNAME, TEST_PASSWORD), TEST_PASSWORD, seventyOne).then().statusCode(200);
         login(TEST_USERNAME, seventyOne + jsonEscape(0x0000)).then()
             .statusCode(400)
             .body("errors.field", contains("password"));
 
-        changePassword(accessToken(TEST_USERNAME, seventyOne), seventyOne, "Clave123?").then().statusCode(204);
+        changePassword(accessToken(TEST_USERNAME, seventyOne), seventyOne, "Clave123?").then().statusCode(200);
         login(TEST_USERNAME, "Clave123" + jsonEscape(0xD800)).then()
             .statusCode(400)
             .body("errors.field", contains("password"));
@@ -212,7 +212,7 @@ class PasswordByteLimitTest {
             .statusCode(400)
             .body("code", equalTo("AUTH-004"));
         changePassword(token, TEST_PASSWORD, repeat(EMOJI, 4)).then()
-            .statusCode(204);
+            .statusCode(200);
     }
 
     @Test
@@ -236,11 +236,11 @@ class PasswordByteLimitTest {
         String accents = repeat(A_WITH_ACCENT, 36);
 
         changePassword(accessToken(TEST_USERNAME, TEST_PASSWORD), TEST_PASSWORD, emojis).then()
-            .statusCode(204);
+            .statusCode(200);
         String token = accessToken(TEST_USERNAME, emojis);
 
         changePassword(token, emojis, accents).then()
-            .statusCode(204);
+            .statusCode(200);
         accessToken(TEST_USERNAME, accents);
     }
 

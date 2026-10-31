@@ -1,5 +1,6 @@
 package com.scaramutti.tms.auth;
 
+import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.support.RoutePolicyTrickyUrls;
 import com.scaramutti.tms.support.WarehouseTestData;
@@ -220,33 +221,35 @@ class AuthResourceTest {
             .body("code", equalTo("AUTH-003"));
     }
 
+    /**
+     * Con una cuenta de prueba y no con una sembrada: cambiar la clave sube la version de las
+     * sesiones, y sobre la base de dev cortaria las sesiones abiertas de esa cuenta.
+     */
     @Test
-    void changePassword_withCorrectCurrent_returns204() {
-        String token = login("admin", "Admin1234");
+    void changePassword_withCorrectCurrent_returns200_andTheNewPasswordLogsIn() {
+        try {
+            int workerId = fixtures.seedWorker("ZTESTCLV1", "Cambio", "Clave", "sales", true);
+            int userId = fixtures.seedUserFor(workerId, "ztestusercambio1", "sales");
+            fixtures.copyPasswordHashFrom(userId, "sales");
+            String token = login("ztestusercambio1", "Sales1234");
 
-        given()
-            .header("Authorization", "Bearer " + token)
-            .contentType(ContentType.JSON)
-            .body("""
-                {"currentPassword":"Admin1234","newPassword":"AdminCambiado99"}
-                """)
-        .when()
-            .post("/auth/change-password")
-        .then()
-            .statusCode(204);
+            given()
+                .header("Authorization", "Bearer " + token)
+                .contentType(ContentType.JSON)
+                .body("""
+                    {"currentPassword":"Sales1234","newPassword":"SalesCambiado99"}
+                    """)
+            .when()
+                .post("/auth/change-password")
+            .then()
+                .statusCode(200)
+                .body("user.id", equalTo(userId));
 
-        // Volvemos a la password original para no contaminar otros tests
-        String tokenAfter = login("admin", "AdminCambiado99");
-        given()
-            .header("Authorization", "Bearer " + tokenAfter)
-            .contentType(ContentType.JSON)
-            .body("""
-                {"currentPassword":"AdminCambiado99","newPassword":"Admin1234"}
-                """)
-        .when()
-            .post("/auth/change-password")
-        .then()
-            .statusCode(204);
+            assertTrue(login("ztestusercambio1", "SalesCambiado99").length() > 0);
+        } finally {
+            fixtures.deleteTestWorkerDependents();
+            QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestWorkers());
+        }
     }
 
     @Test
@@ -300,12 +303,12 @@ class AuthResourceTest {
     /**
      * El cliente renueva el token ante este 401 y reintenta el mismo pedido: es seguro solo si el
      * vencido se rechaza antes de escribir. La nueva es la misma clave, así admin sigue entrando si
-     * la regla fallara; el hash cambiaría igual (otra sal), y eso es lo que se mide.
+     * la regla fallara; el hash cambiaría igual (otra sal) y la versión subiría, y eso es lo que se mide.
      */
     @Test
     void changePassword_withExpiredAccessToken_returns401TokenExpired_andThePasswordStaysTheSame() {
         String expiredAccessToken = expiredAdminAccessToken();
-        String hashBefore = adminPasswordHash();
+        String credentialsBefore = adminCredentials();
         try {
             given()
                 .header("Authorization", "Bearer " + expiredAccessToken)
@@ -320,9 +323,9 @@ class AuthResourceTest {
                 .contentType("application/problem+json")
                 .body("code", equalTo("AUTH-007"));
 
-            assertEquals(hashBefore, adminPasswordHash());
+            assertEquals(credentialsBefore, adminCredentials());
         } finally {
-            restoreAdminPasswordHash(hashBefore);
+            restoreAdminCredentials(credentialsBefore);
         }
     }
 
@@ -642,14 +645,21 @@ class AuthResourceTest {
             .sign();
     }
 
-    private String adminPasswordHash() {
-        return QuarkusTransaction.requiringNew().call(() ->
-            userRepository.findByUsername("admin").orElseThrow().passwordHash);
+    /** El hash y la version de las sesiones de admin: cambiar la clave mueve los dos. */
+    private String adminCredentials() {
+        return QuarkusTransaction.requiringNew().call(() -> {
+            User admin = userRepository.findByUsername("admin").orElseThrow();
+            return admin.passwordHash + "|" + admin.sessionVersion;
+        });
     }
 
-    private void restoreAdminPasswordHash(String hash) {
-        QuarkusTransaction.requiringNew().run(() ->
-            userRepository.findByUsername("admin").orElseThrow().passwordHash = hash);
+    private void restoreAdminCredentials(String credentials) {
+        String[] parts = credentials.split("\\|");
+        QuarkusTransaction.requiringNew().run(() -> {
+            User admin = userRepository.findByUsername("admin").orElseThrow();
+            admin.passwordHash = parts[0];
+            admin.sessionVersion = Integer.valueOf(parts[1]);
+        });
     }
 
     private String login(String username, String password) {

@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -207,8 +208,8 @@ class PublishedContractTest {
     /**
      * Las cabeceras de caché de la sesión: el ingreso y la renovación traen tokens ({@code no-store}
      * y {@code Pragma}, sin {@code Vary}); {@code /auth/me}, los datos de la cuenta ({@code no-store}
-     * y {@code Vary}). El cliente generado no lleva cabeceras: sin este test, nada notaría que el
-     * contrato las perdió.
+     * y {@code Vary}); el cambio de contraseña, las dos cosas (las tres). El cliente generado no lleva
+     * cabeceras: sin este test, nada notaría que el contrato las perdió.
      */
     @Test
     void publishedContract_declaresTheSessionResponsesNotStored() {
@@ -223,6 +224,23 @@ class PublishedContractTest {
         assertThat(contract.getString(me + "'Cache-Control'.description"), containsString("no-store"));
         assertThat(contract.getString(me + "Vary.description"), containsString("Authorization"));
         assertThat(contract.get(me + "Pragma"), nullValue());
+        String change = "paths.'/auth/change-password'.post.responses.'200'.headers.";
+        assertThat(contract.getString(change + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(change + "Pragma.description"), containsString("no-cache"));
+        assertThat(contract.getString(change + "Vary.description"), containsString("Authorization"));
+    }
+
+    /** El cambio de contraseña responde con una sesión nueva, ya no con un 204, o con el conflicto. */
+    @Test
+    void publishedContract_answersThePasswordChangeWithANewSession() {
+        JsonPath contract = publishedContract();
+        String responses = "paths.'/auth/change-password'.post.responses.";
+        assertThat(contract.getString(responses + "'200'.content.'application/json'.schema.'$ref'"),
+            endsWith("/LoginResponse"));
+        assertThat(contract.get(responses + "'204'"), nullValue());
+        assertThat(contract.getString(responses
+            + "'409'.content.'application/problem+json'.examples.accountBusyOnPasswordChange.value.code"),
+            equalTo("AUTH-010"));
     }
 
     /**

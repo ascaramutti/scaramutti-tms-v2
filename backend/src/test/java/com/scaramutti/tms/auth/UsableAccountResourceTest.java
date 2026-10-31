@@ -157,7 +157,7 @@ class UsableAccountResourceTest {
         assertEquals(hashBefore, passwordHashOf(account.userId()));
     }
 
-    /** La vigencia se mira antes que la contrasena actual: con la actual equivocada, igual AUTH-002. */
+    /** Con la cuenta no utilizable, la actual equivocada da igual AUTH-002: gana sobre AUTH-004. */
     @ParameterizedTest
     @EnumSource(State.class)
     void changePassword_onAnUnusableAccount_withTheWrongCurrent_returns401UserInactive(State state) {
@@ -184,7 +184,7 @@ class UsableAccountResourceTest {
         .then().statusCode(200).body("id", equalTo(account.userId()));
 
         String hashBefore = passwordHashOf(account.userId());
-        postChangePassword(login.path("token"), PASSWORD).then().statusCode(204);
+        postChangePassword(login.path("token"), PASSWORD).then().statusCode(200);
         assertNotEquals(hashBefore, passwordHashOf(account.userId()));
     }
 
