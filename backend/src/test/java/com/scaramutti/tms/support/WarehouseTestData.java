@@ -569,6 +569,18 @@ public class WarehouseTestData {
                 "DELETE FROM almacen.products WHERE name LIKE ?1 AND created_by IN "
                     + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')")
                 .setParameter(1, PREFIX + "%").executeUpdate();
+            // El rastro de las cuentas apunta a la cuenta y a su autor, y la autoria de una cuenta a
+            // otra: una fila de una cuenta de prueba, o firmada por una, traba el borrado de abajo.
+            entityManager.createNativeQuery(
+                "DELETE FROM public.user_audit_logs WHERE user_id IN "
+                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%') OR changed_by IN "
+                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+            entityManager.createNativeQuery(
+                "UPDATE public.users SET created_by = NULL WHERE created_by IN "
+                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+            entityManager.createNativeQuery(
+                "UPDATE public.users SET updated_by = NULL WHERE updated_by IN "
+                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
             entityManager.createNativeQuery(
                 "DELETE FROM public.users WHERE username LIKE 'ztestuser%'").executeUpdate();
         });
@@ -853,6 +865,48 @@ public class WarehouseTestData {
     public boolean userIsActive(int userId) {
         return (Boolean) entityManager.createNativeQuery(
             "SELECT is_active FROM public.users WHERE id = ?1").setParameter(1, userId).getSingleResult();
+    }
+
+    /** La autoria de una cuenta: quien la creo, quien la cambio por ultima vez y cuando. */
+    public record UserAuthorship(Integer createdBy, Integer updatedBy, OffsetDateTime createdAt,
+        OffsetDateTime updatedAt) {}
+
+    public UserAuthorship userAuthorshipOf(int userId) {
+        Object[] row = (Object[]) entityManager.createNativeQuery(
+            "SELECT created_by, updated_by, created_at, updated_at FROM public.users WHERE id = ?1")
+            .setParameter(1, userId).getSingleResult();
+        return new UserAuthorship(row[0] == null ? null : ((Number) row[0]).intValue(),
+            row[1] == null ? null : ((Number) row[1]).intValue(), timestampOf(row[2]), timestampOf(row[3]));
+    }
+
+    /** Las filas del rastro de una cuenta, de la mas vieja a la mas nueva. */
+    public record UserAuditRow(String changeType, String fieldName, String fieldLabel, String oldValue,
+        String newValue, Integer changedBy, OffsetDateTime loggedAt) {}
+
+    @SuppressWarnings("unchecked")
+    public List<UserAuditRow> userAuditRows(int userId) {
+        List<Object[]> rows = entityManager.createNativeQuery(
+            "SELECT change_type, field_name, field_label, old_value, new_value, changed_by, logged_at "
+                + "FROM public.user_audit_logs WHERE user_id = ?1 ORDER BY id")
+            .setParameter(1, userId).getResultList();
+        return rows.stream().map(row -> new UserAuditRow((String) row[0], (String) row[1], (String) row[2],
+            (String) row[3], (String) row[4], row[5] == null ? null : ((Number) row[5]).intValue(),
+            timestampOf(row[6]))).toList();
+    }
+
+    /** La autoria de todas las cuentas, una linea por cuenta: para afirmar que una escritura no movio ninguna. */
+    @SuppressWarnings("unchecked")
+    public List<String> authorshipOfEveryAccount() {
+        return entityManager.createNativeQuery(
+            "SELECT id || '|' || coalesce(created_by::text, '-') || '|' || coalesce(updated_by::text, '-') "
+                + "|| '|' || updated_at::text FROM public.users ORDER BY id").getResultList();
+    }
+
+    /** Cada fila del rastro de cuentas entera, como texto: para buscar lo que nunca tiene que guardar. */
+    @SuppressWarnings("unchecked")
+    public List<String> userAuditRowsAsText() {
+        return entityManager.createNativeQuery("SELECT row_to_json(l)::text FROM public.user_audit_logs l")
+            .getResultList();
     }
 
     /** Enciende o apaga un trabajador de prueba por SQL, con el guardia de prefijo. */

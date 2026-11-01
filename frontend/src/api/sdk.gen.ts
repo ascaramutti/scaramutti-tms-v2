@@ -81,15 +81,17 @@ export const refreshToken = <ThrowOnError extends boolean = false>(options: Opti
  * Cambia la contraseña de la cuenta de la sesión y responde con una
  * **sesión nueva**: quien la cambia sigue trabajando con esos tokens, y
  * los refresh emitidos antes dejan de renovar (`401 AUTH-003` en
- * `refreshToken`).
+ * `refreshToken`). Deja una fila de rastro "cambió su contraseña",
+ * firmada por la propia cuenta y sin valores.
  *
  * La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
  * `401 AUTH-002`, sin cambio, también con la actual equivocada (gana
  * sobre `AUTH-004`). Si la actual verifica, la fila de la cuenta se toma y
  * se decide contra la confirmada: si otra escritura cambió la contraseña en
  * el medio, responde `400 AUTH-004` en vez de pisarla. Si otra operación
- * retiene la fila, o una de sus tablas mientras el cambio la toma, la lee
- * o la escribe, más allá del tope de espera, `409 AUTH-010`, sin cambio:
+ * retiene la fila, o una de sus tablas (también la del rastro) mientras el
+ * cambio la toma, la lee o la escribe, más allá del tope de espera, `409
+ * AUTH-010`, sin cambio:
  * se reintenta. La tabla de cuentas ya tomada en `ACCESS EXCLUSIVE` al
  * llegar el pedido (una migración) lo hace esperar, como al ingreso.
  *

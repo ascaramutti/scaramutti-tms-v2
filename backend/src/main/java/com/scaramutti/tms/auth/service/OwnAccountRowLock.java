@@ -26,14 +26,14 @@ public class OwnAccountRowLock {
     private static final String PROPERTY = "app.accounts.lock-timeout-ms";
 
     /**
-     * Los topes que el cambio propio puede gastar, medidos en un PostgreSQL 16 con tope de 600ms: la
-     * tabla al tomar la fila (uno, solo con EXCLUSIVE: la lectura del hash ya la tiene compartida); la
-     * fila con cola (DOS: la tupla del primero y, cuando se rinde, quien la retiene); la lectura, que
-     * trae trabajador y cargo (uno por tabla); y la tabla en el UPDATE (uno, con SHARE o SHARE ROW
-     * EXCLUSIVE). La lectura del hash corre antes y sin tope, como el ingreso. Una cola de escrituras
-     * suma una espera por cada una: la cubre que cada una retiene la fila milisegundos, sin BCrypt.
+     * Los topes que el cambio propio puede gastar, medidos en un PostgreSQL 16: la tabla al tomar la
+     * fila (uno, solo con EXCLUSIVE: la lectura del hash ya la tiene compartida); la fila con cola (DOS:
+     * la tupla del primero y, al rendirse, quien la retiene); la lectura (uno por tabla: trabajador y
+     * cargo); el INSERT del rastro (DOS: su tabla, con SHARE o mas, y despues su secuencia); la de
+     * cuentas en el UPDATE (uno, con SHARE o SHARE ROW EXCLUSIVE). La lectura del hash corre antes y sin
+     * tope. Una cola de escrituras suma una por cada una: la cubre que retienen la fila milisegundos, sin BCrypt.
      */
-    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 6;
+    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 8;
 
     /** El tope de las filas de cuentas: quien las escriba lo multiplica por su propio presupuesto. */
     @ConfigProperty(name = PROPERTY)
@@ -57,22 +57,28 @@ public class OwnAccountRowLock {
     }
 
     /**
-     * Escribe lo pendiente dentro del traductor: el UPDATE tambien puede esperar (la tabla, no la
-     * fila), y escrito recien al confirmar, su choque saldria como error del servidor.
+     * Corre las altas del llamador y escribe lo pendiente dentro del traductor: el INSERT del rastro
+     * (su id lo genera la base, asi que sale al persistirlo) y el UPDATE tambien pueden esperar una
+     * tabla o la secuencia, y fuera de el su choque saldria como error del servidor.
      */
     @Transactional(Transactional.TxType.MANDATORY)
-    public void flushTranslatingConflicts(Integer userId) {
+    public void flushTranslatingConflicts(Integer userId, Runnable inserts) {
         try {
+            inserts.run();
             entityManager.flush();
         } catch (PersistenceException e) {
             throw asAccountBusy(e, userId);
         }
     }
 
-    /** El choque puede ser con la fila o con una tabla de la lectura: el registro nombra la cuenta. */
+    /**
+     * El choque puede ser con la fila, una tabla o la secuencia que el cambio lee o escribe: el
+     * registro nombra la cuenta.
+     */
     private RuntimeException asAccountBusy(PersistenceException e, Integer userId) {
         return RowLockSupport.asLockConflictOrRethrow(e, AuthError.ACCOUNT_BUSY,
-            "la cuenta id=" + userId + " (su fila o una de sus tablas) con un tope de " + lockTimeoutMillis + "ms");
+            "la cuenta id=" + userId + " (su fila, una de sus tablas o la secuencia del rastro) con un tope de "
+                + lockTimeoutMillis + "ms");
     }
 
     /**

@@ -195,6 +195,46 @@ class WorkerStatusResourceTest {
         assertEquals(detalle, respuesta);
     }
 
+    // ---------- desactivar: la autoria de la cuenta ----------
+
+    /**
+     * La cuenta que la cascada apaga queda firmada por quien da de baja, como el trabajador: la de la
+     * sesion, no la del administrador sembrado. Su fila va al rastro del trabajador, no al de cuentas.
+     */
+    @Test
+    void deactivate_signsTheAccountItTurnsOff_withTheSessionUser() {
+        var actor = fixtures.seedActor("general_manager", "S08");
+        int id = fixtures.seedWorker("ZTESTS080", "Juan", "Pérez", "sales", true);
+        int userId = fixtures.seedUserFor(id, "ztestuserS080", "sales");
+        var before = fixtures.userAuthorshipOf(userId);
+
+        post(fabricateTokenForUser(actor.userId(), "ztestuserS08", "general_manager"), id, DEACTIVATE)
+            .statusCode(200);
+
+        var after = fixtures.userAuthorshipOf(userId);
+        assertEquals(actor.userId(), after.updatedBy());
+        assertTrue(after.updatedAt().isAfter(before.updatedAt()), "la marca del cambio se mueve");
+        assertEquals(before.createdBy(), after.createdBy(), "quien la creo no cambia");
+        assertEquals(before.createdAt(), after.createdAt());
+        assertEquals(List.of(), fixtures.userAuditRows(userId), "la fila de la baja es del trabajador");
+        assertEquals(List.of("isActive", "user.isActive"), auditFieldNames(id));
+    }
+
+    /** Si la cascada no apaga ninguna cuenta, no firma ninguna: ni la que ya estaba apagada ni otra. */
+    @ParameterizedTest(name = "cuenta {0}")
+    @ValueSource(strings = {"apagada", "ninguna"})
+    void deactivate_whenItTurnsNoAccountOff_movesNoAuthorship(String account) {
+        int id = fixtures.seedWorker("ZTESTS081", "Juan", "Pérez", "sales", true);
+        if ("apagada".equals(account)) {
+            fixtures.seedUserFor(id, "ztestuserS081", "sales", false);
+        }
+        List<String> before = fixtures.authorshipOfEveryAccount();
+
+        post(adminToken(), id, DEACTIVATE).statusCode(200).body("isActive", equalTo(false));
+
+        assertEquals(before, fixtures.authorshipOfEveryAccount());
+    }
+
     // ---------- reactivar: la ficha si el cargo la lleva, la cuenta nunca ----------
 
     /**

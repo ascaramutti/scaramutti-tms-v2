@@ -10,8 +10,10 @@ import com.scaramutti.tms.auth.service.cmd.LoginCommand;
 import com.scaramutti.tms.auth.service.cmd.RefreshCommand;
 import com.scaramutti.tms.shared.entity.Role;
 import com.scaramutti.tms.shared.entity.User;
+import com.scaramutti.tms.shared.entity.UserAuditLog;
 import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.repository.UserAuditLogRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import io.smallrye.jwt.auth.principal.JWTParser;
 import io.smallrye.jwt.auth.principal.ParseException;
@@ -21,6 +23,7 @@ import org.eclipse.microprofile.jwt.JsonWebToken;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
@@ -30,25 +33,30 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Unit tests para AuthService con mocks de UserRepository, PasswordService,
- * TokenService, JWTParser y AuthServiceMapper. Aisla la logica del service
- * sin levantar Quarkus ni tocar BD.
+ * Unit tests para AuthService con mocks de UserRepository, PasswordService, TokenService,
+ * JWTParser, AuthServiceMapper, OwnAccountRowLock y UserAuditLogRepository. Aisla la logica del
+ * service sin levantar Quarkus ni tocar BD.
  */
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -59,6 +67,7 @@ class AuthServiceTest {
     @Mock JWTParser jwtParser;
     @Mock AuthServiceMapper authServiceMapper;
     @Mock OwnAccountRowLock ownAccountRowLock;
+    @Mock UserAuditLogRepository userAuditLogRepository;
 
     @InjectMocks AuthService authService;
 
@@ -295,6 +304,17 @@ class AuthServiceTest {
         when(tokenService.createAccessToken(user)).thenReturn(accessToken);
         when(tokenService.createRefreshToken(user)).thenReturn("new.refresh.token");
         when(authServiceMapper.toLoginResponse(user, accessToken, "new.refresh.token")).thenReturn(loginResponse);
+        AtomicBoolean insideTheTranslator = new AtomicBoolean();
+        doAnswer(call -> {
+            insideTheTranslator.set(true);
+            ((Runnable) call.getArgument(1)).run();
+            insideTheTranslator.set(false);
+            return null;
+        }).when(ownAccountRowLock).flushTranslatingConflicts(eq(100), any(Runnable.class));
+        doAnswer(call -> {
+            assertTrue(insideTheTranslator.get(), "el INSERT del rastro sale al persistirlo: dentro del traductor");
+            return null;
+        }).when(userAuditLogRepository).persist(any(UserAuditLog.class));
 
         LoginResponse result = authService.changePassword(new ChangePasswordCommand(100, "current-plain", "new-plain"));
 
@@ -302,7 +322,11 @@ class AuthServiceTest {
         assertEquals("new-hashed", user.passwordHash);
         assertEquals(5, user.sessionVersion);
         verify(userRepository).persist(user);
-        verify(ownAccountRowLock).flushTranslatingConflicts(100);
+        ArgumentCaptor<UserAuditLog> row = ArgumentCaptor.forClass(UserAuditLog.class);
+        verify(userAuditLogRepository).persist(row.capture());
+        assertEquals("100|PASSWORD_CHANGED|password|Contraseña|null|null|100", rowOf(row.getValue()));
+        assertEquals(100, user.updatedBy, "la propia cuenta firma su cambio");
+        assertNotNull(user.updatedAt);
         // Las dos BCrypt antes de tomar la fila: con la fila tomada, una tanda de cambios la retiene.
         InOrder order = inOrder(passwordService, ownAccountRowLock);
         order.verify(passwordService).matches("current-plain", "hashed-password");
@@ -337,6 +361,7 @@ class AuthServiceTest {
         verify(passwordService, never()).hash(anyString());
         verify(userRepository, never()).persist(user);
         assertEquals(0, user.sessionVersion);
+        assertNothingSigned();
     }
 
     /** La vigencia decide antes que la actual, tambien cuando la actual esta mal. */
@@ -369,6 +394,7 @@ class AuthServiceTest {
         assertEquals(AuthError.USER_INACTIVE.code(), ex.code());
         assertEquals("hashed-password", user.passwordHash);
         verify(userRepository, never()).persist(user);
+        assertNothingSigned();
     }
 
     /** El hash de la fila tomada ya no es el verificado: otra escritura lo cambio en el medio. */
@@ -386,6 +412,19 @@ class AuthServiceTest {
         assertEquals(AuthError.WRONG_CURRENT_PASSWORD.code(), ex.code());
         assertEquals("hash-de-otra-escritura", user.passwordHash);
         verify(userRepository, never()).persist(user);
+        assertNothingSigned();
+    }
+
+    /** Un cambio rechazado no deja fila de rastro ni mueve la autoria de la cuenta. */
+    private void assertNothingSigned() {
+        verifyNoInteractions(userAuditLogRepository);
+        assertNull(user.updatedBy);
+        assertNull(user.updatedAt);
+    }
+
+    private static String rowOf(UserAuditLog log) {
+        return log.userId + "|" + log.changeType + "|" + log.fieldName + "|" + log.fieldLabel + "|" + log.oldValue
+            + "|" + log.newValue + "|" + log.changedBy;
     }
 
     // ============== la version de las sesiones ================================

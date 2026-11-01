@@ -493,6 +493,8 @@ public class WorkerService {
             if (user != null && Boolean.TRUE.equals(user.isActive)) {
                 changes.compare(WorkerAuditField.USER_IS_ACTIVE, "true", "false");
                 user.isActive = false;
+                // Como el trabajador, la cuenta que se apago queda firmada por quien la apago.
+                user.markChangedBy(currentUserId);
             }
             writeAuditLogs(worker.id, WorkerAuditChangeType.DEACTIVATED, changes.asList(), null,
                 currentUserId);

@@ -1930,7 +1930,7 @@ export type ChangePasswordErrors = {
      */
     404: Problem;
     /**
-     * Conflicto transitorio: otra operación retuvo la fila de la cuenta, o una de sus tablas mientras el cambio la tomaba, la leía o la escribía, más allá del tope; se reintenta
+     * Conflicto transitorio: otra operación retuvo la fila de la cuenta, o una de sus tablas (también la del rastro) mientras el cambio la tomaba, la leía o la escribía, más allá del tope; se reintenta
      */
     409: Problem;
 };

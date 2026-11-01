@@ -130,6 +130,7 @@ class OwnAccountRowLockResourceTest {
         }
         assertEquals(hashBefore, passwordHashOf(userId));
         assertEquals(0, sessionVersionOf(userId));
+        assertNothingSigned();
     }
 
     /**
@@ -222,6 +223,71 @@ class OwnAccountRowLockResourceTest {
         }
         assertEquals(hashBefore, passwordHashOf(userId));
         assertEquals(0, sessionVersionOf(userId));
+        assertNothingSigned();
+    }
+
+    /**
+     * El INSERT del rastro tambien puede esperar: una migracion que toma esa tabla lo frena. Su id lo
+     * genera la base, asi que sale al persistirlo y no en la descarga: fuera del traductor, su choque
+     * saldria como error del servidor. Pasado el tope, el conflicto del contrato y nada cambia.
+     */
+    @Test
+    void withTheTrailTableHeldByAMigrationAtTheInsert_returns409AccountBusy_andChangesNothing() throws Exception {
+        String accessToken = accessToken();
+        String hashBefore = passwordHashOf(userId);
+        try (Connection holder = dataSource.getConnection(); Connection observer = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            Future<Response> change = null;
+            try {
+                try (Statement statement = holder.createStatement()) {
+                    statement.execute("LOCK TABLE public.user_audit_logs IN SHARE MODE");
+                }
+                change = executor.submit(() -> changePassword(accessToken));
+
+                assertTrue(awaitWaiters(observer, backendPid(holder), 1, change, UNTIL_IT_ARRIVES_MILLIS),
+                    "el cambio tiene que estar esperando la tabla del rastro");
+                change.get(10, TimeUnit.SECONDS).then()
+                    .statusCode(409)
+                    .body("code", equalTo("AUTH-010"));
+            } finally {
+                release(holder, change);
+            }
+        }
+        assertEquals(hashBefore, passwordHashOf(userId));
+        assertEquals(0, sessionVersionOf(userId));
+        assertNothingSigned();
+    }
+
+    /**
+     * Despues de su tabla, el INSERT del rastro pide su secuencia: un {@code ALTER SEQUENCE} que la
+     * retiene lo frena con otro tope, que el presupuesto cuenta aparte. Pasado el tope, el conflicto
+     * del contrato y nada cambia.
+     */
+    @Test
+    void withTheTrailSequenceHeldAtTheInsert_returns409AccountBusy_andChangesNothing() throws Exception {
+        String accessToken = accessToken();
+        String hashBefore = passwordHashOf(userId);
+        try (Connection holder = dataSource.getConnection(); Connection observer = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            Future<Response> change = null;
+            try {
+                try (Statement statement = holder.createStatement()) {
+                    statement.execute("ALTER SEQUENCE public.user_audit_logs_id_seq INCREMENT BY 1");
+                }
+                change = executor.submit(() -> changePassword(accessToken));
+
+                assertTrue(awaitWaiters(observer, backendPid(holder), 1, change, UNTIL_IT_ARRIVES_MILLIS),
+                    "el cambio tiene que estar esperando la secuencia del rastro");
+                change.get(10, TimeUnit.SECONDS).then()
+                    .statusCode(409)
+                    .body("code", equalTo("AUTH-010"));
+            } finally {
+                release(holder, change);
+            }
+        }
+        assertEquals(hashBefore, passwordHashOf(userId));
+        assertEquals(0, sessionVersionOf(userId));
+        assertNothingSigned();
     }
 
     /**
@@ -274,6 +340,12 @@ class OwnAccountRowLockResourceTest {
             statement.setInt(index, userId);
             statement.execute();
         }
+    }
+
+    /** Un cambio que no confirmo no deja fila de rastro ni firma la cuenta. */
+    private void assertNothingSigned() {
+        assertEquals(List.of(), fixtures.userAuditRows(userId));
+        assertEquals(null, fixtures.userAuthorshipOf(userId).updatedBy());
     }
 
     private int sessionVersionOf(int id) {
