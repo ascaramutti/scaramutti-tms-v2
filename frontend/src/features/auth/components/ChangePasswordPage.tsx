@@ -24,11 +24,14 @@ type FieldName = keyof ChangePasswordFormInput
 
 const CHANGE_PASSWORD_FIELDS: readonly FieldName[] = ['currentPassword', 'newPassword']
 
-// Un 401 llega hasta acá solo si el servidor rechaza también el token recién renovado. Su texto es
-// para quien programa, no para el usuario: el de AUTH-007 va en usted y nombra una ruta de la API.
-const SESSION_ERROR_MESSAGES: Record<string, string> = {
+// Textos propios donde el del servidor no le sirve a la persona: el de AUTH-007 va en usted y nombra
+// una ruta de la API, el de AUTH-002 dice "desactivado" por los tres motivos y el de AUTH-010 no dice
+// que se reintente. Un 401 llega hasta acá solo si el servidor rechaza también el token renovado.
+const CHANGE_PASSWORD_ERROR_MESSAGES: Record<string, string> = {
   'AUTH-007': 'Tu sesión venció. Cierra sesión y vuelve a ingresar.',
   'AUTH-008': 'Tu sesión no es válida. Cierra sesión y vuelve a ingresar.',
+  'AUTH-002': 'Tu cuenta ya no puede ingresar al sistema. Cierra sesión y consulta con quien administra las cuentas.',
+  'AUTH-010': 'Tu cuenta se está modificando en este momento. Intenta de nuevo en unos segundos.',
 }
 
 export function ChangePasswordPage() {
@@ -39,8 +42,8 @@ export function ChangePasswordPage() {
   // Cambiar contraseña es la única pantalla accesible para TODOS los roles: al
   // salir (éxito o cancelar), cada rol vuelve a SU lugar de trabajo. Sin esto,
   // los que no trabajan en cotizaciones caían en la vista "Sin acceso".
-  const goToLanding = () => {
-    navigate(landingPathFor(user?.role), { replace: true })
+  const goToLanding = (role = user?.role) => {
+    navigate(landingPathFor(role), { replace: true })
   }
 
   const {
@@ -60,7 +63,7 @@ export function ChangePasswordPage() {
 
   const onSubmit = handleSubmit(async (values) => {
     try {
-      await withMinDuration(
+      const session = await withMinDuration(
         mutation.mutateAsync({
           currentPassword: values.currentPassword,
           newPassword: values.newPassword,
@@ -68,14 +71,15 @@ export function ChangePasswordPage() {
         MIN_LOADER_MS,
       )
       toast.success('Contraseña actualizada')
-      goToLanding()
+      // El cargo de la respuesta es el de ahora; el de la sesión puede ser de cuando entró.
+      goToLanding(session?.user.role)
     } catch (error) {
       handleApiFormError(error, {
         setError,
         fallbackMessage: 'No se pudo cambiar la contraseña. Verifica tu conexión e intenta de nuevo.',
         allowedFields: CHANGE_PASSWORD_FIELDS,
         codeFieldMap: { 'AUTH-004': 'currentPassword' },
-        codeMessages: SESSION_ERROR_MESSAGES,
+        codeMessages: CHANGE_PASSWORD_ERROR_MESSAGES,
       })
     }
   })
@@ -131,7 +135,7 @@ export function ChangePasswordPage() {
           <div className="flex items-center justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={goToLanding}
+              onClick={() => goToLanding()}
               disabled={isPending}
               className="px-4 py-2.5 text-sm font-medium text-fg-body rounded-lg hover:bg-surface-muted focus:outline-none focus:ring-2 focus:ring-focus focus:ring-offset-2 focus:ring-offset-surface transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
