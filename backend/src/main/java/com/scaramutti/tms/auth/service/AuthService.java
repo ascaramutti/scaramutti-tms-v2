@@ -11,7 +11,9 @@ import com.scaramutti.tms.auth.service.cmd.ChangePasswordCommand;
 import com.scaramutti.tms.auth.service.cmd.LoginCommand;
 import com.scaramutti.tms.auth.service.cmd.RefreshCommand;
 import com.scaramutti.tms.shared.entity.User;
+import com.scaramutti.tms.shared.entity.UserAuditLog;
 import com.scaramutti.tms.shared.exception.ApiError;
+import com.scaramutti.tms.shared.repository.UserAuditLogRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import io.smallrye.jwt.auth.principal.JWTParser;
 import io.smallrye.jwt.auth.principal.ParseException;
@@ -30,6 +32,7 @@ public class AuthService {
     private static final Logger LOG = Logger.getLogger(AuthService.class);
 
     @Inject UserRepository userRepository;
+    @Inject UserAuditLogRepository userAuditLogRepository;
     @Inject PasswordService passwordService;
     @Inject TokenService tokenService;
     @Inject JWTParser jwtParser;
@@ -140,8 +143,11 @@ public class AuthService {
         // Subir la version corta los refresh emitidos antes; la sesion de la respuesta lleva la nueva.
         user.passwordHash = newHash;
         user.sessionVersion = user.sessionVersion + 1;
+        // Lo firma la propia cuenta, y su fila del rastro dice quien y cuando, sin la clave.
+        user.markChangedBy(user.id);
         userRepository.persist(user);
-        ownAccountRowLock.flushTranslatingConflicts(user.id);
+        ownAccountRowLock.flushTranslatingConflicts(user.id,
+            () -> userAuditLogRepository.persist(UserAuditLog.ownPasswordChange(user.id)));
         LOG.infof("Password actualizada [username=%s, id=%d]", user.username, user.id);
         return buildLoginResponse(user);
     }

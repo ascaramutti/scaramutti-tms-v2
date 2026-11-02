@@ -60,20 +60,21 @@ class OwnAccountRowLockTest {
     }
 
     /**
-     * Seis: la tabla al tomar la fila (con EXCLUSIVE), la fila con cola (dos), trabajador y cargo al
-     * leer, la tabla en el UPDATE. La lectura del hash, antes, no tiene tope.
+     * Ocho: la tabla al tomar la fila (con EXCLUSIVE), la fila con cola (dos), trabajador y cargo al
+     * leer, la tabla y la secuencia del rastro en su INSERT y la de cuentas en el UPDATE. La lectura del
+     * hash, antes, no tiene tope.
      */
     @Test
     void theBudget_countsTheTableAndRowWaitsOfTheChange() {
-        assertEquals(6, OwnAccountRowLock.MAX_LOCK_WAITS_PER_TRANSACTION);
+        assertEquals(8, OwnAccountRowLock.MAX_LOCK_WAITS_PER_TRANSACTION);
     }
 
-    /** El presupuesto es el del cambio propio: 834 x 6 pasa los 5s del pool y no entra; 833, si. */
+    /** El presupuesto es el del cambio propio: 625 x 8 llega a los 5s del pool y no entra; 624, si. */
     @Test
     void requireUsableLockTimeout_multipliesByItsOwnBudget() {
         assertThrows(IllegalStateException.class,
-            () -> lockWith(834, Duration.ofSeconds(5)).requireUsableLockTimeout());
-        assertEquals(833, lockWith(833, Duration.ofSeconds(5)).requireUsableLockTimeout());
+            () -> lockWith(625, Duration.ofSeconds(5)).requireUsableLockTimeout());
+        assertEquals(624, lockWith(624, Duration.ofSeconds(5)).requireUsableLockTimeout());
     }
 
     @Test
@@ -124,9 +125,23 @@ class OwnAccountRowLockTest {
         Mockito.doThrow(new PersistenceException(new SQLException("canceling statement due to lock timeout", "55P03")))
             .when(lock.entityManager).flush();
 
-        ApiException thrown = assertThrows(ApiException.class, () -> lock.flushTranslatingConflicts(7));
+        ApiException thrown = assertThrows(ApiException.class, () -> lock.flushTranslatingConflicts(7, () -> { }));
 
         assertEquals("AUTH-010", thrown.code());
+    }
+
+    /** El INSERT del rastro sale al persistirlo, antes de la descarga: su choque tambien se traduce. */
+    @Test
+    void flushTranslatingConflicts_translatesALockTimeoutOfTheInserts() {
+        OwnAccountRowLock lock = lockWith(380, Duration.ofSeconds(5));
+        lock.entityManager = Mockito.mock(EntityManager.class);
+
+        ApiException thrown = assertThrows(ApiException.class, () -> lock.flushTranslatingConflicts(7, () -> {
+            throw new PersistenceException(new SQLException("canceling statement due to lock timeout", "55P03"));
+        }));
+
+        assertEquals("AUTH-010", thrown.code());
+        Mockito.verify(lock.entityManager, Mockito.never()).flush();
     }
 
     @Test
