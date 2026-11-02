@@ -41,10 +41,10 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     /**
      * El nombre completo en SQL, con la regla de {@link Worker#fullName()}. Es un metodo y no un
      * literal repetido porque lo componen los conductores, los viajes y su reporte, la asignacion
-     * de recursos, el kardex y el detalle (tres veces, de ahi el alias): dos formas de armarlo harian
-     * que la misma persona se llame distinto segun por donde se la mire. Los nombres van con
-     * {@code ||} y fuera del {@code concat_ws}: sin fila de trabajador (un LEFT JOIN que no
-     * encontro) da nulo, y el reporte de viajes rechaza esa fila por el nulo.
+     * de recursos, el kardex, el detalle (tres veces, de ahi el alias) y la lista de cuentas: dos
+     * formas de armarlo harian que la misma persona se llame distinto segun por donde se la mire. Los
+     * nombres van con {@code ||} y fuera del {@code concat_ws}: sin fila de trabajador (un LEFT JOIN
+     * que no encontro) da nulo, y el reporte de viajes rechaza esa fila por el nulo.
      */
     public static String fullNameExpression(String workersAlias) {
         return "trim(" + workersAlias + ".first_name || ' ' || concat_ws(' ', "

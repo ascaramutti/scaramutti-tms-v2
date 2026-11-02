@@ -1358,6 +1358,32 @@ export type WarehouseReportResponse = {
 };
 
 /**
+ * El trabajador de una cuenta. Toda cuenta tiene uno, y un trabajador
+ * tiene a lo sumo una cuenta. `fullName` une nombres, paterno y materno
+ * con un espacio, sin el materno si es nulo, y recorta los espacios de
+ * los extremos.
+ *
+ */
+export type UserAccountWorkerRef = {
+    id: number;
+    fullName: string;
+    isActive: boolean;
+};
+
+/**
+ * Una fila de la lista de cuentas. `role` es el cargo del trabajador (la
+ * cuenta no tiene rol propio), con la forma del catálogo de cargos.
+ *
+ */
+export type UserAccountSummaryResponse = {
+    id: number;
+    username: string;
+    worker: UserAccountWorkerRef;
+    role: RoleResponse;
+    isActive: boolean;
+};
+
+/**
  * Ciclo de vida del servicio:
  * `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`;
  * `CANCELLED` desde cualquiera de los tres no terminales; `DELETED` solo desde
@@ -4031,6 +4057,40 @@ export type ListDriversResponses = {
 };
 
 export type ListDriversResponse = ListDriversResponses[keyof ListDriversResponses];
+
+export type ListUserAccountsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Activas (`true`), inactivas (`false`) o todas (sin el parámetro).
+         */
+        isActive?: boolean;
+    };
+    url: '/users';
+};
+
+export type ListUserAccountsErrors = {
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListUserAccountsError = ListUserAccountsErrors[keyof ListUserAccountsErrors];
+
+export type ListUserAccountsResponses = {
+    /**
+     * Cuentas
+     */
+    200: Array<UserAccountSummaryResponse>;
+};
+
+export type ListUserAccountsResponse = ListUserAccountsResponses[keyof ListUserAccountsResponses];
 
 export type ListServicesData = {
     body?: never;

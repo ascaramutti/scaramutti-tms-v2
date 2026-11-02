@@ -267,6 +267,54 @@ class PublishedContractTest {
     }
 
     /**
+     * La lista de cuentas: quién la lee, sus respuestas de error, las cabeceras de caché y las claves
+     * exactas de cada fila (sin hash, sin versión de las sesiones y sin bloqueo). El documento servido es
+     * este archivo y no el código: esto fija lo que declara; que el recurso exista lo miden
+     * {@code CodeLayerAuthGuardTest} y {@code UserAccountsResourceTest}.
+     */
+    @Test
+    void publishedContract_declaresWhoReadsTheAccountsAndWhatEachRowBrings() {
+        JsonPath contract = publishedContract();
+        String list = "paths.'/users'.get.";
+        assertEquals("listUserAccounts", contract.getString(list + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(list + "'x-required-roles'"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(list + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(list + "responses.'403'.$ref"));
+        String headers = list + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertEquals("array", contract.getString(list + "responses.'200'.content.'application/json'.schema.type"));
+        assertThat(contract.getString(list + "responses.'200'.content.'application/json'.schema.items.$ref"),
+            endsWith("/UserAccountSummaryResponse"));
+        // El filtro, tal como lo toma el cliente generado: un booleano opcional en la consulta.
+        assertEquals(List.of("isActive"), contract.getList(list + "parameters.name"));
+        assertEquals("query", contract.getString(list + "parameters[0].in"));
+        assertEquals("boolean", contract.getString(list + "parameters[0].schema.type"));
+        assertThat(contract.get(list + "parameters[0].required"), nullValue());
+
+        // Lo que el cliente generado tipa como obligatorio, y con qué tipo.
+        String row = "components.schemas.UserAccountSummaryResponse.";
+        assertEquals(Set.of("id", "username", "worker", "role", "isActive"),
+            contract.getMap(row + "properties").keySet());
+        assertEquals(List.of("id", "username", "worker", "role", "isActive"), contract.getList(row + "required"));
+        assertThat(contract.getString(row + "properties.worker.$ref"), endsWith("/UserAccountWorkerRef"));
+        assertThat(contract.getString(row + "properties.role.$ref"), endsWith("/RoleResponse"));
+        assertEquals("integer|int32", contract.getString(row + "properties.id.type") + "|"
+            + contract.getString(row + "properties.id.format"));
+        assertEquals("string", contract.getString(row + "properties.username.type"));
+        assertEquals("boolean", contract.getString(row + "properties.isActive.type"));
+        String worker = "components.schemas.UserAccountWorkerRef.";
+        assertEquals(Set.of("id", "fullName", "isActive"), contract.getMap(worker + "properties").keySet());
+        assertEquals(List.of("id", "fullName", "isActive"), contract.getList(worker + "required"));
+        assertEquals("integer|int32", contract.getString(worker + "properties.id.type") + "|"
+            + contract.getString(worker + "properties.id.format"));
+        assertEquals("string", contract.getString(worker + "properties.fullName.type"));
+        assertEquals("boolean", contract.getString(worker + "properties.isActive.type"));
+    }
+
+    /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
      * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.
