@@ -69,6 +69,7 @@ class CodeLayerAuthGuardTest {
         "/workers",
         "/document-types",
         "/roles",
+        "/users",
         "/auth/me",
     })
     void withoutToken_andWithoutTheRoutePolicy_returns401(String path) {
@@ -117,6 +118,7 @@ class CodeLayerAuthGuardTest {
         "/workers",
         "/document-types",
         "/roles",
+        "/users",
         "/auth/me",
     })
     void withAValidToken_theGuardLetsThrough(String path) {
@@ -196,6 +198,7 @@ class CodeLayerAuthGuardTest {
         "/workers",
         "/document-types",
         "/roles",
+        "/users",
         "/auth/me",
     })
     void withTrickyUrls_andWithoutTheRoutePolicy_returns401(String path) {

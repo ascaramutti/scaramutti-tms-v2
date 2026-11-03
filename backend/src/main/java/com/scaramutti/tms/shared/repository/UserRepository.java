@@ -4,13 +4,17 @@ import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.User_;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.persistence.Query;
+import jakarta.persistence.Tuple;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 /**
- * Repository de usuarios. Vive en `shared` porque otros modulos lo usaran
- * (created_by, updated_by, audits, etc.). Auth lo consume para login.
+ * Las cuentas de {@code public.users}. Vive en {@code shared} porque las leen y escriben varios
+ * modulos: auth (la sesion y los autores que embeben las demas respuestas), trabajadores (en sus
+ * escrituras, la cuenta de quien escribe y la del trabajador que cambia) y usuarios (su lista).
  */
 @ApplicationScoped
 public class UserRepository implements PanacheRepositoryBase<User, Integer> {
@@ -73,4 +77,63 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
             .getSingleResult() > 0;
     }
 
+    /**
+     * Las cuentas con su trabajador y su cargo, en una consulta que no lee el hash ni la version de
+     * las sesiones. El nombre completo sale de {@link WorkerRepository#fullNameExpression}, la misma
+     * composicion que el detalle del trabajador. {@code isActive} nulo = todas.
+     */
+    public List<UserAccountRow> listAccounts(Boolean isActive) {
+        String sql = "SELECT u.id AS u_id, u.username AS u_username, u.is_active AS u_is_active, "
+            + "w.id AS w_id, " + WorkerRepository.fullNameExpression("w") + " AS w_full_name, "
+            + "w.is_active AS w_is_active, "
+            + "r.name AS role_name, r.description AS role_description, r.level AS role_level, "
+            + "r.can_login AS role_can_login, r.driver_profile AS role_driver_profile "
+            + "FROM public.users u "
+            + "JOIN public.workers w ON w.id = u.worker_id "
+            + "JOIN public.roles r ON r.id = w.role_id "
+            + (isActive == null ? "" : "WHERE u.is_active = :isActive ")
+            + "ORDER BY u.username, u.id";
+
+        Query query = getEntityManager().createNativeQuery(sql, Tuple.class);
+        if (isActive != null) {
+            query.setParameter("isActive", isActive);
+        }
+
+        @SuppressWarnings("unchecked")
+        List<Tuple> rows = query.getResultList();
+        return rows.stream().map(UserRepository::toUserAccountRow).toList();
+    }
+
+    private static UserAccountRow toUserAccountRow(Tuple row) {
+        return new UserAccountRow(
+            intOf(row, "u_id"),
+            (String) row.get("u_username"),
+            new UserAccountWorkerRow(
+                intOf(row, "w_id"),
+                (String) row.get("w_full_name"),
+                (Boolean) row.get("w_is_active")),
+            new UserAccountRoleRow(
+                (String) row.get("role_name"),
+                (String) row.get("role_description"),
+                intOf(row, "role_level"),
+                (Boolean) row.get("role_can_login"),
+                (String) row.get("role_driver_profile")),
+            (Boolean) row.get("u_is_active"));
+    }
+
+    /** Postgres devuelve los enteros con anchos distintos segun la columna; se normalizan aca. */
+    private static Integer intOf(Tuple row, String alias) {
+        Object value = row.get(alias);
+        return value == null ? null : ((Number) value).intValue();
+    }
+
+    /** Una fila de la lista, tal como sale de la consulta. */
+    public record UserAccountRow(
+        Integer id, String username, UserAccountWorkerRow worker, UserAccountRoleRow role, Boolean isActive) {}
+
+    public record UserAccountWorkerRow(Integer id, String fullName, Boolean isActive) {}
+
+    /** {@code driverProfile} es el texto crudo de la columna, que la respuesta lleva tal cual. */
+    public record UserAccountRoleRow(
+        String name, String description, Integer level, Boolean canLogin, String driverProfile) {}
 }

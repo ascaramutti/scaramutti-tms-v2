@@ -85,6 +85,8 @@ tags:
     description: Catálogos compartidos de `public` (el listado de trabajadores, la flota unificada y los conductores); sin prefijo de módulo porque los usan Almacén y Operaciones
   - name: Workers
     description: Trabajadores — el padrón. Hoy trae el alta de un trabajador, su edición, su detalle y sus catálogos (tipos de documento y roles); el cambio de estado llega con la historia siguiente
+  - name: Users
+    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una
 
 # =============================================================================
 paths:
@@ -1981,6 +1983,47 @@ paths:
                 type: array
                 items: { $ref: '#/components/schemas/DriverResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ----- Users ----------------------------------------------------------------
+
+  /users:
+    get:
+      tags: [Users]
+      operationId: listUserAccounts
+      summary: Listar las cuentas del sistema
+      description: |
+        Todas las cuentas, sin texto de búsqueda (son decenas), con su
+        trabajador, su cargo (el del trabajador) y su estado. `isActive=true`
+        trae las activas; `false`, las inactivas; sin el parámetro, todas.
+        Orden: nombre de usuario y, a igualdad, `id`. Sin paginar.
+
+        Lectura plana para los cuatro cargos que administran cuentas: cada uno
+        ve todas, también las de cargos por encima del suyo. Se decide por el
+        cargo del token. La respuesta no trae el hash ni la versión de las
+        sesiones.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      parameters:
+        - name: isActive
+          in: query
+          description: Activas (`true`), inactivas (`false`) o todas (sin el parámetro).
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Cuentas
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserAccountSummaryResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
@@ -5154,6 +5197,33 @@ components:
             - $ref: '#/components/schemas/WorkerDriverProfileResponse'
             - type: 'null'
         hasUser:        { type: boolean }
+
+    # -------- Users: cuentas ---------------------------------------------------
+    UserAccountWorkerRef:
+      type: object
+      description: |
+        El trabajador de una cuenta. Toda cuenta tiene uno, y un trabajador
+        tiene a lo sumo una cuenta. `fullName` une nombres, paterno y materno
+        con un espacio, sin el materno si es nulo, y recorta los espacios de
+        los extremos.
+      required: [id, fullName, isActive]
+      properties:
+        id:       { type: integer, format: int32, example: 31 }
+        fullName: { type: string, example: 'Juan Pérez Quispe' }
+        isActive: { type: boolean, example: true }
+
+    UserAccountSummaryResponse:
+      type: object
+      description: |
+        Una fila de la lista de cuentas. `role` es el cargo del trabajador (la
+        cuenta no tiene rol propio), con la forma del catálogo de cargos.
+      required: [id, username, worker, role, isActive]
+      properties:
+        id:       { type: integer, format: int32, example: 12 }
+        username: { type: string, maxLength: 50, example: 'jperez' }
+        worker:   { $ref: '#/components/schemas/UserAccountWorkerRef' }
+        role:     { $ref: '#/components/schemas/RoleResponse' }
+        isActive: { type: boolean, example: true }
 
     # -------- Warehouse: catálogos del módulo ----------------------------------
     WarehouseProductCategoryResponse:
