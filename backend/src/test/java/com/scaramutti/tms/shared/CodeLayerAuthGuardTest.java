@@ -215,6 +215,7 @@ class CodeLayerAuthGuardTest {
     @ValueSource(strings = {
         "/workers/1",
         "/clients/1",
+        "/users/1",
     })
     void withTrickyUrls_onPathsWithId_withoutToken_returns401(String path) {
         RoutePolicyTrickyUrls.assertReachingVariantsReturn401WithoutToken(path);
