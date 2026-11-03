@@ -1,6 +1,7 @@
 package com.scaramutti.tms.users.api;
 
 import com.scaramutti.tms.shared.util.CacheHeaders;
+import com.scaramutti.tms.users.dto.UserAccountDetailResponse;
 import com.scaramutti.tms.users.dto.UserAccountSummaryResponse;
 import com.scaramutti.tms.users.service.UserAccountService;
 import io.quarkus.security.Authenticated;
@@ -8,6 +9,7 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
@@ -36,5 +38,17 @@ public class UserAccountResource {
     public RestResponse<List<UserAccountSummaryResponse>> listUserAccounts(@QueryParam("isActive") Boolean isActive) {
         // Quien tiene acceso al sistema es el padron de accesos: ninguna cache lo guarda.
         return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.listUserAccounts(isActive)));
+    }
+
+    /**
+     * Una cuenta, activa o inactiva, con la misma lectura plana que la lista. El cargo se decide antes
+     * que el id: un cargo sin acceso recibe el 403 tambien con un id que no existe o no es un entero.
+     */
+    @GET
+    @Path("/{id}")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public RestResponse<UserAccountDetailResponse> getUserAccount(@PathParam("id") Integer id) {
+        // Ademas del padron, trae quien creo y modifico la cuenta: ninguna cache lo guarda.
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.getUserAccount(id)));
     }
 }

@@ -55,7 +55,7 @@ tags:
   - name: Workers
     description: Trabajadores — el padrón. Hoy trae el alta de un trabajador, su edición, su detalle y sus catálogos (tipos de documento y roles); el cambio de estado llega con la historia siguiente
   - name: Users
-    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una
+    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, y el detalle de una cuenta, con quién la creó y la modificó
 
 # =============================================================================
 paths:
@@ -2580,6 +2580,50 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      tags: [Users]
+      operationId: getUserAccount
+      summary: Obtener una cuenta del sistema
+      description: |
+        La cuenta con ese `id`, activa o inactiva: lo de la lista más el nombre
+        del trabajador en partes (nombres, paterno y materno, este nulo si no
+        tiene), y quién la creó y la modificó por última vez y cuándo.
+        `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
+        `updatedBy` es nulo hasta el primer cambio que deja rastro. Hoy dejan
+        rastro el cambio propio de contraseña, que firma la propia cuenta, y la
+        baja de su trabajador desde Trabajadores cuando apaga la cuenta, que
+        firma quien la da. La respuesta no trae el hash ni la versión de las
+        sesiones.
+
+        Lectura plana para los cuatro cargos que administran cuentas, por el
+        cargo del token; el resto → `403 COM-003`, también con un `id` que no
+        existe o que no encaja en un entero.
+
+        `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+        cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+        sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+        recurso.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   # ----- Operations: servicios de transporte (schema operaciones) -------------
   /services:
     get:
@@ -3764,6 +3808,16 @@ components:
                 instance: '/api/v1/workers/999'
                 code: 'WRK-001'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            userAccountNotFound:
+              summary: Cuenta inexistente
+              value:
+                type: 'urn:tms:error:usr-001'
+                title: 'Not Found'
+                status: 404
+                detail: 'Cuenta no encontrada'
+                instance: '/api/v1/users/999'
+                code: 'USR-001'
+                traceId: '4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d'
             serviceNotFound:
               summary: Servicio de transporte inexistente
               value:
@@ -5305,6 +5359,47 @@ components:
         worker:   { $ref: '#/components/schemas/UserAccountWorkerRef' }
         role:     { $ref: '#/components/schemas/RoleResponse' }
         isActive: { type: boolean, example: true }
+
+    UserAccountWorkerDetailRef:
+      description: |
+        El trabajador de una cuenta, en el detalle: lo de UserAccountWorkerRef
+        más su nombre en partes. `maternalLastName` es nulo si el trabajador no
+        tiene materno.
+      allOf:
+        - $ref: '#/components/schemas/UserAccountWorkerRef'
+        - type: object
+          required: [firstName, paternalLastName, maternalLastName]
+          properties:
+            firstName:        { type: string, example: 'Juan' }
+            paternalLastName: { type: string, example: 'Pérez' }
+            maternalLastName: { type: [string, 'null'], example: 'Quispe' }
+
+    UserAccountDetailResponse:
+      type: object
+      description: |
+        Una cuenta completa: lo de la fila de la lista, el trabajador con su
+        nombre en partes y quién la creó y la modificó por última vez.
+        `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
+        `updatedBy` es nulo hasta el primer cambio que deja rastro. Instantes
+        en UTC.
+        Sin hash ni versión de las sesiones.
+      required: [id, username, worker, role, isActive, createdAt, createdBy, updatedAt, updatedBy]
+      properties:
+        id:        { type: integer, format: int32, example: 12 }
+        username:  { type: string, maxLength: 50, example: 'jperez' }
+        worker:    { $ref: '#/components/schemas/UserAccountWorkerDetailRef' }
+        role:      { $ref: '#/components/schemas/RoleResponse' }
+        isActive:  { type: boolean, example: true }
+        createdAt: { type: string, format: date-time, example: '2026-11-03T14:20:00Z' }
+        createdBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        updatedAt: { type: string, format: date-time, example: '2026-11-03T14:20:00Z' }
+        updatedBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
 
     # -------- Operations: servicios de transporte ------------------------------
     ServiceStatus:

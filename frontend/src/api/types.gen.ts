@@ -1384,6 +1384,39 @@ export type UserAccountSummaryResponse = {
 };
 
 /**
+ * El trabajador de una cuenta, en el detalle: lo de UserAccountWorkerRef
+ * más su nombre en partes. `maternalLastName` es nulo si el trabajador no
+ * tiene materno.
+ *
+ */
+export type UserAccountWorkerDetailRef = UserAccountWorkerRef & {
+    firstName: string;
+    paternalLastName: string;
+    maternalLastName: string | null;
+};
+
+/**
+ * Una cuenta completa: lo de la fila de la lista, el trabajador con su
+ * nombre en partes y quién la creó y la modificó por última vez.
+ * `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
+ * `updatedBy` es nulo hasta el primer cambio que deja rastro. Instantes
+ * en UTC.
+ * Sin hash ni versión de las sesiones.
+ *
+ */
+export type UserAccountDetailResponse = {
+    id: number;
+    username: string;
+    worker: UserAccountWorkerDetailRef;
+    role: RoleResponse;
+    isActive: boolean;
+    createdAt: string;
+    createdBy: UserRef | null;
+    updatedAt: string;
+    updatedBy: UserRef | null;
+};
+
+/**
  * Ciclo de vida del servicio:
  * `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`;
  * `CANCELLED` desde cualquiera de los tres no terminales; `DELETED` solo desde
@@ -4091,6 +4124,41 @@ export type ListUserAccountsResponses = {
 };
 
 export type ListUserAccountsResponse = ListUserAccountsResponses[keyof ListUserAccountsResponses];
+
+export type GetUserAccountData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/users/{id}';
+};
+
+export type GetUserAccountErrors = {
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetUserAccountError = GetUserAccountErrors[keyof GetUserAccountErrors];
+
+export type GetUserAccountResponses = {
+    /**
+     * OK
+     */
+    200: UserAccountDetailResponse;
+};
+
+export type GetUserAccountResponse = GetUserAccountResponses[keyof GetUserAccountResponses];
 
 export type ListServicesData = {
     body?: never;

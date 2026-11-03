@@ -315,6 +315,65 @@ class PublishedContractTest {
     }
 
     /**
+     * El detalle de una cuenta: quién lo lee, sus respuestas de error con el ejemplo de {@code USR-001},
+     * las cabeceras de caché y las claves exactas, con los autores obligatorios y anulables. El
+     * trabajador del detalle suma las partes del nombre sin redefinir el nombre completo de la lista.
+     */
+    @Test
+    void publishedContract_declaresWhoReadsAnAccountAndWhatItBrings() {
+        JsonPath contract = publishedContract();
+        String get = "paths.'/users/{id}'.get.";
+        assertEquals("getUserAccount", contract.getString(get + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(get + "'x-required-roles'"));
+        assertEquals(List.of("id"), contract.getList("paths.'/users/{id}'.parameters.name"));
+        assertEquals("path|integer", contract.getString("paths.'/users/{id}'.parameters[0].in") + "|"
+            + contract.getString("paths.'/users/{id}'.parameters[0].schema.type"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(get + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(get + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/NotFound", contract.getString(get + "responses.'404'.$ref"));
+        assertEquals("USR-001", contract.getString("components.responses.NotFound.content."
+            + "'application/problem+json'.examples.userAccountNotFound.value.code"));
+        String headers = get + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(get + "responses.'200'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountDetailResponse"));
+
+        // Lo que el cliente generado tipa como obligatorio, y con qué tipo.
+        String detail = "components.schemas.UserAccountDetailResponse.";
+        List<String> keys = List.of(
+            "id", "username", "worker", "role", "isActive", "createdAt", "createdBy", "updatedAt", "updatedBy");
+        assertEquals(Set.copyOf(keys), contract.getMap(detail + "properties").keySet());
+        assertEquals(keys, contract.getList(detail + "required"));
+        assertThat(contract.getString(detail + "properties.worker.$ref"), endsWith("/UserAccountWorkerDetailRef"));
+        assertThat(contract.getString(detail + "properties.role.$ref"), endsWith("/RoleResponse"));
+        assertEquals("integer|int32", contract.getString(detail + "properties.id.type") + "|"
+            + contract.getString(detail + "properties.id.format"));
+        assertEquals("string", contract.getString(detail + "properties.username.type"));
+        assertEquals("boolean", contract.getString(detail + "properties.isActive.type"));
+        for (String author : List.of("createdBy", "updatedBy")) {
+            assertThat(author, contract.getString(detail + "properties." + author + ".anyOf[0].$ref"),
+                endsWith("/UserRef"));
+            assertEquals("null", contract.getString(detail + "properties." + author + ".anyOf[1].type"), author);
+        }
+        for (String instant : List.of("createdAt", "updatedAt")) {
+            assertEquals("string|date-time", contract.getString(detail + "properties." + instant + ".type") + "|"
+                + contract.getString(detail + "properties." + instant + ".format"), instant);
+        }
+        String worker = "components.schemas.UserAccountWorkerDetailRef.";
+        assertThat(contract.getString(worker + "allOf[0].$ref"), endsWith("/UserAccountWorkerRef"));
+        assertEquals(Set.of("firstName", "paternalLastName", "maternalLastName"),
+            contract.getMap(worker + "allOf[1].properties").keySet());
+        assertEquals(List.of("firstName", "paternalLastName", "maternalLastName"),
+            contract.getList(worker + "allOf[1].required"));
+        assertEquals("string", contract.getString(worker + "allOf[1].properties.firstName.type"));
+        assertEquals("string", contract.getString(worker + "allOf[1].properties.paternalLastName.type"));
+        assertEquals(List.of("string", "null"), contract.getList(worker + "allOf[1].properties.maternalLastName.type"));
+    }
+
+    /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
      * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.

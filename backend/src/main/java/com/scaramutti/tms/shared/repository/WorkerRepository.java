@@ -61,6 +61,17 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
+     * Las tres partes del nombre tal como estan, sin componer, con los alias {@code <prefijo>_first_name},
+     * {@code <prefijo>_paternal_last_name} y {@code <prefijo>_maternal_last_name}: quien las muestra fuera
+     * de este archivo las pide aca, y fuera de el y de la entidad nadie nombra las columnas del nombre.
+     */
+    public static String namePartsColumns(String workersAlias, String aliasPrefix) {
+        return workersAlias + ".first_name AS " + aliasPrefix + "_first_name, "
+            + workersAlias + ".paternal_last_name AS " + aliasPrefix + "_paternal_last_name, "
+            + workersAlias + ".maternal_last_name AS " + aliasPrefix + "_maternal_last_name";
+    }
+
+    /**
      * Las columnas que mapea {@link Worker}, nombradas: un {@code w.*} traeria tambien la de antes
      * del apellido, y el dia que se borre, el plan preparado de esa consulta cambiaria de forma.
      */
