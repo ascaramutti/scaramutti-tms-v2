@@ -5,6 +5,7 @@ import {
   QUOTATION_ROLES,
   SERVICES_REPORT_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
+  USER_ACCOUNT_ADMIN_ROLES,
   WAREHOUSE_ROLES,
   WORKER_MAINTENANCE_ROLES,
 } from './moduleRoles'
@@ -128,5 +129,20 @@ describe('WORKER_MAINTENANCE_ROLES', () => {
       'general_manager',
       'operations_manager',
     ])
+  })
+})
+
+describe('USER_ACCOUNT_ADMIN_ROLES', () => {
+  it('son los cuatro que administran las cuentas', () => {
+    expect([...USER_ACCOUNT_ADMIN_ROLES].sort()).toEqual([
+      'admin',
+      'finance_manager',
+      'general_manager',
+      'operations_manager',
+    ])
+  })
+
+  it('no es la lista del padrón, aunque hoy coincidan', () => {
+    expect(USER_ACCOUNT_ADMIN_ROLES).not.toBe(WORKER_MAINTENANCE_ROLES)
   })
 })

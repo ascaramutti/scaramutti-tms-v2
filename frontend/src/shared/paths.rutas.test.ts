@@ -30,6 +30,7 @@ const RUTAS = [
   '/trabajadores/nuevo',
   '/trabajadores/:id',
   '/trabajadores/:id/editar',
+  '/usuarios',
   '/almacen',
   '/almacen/entradas/nueva',
   '/almacen/entradas',

@@ -145,3 +145,10 @@ export const WORKER_MAINTENANCE_ROLES: UserRole[] = [
   'operations_manager',
   'finance_manager',
 ]
+
+export const USER_ACCOUNT_ADMIN_ROLES: UserRole[] = [
+  'admin',
+  'general_manager',
+  'operations_manager',
+  'finance_manager',
+]
