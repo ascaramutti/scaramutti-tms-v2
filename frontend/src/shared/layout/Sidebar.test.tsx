@@ -3,6 +3,7 @@ import {
   CLIENTS_BASE,
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
+  USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
 } from '../../shared/paths'
@@ -387,9 +388,8 @@ describe('Sidebar - maestro de clientes', () => {
 
   /**
    * El maestro de clientes dejó el grupo Comercial: es transversal a cotizaciones
-   * y a operaciones, y ahí va a vivir también el maestro de usuarios. Se afirma
-   * el grupo y no solo el ítem, porque mover el ítem de grupo no rompe ninguna
-   * aserción de visibilidad.
+   * y a operaciones. Se afirma el grupo y no solo el ítem, porque mover el ítem de
+   * grupo no rompe ninguna aserción de visibilidad.
    */
   it('Clientes vive en el grupo Administración y no en Comercial', async () => {
     renderSidebarAs('admin')
@@ -455,17 +455,14 @@ describe('Sidebar - padrón de trabajadores', () => {
     },
   )
 
-  /**
-   * Se afirma la lista entera del grupo y no solo el ítem: finanzas no ve
-   * Clientes, así que Trabajadores es lo único que le abre Administración.
-   */
-  it('finance_manager ve Administración solo con Trabajadores', async () => {
+  /** Se afirma la lista entera del grupo y no solo el ítem: finanzas no ve Clientes. */
+  it('finance_manager ve Administración con Trabajadores y Usuarios, sin Clientes', async () => {
     renderSidebarAs('finance_manager')
     await esperarLaSesion('finance_manager')
 
     const grupo = screen.getByRole('list', { name: /^administración$/i })
     const enlaces = within(grupo).getAllByRole('link').map((enlace) => enlace.textContent)
-    expect(enlaces).toEqual(['Trabajadores'])
+    expect(enlaces).toEqual(['Trabajadores', 'Usuarios'])
   })
 
   it('warehouse_keeper no ve el grupo Administración', async () => {
@@ -474,13 +471,13 @@ describe('Sidebar - padrón de trabajadores', () => {
     expect(screen.queryByText(/^administración$/i)).not.toBeInTheDocument()
   })
 
-  it('Trabajadores va después de Clientes, en el mismo grupo', async () => {
+  it('Clientes, Trabajadores y Usuarios van en ese orden, en el mismo grupo', async () => {
     renderSidebarAs('admin')
     await esperarLaSesion('admin')
 
     const grupo = screen.getByRole('list', { name: /^administración$/i })
     const enlaces = within(grupo).getAllByRole('link').map((enlace) => enlace.textContent)
-    expect(enlaces).toEqual(['Clientes', 'Trabajadores'])
+    expect(enlaces).toEqual(['Clientes', 'Trabajadores', 'Usuarios'])
   })
 
   it('estando en la búsqueda, Trabajadores queda marcado como la página actual', async () => {
@@ -510,5 +507,54 @@ describe('Sidebar - padrón de trabajadores', () => {
     const enlace = screen.getByRole('link', { name: /^trabajadores$/i })
     expect(enlace.querySelector('svg.lucide-id-card')).not.toBeNull()
     expect(enlace.querySelector('svg.lucide-users')).toBeNull()
+  })
+})
+
+describe('Sidebar - Usuarios', () => {
+  beforeEach(() => {
+    tokenStorage.clear()
+  })
+
+  async function esperarLaSesion(role: UserRole) {
+    await waitFor(() => {
+      expect(screen.getByText(new RegExp(`usuario ${role}`, 'i'))).toBeInTheDocument()
+    })
+  }
+
+  it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+    '%s ve Usuarios como enlace a la lista',
+    async (role) => {
+      renderSidebarAs(role)
+      await esperarLaSesion(role)
+      expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('href', USERS_BASE)
+    },
+  )
+
+  it.each(['warehouse_keeper', 'sales', 'dispatcher'] as const)('%s no ve Usuarios', async (role) => {
+    renderSidebarAs(role)
+    await esperarLaSesion(role)
+    expect(screen.queryByRole('link', { name: /^usuarios$/i })).not.toBeInTheDocument()
+  })
+
+  it('estando en la lista, Usuarios queda marcado y Trabajadores no', async () => {
+    renderSidebarAs('admin', USERS_BASE)
+    await esperarLaSesion('admin')
+    expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: /^trabajadores$/i })).not.toHaveAttribute('aria-current')
+  })
+
+  it('debajo de la lista, Usuarios sigue marcado', async () => {
+    renderSidebarAs('admin', `${USERS_BASE}/7`)
+    await esperarLaSesion('admin')
+    expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('Usuarios lleva su propio ícono, distinto de Clientes y de Trabajadores', async () => {
+    renderSidebarAs('admin')
+    await esperarLaSesion('admin')
+    const enlace = screen.getByRole('link', { name: /^usuarios$/i })
+    expect(enlace.querySelector('svg.lucide-user-cog')).not.toBeNull()
+    expect(enlace.querySelector('svg.lucide-users')).toBeNull()
+    expect(enlace.querySelector('svg.lucide-id-card')).toBeNull()
   })
 })

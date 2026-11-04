@@ -5,6 +5,7 @@ import {
   CLIENTS_BASE,
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
+  USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
 } from '../paths'
@@ -156,6 +157,26 @@ describe('canRoleOpenPath', () => {
 
   it('no confunde con el padrón una ruta que solo comparte el comienzo', () => {
     expect(canRoleOpenPath(`${WORKERS_BASE}X`, 'sales')).toBe(true)
+  })
+
+  it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+    '%s abre Usuarios',
+    (role) => {
+      expect(canRoleOpenPath(USERS_BASE, role)).toBe(true)
+    },
+  )
+
+  it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)('%s no abre Usuarios', (role) => {
+    expect(canRoleOpenPath(USERS_BASE, role)).toBe(false)
+  })
+
+  it('una ruta debajo de Usuarios hereda su permiso', () => {
+    expect(canRoleOpenPath(`${USERS_BASE}/7`, 'finance_manager')).toBe(true)
+    expect(canRoleOpenPath(`${USERS_BASE}/7`, 'sales')).toBe(false)
+  })
+
+  it('no confunde con Usuarios una ruta que solo comparte el comienzo', () => {
+    expect(canRoleOpenPath(`${USERS_BASE}X`, 'sales')).toBe(true)
   })
 
 })

@@ -8,9 +8,11 @@ import {
   LOGIN_PATH,
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
+  USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
 } from './paths'
+import * as paths from './paths'
 
 /**
  * La guarda que mantiene la centralización: las rutas se declaran en un solo
@@ -51,6 +53,7 @@ const VALORES = [
   QUOTATIONS_BASE,
   CLIENTS_BASE,
   WORKERS_BASE,
+  USERS_BASE,
   WAREHOUSE_BASE,
   OPERATIONS_BASE,
 ].filter((valor) => valor !== '/')
@@ -92,6 +95,14 @@ describe('las rutas de la SPA viven en un solo lugar', () => {
   it('ningún archivo fuera de los dos declarados las escribe', () => {
     const permitidos = PERMITIDOS.map((ruta) => ruta.split(sep).join('/'))
     expect(conRutasEscritas().filter((ruta) => !permitidos.includes(ruta))).toEqual([])
+  })
+
+  // La lista de arriba se escribe a mano: una ruta nueva que no se sume queda sin guarda.
+  it('busca cada ruta que declara paths.ts', () => {
+    const declaradas: string[] = Object.values(paths).flatMap((valor) => (typeof valor === 'string' ? [valor] : []))
+    const buscadas: readonly string[] = VALORES
+    expect(declaradas.length).toBeGreaterThan(5)
+    expect(declaradas.filter((valor) => valor !== '/' && !buscadas.includes(valor))).toEqual([])
   })
 
   it('el recorrido encuentra exactamente los dos declarados', () => {

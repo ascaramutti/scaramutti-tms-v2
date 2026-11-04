@@ -3,6 +3,7 @@ import {
   CLIENTS_BASE,
   LOGIN_PATH,
   QUOTATIONS_BASE,
+  USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
 } from './shared/paths'
@@ -15,6 +16,7 @@ import {
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
   SERVICE_PRICE_WRITE_ROLES,
+  USER_ACCOUNT_ADMIN_ROLES,
   WAREHOUSE_ROLES,
   WORKER_MAINTENANCE_ROLES,
 } from './shared/auth/moduleRoles'
@@ -32,6 +34,7 @@ import { WorkersSearchPage } from './features/workers/pages/WorkersSearchPage'
 import { WorkerDetailPage } from './features/workers/pages/WorkerDetailPage'
 import { WorkerCreatePage } from './features/workers/pages/WorkerCreatePage'
 import { WorkerEditPage } from './features/workers/pages/WorkerEditPage'
+import { UsersListPage } from './features/users/pages/UsersListPage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -182,6 +185,14 @@ export const routes: RouteObject[] = [
               <WorkerEditPage />
             </ProtectedRoute>
           </RequireNumericId>
+        ),
+      },
+      {
+        path: USERS_BASE,
+        element: (
+          <ProtectedRoute allowedRoles={USER_ACCOUNT_ADMIN_ROLES} moduleName="Usuarios">
+            <UsersListPage />
+          </ProtectedRoute>
         ),
       },
       // Módulo Almacén, con su propia raíz. Hasta la mudanza de 2026-09 colgaba

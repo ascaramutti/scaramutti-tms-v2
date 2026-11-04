@@ -3,6 +3,7 @@ import {
   LOGIN_PATH,
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
+  USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
   workerDetailPath,
@@ -530,6 +531,43 @@ describe('router - URL viejas y la raíz del dominio', () => {
       await screen.findByRole('heading', { level: 1, name: 'Ana Torres Ruiz' })
       expect(screen.getByRole('link', { name: /^trabajadores$/i })).toHaveAttribute('aria-current', 'page')
       expect(screen.getByRole('link', { name: /^clientes$/i })).not.toHaveAttribute('aria-current')
+    })
+  })
+
+  describe('Usuarios', () => {
+    it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+      '%s abre la lista de cuentas',
+      async (role) => {
+        renderRouteAs(role, USERS_BASE)
+        expect(await screen.findByRole('heading', { level: 1, name: /^usuarios$/i })).toBeInTheDocument()
+      },
+    )
+
+    it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso a Usuarios al escribir la URL, sin pedir la lista',
+      async (role) => {
+        let pedidos = 0
+        server.use(
+          http.get(`${API}/users`, () => {
+            pedidos += 1
+            return HttpResponse.json([])
+          }),
+        )
+        renderRouteAs(role, USERS_BASE)
+        expect(await screen.findByText(/sin acceso a usuarios/i)).toBeInTheDocument()
+        expect(pedidos).toBe(0)
+      },
+    )
+
+    it('sin sesión la URL de Usuarios lleva al login', async () => {
+      const router = goTo(null, USERS_BASE)
+      await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+
+    it('en la lista, Usuarios queda marcado en el menú', async () => {
+      renderRouteAs('admin', USERS_BASE)
+      await screen.findByRole('heading', { level: 1, name: /^usuarios$/i })
+      expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('aria-current', 'page')
     })
   })
 
