@@ -6,6 +6,7 @@ import {
   USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
+  userAccountDetailPath,
   workerDetailPath,
   workerEditPath,
 } from './shared/paths'
@@ -19,6 +20,7 @@ import { fakeClient } from './test/mocks/handlers/clients'
 import { fakeWorker, workersSearchPage } from './test/mocks/handlers/shared-catalogs'
 import { fakeWorkerDetail, getWorkerCapture, getWorkerOk } from './test/mocks/handlers/workers'
 import { fakeDriverProfile, ROLES } from './test/mocks/handlers/workers'
+import { fakeUserAccount, fakeUserAccountDetail, getUserAccountCapture, getUserAccountOk } from './test/mocks/handlers/users'
 import { routes } from './router'
 import { AuthProvider } from './shared/auth/AuthContext'
 import { ThemeProvider } from './shared/ui/theme/ThemeContext'
@@ -568,6 +570,74 @@ describe('router - URL viejas y la raíz del dominio', () => {
       renderRouteAs('admin', USERS_BASE)
       await screen.findByRole('heading', { level: 1, name: /^usuarios$/i })
       expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('aria-current', 'page')
+    })
+
+    it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+      '%s abre el detalle de una cuenta',
+      async (role) => {
+        server.use(getUserAccountOk(fakeUserAccountDetail({ id: 12 })))
+        renderRouteAs(role, userAccountDetailPath(12))
+        expect(await screen.findByRole('heading', { level: 1, name: 'jperez' })).toBeInTheDocument()
+      },
+    )
+
+    it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso a Usuarios en el detalle, sin pedirlo',
+      async (role) => {
+        const sink: { ids?: number[] } = {}
+        server.use(getUserAccountCapture(sink))
+        renderRouteAs(role, userAccountDetailPath(12))
+        expect(await screen.findByText(/sin acceso a usuarios/i)).toBeInTheDocument()
+        expect(sink.ids).toEqual([])
+      },
+    )
+
+    /** Con el almacenero: si la guarda de rol fuera primero, vería "Sin acceso" y no su aterrizaje. */
+    it.each(['0', '-3', '1e2', 'abc'])(
+      'el id %s del detalle desvía al aterrizaje antes de evaluar permisos',
+      async (id) => {
+        const sink: { ids?: number[] } = {}
+        server.use(getUserAccountCapture(sink))
+        const router = goTo('warehouse_keeper', `${USERS_BASE}/${id}`)
+        await waitFor(() => expect(router.state.location.pathname).toBe(WAREHOUSE_BASE))
+        expect(screen.queryByText(/sin acceso/i)).not.toBeInTheDocument()
+        expect(sink.ids).toEqual([])
+      },
+    )
+
+    it('sin sesión el detalle lleva al login', async () => {
+      const router = goTo(null, userAccountDetailPath(12))
+      await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+
+    /** La fila y el endpoint difieren a propósito: el detalle tiene que salir del endpoint. */
+    it('desde la lista, la fila lleva al detalle con los datos del endpoint', async () => {
+      const user = userEvent.setup()
+      const fila = fakeUserAccount({
+        id: 12,
+        role: { name: 'operations_manager', description: 'Cargo de la fila', level: 3, canLogin: true, driverProfile: 'NONE' },
+      })
+      server.use(
+        http.get(`${API}/users`, () => HttpResponse.json([fila])),
+        getUserAccountOk(fakeUserAccountDetail({ id: 12 })),
+      )
+      const router = goTo('admin', USERS_BASE)
+
+      await user.click(await screen.findByRole('button', { name: /^ver la cuenta jperez /i }))
+
+      await waitFor(() => expect(router.state.location.pathname).toBe(userAccountDetailPath(12)))
+      expect(await screen.findByRole('heading', { level: 1, name: 'jperez' })).toBeInTheDocument()
+      expect(screen.getByText('Juan Pérez Quispe · Gerente de Operaciones')).toBeInTheDocument()
+      expect(screen.queryByText('Cargo de la fila')).not.toBeInTheDocument()
+    })
+
+    it('en el detalle, Usuarios queda marcado en el menú', async () => {
+      server.use(getUserAccountOk(fakeUserAccountDetail({ id: 12 })))
+      renderRouteAs('admin', userAccountDetailPath(12))
+
+      await screen.findByRole('heading', { level: 1, name: 'jperez' })
+      expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('aria-current', 'page')
+      expect(screen.getByRole('link', { name: /^trabajadores$/i })).not.toHaveAttribute('aria-current')
     })
   })
 

@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { delay, http, HttpResponse } from 'msw'
 import { axe } from 'vitest-axe'
 import { UsersListPage } from './UsersListPage'
-import { USERS_BASE } from '../../../shared/paths'
+import { USERS_BASE, userAccountDetailPath } from '../../../shared/paths'
 import { server } from '../../../test/mocks/server'
 import { fakeUserAccount } from '../../../test/mocks/handlers/users'
 import type { UserAccountSummaryResponse } from '../../../api'
@@ -54,6 +54,7 @@ function renderPage(queryClient = newQueryClient()) {
   const router = createMemoryRouter(
     [
       { path: USERS_BASE, element: <UsersListPage /> },
+      { path: `${USERS_BASE}/:id`, element: <p>Detalle de la cuenta</p> },
       { path: '/otra', element: <Link to={USERS_BASE}>Volver</Link> },
     ],
     { initialEntries: [USERS_BASE] },
@@ -74,8 +75,12 @@ function regionViva(container: HTMLElement) {
   return container.querySelector('p[aria-live="polite"]') as HTMLElement
 }
 
+function filas() {
+  return screen.queryAllByRole('button', { name: /^ver la cuenta /i })
+}
+
 async function esperarFilas(n: number) {
-  await waitFor(() => expect(screen.getAllByRole('row')).toHaveLength(n + 1))
+  await waitFor(() => expect(filas()).toHaveLength(n))
 }
 
 describe('UsersListPage', () => {
@@ -146,7 +151,7 @@ describe('UsersListPage', () => {
     usersByStatus({ true: [zeta, alfa], false: [], none: [] })
     renderPage()
     await esperarFilas(2)
-    const usuarios = screen.getAllByRole('row').slice(1).map((row) => within(row).getAllByRole('cell')[0].textContent)
+    const usuarios = filas().map((row) => within(row).getAllByRole('cell')[0].textContent)
     expect(usuarios).toEqual(['zeta', 'alfa'])
   })
 
@@ -273,12 +278,64 @@ describe('UsersListPage', () => {
     await waitFor(() => expect(pedidos).toEqual(['true', 'true']))
   })
 
-  it('con filas no hay enlaces ni botones', async () => {
-    usersByStatus({ true: [JPEREZ], false: [], none: [] })
+  it('con filas no hay enlaces y las filas son los únicos botones', async () => {
+    usersByStatus({ true: [JPEREZ, MRIOS], false: [], none: [] })
     renderPage()
-    await esperarFilas(1)
+    await esperarFilas(2)
     expect(screen.queryAllByRole('link')).toHaveLength(0)
-    expect(screen.queryAllByRole('button')).toHaveLength(0)
+    expect(screen.getAllByRole('button')).toEqual(filas())
+  })
+
+  describe('la fila abre el detalle', () => {
+    it.each([
+      ['jperez', 12],
+      ['mrios', 13],
+    ])('el clic en la fila de %s abre su cuenta', async (usuario, id) => {
+      const user = userEvent.setup()
+      usersByStatus({ true: [JPEREZ, MRIOS], false: [], none: [] })
+      const { router } = renderPage()
+
+      await user.click(await screen.findByRole('button', { name: new RegExp(`^ver la cuenta ${usuario} `, 'i') }))
+
+      expect(router.state.location.pathname).toBe(userAccountDetailPath(id))
+      expect(await screen.findByText('Detalle de la cuenta')).toBeInTheDocument()
+    })
+
+    it.each(['{Enter}', ' '])('la fila se abre con el teclado (%j)', async (tecla) => {
+      const user = userEvent.setup()
+      usersByStatus({ true: [JPEREZ, MRIOS], false: [], none: [] })
+      const { router } = renderPage()
+
+      const fila = await screen.findByRole('button', { name: /^ver la cuenta mrios /i })
+      fila.focus()
+      await user.keyboard(tecla)
+
+      expect(router.state.location.pathname).toBe(userAccountDetailPath(13))
+    })
+
+    it('la fila llega con el tabulador desde el filtro', async () => {
+      const user = userEvent.setup()
+      usersByStatus({ true: [JPEREZ], false: [], none: [] })
+      renderPage()
+
+      const fila = await screen.findByRole('button', { name: /^ver la cuenta jperez /i })
+      selectEstado().focus()
+      await user.tab()
+
+      expect(fila).toHaveFocus()
+    })
+
+    it('la fila se anuncia con usuario, trabajador, cargo y estado', async () => {
+      usersByStatus({ true: [JPEREZ, MRIOS], false: [], none: [] })
+      renderPage()
+
+      expect(
+        await screen.findByRole('button', { name: 'Ver la cuenta jperez de Juan Pérez Quispe, Gerente de Operaciones, activa' }),
+      ).toBeInTheDocument()
+      expect(
+        screen.getByRole('button', { name: 'Ver la cuenta mrios de María Ríos Vega, Ejecutivo de Ventas, inactiva' }),
+      ).toBeInTheDocument()
+    })
   })
 
   describe('el conteo, que es la región viva', () => {

@@ -21,4 +21,10 @@ describe('userAccountKeys', () => {
     expect(activas).not.toEqual(todas)
     expect(inactivas).not.toEqual(todas)
   })
+
+  it('el detalle cuelga de la raíz, fuera de las listas, y cada id es su entrada', () => {
+    expect(userAccountKeys.detail(42)).toEqual(['users', 'detail', 42])
+    expect(userAccountKeys.detail(42).slice(0, 2)).not.toEqual(userAccountKeys.lists())
+    expect(userAccountKeys.detail(7)).not.toEqual(userAccountKeys.detail(12))
+  })
 })

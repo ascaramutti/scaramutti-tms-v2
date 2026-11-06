@@ -66,3 +66,7 @@ export function workerDetailPath(id: number | string): string {
 export function workerEditPath(id: number | string): string {
   return `${WORKERS_BASE}/${id}/editar`
 }
+
+export function userAccountDetailPath(id: number | string): string {
+  return `${USERS_BASE}/${id}`
+}

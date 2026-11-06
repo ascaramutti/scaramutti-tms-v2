@@ -6,4 +6,5 @@ export const userAccountKeys = {
   all: ['users'] as const,
   lists: () => [...userAccountKeys.all, 'list'] as const,
   list: (params: UserAccountListParams) => [...userAccountKeys.lists(), params] as const,
+  detail: (id: number) => [...userAccountKeys.all, 'detail', id] as const,
 }
