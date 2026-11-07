@@ -16,10 +16,10 @@ import org.hibernate.annotations.DynamicUpdate;
 import java.time.OffsetDateTime;
 
 /*
- * `@DynamicUpdate` porque transacciones distintas escriben esta fila sin coordinarse: el cambio
- * de contrasena y la baja de un trabajador. El cambio toma la fila antes de cargarla, pero la baja
- * la lee sin tomarla: con la escritura de columnas completas, la baja pisaria el hash y la version
- * que el cambio acaba de guardar; escribiendo solo lo que cada una cambia, ninguna borra a la otra.
+ * `@DynamicUpdate` porque transacciones distintas escriben esta fila sin coordinarse. Las de
+ * cuentas la toman antes de cargarla, pero la baja de un trabajador la lee sin tomarla: escribiendo
+ * columnas completas, la baja pisaria lo que otra acaba de guardar (el hash y la version de un
+ * cambio de contrasena); escribiendo solo lo que cambia, ninguna borra a la otra.
  * La autoria tambien va por columna: la ultima en confirmar deja su hora, quizas anterior a la del
  * cambio que pisa, y su autor solo si no es el que leyo (cada fila de rastro guarda los suyos).
  */

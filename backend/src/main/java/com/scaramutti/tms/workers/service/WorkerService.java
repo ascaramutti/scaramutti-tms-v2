@@ -545,9 +545,7 @@ public class WorkerService {
      * al actor. Sin la segunda, dos administradores que se desactivan o se bajan el cargo entre si
      * a la vez pasaban los dos la validacion y la empresa podia quedar sin administradores; con
      * ella, el segundo espera y relee su propio cargo ya cambiado. El orden por id impide el
-     * abrazo mortal. Protege a la cuenta solo porque quien le escribe la vigencia toma antes la
-     * fila de su trabajador (el cargo ya vive ahi): un escritor nuevo de cuentas tiene que hacer lo
-     * mismo.
+     * abrazo mortal.
      * Antes de bloquear: el 404 y el corte a quien ya no escribe, sin cargar nada, en ese orden.
      */
     private Worker lockTargetAndOwnWorker(Integer targetId) {
