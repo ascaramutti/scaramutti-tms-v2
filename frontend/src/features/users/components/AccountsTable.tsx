@@ -1,4 +1,6 @@
+import { useNavigate } from 'react-router-dom'
 import type { UserAccountSummaryResponse } from '../../../api'
+import { userAccountDetailPath } from '../../../shared/paths'
 import { DataTable, type Column } from '../../../shared/ui/DataTable'
 import type { AccountStatusFilter } from '../accountStatusFilter'
 import { AccountStatusBadge } from './AccountStatusBadge'
@@ -29,6 +31,12 @@ const COLUMNS: Column<UserAccountSummaryResponse>[] = [
   },
 ]
 
+// El nombre accesible de la fila tapa sus celdas: repite el cargo y el estado, que si no, no se oyen.
+function rowLabel(account: UserAccountSummaryResponse): string {
+  const estado = account.isActive ? 'activa' : 'inactiva'
+  return `Ver la cuenta ${account.username} de ${account.worker.fullName}, ${account.role.description}, ${estado}`
+}
+
 export function AccountsTable({
   accounts,
   status,
@@ -39,6 +47,7 @@ export function AccountsTable({
   errorMessage,
   onRetry,
 }: AccountsTableProps) {
+  const navigate = useNavigate()
   return (
     <DataTable
       columns={COLUMNS}
@@ -59,6 +68,8 @@ export function AccountsTable({
       emptyTitle="No hay cuentas con este estado"
       emptyDescription={status === 'all' ? undefined : 'Cambia el filtro de estado para ver las demás.'}
       caption="Cuentas del sistema"
+      onRowClick={(account) => navigate(userAccountDetailPath(account.id))}
+      rowLabel={rowLabel}
     />
   )
 }

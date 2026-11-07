@@ -14,10 +14,9 @@ interface PersonNameRowProps {
 }
 
 /**
- * El nombre de una persona en sus tres partes, juntas en una fila y antes que el documento: en la
- * grilla de dos columnas de una ficha, el materno quedaría junto al tipo de documento. Lleva su propia
- * `<dl>` porque un `div` dentro de otra agrupa un solo rótulo, y repite el marcado de los campos de
- * las fichas porque una pieza compartida no importa de las features.
+ * El nombre de una persona en sus tres partes, juntas en una fila. Lleva su propia `<dl>` porque un
+ * `div` dentro de otra agrupa un solo rótulo, y repite el marcado de los campos de las fichas porque
+ * una pieza compartida no importa de las features.
  */
 export function PersonNameRow({ firstName, paternalLastName, maternalLastName, className }: PersonNameRowProps) {
   const parts = [
