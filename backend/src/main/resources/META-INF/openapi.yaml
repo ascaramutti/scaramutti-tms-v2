@@ -55,7 +55,7 @@ tags:
   - name: Workers
     description: Trabajadores — el padrón. Hoy trae el alta de un trabajador, su edición, su detalle y sus catálogos (tipos de documento y roles); el cambio de estado llega con la historia siguiente
   - name: Users
-    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, el detalle de una cuenta, con quién la creó y la modificó, y desactivarla
+    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, el detalle de una cuenta, con quién la creó y la modificó, y desactivarla y reactivarla
 
 # =============================================================================
 paths:
@@ -163,13 +163,14 @@ paths:
         ingreso: si no, o si la cuenta del token ya no existe, `401 AUTH-002`.
 
         Revocación: el refresh lleva la versión de las sesiones de la cuenta y
-        se compara por igualdad con la actual. Cambiar la propia contraseña sube
-        la versión: un refresh anterior responde `401 AUTH-003`, también si se
-        emitió en el mismo segundo. Un refresh sin la versión (emitido antes de
-        que existiera), o con ella nula, cuenta como la inicial y renueva hasta
-        el primer cambio; una versión que no es un entero sin decimales, `401
-        AUTH-003`. El token de acceso vigente no se revoca: vale hasta su
-        vencimiento (`expiresAt`) y 60 s más de tolerancia de reloj.
+        se compara por igualdad con la actual. Cambiar la propia contraseña o
+        reactivar la cuenta sube la versión: un refresh anterior responde `401
+        AUTH-003`, también si se emitió en el mismo segundo. Un refresh sin la
+        versión (emitido antes de que existiera), o con ella nula, cuenta como
+        la inicial y renueva hasta el primer cambio; una versión que no es un
+        entero sin decimales, `401 AUTH-003`. El token de acceso vigente no se
+        revoca: vale hasta su vencimiento (`expiresAt`) y 60 s más de
+        tolerancia de reloj.
 
         Orden: `400 COM-001` → `401 AUTH-009` o `AUTH-003` (vencido, mal
         formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `401 AUTH-003`
@@ -2424,7 +2425,7 @@ paths:
         Marca `isActive = true` y enciende su ficha de conductor solo si existe
         y el rol actual la lleva; un rol `OPTIONAL` la enciende aunque una
         edición anterior la haya apagado. **No reactiva el usuario**: eso lo
-        hace el módulo de usuarios, que exigirá trabajador activo. Tampoco crea
+        hace el módulo de usuarios, que exige trabajador activo. Tampoco crea
         una ficha que no existe. Idempotente: sobre un activo responde `200` sin
         cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
         llega uno, o cualquier `Content-Type`, se ignora.
@@ -2594,9 +2595,9 @@ paths:
         `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
         `updatedBy` es nulo hasta el primer cambio que deja rastro. Hoy dejan
         rastro el cambio propio de contraseña, que firma la propia cuenta,
-        desactivarla, que firma quien la desactiva, y la baja de su trabajador
-        desde Trabajadores cuando apaga la cuenta, que firma quien la da. La
-        respuesta no trae el hash ni la versión de las sesiones.
+        desactivarla y reactivarla, que firma quien lo hace, y la baja de su
+        trabajador desde Trabajadores cuando apaga la cuenta, que firma quien la
+        da. La respuesta no trae el hash ni la versión de las sesiones.
 
         Lectura plana para los cuatro cargos que administran cuentas, por el
         cargo del token; el resto → `403 COM-003`, también con un `id` que no
@@ -2676,6 +2677,72 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /users/{id}/reactivate:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Users]
+      operationId: reactivateUserAccount
+      summary: Reactivar una cuenta del sistema
+      description: |
+        Marca la cuenta activa y sube la versión de sus sesiones: un refresh
+        emitido antes de la baja ya no renueva (`401 AUTH-003`), y uno de un
+        ingreso posterior sí. Un token de acceso emitido antes de la baja
+        vuelve a servir hasta que vence, más 60 s de margen de reloj. No toca
+        la contraseña ni al trabajador.
+        Deja una fila `REACTIVATED` en el rastro de la cuenta (`isActive`, de
+        `false` a `true`) y la firma quien la reactiva.
+
+        Exige el trabajador de la cuenta activo → si no, `409 USR-005`; y su
+        cargo con inicio de sesión → si no, `400 USR-006`. Si coincide con la
+        baja de su trabajador desde Trabajadores, la cuenta puede quedar activa
+        sobre el trabajador de baja: no ingresa mientras dure la baja, pero
+        vuelve a ingresar si Trabajadores reactiva al trabajador, sin pasar por
+        Usuarios. Se corrige desactivándola.
+
+        Idempotente: sobre una activa responde `200` sin cambio, sin fila de
+        rastro, sin firma y sin subir la versión. Las guardas y las dos reglas
+        corren antes del corte: una cuenta activa con su trabajador de baja
+        responde `409 USR-005`. Sin cuerpo: si llega uno, o cualquier
+        `Content-Type`, se ignora.
+
+        Rango: el cargo de la cuenta tiene que ser de nivel estrictamente menor
+        al de quien escribe; `admin` exento. La propia cuenta inactiva no se
+        reactiva: su sesión ya no escribe (`403 COM-003`).
+
+        Quien escribe y el trabajador de la cuenta se releen de la base después
+        de tomar la fila de la cuenta. Si otra operación retiene esa fila, una
+        de sus tablas o la secuencia del rastro más allá del tope →
+        `409 USR-009`.
+
+        `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+        cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+        sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+        recurso.
+
+        Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+        `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-008` →
+        `409 USR-005` → `400 USR-006` → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: La cuenta con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -3654,6 +3721,16 @@ components:
                   - field: 'ruc'
                     message: 'debe tener exactamente 11 dígitos'
                     code: 'PATTERN'
+            roleCannotLoginForAccount:
+              summary: El cargo del trabajador no inicia sesión (reactivación)
+              value:
+                type: 'urn:tms:error:usr-006'
+                title: 'Bad Request'
+                status: 400
+                detail: 'El cargo del trabajador no inicia sesión'
+                instance: '/api/v1/users/12/reactivate'
+                code: 'USR-006'
+                traceId: '9f0a1b2c-3d4e-4f5a-8b6c-7d8e9f0a1b2c'
 
     Forbidden:
       description: Autenticado pero sin permisos para esta operación
@@ -3758,6 +3835,16 @@ components:
                 instance: '/api/v1/users/12/deactivate'
                 code: 'USR-009'
                 traceId: '2c3d4e5f-6a7b-4c8d-9e9f-0a1b2c3d4e5a'
+            workerInactiveForAccount:
+              summary: El trabajador de la cuenta está dado de baja (reactivación)
+              value:
+                type: 'urn:tms:error:usr-005'
+                title: 'Conflict'
+                status: 409
+                detail: 'El trabajador está dado de baja'
+                instance: '/api/v1/users/12/reactivate'
+                code: 'USR-005'
+                traceId: '8e9f0a1b-2c3d-4e4f-9a5b-6c7d8e9f0a1b'
             duplicateWorkerLicense:
               summary: Numero de licencia de otra ficha
               value:

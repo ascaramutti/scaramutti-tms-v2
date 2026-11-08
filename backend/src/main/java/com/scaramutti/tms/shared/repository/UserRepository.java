@@ -40,8 +40,7 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
 
     /**
      * Si el trabajador tiene usuario, sin cargarlo. NO filtra por vigente a proposito: quien
-     * pregunta decide si un cambio de cargo dejaria una cuenta con un rol sin permisos, y una
-     * cuenta apagada se puede volver a encender.
+     * pregunta decide si un cambio de cargo dejaria una cuenta con un rol sin permisos.
      */
     public boolean existsByWorkerId(Integer workerId) {
         return count("worker.id", workerId) > 0;

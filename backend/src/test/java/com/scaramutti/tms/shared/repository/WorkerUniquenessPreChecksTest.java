@@ -168,8 +168,7 @@ class WorkerUniquenessPreChecksTest {
         int userId = fixtures.seedUserFor(id, "ztestuser500", "sales");
         fixtures.setUserActive(userId, false);
 
-        assertTrue(userRepository.findByWorkerIdOptional(id).isPresent(),
-            "una cuenta apagada se puede volver a encender: sigue contando");
+        assertTrue(userRepository.findByWorkerIdOptional(id).isPresent());
     }
 
     @Test
@@ -186,7 +185,7 @@ class WorkerUniquenessPreChecksTest {
         int userId = fixtures.seedUserFor(id, "ztestuser501", "sales");
         fixtures.setUserActive(userId, false);
 
-        assertTrue(userRepository.existsByWorkerId(id), "una cuenta apagada se puede volver a encender");
+        assertTrue(userRepository.existsByWorkerId(id));
     }
 
     @Test

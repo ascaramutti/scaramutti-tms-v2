@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, CreateWorkerData, CreateWorkerErrors, CreateWorkerResponses, DeactivateUserAccountData, DeactivateUserAccountErrors, DeactivateUserAccountResponses, DeactivateWorkerData, DeactivateWorkerErrors, DeactivateWorkerResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetUserAccountData, GetUserAccountErrors, GetUserAccountResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListUserAccountsData, ListUserAccountsErrors, ListUserAccountsResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, ReactivateWorkerData, ReactivateWorkerErrors, ReactivateWorkerResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses, UpdateWorkerData, UpdateWorkerErrors, UpdateWorkerResponses } from './types.gen';
+import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, CreateWorkerData, CreateWorkerErrors, CreateWorkerResponses, DeactivateUserAccountData, DeactivateUserAccountErrors, DeactivateUserAccountResponses, DeactivateWorkerData, DeactivateWorkerErrors, DeactivateWorkerResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetUserAccountData, GetUserAccountErrors, GetUserAccountResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListUserAccountsData, ListUserAccountsErrors, ListUserAccountsResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, ReactivateUserAccountData, ReactivateUserAccountErrors, ReactivateUserAccountResponses, ReactivateWorkerData, ReactivateWorkerErrors, ReactivateWorkerResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses, UpdateWorkerData, UpdateWorkerErrors, UpdateWorkerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -52,13 +52,14 @@ export const login = <ThrowOnError extends boolean = false>(options: Options<Log
  * ingreso: si no, o si la cuenta del token ya no existe, `401 AUTH-002`.
  *
  * Revocación: el refresh lleva la versión de las sesiones de la cuenta y
- * se compara por igualdad con la actual. Cambiar la propia contraseña sube
- * la versión: un refresh anterior responde `401 AUTH-003`, también si se
- * emitió en el mismo segundo. Un refresh sin la versión (emitido antes de
- * que existiera), o con ella nula, cuenta como la inicial y renueva hasta
- * el primer cambio; una versión que no es un entero sin decimales, `401
- * AUTH-003`. El token de acceso vigente no se revoca: vale hasta su
- * vencimiento (`expiresAt`) y 60 s más de tolerancia de reloj.
+ * se compara por igualdad con la actual. Cambiar la propia contraseña o
+ * reactivar la cuenta sube la versión: un refresh anterior responde `401
+ * AUTH-003`, también si se emitió en el mismo segundo. Un refresh sin la
+ * versión (emitido antes de que existiera), o con ella nula, cuenta como
+ * la inicial y renueva hasta el primer cambio; una versión que no es un
+ * entero sin decimales, `401 AUTH-003`. El token de acceso vigente no se
+ * revoca: vale hasta su vencimiento (`expiresAt`) y 60 s más de
+ * tolerancia de reloj.
  *
  * Orden: `400 COM-001` → `401 AUTH-009` o `AUTH-003` (vencido, mal
  * formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `401 AUTH-003`
@@ -1259,7 +1260,7 @@ export const deactivateWorker = <ThrowOnError extends boolean = false>(options: 
  * Marca `isActive = true` y enciende su ficha de conductor solo si existe
  * y el rol actual la lleva; un rol `OPTIONAL` la enciende aunque una
  * edición anterior la haya apagado. **No reactiva el usuario**: eso lo
- * hace el módulo de usuarios, que exigirá trabajador activo. Tampoco crea
+ * hace el módulo de usuarios, que exige trabajador activo. Tampoco crea
  * una ficha que no existe. Idempotente: sobre un activo responde `200` sin
  * cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
  * llega uno, o cualquier `Content-Type`, se ignora.
@@ -1374,9 +1375,9 @@ export const listUserAccounts = <ThrowOnError extends boolean = false>(options?:
  * `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
  * `updatedBy` es nulo hasta el primer cambio que deja rastro. Hoy dejan
  * rastro el cambio propio de contraseña, que firma la propia cuenta,
- * desactivarla, que firma quien la desactiva, y la baja de su trabajador
- * desde Trabajadores cuando apaga la cuenta, que firma quien la da. La
- * respuesta no trae el hash ni la versión de las sesiones.
+ * desactivarla y reactivarla, que firma quien lo hace, y la baja de su
+ * trabajador desde Trabajadores cuando apaga la cuenta, que firma quien la
+ * da. La respuesta no trae el hash ni la versión de las sesiones.
  *
  * Lectura plana para los cuatro cargos que administran cuentas, por el
  * cargo del token; el resto → `403 COM-003`, también con un `id` que no
@@ -1434,6 +1435,56 @@ export const deactivateUserAccount = <ThrowOnError extends boolean = false>(opti
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/users/{id}/deactivate',
+    ...options
+});
+
+/**
+ * Reactivar una cuenta del sistema
+ *
+ * Marca la cuenta activa y sube la versión de sus sesiones: un refresh
+ * emitido antes de la baja ya no renueva (`401 AUTH-003`), y uno de un
+ * ingreso posterior sí. Un token de acceso emitido antes de la baja
+ * vuelve a servir hasta que vence, más 60 s de margen de reloj. No toca
+ * la contraseña ni al trabajador.
+ * Deja una fila `REACTIVATED` en el rastro de la cuenta (`isActive`, de
+ * `false` a `true`) y la firma quien la reactiva.
+ *
+ * Exige el trabajador de la cuenta activo → si no, `409 USR-005`; y su
+ * cargo con inicio de sesión → si no, `400 USR-006`. Si coincide con la
+ * baja de su trabajador desde Trabajadores, la cuenta puede quedar activa
+ * sobre el trabajador de baja: no ingresa mientras dure la baja, pero
+ * vuelve a ingresar si Trabajadores reactiva al trabajador, sin pasar por
+ * Usuarios. Se corrige desactivándola.
+ *
+ * Idempotente: sobre una activa responde `200` sin cambio, sin fila de
+ * rastro, sin firma y sin subir la versión. Las guardas y las dos reglas
+ * corren antes del corte: una cuenta activa con su trabajador de baja
+ * responde `409 USR-005`. Sin cuerpo: si llega uno, o cualquier
+ * `Content-Type`, se ignora.
+ *
+ * Rango: el cargo de la cuenta tiene que ser de nivel estrictamente menor
+ * al de quien escribe; `admin` exento. La propia cuenta inactiva no se
+ * reactiva: su sesión ya no escribe (`403 COM-003`).
+ *
+ * Quien escribe y el trabajador de la cuenta se releen de la base después
+ * de tomar la fila de la cuenta. Si otra operación retiene esa fila, una
+ * de sus tablas o la secuencia del rastro más allá del tope →
+ * `409 USR-009`.
+ *
+ * `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+ * cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+ * sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+ * recurso.
+ *
+ * Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+ * `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-008` →
+ * `409 USR-005` → `400 USR-006` → `200`.
+ *
+ */
+export const reactivateUserAccount = <ThrowOnError extends boolean = false>(options: Options<ReactivateUserAccountData, ThrowOnError>): RequestResult<ReactivateUserAccountResponses, ReactivateUserAccountErrors, ThrowOnError> => (options.client ?? client).post<ReactivateUserAccountResponses, ReactivateUserAccountErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/users/{id}/reactivate',
     ...options
 });
 

@@ -4199,6 +4199,49 @@ export type DeactivateUserAccountResponses = {
 
 export type DeactivateUserAccountResponse = DeactivateUserAccountResponses[keyof DeactivateUserAccountResponses];
 
+export type ReactivateUserAccountData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/users/{id}/reactivate';
+};
+
+export type ReactivateUserAccountErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type ReactivateUserAccountError = ReactivateUserAccountErrors[keyof ReactivateUserAccountErrors];
+
+export type ReactivateUserAccountResponses = {
+    /**
+     * La cuenta con el estado resultante
+     */
+    200: UserAccountDetailResponse;
+};
+
+export type ReactivateUserAccountResponse = ReactivateUserAccountResponses[keyof ReactivateUserAccountResponses];
+
 export type ListServicesData = {
     body?: never;
     path?: never;

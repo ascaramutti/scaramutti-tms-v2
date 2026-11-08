@@ -69,6 +69,39 @@ public class UserAccountService {
         return getUserAccount(userId);
     }
 
+    /**
+     * Las reglas del trabajador corren antes del corte idempotente, como las guardas: una cuenta activa
+     * sobre un trabajador de baja responde el 409 y no un 200 que la daria por utilizable.
+     */
+    @Transactional
+    public UserAccountDetailResponse reactivateUserAccount(Integer userId) {
+        if (userRepository.count("id", userId) == 0) {
+            throw UsersError.NOT_FOUND.toException();
+        }
+        userAccountRankPolicy.rejectDisabledActorBeforeLocking();
+        User account = userAccountWriteLock.lockThenFind(userId).orElseThrow(UsersError.NOT_FOUND::toException);
+        userAccountRankPolicy.assertCanActOn(account.worker.role);
+        if (!Boolean.TRUE.equals(account.worker.isActive)) {
+            throw UsersError.WORKER_INACTIVE.toException();
+        }
+        if (!Boolean.TRUE.equals(account.worker.role.canLogin)) {
+            throw UsersError.ROLE_CANNOT_LOGIN.toException();
+        }
+        if (Boolean.TRUE.equals(account.isActive)) {
+            return getUserAccount(userId);
+        }
+
+        Integer actorId = currentUser.requireId();
+        userAccountWriteLock.writeTranslatingConflicts(userId, () -> {
+            account.isActive = true;
+            // Sin la subida, un refresh guardado antes de la baja volveria a renovar.
+            account.sessionVersion = account.sessionVersion + 1;
+            account.markChangedBy(actorId);
+            userAuditLogRepository.persist(statusChange(userId, UserAuditChangeType.REACTIVATED, false, true, actorId));
+        });
+        return getUserAccount(userId);
+    }
+
     private static UserAuditLog statusChange(Integer userId, UserAuditChangeType changeType, boolean oldValue,
             boolean newValue, Integer actorId) {
         UserAuditLog log = new UserAuditLog();

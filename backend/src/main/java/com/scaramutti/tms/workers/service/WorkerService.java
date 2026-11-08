@@ -507,7 +507,7 @@ public class WorkerService {
 
     /**
      * Reactiva al trabajador y enciende su ficha solo si existe y el cargo actual la lleva. La
-     * cuenta NO: eso lo decide el modulo de usuarios, que exigira trabajador activo. Tampoco
+     * cuenta NO: eso lo decide el modulo de usuarios, que exige trabajador activo. Tampoco
      * crea una ficha que no existe; si el cargo la exige, el siguiente PUT la pide.
      */
     @Transactional
@@ -582,9 +582,6 @@ public class WorkerService {
      *
      * <p>Solo aplica si el cargo cambia. Sin esa condicion, alguien que ya estuviera en ese estado
      * no se podria editar nunca mas, ni para corregirle una errata en el telefono.
-     *
-     * <p>Y cuenta que la fila de usuario EXISTA, no que este vigente: una cuenta apagada se puede
-     * volver a encender, y filtrarla aca dejaria armada justo la cuenta rota que esto previene.
      */
     private void assertUserKeepsLogin(Worker worker, Role newRole) {
         if (worker.role.id.equals(newRole.id) || Boolean.TRUE.equals(newRole.canLogin)) {
