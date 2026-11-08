@@ -1067,12 +1067,6 @@ class WorkerUpdateResourceTest {
         assertNotNull(fixtures.driverRowOf(id));
     }
 
-    /**
-     * Una cuenta APAGADA sigue contando.
-     *
-     * <p>Filtrarla dejaria armada justo la cuenta rota que la regla previene: cuando el modulo de
-     * usuarios la vuelva a encender, tendria un cargo sin permisos.
-     */
     @Test
     void update_anInactiveUserStillCounts_returns400_WRK011() {
         int id = seedWorker("ZTESTE064", "sales");

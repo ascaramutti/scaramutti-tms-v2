@@ -411,6 +411,44 @@ class PublishedContractTest {
     }
 
     /**
+     * Reactivar una cuenta: quién la reactiva, sus respuestas de error con los ejemplos de los dos
+     * códigos que estrena, las cabeceras de caché y que responde con el detalle de la cuenta.
+     */
+    @Test
+    void publishedContract_declaresWhoReactivatesAnAccountAndWhatItAnswers() {
+        JsonPath contract = publishedContract();
+        String path = "paths.'/users/{id}/reactivate'.";
+        String post = path + "post.";
+        assertEquals("reactivateUserAccount", contract.getString(post + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(post + "'x-required-roles'"));
+        assertEquals(List.of("id"), contract.getList(path + "parameters.name"));
+        assertEquals("path|true|integer", contract.getString(path + "parameters[0].in") + "|"
+            + contract.getString(path + "parameters[0].required") + "|"
+            + contract.getString(path + "parameters[0].schema.type"));
+        assertThat(contract.get(post + "requestBody"), nullValue());
+        assertEquals(Set.of("200", "400", "401", "403", "404", "409"), contract.getMap(post + "responses").keySet());
+        assertEquals("#/components/responses/BadRequest", contract.getString(post + "responses.'400'.$ref"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(post + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(post + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/NotFound", contract.getString(post + "responses.'404'.$ref"));
+        assertEquals("#/components/responses/Conflict", contract.getString(post + "responses.'409'.$ref"));
+        String examples = "'application/problem+json'.examples.";
+        assertEquals("USR-005|409", contract.getString("components.responses.Conflict.content." + examples
+            + "workerInactiveForAccount.value.code") + "|" + contract.getString(
+            "components.responses.Conflict.content." + examples + "workerInactiveForAccount.value.status"));
+        assertEquals("USR-006|400", contract.getString("components.responses.BadRequest.content." + examples
+            + "roleCannotLoginForAccount.value.code") + "|" + contract.getString(
+            "components.responses.BadRequest.content." + examples + "roleCannotLoginForAccount.value.status"));
+        String headers = post + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(post + "responses.'200'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountDetailResponse"));
+    }
+
+    /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
      * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.

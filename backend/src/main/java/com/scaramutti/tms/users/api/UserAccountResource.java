@@ -59,4 +59,11 @@ public class UserAccountResource {
     public RestResponse<UserAccountDetailResponse> deactivateUserAccount(@PathParam("id") Integer id) {
         return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.deactivateUserAccount(id)));
     }
+
+    @POST
+    @Path("/{id}/reactivate")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public RestResponse<UserAccountDetailResponse> reactivateUserAccount(@PathParam("id") Integer id) {
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.reactivateUserAccount(id)));
+    }
 }
