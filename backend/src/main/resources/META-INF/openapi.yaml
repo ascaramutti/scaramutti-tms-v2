@@ -55,7 +55,7 @@ tags:
   - name: Workers
     description: Trabajadores — el padrón. Hoy trae el alta de un trabajador, su edición, su detalle y sus catálogos (tipos de documento y roles); el cambio de estado llega con la historia siguiente
   - name: Users
-    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, y el detalle de una cuenta, con quién la creó y la modificó
+    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, el detalle de una cuenta, con quién la creó y la modificó, y desactivarla
 
 # =============================================================================
 paths:
@@ -2593,10 +2593,10 @@ paths:
         tiene), y quién la creó y la modificó por última vez y cuándo.
         `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
         `updatedBy` es nulo hasta el primer cambio que deja rastro. Hoy dejan
-        rastro el cambio propio de contraseña, que firma la propia cuenta, y la
-        baja de su trabajador desde Trabajadores cuando apaga la cuenta, que
-        firma quien la da. La respuesta no trae el hash ni la versión de las
-        sesiones.
+        rastro el cambio propio de contraseña, que firma la propia cuenta,
+        desactivarla, que firma quien la desactiva, y la baja de su trabajador
+        desde Trabajadores cuando apaga la cuenta, que firma quien la da. La
+        respuesta no trae el hash ni la versión de las sesiones.
 
         Lectura plana para los cuatro cargos que administran cuentas, por el
         cargo del token; el resto → `403 COM-003`, también con un `id` que no
@@ -2623,6 +2623,63 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{id}/deactivate:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Users]
+      operationId: deactivateUserAccount
+      summary: Desactivar una cuenta del sistema
+      description: |
+        Marca la cuenta inactiva: ya no ingresa ni renueva (`401 AUTH-002`), y
+        `/auth/me` con su token responde `401 AUTH-002`. No toca al trabajador.
+        Un token de acceso suyo ya emitido sigue valiendo hasta que vence, más
+        60 s de margen de reloj, para leer y para escribir donde no se relee a
+        quien escribe. Las escrituras de Usuarios y Trabajadores sí lo releen y
+        responden `403 COM-003`.
+        Deja una fila `DEACTIVATED` en el rastro de la cuenta (`isActive`, de
+        `true` a `false`) y la firma quien la desactiva.
+
+        Idempotente: sobre una inactiva responde `200` sin cambio, sin fila de
+        rastro y sin firma. Sin cuerpo: si llega uno, o cualquier
+        `Content-Type`, se ignora.
+
+        Nadie desactiva su propia cuenta, tampoco `admin` → `403 USR-007`, antes
+        del rango. Rango: el cargo de la cuenta tiene que ser de nivel
+        estrictamente menor al de quien escribe; `admin` exento, y un `admin`
+        desactiva a otro `admin`. Las guardas corren antes del corte idempotente.
+
+        Quien escribe se relee de la base después de tomar la fila de la cuenta.
+        Si otra operación retiene esa fila, una de sus tablas o la secuencia del
+        rastro más allá del tope → `409 USR-009`.
+
+        `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+        cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+        sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+        recurso.
+
+        Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+        `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-007` →
+        `403 USR-008` → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: La cuenta con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   # ----- Operations: servicios de transporte (schema operaciones) -------------
   /services:
@@ -3634,6 +3691,26 @@ components:
                 instance: '/api/v1/workers'
                 code: 'WRK-006'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            userAccountSelf:
+              summary: Acción sobre la propia cuenta (desactivar)
+              value:
+                type: 'urn:tms:error:usr-007'
+                title: 'Forbidden'
+                status: 403
+                detail: 'No puedes hacer esto sobre tu propia cuenta'
+                instance: '/api/v1/users/3/deactivate'
+                code: 'USR-007'
+                traceId: '0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3e'
+            userAccountOutOfRank:
+              summary: Cuenta de un cargo fuera del alcance de quien escribe
+              value:
+                type: 'urn:tms:error:usr-008'
+                title: 'Forbidden'
+                status: 403
+                detail: 'No puedes gestionar cuentas de ese cargo'
+                instance: '/api/v1/users/5/deactivate'
+                code: 'USR-008'
+                traceId: '1b2c3d4e-5f6a-4b7c-8d8e-9f0a1b2c3d4f'
             insufficientRole:
               summary: Rol insuficiente para la operación
               value:
@@ -3671,6 +3748,16 @@ components:
                 instance: '/api/v1/workers/8'
                 code: 'WRK-013'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            userAccountLocked:
+              summary: La cuenta la tiene otra operación (conflicto transitorio; se reintenta)
+              value:
+                type: 'urn:tms:error:usr-009'
+                title: 'Conflict'
+                status: 409
+                detail: 'La cuenta está siendo modificada por otra operación'
+                instance: '/api/v1/users/12/deactivate'
+                code: 'USR-009'
+                traceId: '2c3d4e5f-6a7b-4c8d-9e9f-0a1b2c3d4e5a'
             duplicateWorkerLicense:
               summary: Numero de licencia de otra ficha
               value:

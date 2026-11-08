@@ -8,6 +8,7 @@ import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
+import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
@@ -50,5 +51,12 @@ public class UserAccountResource {
     public RestResponse<UserAccountDetailResponse> getUserAccount(@PathParam("id") Integer id) {
         // Ademas del padron, trae quien creo y modifico la cuenta: ninguna cache lo guarda.
         return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.getUserAccount(id)));
+    }
+
+    @POST
+    @Path("/{id}/deactivate")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public RestResponse<UserAccountDetailResponse> deactivateUserAccount(@PathParam("id") Integer id) {
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.deactivateUserAccount(id)));
     }
 }
