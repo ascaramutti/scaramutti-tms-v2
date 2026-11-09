@@ -1417,6 +1417,21 @@ export type UserAccountDetailResponse = {
 };
 
 /**
+ * La cuenta y la contraseña temporal que el servidor acaba de generar. Es
+ * la única vez que sale: se guarda solo su hash y no se puede volver a
+ * pedir. Nada obliga a cambiarla: la persona la cambia con
+ * `changePassword`.
+ *
+ */
+export type UserAccountTemporaryPasswordResponse = {
+    account: UserAccountDetailResponse;
+    /**
+     * 12 caracteres al azar de un alfabeto de 55 sin los ambiguos (0, O, o, 1, l, I, i): mayúsculas, minúsculas y dígitos del 2 al 9. Cumple la regla de newPassword de ChangePasswordRequest.
+     */
+    temporaryPassword: string;
+};
+
+/**
  * Ciclo de vida del servicio:
  * `PENDING_ASSIGNMENT → PENDING_START → IN_PROGRESS → COMPLETED`;
  * `CANCELLED` desde cualquiera de los tres no terminales; `DELETED` solo desde
@@ -4241,6 +4256,45 @@ export type ReactivateUserAccountResponses = {
 };
 
 export type ReactivateUserAccountResponse = ReactivateUserAccountResponses[keyof ReactivateUserAccountResponses];
+
+export type ResetUserAccountPasswordData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/users/{id}/reset-password';
+};
+
+export type ResetUserAccountPasswordErrors = {
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type ResetUserAccountPasswordError = ResetUserAccountPasswordErrors[keyof ResetUserAccountPasswordErrors];
+
+export type ResetUserAccountPasswordResponses = {
+    /**
+     * La cuenta con el estado resultante y la temporal generada, que no se vuelve a mostrar
+     */
+    200: UserAccountTemporaryPasswordResponse;
+};
+
+export type ResetUserAccountPasswordResponse = ResetUserAccountPasswordResponses[keyof ResetUserAccountPasswordResponses];
 
 export type ListServicesData = {
     body?: never;
