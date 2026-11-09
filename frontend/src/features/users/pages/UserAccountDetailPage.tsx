@@ -1,22 +1,47 @@
-import type { ReactNode } from 'react'
-import { UserX } from 'lucide-react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { USERS_BASE } from '../../../shared/paths'
+import { useEffect, useRef, useState } from 'react'
+import type { ReactNode, Ref } from 'react'
+import { Power, UserX } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { toast } from 'sonner'
+import { useAuth } from '../../../shared/auth/AuthContext'
+import { USERS_BASE, workerDetailPath } from '../../../shared/paths'
+import { Alert } from '../../../shared/ui/Alert'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { Button } from '../../../shared/ui/Button'
 import { EmptyState } from '../../../shared/ui/EmptyState'
 import { PageHeader } from '../../../shared/ui/PageHeader'
 import { Spinner } from '../../../shared/ui/Spinner'
 import { getApiErrorMessage, isForbiddenError, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
+import { useSessionRankLevel } from '../../workers/hooks/useSessionRankLevel'
+import { accountActions, REACTIVATE_BLOCKED_REASON } from '../accountActions'
 import { AccountAuditFooter } from '../components/AccountAuditFooter'
 import { AccountDetailCard } from '../components/AccountDetailCard'
+import { AccountStatusDialog } from '../components/AccountStatusDialog'
 import { AccountWorkerCard } from '../components/AccountWorkerCard'
 import { useUserAccount } from '../hooks/useUserAccount'
+
+const NOTICE = 'px-4 py-3 text-sm text-fg-body'
+const LINK =
+  'rounded font-medium text-accent hover:text-accent-hover hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-focus'
 
 export function UserAccountDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const { level } = useSessionRankLevel()
   const { data, isLoading, isError, error, refetch } = useUserAccount(Number(id))
+  const [dialog, setDialog] = useState<'status' | null>(null)
+  const shell = useRef<HTMLDivElement>(null)
+  // Si el botón de estado desapareció al cerrar, el foco se perdería fuera de la página.
+  useEffect(() => {
+    const page = shell.current
+    if (!dialog || !page) return
+    return () => {
+      if (document.activeElement === document.body) {
+        page.querySelector<HTMLElement>(`a[href="${USERS_BASE}"]`)?.focus()
+      }
+    }
+  }, [dialog])
 
   if (isLoading) {
     return (
@@ -67,19 +92,65 @@ export function UserAccountDetailPage() {
     )
   }
 
+  const actions = accountActions(data, user, level)
   return (
-    <Shell>
-      <PageHeader title={data.username} description={`${data.worker.fullName} · ${data.role.description}`} divider />
+    <Shell ref={shell}>
+      <PageHeader
+        title={data.username}
+        description={`${data.worker.fullName} · ${data.role.description}`}
+        divider
+        action={
+          actions.canDeactivate || actions.canReactivate ? (
+            <div className="flex flex-wrap gap-3">
+              <Button
+                variant={data.isActive ? 'danger' : 'success'}
+                onClick={() => setDialog('status')}
+              >
+                <Power className="mr-2 h-4 w-4" aria-hidden="true" />
+                {data.isActive ? 'Desactivar' : 'Reactivar'}
+              </Button>
+            </div>
+          ) : undefined
+        }
+      />
+      {actions.reactivateBlockedBy && (
+        <Alert variant="warning" role={undefined} className={NOTICE}>
+          {REACTIVATE_BLOCKED_REASON[actions.reactivateBlockedBy]}{' '}
+          <Link to={workerDetailPath(data.worker.id)} className={LINK}>
+            Ver la ficha de {data.worker.fullName}
+          </Link>
+        </Alert>
+      )}
+      {actions.isOwn && (
+        <Alert variant="info" role={undefined} className={NOTICE}>
+          Es tu cuenta: no puedes desactivarla.
+        </Alert>
+      )}
+      {actions.isOutOfRank && (
+        <Alert variant="info" role={undefined} className={NOTICE}>
+          Es de un cargo de tu nivel o superior: puedes verla, no modificarla.
+        </Alert>
+      )}
       <AccountDetailCard account={data} />
       <AccountWorkerCard worker={data.worker} />
       <AccountAuditFooter account={data} />
+      {dialog === 'status' && (
+        <AccountStatusDialog
+          account={data}
+          onClose={() => setDialog(null)}
+          onNotFound={() => {
+            toast.error('Esta cuenta no existe.')
+            navigate(USERS_BASE, { replace: true })
+          }}
+        />
+      )}
     </Shell>
   )
 }
 
-function Shell({ children }: { children: ReactNode }) {
+function Shell({ children, ref }: { children: ReactNode; ref?: Ref<HTMLDivElement> }) {
   return (
-    <div className="mx-auto max-w-[860px] space-y-6 px-6 py-8">
+    <div ref={ref} className="mx-auto max-w-[860px] space-y-6 px-6 py-8">
       <BackLink to={USERS_BASE}>Volver a usuarios</BackLink>
       {children}
     </div>

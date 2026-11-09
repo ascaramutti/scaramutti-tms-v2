@@ -116,3 +116,36 @@ export function getUserAccountError(status = 500, sink?: { ids?: number[] }, det
 export function getUserAccountEmpty() {
   return contando(undefined, () => new HttpResponse(null, { status: 200 }))
 }
+
+type AccountStatusAction = 'deactivate' | 'reactivate'
+
+export function changeAccountStatusCapture(
+  action: AccountStatusAction,
+  sink: { ids?: number[] },
+  response?: UserAccountDetailResponse,
+  ms = 0,
+) {
+  sink.ids = []
+  return http.post(`${API}/users/:id/${action}`, async ({ params }) => {
+    sink.ids = [...(sink.ids ?? []), Number(params.id)]
+    if (ms) await delay(ms)
+    return HttpResponse.json(response ?? fakeUserAccountDetail({ id: Number(params.id), isActive: action === 'reactivate' }))
+  })
+}
+
+export function changeAccountStatusProblem(
+  action: AccountStatusAction,
+  code: string,
+  status: number,
+  detail = 'detail del backend',
+) {
+  return http.post(`${API}/users/:id/${action}`, () => problema(code, status, detail))
+}
+
+export function changeAccountStatusNetworkError(action: AccountStatusAction) {
+  return http.post(`${API}/users/:id/${action}`, () => HttpResponse.error())
+}
+
+export function changeAccountStatusEmpty(action: AccountStatusAction) {
+  return http.post(`${API}/users/:id/${action}`, () => new HttpResponse(null, { status: 200 }))
+}
