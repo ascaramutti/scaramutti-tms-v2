@@ -1,16 +1,10 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import type { WorkerDetailResponse } from '../../../api'
-import { Alert } from '../../../shared/ui/Alert'
-import { Button } from '../../../shared/ui/Button'
-import { Modal } from '../../../shared/ui/Modal'
-import { Spinner } from '../../../shared/ui/Spinner'
+import { ConfirmActionDialog } from '../../../shared/ui/ConfirmActionDialog'
 import { isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { useChangeWorkerStatus, type WorkerStatusAction } from '../hooks/useChangeWorkerStatus'
 import { workerStatusErrorMessage } from '../workerApiErrors'
-
-/** Como en el rechazo de una cotización: mientras envía, los dos botones se ven apagados. */
-const DISABLED = 'disabled:cursor-not-allowed disabled:opacity-60'
 
 interface WorkerStatusDialogProps {
   worker: WorkerDetailResponse
@@ -30,12 +24,6 @@ export function WorkerStatusDialog({ worker, onClose, onNotFound }: WorkerStatus
   const [action] = useState<WorkerStatusAction>(worker.isActive ? 'deactivate' : 'reactivate')
   const changeStatus = useChangeWorkerStatus(worker.id)
   const [error, setError] = useState<string | null>(null)
-  const confirmButton = useRef<HTMLButtonElement>(null)
-  // Al enviar, el botón se deshabilita con el foco encima y el foco cae fuera del diálogo. Con el
-  // error a la vista vuelve a confirmar, como en la salida de un viaje, para reintentar desde ahí.
-  useEffect(() => {
-    if (error && !changeStatus.isPending) confirmButton.current?.focus()
-  }, [error, changeStatus.isPending])
   const name = worker.fullName
   const copy = COPY[action]
 
@@ -57,40 +45,21 @@ export function WorkerStatusDialog({ worker, onClose, onNotFound }: WorkerStatus
   }
 
   return (
-    // Mientras envía no se cierra: la respuesta tiene que verse en la ficha o en el diálogo.
-    <Modal isOpen onClose={changeStatus.isPending ? () => {} : onClose} title={copy.title} size="sm">
-      <div className="space-y-4">
-        <p className="text-sm text-fg-body">
-          {copy.question} a {name}?
-        </p>
-        {action === 'deactivate' ? <DeactivateNotes worker={worker} /> : <ReactivateNotes worker={worker} />}
-        {error && (
-          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
-            {error}
-          </Alert>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={changeStatus.isPending} className={DISABLED}>
-            Cancelar
-          </Button>
-          <Button
-            ref={confirmButton}
-            variant={action === 'deactivate' ? 'danger' : 'success'}
-            onClick={confirm}
-            disabled={changeStatus.isPending}
-            className={DISABLED}
-          >
-            {changeStatus.isPending ? (
-              <>
-                <Spinner size={16} className="mr-2 text-on-solid" /> {copy.pending}
-              </>
-            ) : (
-              copy.confirm
-            )}
-          </Button>
-        </div>
-      </div>
-    </Modal>
+    <ConfirmActionDialog
+      title={copy.title}
+      confirmLabel={copy.confirm}
+      pendingLabel={copy.pending}
+      confirmVariant={action === 'deactivate' ? 'danger' : 'success'}
+      isPending={changeStatus.isPending}
+      error={error}
+      onConfirm={confirm}
+      onClose={onClose}
+    >
+      <p className="text-sm text-fg-body">
+        {copy.question} a {name}?
+      </p>
+      {action === 'deactivate' ? <DeactivateNotes worker={worker} /> : <ReactivateNotes worker={worker} />}
+    </ConfirmActionDialog>
   )
 }
 
