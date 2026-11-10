@@ -1,5 +1,5 @@
 import { delay, http, HttpResponse } from 'msw'
-import type { UserAccountDetailResponse, UserAccountSummaryResponse } from '../../../api'
+import type { UserAccountDetailResponse, UserAccountSummaryResponse, UserAccountTemporaryPasswordResponse } from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -118,6 +118,7 @@ export function getUserAccountEmpty() {
 }
 
 type AccountStatusAction = 'deactivate' | 'reactivate'
+type AccountWrite = AccountStatusAction | 'reset-password'
 
 export function changeAccountStatusCapture(
   action: AccountStatusAction,
@@ -139,13 +140,63 @@ export function changeAccountStatusProblem(
   status: number,
   detail = 'detail del backend',
 ) {
-  return http.post(`${API}/users/:id/${action}`, () => problema(code, status, detail))
+  return writeProblem(action, code, status, detail)
 }
 
 export function changeAccountStatusNetworkError(action: AccountStatusAction) {
-  return http.post(`${API}/users/:id/${action}`, () => HttpResponse.error())
+  return writeNetworkError(action)
 }
 
 export function changeAccountStatusEmpty(action: AccountStatusAction) {
-  return http.post(`${API}/users/:id/${action}`, () => new HttpResponse(null, { status: 200 }))
+  return writeEmpty(action)
+}
+
+/** Doce letras sin dígitos: la forma de la temporal, sin parecerse a un secreto. */
+export const TEMPORARY_PASSWORD = 'AbCdEfGhJkMn'
+
+export function fakeTemporaryPasswordResponse(
+  overrides: Partial<UserAccountTemporaryPasswordResponse> = {},
+): UserAccountTemporaryPasswordResponse {
+  return { account: fakeUserAccountDetail(), temporaryPassword: TEMPORARY_PASSWORD, ...overrides }
+}
+
+export function resetPasswordCapture(
+  sink: { ids?: number[]; bodies?: string[] },
+  response?: UserAccountTemporaryPasswordResponse,
+  ms = 0,
+) {
+  sink.ids = []
+  sink.bodies = []
+  return http.post(`${API}/users/:id/reset-password`, async ({ params, request }) => {
+    sink.ids = [...(sink.ids ?? []), Number(params.id)]
+    sink.bodies = [...(sink.bodies ?? []), await request.text()]
+    if (ms) await delay(ms)
+    return HttpResponse.json(
+      response ?? fakeTemporaryPasswordResponse({ account: fakeUserAccountDetail({ id: Number(params.id) }) }),
+    )
+  })
+}
+
+export function resetPasswordProblem(code: string, status: number, detail = 'detail del backend') {
+  return writeProblem('reset-password', code, status, detail)
+}
+
+export function resetPasswordNetworkError() {
+  return writeNetworkError('reset-password')
+}
+
+export function resetPasswordEmpty() {
+  return writeEmpty('reset-password')
+}
+
+function writeProblem(write: AccountWrite, code: string, status: number, detail: string) {
+  return http.post(`${API}/users/:id/${write}`, () => problema(code, status, detail))
+}
+
+function writeNetworkError(write: AccountWrite) {
+  return http.post(`${API}/users/:id/${write}`, () => HttpResponse.error())
+}
+
+function writeEmpty(write: AccountWrite) {
+  return http.post(`${API}/users/:id/${write}`, () => new HttpResponse(null, { status: 200 }))
 }

@@ -10,6 +10,7 @@ interface ModalProps {
   title: string
   children: ReactNode
   size?: 'sm' | 'md' | 'lg'
+  dismissible?: boolean
 }
 
 const SIZES: Record<NonNullable<ModalProps['size']>, string> = {
@@ -23,8 +24,8 @@ const FOCUSABLE =
 
 /**
  * Dialog modal reutilizable. A11y: `role="dialog"` + `aria-modal`, etiquetado
- * por el título, foco inicial al primer campo, focus-trap con Tab, cierre por
- * Escape y backdrop, y restauración del foco al elemento que lo abrió.
+ * por el título, foco inicial, focus-trap con Tab, cierre por Escape, backdrop
+ * y la X, y restauración del foco al elemento que lo abrió.
  *
  * Se monta con un portal en `document.body`, no donde se lo invoca: los modales
  * de creación al vuelo se abren DESDE un formulario, y anidado quedaría un
@@ -34,18 +35,20 @@ const FOCUSABLE =
  * árbol de componentes, no por el DOM, así que el submit del form de adentro
  * igual llegaría al de afuera. Por eso el panel también corta la propagación.
  */
-export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ isOpen, onClose, title, children, size = 'md', dismissible = true }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null)
   const previousFocus = useRef<HTMLElement | null>(null)
   // onClose suele ser un arrow inline del padre (ref nueva por render). Lo leemos
   // vía ref para que el efecto de foco/teclado dependa solo de `isOpen` y no se
   // re-ejecute en cada render del padre (lo que robaba el foco a media escritura).
   const onCloseRef = useRef(onClose)
+  const dismissibleRef = useRef(dismissible)
   const titleId = useId()
 
   useEffect(() => {
     onCloseRef.current = onClose
-  }, [onClose])
+    dismissibleRef.current = dismissible
+  }, [onClose, dismissible])
 
   useEffect(() => {
     if (!isOpen) return
@@ -53,7 +56,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
     function handleKey(event: KeyboardEvent) {
       if (event.key === 'Escape') {
-        onCloseRef.current()
+        if (dismissibleRef.current) onCloseRef.current()
         return
       }
       if (event.key !== 'Tab' || !panelRef.current) return
@@ -71,8 +74,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
     }
 
     document.addEventListener('keydown', handleKey)
-    // Foco inicial al primer campo (input/select/textarea), NO al botón de cerrar:
-    // así un Espacio tipeado no activa ese botón ni cierra el modal por accidente.
+    // Con campos, el foco va al primero y no a "Cerrar": un Espacio tipeado no cierra el modal.
     const panel = panelRef.current
     const firstField = panel?.querySelector<HTMLElement>('input, select, textarea')
     ;(firstField ?? panel?.querySelector<HTMLElement>(FOCUSABLE))?.focus()
@@ -87,7 +89,7 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="fixed inset-0 bg-overlay/60" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 bg-overlay/60" onClick={dismissible ? onClose : undefined} aria-hidden="true" />
       <div
         ref={panelRef}
         role="dialog"
@@ -107,14 +109,16 @@ export function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalPr
           <h2 id={titleId} className="text-lg font-semibold text-fg">
             {title}
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Cerrar"
-            className="text-fg-subtle hover:text-fg-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
-          >
-            <X className="h-5 w-5" aria-hidden="true" />
-          </button>
+          {dismissible && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Cerrar"
+              className="text-fg-subtle hover:text-fg-body focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus"
+            >
+              <X className="h-5 w-5" aria-hidden="true" />
+            </button>
+          )}
         </div>
         <div className="px-6 py-4">{children}</div>
       </div>

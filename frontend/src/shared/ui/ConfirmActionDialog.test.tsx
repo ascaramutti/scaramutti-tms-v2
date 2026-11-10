@@ -133,6 +133,12 @@ describe('ConfirmActionDialog', () => {
     expect(dialogo().className).toContain('max-w-sm')
   })
 
+  it('el que llama puede pedirlo mediano', () => {
+    renderDialogo({ size: 'md' })
+    expect(dialogo().className).toContain('max-w-lg')
+    expect(dialogo().className).not.toContain('max-w-sm')
+  })
+
   it('sin violaciones abierto y con un error', async () => {
     const { rerender } = renderDialogo()
     expect(await axe(dialogo())).toHaveNoViolations()

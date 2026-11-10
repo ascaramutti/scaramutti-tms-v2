@@ -60,7 +60,7 @@ export function AccountStatusDialog({ account, onClose, onNotFound }: AccountSta
         </>
       ) : (
         <>
-          <p className="text-sm text-fg-body">Podrá volver a iniciar sesión con la contraseña que tenía.</p>
+          <p className="text-sm text-fg-body">Podrá volver a iniciar sesión con su contraseña actual.</p>
           <p className="text-sm text-fg-body">
             Si tenía una sesión abierta antes de la baja, no se renueva: tendrá que ingresar de nuevo.
           </p>
