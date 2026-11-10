@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode, Ref } from 'react'
-import { Power, UserX } from 'lucide-react'
+import { KeyRound, Power, UserX } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { useAuth } from '../../../shared/auth/AuthContext'
@@ -18,6 +18,7 @@ import { AccountAuditFooter } from '../components/AccountAuditFooter'
 import { AccountDetailCard } from '../components/AccountDetailCard'
 import { AccountStatusDialog } from '../components/AccountStatusDialog'
 import { AccountWorkerCard } from '../components/AccountWorkerCard'
+import { ResetAccountPasswordDialog } from '../components/ResetAccountPasswordDialog'
 import { useUserAccount } from '../hooks/useUserAccount'
 
 const NOTICE = 'px-4 py-3 text-sm text-fg-body'
@@ -30,15 +31,17 @@ export function UserAccountDetailPage() {
   const { user } = useAuth()
   const { level } = useSessionRankLevel()
   const { data, isLoading, isError, error, refetch } = useUserAccount(Number(id))
-  const [dialog, setDialog] = useState<'status' | null>(null)
+  const [dialog, setDialog] = useState<'status' | 'reset' | null>(null)
   const shell = useRef<HTMLDivElement>(null)
-  // Si el botón de estado desapareció al cerrar, el foco se perdería fuera de la página.
+  // Si el botón que abrió el diálogo desapareció al cerrar, el foco se perdería fuera de la página.
   useEffect(() => {
     const page = shell.current
     if (!dialog || !page) return
     return () => {
       if (document.activeElement === document.body) {
-        page.querySelector<HTMLElement>(`a[href="${USERS_BASE}"]`)?.focus()
+        const next =
+          page.querySelector<HTMLElement>('header button') ?? page.querySelector<HTMLElement>(`a[href="${USERS_BASE}"]`)
+        next?.focus()
       }
     }
   }, [dialog])
@@ -93,6 +96,11 @@ export function UserAccountDetailPage() {
   }
 
   const actions = accountActions(data, user, level)
+  const closeDialog = () => setDialog(null)
+  const goneToList = () => {
+    toast.error('Esta cuenta no existe.')
+    navigate(USERS_BASE, { replace: true })
+  }
   return (
     <Shell ref={shell}>
       <PageHeader
@@ -100,15 +108,21 @@ export function UserAccountDetailPage() {
         description={`${data.worker.fullName} · ${data.role.description}`}
         divider
         action={
-          actions.canDeactivate || actions.canReactivate ? (
+          actions.canResetPassword ? (
             <div className="flex flex-wrap gap-3">
-              <Button
-                variant={data.isActive ? 'danger' : 'success'}
-                onClick={() => setDialog('status')}
-              >
-                <Power className="mr-2 h-4 w-4" aria-hidden="true" />
-                {data.isActive ? 'Desactivar' : 'Reactivar'}
+              <Button variant="secondary" onClick={() => setDialog('reset')}>
+                <KeyRound className="mr-2 h-4 w-4" aria-hidden="true" />
+                Restablecer contraseña
               </Button>
+              {(actions.canDeactivate || actions.canReactivate) && (
+                <Button
+                  variant={data.isActive ? 'danger' : 'success'}
+                  onClick={() => setDialog('status')}
+                >
+                  <Power className="mr-2 h-4 w-4" aria-hidden="true" />
+                  {data.isActive ? 'Desactivar' : 'Reactivar'}
+                </Button>
+              )}
             </div>
           ) : undefined
         }
@@ -123,7 +137,7 @@ export function UserAccountDetailPage() {
       )}
       {actions.isOwn && (
         <Alert variant="info" role={undefined} className={NOTICE}>
-          Es tu cuenta: no puedes desactivarla.
+          Es tu cuenta: no puedes desactivarla. Tu contraseña la cambias desde Cambiar contraseña.
         </Alert>
       )}
       {actions.isOutOfRank && (
@@ -134,16 +148,8 @@ export function UserAccountDetailPage() {
       <AccountDetailCard account={data} />
       <AccountWorkerCard worker={data.worker} />
       <AccountAuditFooter account={data} />
-      {dialog === 'status' && (
-        <AccountStatusDialog
-          account={data}
-          onClose={() => setDialog(null)}
-          onNotFound={() => {
-            toast.error('Esta cuenta no existe.')
-            navigate(USERS_BASE, { replace: true })
-          }}
-        />
-      )}
+      {dialog === 'status' && <AccountStatusDialog account={data} onClose={closeDialog} onNotFound={goneToList} />}
+      {dialog === 'reset' && <ResetAccountPasswordDialog account={data} onClose={closeDialog} onNotFound={goneToList} />}
     </Shell>
   )
 }

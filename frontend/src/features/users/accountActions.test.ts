@@ -30,7 +30,7 @@ function accionesDe(role: UserRole, account: UserAccountDetailResponse) {
   return accountActions(account, sesion(role), sessionRankLevel(role, ROLES))
 }
 
-const NADA = { canDeactivate: false, canReactivate: false, reactivateBlockedBy: null }
+const NADA = { canResetPassword: false, canDeactivate: false, canReactivate: false, reactivateBlockedBy: null }
 
 describe('accountActions', () => {
   it.each<[UserRole, string, 'la gestiona' | 'no la gestiona']>([
@@ -44,6 +44,7 @@ describe('accountActions', () => {
     expect(accionesDe(sesionRole, cuentaDe(cuentaRole))).toEqual({
       isOwn: false,
       isOutOfRank: !enRango,
+      canResetPassword: enRango,
       canDeactivate: enRango,
       canReactivate: false,
       reactivateBlockedBy: null,
@@ -52,6 +53,7 @@ describe('accountActions', () => {
 
   it('en rango, una inactiva se reactiva y no se desactiva', () => {
     expect(accionesDe('admin', cuentaDe('sales', { isActive: false }))).toMatchObject({
+      canResetPassword: true,
       canDeactivate: false,
       canReactivate: true,
       reactivateBlockedBy: null,
@@ -110,6 +112,7 @@ describe('accountActions', () => {
     expect(accionesDe('admin', cuenta)).toEqual({
       isOwn: false,
       isOutOfRank: false,
+      canResetPassword: true,
       canDeactivate: false,
       canReactivate: false,
       reactivateBlockedBy: motivo,

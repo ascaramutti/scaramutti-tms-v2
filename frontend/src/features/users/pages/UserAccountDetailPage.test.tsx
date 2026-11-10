@@ -29,7 +29,14 @@ import {
   getUserAccountNotFoundWithoutBody,
   getUserAccountOk,
   getUserAccountSlow,
+  fakeTemporaryPasswordResponse,
+  resetPasswordCapture,
+  resetPasswordEmpty,
+  resetPasswordNetworkError,
+  resetPasswordProblem,
+  TEMPORARY_PASSWORD,
 } from '../../../test/mocks/handlers/users'
+import { hidePageAndReadText } from '../../../test/pagehide'
 import type { SessionUser, UserAccountDetailResponse, UserRole } from '../../../api'
 
 vi.mock('sonner', () => ({
@@ -175,7 +182,7 @@ describe('UserAccountDetailPage', () => {
 
       expect(screen.queryByText(/bloque/i)).not.toBeInTheDocument()
       expect(screen.queryByText(/corregir/i)).not.toBeInTheDocument()
-      expect(screen.queryAllByRole('button').map((boton) => boton.textContent)).toEqual(['Desactivar'])
+      expect(screen.queryAllByRole('button').map((boton) => boton.textContent)).toEqual(['Restablecer contraseña', 'Desactivar'])
       expect(screen.getAllByRole('link').map((enlace) => enlace.textContent)).toEqual(['Volver a usuarios', 'Ver la ficha'])
     })
   })
@@ -485,7 +492,7 @@ describe('UserAccountDetailPage', () => {
       await renderAccount(cuenta({ id: 1, isActive }))
       expect(screen.queryAllByRole('button')).toEqual([])
       const aviso = screen.getByText(/^Es tu cuenta/)
-      expect(aviso).toHaveTextContent(/^Es tu cuenta: no puedes desactivarla\.$/)
+      expect(aviso).toHaveTextContent(/^Es tu cuenta: no puedes desactivarla\. Tu contraseña la cambias desde Cambiar contraseña\.$/)
       expect(aviso).not.toHaveAttribute('role')
       expect(aviso.className).toContain('bg-accent-soft')
       expect(within(aviso).queryAllByRole('link')).toEqual([])
@@ -530,7 +537,7 @@ describe('UserAccountDetailPage', () => {
       ['con el cargo sin sesión', { role: { ...CARGO, canLogin: false } }, MOTIVO_CARGO],
     ])('%s, Reactivar no se muestra y el motivo dice por qué, con el enlace a la ficha', async (_caso, overrides, motivo) => {
       await renderAccount(cuenta({ isActive: false, ...overrides }))
-      expect(screen.queryAllByRole('button')).toEqual([])
+      expect(screen.queryAllByRole('button').map((boton) => boton.textContent)).toEqual(['Restablecer contraseña'])
       const aviso = screen.getByText(new RegExp(`^${motivo}`))
       expect(aviso).toHaveTextContent(new RegExp(`^${motivo} Ver la ficha de Juan Pérez Quispe$`))
       expect(aviso).not.toHaveAttribute('role')
@@ -598,7 +605,7 @@ describe('UserAccountDetailPage', () => {
       expect(screen.getByRole('dialog', { name: 'Reactivar cuenta' })).toBeInTheDocument()
       expect(parrafos()).toEqual([
         '¿Reactivas la cuenta jperez de Juan Pérez Quispe?',
-        'Podrá volver a iniciar sesión con la contraseña que tenía.',
+        'Podrá volver a iniciar sesión con su contraseña actual.',
         'Si tenía una sesión abierta antes de la baja, no se renueva: tendrá que ingresar de nuevo.',
       ])
     })
@@ -709,7 +716,7 @@ describe('UserAccountDetailPage', () => {
       it.each([
         ['con el trabajador de baja', { worker: { ...TRABAJADOR, isActive: false } }],
         ['de un cargo sin sesión', { role: { ...CARGO, canLogin: false } }],
-      ])('tras desactivar una cuenta %s, Reactivar no se muestra y el foco va a la vuelta a la lista', async (_caso, overrides) => {
+      ])('tras desactivar una cuenta %s, Reactivar no se muestra y el foco va a Restablecer contraseña', async (_caso, overrides) => {
         const user = userEvent.setup()
         server.use(changeAccountStatusCapture('deactivate', {}, cuenta({ isActive: false, ...overrides })))
         await renderAccount(cuenta(overrides))
@@ -718,6 +725,17 @@ describe('UserAccountDetailPage', () => {
         await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
         expect(estado()).toBe('Inactiva')
         expect(screen.queryByRole('button', { name: 'Reactivar' })).not.toBeInTheDocument()
+        expect(screen.getByRole('button', { name: 'Restablecer contraseña' })).toHaveFocus()
+      })
+
+      it('si al cerrar ya no queda ningún botón, el foco va a la vuelta a la lista', async () => {
+        const user = userEvent.setup()
+        const { queryClient } = await renderAccount(cuenta())
+        await user.click(screen.getByRole('button', { name: 'Desactivar' }))
+        act(() => queryClient.setQueryData(userAccountKeys.detail(42), cuenta({ id: 1 })))
+        await user.click(within(dialogo()).getByRole('button', { name: 'Cancelar' }))
+
+        expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
         expect(screen.getByRole('link', { name: 'Volver a usuarios' })).toHaveFocus()
       })
     })
@@ -789,6 +807,351 @@ describe('UserAccountDetailPage', () => {
         await waitFor(() => expect(router.state.location.pathname).toBe(USERS_BASE))
         expect(toast.error).toHaveBeenCalledWith('Esta cuenta no existe.')
         expect(router.state.historyAction).toBe('REPLACE')
+      })
+    })
+  })
+
+  describe('restablecer contraseña', () => {
+    const TRABAJADOR = fakeUserAccountDetail().worker
+    const CARGO = fakeUserAccountDetail().role
+    const GRUPOS = ['AbCd', 'EfGh', 'JkMn']
+
+    function cuenta(overrides: Partial<UserAccountDetailResponse> = {}) {
+      return fakeUserAccountDetail({ id: 42, ...overrides })
+    }
+
+    const dialogo = () => screen.getByRole('dialog')
+    const restablecer = () => screen.getByRole('button', { name: 'Restablecer contraseña' })
+    const parrafos = () =>
+      Array.from(dialogo().querySelectorAll('p'))
+        .filter((parrafo) => !parrafo.closest('[role="alert"]') && parrafo.getAttribute('role') !== 'alert')
+        .map((parrafo) => parrafo.textContent)
+
+    async function abrirYConfirmar(user: ReturnType<typeof userEvent.setup>) {
+      await user.click(restablecer())
+      await user.click(within(dialogo()).getByRole('button', { name: 'Restablecer' }))
+    }
+
+    async function alPaso2(user: ReturnType<typeof userEvent.setup>, account = cuenta(), respuesta?: Parameters<typeof resetPasswordCapture>[1]) {
+      const envios: { ids?: number[]; bodies?: string[] } = {}
+      server.use(resetPasswordCapture(envios, respuesta))
+      const vista = await renderAccount(account)
+      await abrirYConfirmar(user)
+      await screen.findByRole('dialog', { name: 'Contraseña restablecida' })
+      return { ...vista, envios }
+    }
+
+    /** Todo lo que el navegador guarda fuera de la pantalla: la temporal no tiene que estar en nada. */
+    function fueraDeLaPantalla(queryClient: QueryClient, router: ReturnType<typeof renderPage>['router']) {
+      return JSON.stringify({
+        ruta: router.state.location,
+        queries: queryClient.getQueryCache().getAll().map((query) => [query.queryKey, query.state]),
+        mutations: queryClient.getMutationCache().getAll().map((mutation) => mutation.state),
+        href: window.location.href,
+        history: window.history.state,
+        local: { ...localStorage },
+        session: { ...sessionStorage },
+        avisos: [vi.mocked(toast.success).mock.calls, vi.mocked(toast.error).mock.calls],
+      })
+    }
+
+    it('en rango va antes del botón de estado, como secundario', async () => {
+      await renderAccount(cuenta())
+      const desactivar = screen.getByRole('button', { name: 'Desactivar' })
+      expect(siguiente(restablecer(), desactivar)).toBe(true)
+      expect(restablecer().className).toContain('bg-surface')
+      expect(restablecer().parentElement).toBe(desactivar.parentElement)
+    })
+
+    it.each([
+      ['activa', cuenta()],
+      ['inactiva', cuenta({ isActive: false })],
+      ['inactiva con el trabajador de baja', cuenta({ isActive: false, worker: { ...TRABAJADOR, isActive: false } })],
+      ['inactiva de un cargo sin sesión', cuenta({ isActive: false, role: { ...CARGO, canLogin: false } })],
+    ])('se ofrece sobre una %s', async (_caso, account) => {
+      await renderAccount(account)
+      expect(restablecer()).toBeEnabled()
+    })
+
+    it('el paso 1 nombra la cuenta, dice que la actual deja de servir, avisa de la sesión y no tiene campos', async () => {
+      const user = userEvent.setup()
+      await renderAccount(cuenta())
+      await user.click(restablecer())
+
+      expect(screen.getByRole('dialog', { name: 'Restablecer contraseña' })).toBeInTheDocument()
+      expect(parrafos()).toEqual([
+        'El sistema generará una contraseña temporal nueva para jperez (Juan Pérez Quispe) y te la mostrará una sola vez. La actual deja de servir.',
+        SESSION_WINDOW_NOTICE,
+      ])
+      expect(within(dialogo()).getByText('jperez')).toHaveClass('font-mono')
+      expect(dialogo().querySelectorAll('input, textarea, select')).toHaveLength(0)
+    })
+
+    it('sobre una inactiva, el paso 1 avisa que también hay que reactivarla', async () => {
+      const user = userEvent.setup()
+      await renderAccount(cuenta({ isActive: false }))
+      await user.click(restablecer())
+      expect(parrafos()).toEqual([
+        'El sistema generará una contraseña temporal nueva para jperez (Juan Pérez Quispe) y te la mostrará una sola vez. La actual deja de servir.',
+        SESSION_WINDOW_NOTICE,
+        'La cuenta sigue inactiva: para que pueda entrar, también hay que reactivarla.',
+      ])
+    })
+
+    it('el diálogo es mediano en los dos pasos', async () => {
+      const user = userEvent.setup()
+      await renderAccount(cuenta())
+      await user.click(restablecer())
+      expect(dialogo().className).toContain('max-w-lg')
+      server.use(resetPasswordCapture({}))
+      await user.click(within(dialogo()).getByRole('button', { name: 'Restablecer' }))
+      await screen.findByRole('dialog', { name: 'Contraseña restablecida' })
+      expect(dialogo().className).toContain('max-w-lg')
+    })
+
+    it('Cancelar cierra sin enviar, y el foco vuelve a Restablecer contraseña', async () => {
+      const user = userEvent.setup()
+      const envios: { ids?: number[] } = {}
+      server.use(resetPasswordCapture(envios))
+      await renderAccount(cuenta())
+      await user.click(restablecer())
+      await user.click(within(dialogo()).getByRole('button', { name: 'Cancelar' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(envios.ids).toEqual([])
+      expect(restablecer()).toHaveFocus()
+    })
+
+    it('mientras envía dice que restablece', async () => {
+      const user = userEvent.setup()
+      server.use(resetPasswordCapture({}, undefined, 100))
+      await renderAccount(cuenta())
+      await abrirYConfirmar(user)
+      expect(await within(dialogo()).findByRole('button', { name: /Restableciendo…/ })).toBeDisabled()
+    })
+
+    it('confirmar envía un POST sin cuerpo, una vez, y el paso 2 muestra la temporal de la respuesta', async () => {
+      const user = userEvent.setup()
+      const { envios } = await alPaso2(user)
+
+      expect(envios.ids).toEqual([42])
+      expect(envios.bodies).toEqual([''])
+      expect(parrafos().slice(0, 1)).toEqual([
+        'Esta es la contraseña temporal de jperez (Juan Pérez Quispe). Pídele que la cambie desde "Cambiar contraseña" al entrar.',
+      ])
+      expect(within(dialogo()).getByText('AbCd').parentElement).toHaveTextContent(TEMPORARY_PASSWORD)
+      expect(within(dialogo()).getByText('jperez')).toHaveClass('font-mono')
+    })
+
+    it('sin aviso emergente de éxito: el paso 2 es el éxito', async () => {
+      const user = userEvent.setup()
+      await alPaso2(user)
+      expect(toast.success).not.toHaveBeenCalled()
+    })
+
+    it('en el paso 2 el foco va a Copiar, y Listo es el único botón del pie, a la derecha', async () => {
+      const user = userEvent.setup()
+      await alPaso2(user)
+      expect(within(dialogo()).getByRole('button', { name: 'Copiar' })).toHaveFocus()
+      const listo = within(dialogo()).getByRole('button', { name: 'Listo' })
+      const pie = listo.parentElement as HTMLElement
+      expect(pie.className.split(/\s+/)).toContain('justify-end')
+      expect(pie.children).toHaveLength(1)
+    })
+
+    it('ningún paso tiene campos ni dice que el sistema obliga a cambiarla', async () => {
+      const user = userEvent.setup()
+      server.use(resetPasswordCapture({}))
+      await renderAccount(cuenta({ isActive: false }))
+      await user.click(restablecer())
+      expect(dialogo().textContent).not.toMatch(/oblig|deberá|tendrá que cambiar/i)
+      await user.click(within(dialogo()).getByRole('button', { name: 'Restablecer' }))
+      await screen.findByRole('dialog', { name: 'Contraseña restablecida' })
+      expect(dialogo().textContent).not.toMatch(/oblig|deberá|tendrá que cambiar/i)
+      expect(dialogo().querySelectorAll('input, textarea, select')).toHaveLength(0)
+    })
+
+    it.each([
+      ['Escape', (user: ReturnType<typeof userEvent.setup>) => user.keyboard('{Escape}')],
+      ['un clic en el fondo', (user: ReturnType<typeof userEvent.setup>) => user.click(dialogo().previousElementSibling as HTMLElement)],
+    ])('%s no cierra el paso 2, que no tiene "Cerrar"', async (_via, cerrar) => {
+      const user = userEvent.setup()
+      await alPaso2(user)
+      await cerrar(user)
+      expect(screen.getByRole('dialog', { name: 'Contraseña restablecida' })).toBeInTheDocument()
+      expect(within(dialogo()).queryByRole('button', { name: 'Cerrar' })).not.toBeInTheDocument()
+      expect(within(dialogo()).getByText('AbCd')).toBeInTheDocument()
+    })
+
+    it('Listo lo cierra, la temporal ya no está y el foco vuelve a Restablecer contraseña', async () => {
+      const user = userEvent.setup()
+      await alPaso2(user)
+      await user.click(within(dialogo()).getByRole('button', { name: 'Listo' }))
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+      expect(document.body.textContent).not.toContain(TEMPORARY_PASSWORD)
+      expect(restablecer()).toHaveFocus()
+    })
+
+    it('tras cerrar, el detalle muestra la cuenta devuelta sin otro pedido', async () => {
+      const user = userEvent.setup()
+      const pedidos: { ids?: number[] } = {}
+      const devuelta = cuenta({
+        updatedAt: '2026-11-10T15:30:00Z',
+        updatedBy: { id: 1, username: 'user-admin', fullName: 'Usuario admin', position: 'Cargo de prueba' },
+      })
+      server.use(resetPasswordCapture({}, fakeTemporaryPasswordResponse({ account: devuelta })))
+      await renderAccount(cuenta(), sesion(), pedidos)
+      await abrirYConfirmar(user)
+      await user.click(await within(await screen.findByRole('dialog', { name: 'Contraseña restablecida' })).findByRole('button', { name: 'Listo' }))
+
+      expect(screen.getByText('Modificada por Usuario admin el 10/11/2026, 10:30')).toBeInTheDocument()
+      expect(pedidos.ids).toEqual([42])
+    })
+
+    it('siembra el detalle con la cuenta y marca vieja la lista, sin la temporal', async () => {
+      const user = userEvent.setup()
+      const devuelta = cuenta({ username: 'jperez.devuelto' })
+      server.use(resetPasswordCapture({}, fakeTemporaryPasswordResponse({ account: devuelta })))
+      const { queryClient } = await renderAccount(cuenta())
+      queryClient.setQueryData(userAccountKeys.list({ isActive: true }), [])
+      await abrirYConfirmar(user)
+      await screen.findByRole('dialog', { name: 'Contraseña restablecida' })
+
+      expect(queryClient.getQueryData(userAccountKeys.detail(42))).toEqual(devuelta)
+      expect(queryClient.getQueryState(userAccountKeys.list({ isActive: true }))?.isInvalidated).toBe(true)
+    })
+
+    it('con el paso 2 abierto, la temporal está solo en la pantalla', async () => {
+      const user = userEvent.setup()
+      const { queryClient, router } = await alPaso2(user)
+      expect(within(dialogo()).getByText('AbCd')).toBeInTheDocument()
+      await waitFor(() => expect(queryClient.getMutationCache().getAll()).toEqual([]))
+      for (const grupo of [TEMPORARY_PASSWORD, ...GRUPOS]) {
+        expect(fueraDeLaPantalla(queryClient, router)).not.toContain(grupo)
+      }
+    })
+
+    it('tras Listo, la temporal no queda en ningún lado', async () => {
+      const user = userEvent.setup()
+      const { queryClient, router } = await alPaso2(user)
+      await user.click(within(dialogo()).getByRole('button', { name: 'Listo' }))
+      await waitFor(() => expect(queryClient.getMutationCache().getAll()).toEqual([]))
+      expect(fueraDeLaPantalla(queryClient, router)).not.toContain(TEMPORARY_PASSWORD)
+      expect(document.body.textContent).not.toContain(TEMPORARY_PASSWORD)
+    })
+
+    it('al ocultarse la página, la temporal se borra en ese mismo instante y el foco va a Listo', async () => {
+      const user = userEvent.setup()
+      await alPaso2(user)
+      expect(within(dialogo()).getByRole('button', { name: 'Copiar' })).toHaveFocus()
+
+      const texto = hidePageAndReadText()
+      expect(texto).not.toContain(TEMPORARY_PASSWORD)
+      await act(async () => {})
+      expect(within(dialogo()).getByText(/^Ya no se muestra/)).toBeInTheDocument()
+      expect(within(dialogo()).getByRole('button', { name: 'Listo' })).toHaveFocus()
+    })
+
+    describe('errores', () => {
+      it.each([
+        ['USR-007', 403, 'Tu propia contraseña se cambia en Cambiar contraseña.'],
+        ['USR-008', 403, 'No puedes gestionar la cuenta de alguien de tu nivel o superior.'],
+        ['COM-003', 403, 'Tu rol no tiene permisos para esta acción.'],
+        ['USR-009', 409, 'Otra operación estaba en curso y no se pudo restablecer la contraseña. Intenta de nuevo.'],
+      ] as const)('%s se avisa en el diálogo, que sigue en el paso 1', async (code, status, texto) => {
+        const user = userEvent.setup()
+        server.use(resetPasswordProblem(code, status))
+        await renderAccount(cuenta())
+        await abrirYConfirmar(user)
+
+        expect((await within(dialogo()).findByRole('alert')).textContent).toBe(texto)
+        expect(screen.getByRole('dialog', { name: 'Restablecer contraseña' })).toBeInTheDocument()
+      })
+
+      it('un código sin texto propio muestra lo que dice el backend', async () => {
+        const user = userEvent.setup()
+        server.use(resetPasswordProblem('COM-999', 403, 'No tiene permisos para esta operación'))
+        await renderAccount(cuenta())
+        await abrirYConfirmar(user)
+        expect((await within(dialogo()).findByRole('alert')).textContent).toBe('No tiene permisos para esta operación')
+      })
+
+      it.each([
+        ['un problema sin detalle', () => resetPasswordProblem('COM-999', 500, '')],
+        ['una caída de red', () => resetPasswordNetworkError()],
+        ['una respuesta sin cuerpo', () => resetPasswordEmpty()],
+      ])('%s se avisa con el texto genérico', async (_caso, handler) => {
+        const user = userEvent.setup()
+        server.use(handler())
+        await renderAccount(cuenta())
+        await abrirYConfirmar(user)
+        expect((await within(dialogo()).findByRole('alert')).textContent).toBe(
+          'No se pudo restablecer la contraseña. Intenta de nuevo.',
+        )
+      })
+
+      it('tras un USR-009, intentar de nuevo desde el mismo diálogo llega al paso 2', async () => {
+        const user = userEvent.setup()
+        server.use(resetPasswordProblem('USR-009', 409))
+        await renderAccount(cuenta())
+        await abrirYConfirmar(user)
+        await within(dialogo()).findByRole('alert')
+
+        server.use(resetPasswordCapture({}, undefined, 100))
+        await user.click(within(dialogo()).getByRole('button', { name: 'Restablecer' }))
+        await within(dialogo()).findByRole('button', { name: /Restableciendo…/ })
+        expect(within(dialogo()).queryByRole('alert')).not.toBeInTheDocument()
+        expect(await screen.findByRole('dialog', { name: 'Contraseña restablecida' })).toBeInTheDocument()
+      })
+
+      it.each([
+        ['un USR-009', () => resetPasswordProblem('USR-009', 409)],
+        ['un 500', () => resetPasswordProblem('COM-500', 500, 'Error interno del servidor')],
+      ])('tras %s, la temporal de un intento anterior no queda en ningún lado', async (_caso, handler) => {
+        const user = userEvent.setup()
+        const { queryClient, router } = await alPaso2(user)
+        await user.click(within(dialogo()).getByRole('button', { name: 'Listo' }))
+        server.use(handler())
+        await abrirYConfirmar(user)
+        await within(dialogo()).findByRole('alert')
+
+        await waitFor(() => expect(queryClient.getMutationCache().getAll().every((m) => m.state.status === 'error')).toBe(true))
+        expect(fueraDeLaPantalla(queryClient, router)).not.toContain(TEMPORARY_PASSWORD)
+        expect(document.body.textContent).not.toContain(TEMPORARY_PASSWORD)
+      })
+
+      it('USR-001 avisa que no existe y vuelve a la lista reemplazando la entrada', async () => {
+        const user = userEvent.setup()
+        server.use(resetPasswordProblem('USR-001', 404))
+        const { router } = await renderAccount(cuenta())
+        await abrirYConfirmar(user)
+
+        await waitFor(() => expect(router.state.location.pathname).toBe(USERS_BASE))
+        expect(toast.error).toHaveBeenCalledWith('Esta cuenta no existe.')
+        expect(router.state.historyAction).toBe('REPLACE')
+      })
+    })
+
+    describe('accesibilidad', () => {
+      it('sin violaciones en el paso 1, con y sin error', async () => {
+        const user = userEvent.setup()
+        server.use(resetPasswordProblem('USR-009', 409))
+        await renderAccount(cuenta({ isActive: false }))
+        await user.click(restablecer())
+        expect(await axe(dialogo())).toHaveNoViolations()
+        await user.click(within(dialogo()).getByRole('button', { name: 'Restablecer' }))
+        await within(dialogo()).findByRole('alert')
+        expect(await axe(dialogo())).toHaveNoViolations()
+      })
+
+      it('sin violaciones en el paso 2, con la temporal y ya borrada', async () => {
+        const user = userEvent.setup()
+        await alPaso2(user)
+        expect(await axe(dialogo())).toHaveNoViolations()
+        hidePageAndReadText()
+        await act(async () => {})
+        expect(await axe(dialogo())).toHaveNoViolations()
       })
     })
   })

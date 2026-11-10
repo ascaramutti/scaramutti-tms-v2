@@ -6,6 +6,7 @@ export type ReactivateBlockedBy = 'workerInactive' | 'roleCannotLogin'
 export interface AccountActions {
   isOwn: boolean
   isOutOfRank: boolean
+  canResetPassword: boolean
   canDeactivate: boolean
   canReactivate: boolean
   reactivateBlockedBy: ReactivateBlockedBy | null
@@ -35,6 +36,7 @@ export function accountActions(
   return {
     isOwn,
     isOutOfRank: sessionLevel !== undefined && !inRank && !isOwn,
+    canResetPassword: canChange,
     canDeactivate: canChange && account.isActive,
     canReactivate: canChange && !account.isActive && reactivateBlockedBy === null,
     reactivateBlockedBy,

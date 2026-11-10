@@ -14,6 +14,7 @@ interface ConfirmActionDialogProps {
   confirmLabel: string
   pendingLabel: string
   confirmVariant: Exclude<ButtonVariant, 'secondary'>
+  size?: 'sm' | 'md'
   isPending: boolean
   error: string | null
   onConfirm: () => void
@@ -26,6 +27,7 @@ export function ConfirmActionDialog({
   confirmLabel,
   pendingLabel,
   confirmVariant,
+  size = 'sm',
   isPending,
   error,
   onConfirm,
@@ -40,7 +42,7 @@ export function ConfirmActionDialog({
 
   return (
     // Mientras envía no se cierra: la respuesta tiene que verse en la pantalla o en el diálogo.
-    <Modal isOpen onClose={isPending ? () => {} : onClose} title={title} size="sm">
+    <Modal isOpen onClose={isPending ? () => {} : onClose} title={title} size={size}>
       <div className="space-y-4">
         {children}
         {error && (
