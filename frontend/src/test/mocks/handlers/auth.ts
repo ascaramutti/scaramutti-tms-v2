@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { LoginResponse, Problem, SessionUser, UserResponse } from '../../../api'
+import type { LoginResponse, Problem, SessionUser } from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -37,7 +37,7 @@ export const authHandlers = [
 ]
 
 // Login exitoso con un rol específico (para tests del landing por rol).
-export function loginAsRoleResponse(role: UserResponse['role']) {
+export function loginAsRoleResponse(role: SessionUser['role']) {
   return http.post(`${API}/auth/login`, () =>
     HttpResponse.json({
       ...fakeLoginResponse,

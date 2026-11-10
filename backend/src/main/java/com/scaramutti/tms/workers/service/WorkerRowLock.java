@@ -1,6 +1,9 @@
 package com.scaramutti.tms.workers.service;
 
+import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.Worker;
+import com.scaramutti.tms.shared.repository.RowLockSupport;
+import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
 import com.scaramutti.tms.workers.WorkersError;
 import io.quarkus.runtime.StartupEvent;
@@ -17,11 +20,13 @@ import org.hibernate.engine.spi.EntityKey;
 import org.jboss.logging.Logger;
 
 import java.sql.SQLException;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * Lectura con LOCK de la fila de un trabajador, con su tope de espera y la traduccion del choque.
+ * Lectura con LOCK de la fila de un trabajador (y la de su cuenta), con su tope de espera y la
+ * traduccion del choque.
  *
  * <p>Es un componente propio y no tres lineas dentro del servicio porque las tres van SIEMPRE
  * juntas, y las usan igual la edicion y el cambio de estado. Separadas se
@@ -42,7 +47,7 @@ import java.util.TreeSet;
  * choque sale como el conflicto transitorio del contrato. El lock debil sigue siendo el correcto
  * porque evita ese acople en todas las demas ediciones, que son la mayoria.
  *
- * <p>Por eso el presupuesto cuenta NUEVE topes y no uno. La cuenta que importa es cuanto puede
+ * <p>Por eso el presupuesto cuenta ONCE topes y no uno. La cuenta que importa es cuanto puede
  * retener su conexion UNA transaccion, y el detalle esta en
  * {@link #MAX_LOCK_WAITS_PER_TRANSACTION}.
  *
@@ -88,11 +93,11 @@ public class WorkerRowLock {
      *       titular (659ms y 601ms).
      * </ul>
      *
-     * <p>La edicion es la que mas gasta, NUEVE: la fila del destino (2), la de quien actua (2), el
-     * documento (tupla 1 e indice 1) y la ficha (tupla 2 e indice de la licencia 1); la cuenta no
-     * la escribe. Desactivar gasta ocho (destino, quien actua, ficha y cuenta, dos cada una);
-     * reactivar, seis (destino, quien actua y ficha); el alta, cuatro (quien actua 2, documento 1,
-     * licencia 1).
+     * <p>La edicion es la que mas gasta, ONCE: la fila del destino (2), la de quien actua (2), el
+     * documento (tupla 1 e indice 1), la ficha (tupla 2 e indice de la licencia 1) y la cuenta,
+     * cuando el cargo cambia a uno sin sesion (2). Desactivar gasta ocho (destino, quien actua,
+     * ficha y cuenta, dos cada una); reactivar, seis (destino, quien actua y ficha); el alta,
+     * cuatro (quien actua 2, documento 1, licencia 1).
      *
      * <p>NO ES UN TECHO: la misma espera se repite con cada titular distinto. Tres caminos lo pasan
      * sin error: cambiar una clave con varios bloqueos de clave de hijas en curso (se espera a cada
@@ -114,10 +119,10 @@ public class WorkerRowLock {
      *
      * <p>El INSERT de la ficha que nace no suma: es excluyente con su UPDATE.
      */
-    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 9;
+    static final int MAX_LOCK_WAITS_PER_TRANSACTION = 11;
 
     /**
-     * En MILISEGUNDOS y no en segundos: con nueve topes, el valor entero mas chico expresable en
+     * En MILISEGUNDOS y no en segundos: con once topes, el valor entero mas chico expresable en
      * segundos ya se pasa del techo del pool. La unidad nativa del motor para esta opcion es el
      * milisegundo, asi que ademas se escribe tal cual.
      */
@@ -129,6 +134,8 @@ public class WorkerRowLock {
     java.time.Duration poolAcquisitionTimeout;
 
     @Inject WorkerRepository workerRepository;
+    @Inject UserRepository userRepository;
+    @Inject RowLockSupport rowLockSupport;
     @Inject EntityManager entityManager;
 
     /**
@@ -155,6 +162,16 @@ public class WorkerRowLock {
         applyLockTimeout();
 
         return runTranslatingLockConflicts(() -> readAndLock(workerId), workerId);
+    }
+
+    /**
+     * Tomada y no solo leida: si Usuarios la esta reactivando, la edicion espera y decide con lo que
+     * Usuarios confirmo.
+     */
+    @Transactional(Transactional.TxType.MANDATORY)
+    public Optional<User> findAccountForUpdate(Integer workerId) {
+        return userRepository.findIdByWorkerId(workerId).flatMap(userId -> runTranslatingLockConflicts(
+            () -> rowLockSupport.lockThenFind(User.class, userId, requireUsableLockTimeout()), workerId));
     }
 
     private Worker readAndLock(Integer workerId) {
@@ -282,11 +299,10 @@ public class WorkerRowLock {
             if (cause instanceof SQLException sqlException
                     && LOCK_CONFLICT_SQL_STATES.contains(sqlException.getSQLState())) {
                 // El tope rige TODA la transaccion, asi que el choque pudo ser con la fila del
-                // trabajador, con la de su ficha o con un catalogo. El mensaje del motor es lo
-                // unico que nombra la relacion, y no trae valores de la fila: dice que sentencia
-                // se cancelo y sobre que tabla. El id va; datos de la persona, ninguno.
+                // trabajador, con la de su ficha, con su cuenta o con un catalogo. El id va; datos de
+                // la persona, ninguno: el mensaje primario del motor no trae valores de la fila.
                 LOG.warnf("Conflicto de lock (%s) %s con un tope de %dms: %s", sqlException.getSQLState(),
-                    workerId == null ? "en un alta" : "sobre la fila del trabajador id=" + workerId,
+                    workerId == null ? "en un alta" : "en la escritura del trabajador id=" + workerId,
                     lockTimeoutMillis, primaryMessageOf(sqlException));
                 return WorkersError.WORKER_LOCKED.toException();
             }

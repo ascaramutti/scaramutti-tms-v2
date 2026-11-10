@@ -90,17 +90,21 @@ export type UserRef = {
 };
 
 export type UserResponse = UserRef & {
-    role: UserRole;
+    /**
+     * El nombre de sistema del cargo del trabajador; puede ser uno que no inicia sesión
+     */
+    role: string;
     isActive: boolean;
 };
 
 /**
  * El usuario de la sesión (login, refresh, change-password y /auth/me): el de UserResponse
- * más el id de su trabajador, para reconocer la ficha propia. Los autores embebidos en otras
- * respuestas (UserResponse o UserRef) no lo traen.
+ * más el id de su trabajador, para reconocer la ficha propia, y con un rol que inicia sesión.
+ * Los autores embebidos en otras respuestas (UserResponse o UserRef) no traen ese id.
  *
  */
 export type SessionUser = UserResponse & {
+    role: UserRole;
     /**
      * ID del trabajador de la cuenta; toda cuenta tiene uno
      */
@@ -1078,7 +1082,7 @@ export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
  * visible del cargo: es el `position` de todo objeto de usuario embebido
  * (sesión, cotizaciones, almacén, operaciones y el detalle de un
  * trabajador) y el `receivedBy` de un retiro; `level` es el nivel del organigrama, de 4 a 1; `canLogin` dice
- * si el rol puede tener usuario. La tabla completa de nivel por rol no se
+ * si el rol inicia sesión. La tabla completa de nivel por rol no se
  * enumera en ningún contrato: este documento se sirve sin sesión, y el nivel
  * de cada cargo es justamente lo que `GET /roles` restringe a los cuatro
  * roles del padrón.

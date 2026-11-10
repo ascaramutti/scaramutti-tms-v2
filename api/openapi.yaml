@@ -48,8 +48,8 @@ info:
 
     ## Roles
 
-    Siete roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`,
-    `finance_manager`, `warehouse_keeper`.
+    Once cargos; los siete nombrados son roles del sistema e inician sesión: `admin`, `sales`,
+    `dispatcher`, `general_manager`, `operations_manager`, `finance_manager`, `warehouse_keeper`.
     `dispatcher` (Coordinador de Operaciones) opera los viajes: ve el listado y el detalle, asigna
     recursos, inicia y finaliza. No crea ni edita servicios, no los cancela ni los elimina y
     **nunca ve precios** (el servidor los omite de sus respuestas y el reporte le responde 403).
@@ -84,7 +84,7 @@ tags:
   - name: SharedCatalogs
     description: Catálogos compartidos de `public` (el listado de trabajadores, la flota unificada y los conductores); sin prefijo de módulo porque los usan Almacén y Operaciones
   - name: Workers
-    description: Trabajadores — el padrón. Hoy trae el alta de un trabajador, su edición, su detalle y sus catálogos (tipos de documento y roles); el cambio de estado llega con la historia siguiente
+    description: 'Trabajadores: el padrón. El alta, la edición, el detalle, el cambio de estado y sus catálogos (tipos de documento y roles)'
   - name: Users
     description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, el detalle de una cuenta, con quién la creó y la modificó, y desactivarla, reactivarla y restablecer su contraseña
 
@@ -1461,7 +1461,7 @@ paths:
         (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
         que viaja en `role` del request y en el rol de la sesión), nombre visible
         (`description`, el cargo que muestran el pie del menú y el PDF),
-        nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
+        nivel, si el rol inicia sesión (`canLogin`) y modalidad de ficha
         de conductor. El mismo catálogo para todos los roles: el cliente
         esconde los de nivel igual o mayor al del rol de la sesión (para
         `admin` ofrece todos); la autoridad es el `403 WRK-006` de las
@@ -1721,12 +1721,13 @@ paths:
         su trabajador. Si `role` cambia, la cuenta queda con el rol nuevo en la
         MISMA transacción (los grupos del token rigen hasta el próximo inicio de
         sesión o refresco; `/auth/me` y las escrituras de trabajadores ya leen el
-        cargo nuevo), y el cambio de cargo deja una sola fila de auditoría, la
-        del cargo: la cuenta no suma otra.
-        Cambiar a un rol que no inicia sesión a alguien que tiene usuario →
-        `400 WRK-011`: una cuenta no puede quedar con un rol sin permisos; el
-        camino para dejar a alguien sin acceso es desactivarlo. Cuenta que la
-        fila de usuario EXISTA, esté activa o no.
+        cargo nuevo).
+        Si el rol nuevo no inicia sesión y la cuenta está activa, la cuenta se
+        desactiva en la MISMA transacción y deja una fila en el rastro del
+        trabajador (`user.isActive`, de `true` a `false`, con el motivo si
+        vino), además de la del cargo. Una cuenta ya inactiva no se toca. Reenviar el mismo rol
+        no toca la cuenta, y volver a un rol que inicia sesión no la reactiva:
+        eso se hace desde Usuarios.
 
         Ficha (RN-11): si hay fila en `drivers`, `driver` la actualiza
         (`status` ausente → se conserva el actual, a diferencia del alta); si
@@ -1755,8 +1756,10 @@ paths:
         trabajador se serializan, y dos ediciones cruzadas también. La segunda
         relee el cargo actual de quien actúa: si dos administradores se bajan el
         cargo entre sí a la vez, la segunda sale `403 WRK-006` si su cargo nuevo
-        todavía escribe, o `403 COM-003` si ya no. Si otra operación
-        retiene una de las dos más allá del tope de espera → `409 WRK-013`, que
+        todavía escribe, o `403 COM-003` si ya no. Si el rol cambia a uno
+        que no inicia sesión y el trabajador tiene cuenta, activa o no, toma
+        también su fila antes de escribir. Si otra operación retiene una de
+        esas filas más allá del tope de espera → `409 WRK-013`, que
         es transitorio y se reintenta. Sin `If-Match`: entre dos escrituras
         serializadas gana la última.
 
@@ -1766,8 +1769,8 @@ paths:
         vacío, nulo o campo inválido, incluida la ficha) → `404 WRK-001` (el
         `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
         actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
-        `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
-        WRK-009` → `409 WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
+        `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400 WRK-009` → `409
+        WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
         puede escribir (cuenta apagada, rol actual en la base fuera de los cuatro de
         escritura, o trabajador dado de baja) sale como `403 COM-003` en el primer
         escalón del organigrama, después del `404`.
@@ -2044,9 +2047,10 @@ paths:
         `updatedBy` es nulo hasta el primer cambio que deja rastro. Hoy dejan
         rastro el cambio propio de contraseña, que firma la propia cuenta,
         desactivarla, reactivarla y restablecer su contraseña, que firma quien
-        lo hace, y la baja de su trabajador desde Trabajadores cuando apaga la
-        cuenta, que firma quien la da. La respuesta no trae el hash ni la
-        versión de las sesiones.
+        lo hace, la baja de su trabajador desde Trabajadores cuando apaga la
+        cuenta, que firma quien la da, y la edición que pasa a su trabajador a
+        un rol que no inicia sesión con la cuenta activa, que firma quien edita.
+        La respuesta no trae el hash ni la versión de las sesiones.
 
         Lectura plana para los cuatro cargos que administran cuentas, por el
         cargo del token; el resto → `403 COM-003`, también con un `id` que no
@@ -4640,19 +4644,20 @@ components:
         - type: object
           required: [role, isActive]
           properties:
-            role:     { $ref: '#/components/schemas/UserRole' }
+            role:     { type: string, description: 'El nombre de sistema del cargo del trabajador; puede ser uno que no inicia sesión', example: 'sales' }
             isActive: { type: boolean }
 
     SessionUser:
       description: |
         El usuario de la sesión (login, refresh, change-password y /auth/me): el de UserResponse
-        más el id de su trabajador, para reconocer la ficha propia. Los autores embebidos en otras
-        respuestas (UserResponse o UserRef) no lo traen.
+        más el id de su trabajador, para reconocer la ficha propia, y con un rol que inicia sesión.
+        Los autores embebidos en otras respuestas (UserResponse o UserRef) no traen ese id.
       allOf:
         - $ref: '#/components/schemas/UserResponse'
         - type: object
-          required: [workerId]
+          required: [role, workerId]
           properties:
+            role:     { $ref: '#/components/schemas/UserRole' }
             workerId: { type: integer, format: int32, description: 'ID del trabajador de la cuenta; toda cuenta tiene uno', example: 29119 }
 
     # -------- Catálogos: Client --------------------------------------------
@@ -5348,7 +5353,7 @@ components:
         organigrama, de 4 a 1, y llega en este mismo catálogo: solo se escribe
         sobre cargos de nivel estrictamente menor al propio, con `admin` exento;
         `canLogin` dice si
-        el rol puede tener usuario, y NO se deduce del nivel (hay cargos del
+        el rol inicia sesión, y NO se deduce del nivel (hay cargos del
         mismo nivel que sí inician sesión y otros que nunca).
       required: [name, description, level, canLogin, driverProfile]
       properties:

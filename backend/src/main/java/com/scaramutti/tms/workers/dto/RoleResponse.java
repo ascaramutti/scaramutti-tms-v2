@@ -15,6 +15,6 @@ public record RoleResponse(
     @Schema(description = "Nombre de sistema", example = "driver") String name,
     @Schema(description = "Nombre visible del cargo", example = "Conductor") String description,
     @Schema(description = "Nivel del organigrama, de 4 a 1", example = "1") Integer level,
-    @Schema(description = "Si el rol puede tener usuario", example = "false") Boolean canLogin,
+    @Schema(description = "Si el rol inicia sesion", example = "false") Boolean canLogin,
     DriverProfileMode driverProfile
 ) {}

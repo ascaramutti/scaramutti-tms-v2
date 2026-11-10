@@ -867,6 +867,12 @@ public class WarehouseTestData {
             "SELECT is_active FROM public.users WHERE id = ?1").setParameter(1, userId).getSingleResult();
     }
 
+    public int userSessionVersionOf(int userId) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT session_version FROM public.users WHERE id = ?1").setParameter(1, userId).getSingleResult())
+            .intValue();
+    }
+
     /** La autoria de una cuenta: quien la creo, quien la cambio por ultima vez y cuando. */
     public record UserAuthorship(Integer createdBy, Integer updatedBy, OffsetDateTime createdAt,
         OffsetDateTime updatedAt) {}

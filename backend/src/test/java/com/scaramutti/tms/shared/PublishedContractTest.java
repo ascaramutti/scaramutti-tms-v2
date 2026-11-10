@@ -502,7 +502,7 @@ class PublishedContractTest {
 
         String sessionUser = "components.schemas.SessionUser.allOf";
         assertEquals("#/components/schemas/UserResponse", contract.getString(sessionUser + "[0].$ref"));
-        assertEquals(List.of("workerId"), contract.getList(sessionUser + "[1].required"));
+        assertEquals(List.of("role", "workerId"), contract.getList(sessionUser + "[1].required"));
         assertEquals("integer", contract.getString(sessionUser + "[1].properties.workerId.type"));
         assertEquals("int32", contract.getString(sessionUser + "[1].properties.workerId.format"));
         assertEquals(2, refsTo(contract.get("$"), "#/components/schemas/SessionUser"),
@@ -512,6 +512,29 @@ class PublishedContractTest {
             assertFalse(contract.getMap("components.schemas." + schema).toString().contains("workerId"),
                 schema + " no puede declarar workerId: es también el autor embebido");
         }
+    }
+
+    /**
+     * El autor puede quedar con un cargo que no inicia sesión si después lo cambiaron; la sesión no,
+     * y la pantalla elige adónde entrar con los siete valores de la sesión.
+     */
+    @Test
+    void publishedContract_givesTheAuthorAnyRole_andTheSessionOnlyOneThatLogsIn() {
+        JsonPath contract = publishedContract();
+        String authorRole = "components.schemas.UserResponse.allOf[1].properties.role.";
+        assertEquals("string", contract.getString(authorRole + "type"));
+        assertThat(contract.get(authorRole + "$ref"), nullValue());
+        assertThat(contract.get(authorRole + "enum"), nullValue());
+        assertEquals("#/components/schemas/UserRole",
+            contract.getString("components.schemas.SessionUser.allOf[1].properties.role.$ref"));
+        assertEquals(List.of("admin", "sales", "dispatcher", "general_manager", "operations_manager",
+            "finance_manager", "warehouse_keeper"), contract.getList("components.schemas.UserRole.enum"));
+    }
+
+    /** Un cliente viejo puede tener el código traducido: no vuelve a aparecer para otro caso. */
+    @Test
+    void publishedContract_noLongerNamesTheRetiredCodeOfTheRoleWithoutLogin() {
+        assertFalse(publishedContract().prettify().contains("WRK-011"));
     }
 
     /**

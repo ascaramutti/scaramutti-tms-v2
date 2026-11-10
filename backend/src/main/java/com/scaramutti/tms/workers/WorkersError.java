@@ -45,8 +45,6 @@ public enum WorkersError implements ApiError {
      */
     SELF_DEACTIVATION        ("WRK-010", 403, "Forbidden",
         "No puedes darte de baja a ti mismo"),
-    ROLE_CANNOT_LOGIN_WITH_USER ("WRK-011", 400, "Bad Request",
-        "Ese cargo no inicia sesion y el trabajador tiene usuario del sistema"),
     /** Detalle CONSTANTE, sin cargo ni nivel, por el mismo motivo que el codigo de rango. */
     SELF_ROLE_CHANGE         ("WRK-012", 403, "Forbidden",
         "No puedes cambiar tu propio cargo"),
