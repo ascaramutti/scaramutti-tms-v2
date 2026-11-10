@@ -1,6 +1,7 @@
 package com.scaramutti.tms.users.service;
 
 import com.scaramutti.tms.auth.security.CurrentUser;
+import com.scaramutti.tms.auth.service.PasswordService;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.UserAuditLog;
 import com.scaramutti.tms.shared.repository.UserAuditLogRepository;
@@ -8,6 +9,7 @@ import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.users.UsersError;
 import com.scaramutti.tms.users.dto.UserAccountDetailResponse;
 import com.scaramutti.tms.users.dto.UserAccountSummaryResponse;
+import com.scaramutti.tms.users.dto.UserAccountTemporaryPasswordResponse;
 import com.scaramutti.tms.users.mapper.UserAccountServiceMapper;
 import com.scaramutti.tms.users.model.UserAuditChangeType;
 import com.scaramutti.tms.users.model.UserAuditField;
@@ -29,6 +31,8 @@ public class UserAccountService {
     @Inject UserAccountServiceMapper userAccountServiceMapper;
     @Inject UserAccountRankPolicy userAccountRankPolicy;
     @Inject UserAccountWriteLock userAccountWriteLock;
+    @Inject TemporaryPasswordGenerator temporaryPasswordGenerator;
+    @Inject PasswordService passwordService;
     @Inject CurrentUser currentUser;
 
     /** Las activas, las inactivas o, con {@code isActive} nulo, todas, por nombre de usuario. */
@@ -102,6 +106,30 @@ public class UserAccountService {
         return getUserAccount(userId);
     }
 
+    /** La temporal se hashea antes de tomar la fila: el BCrypt con la fila tomada retendria las otras escrituras. */
+    @Transactional
+    public UserAccountTemporaryPasswordResponse resetUserAccountPassword(Integer userId) {
+        if (userRepository.count("id", userId) == 0) {
+            throw UsersError.NOT_FOUND.toException();
+        }
+        userAccountRankPolicy.rejectDisabledActorBeforeLocking();
+        userAccountRankPolicy.assertIsNotOwnAccount(userId);
+        String temporaryPassword = temporaryPasswordGenerator.generate();
+        String passwordHash = passwordService.hash(temporaryPassword);
+        User account = userAccountWriteLock.lockThenFind(userId).orElseThrow(UsersError.NOT_FOUND::toException);
+        userAccountRankPolicy.assertCanActOn(account.worker.role);
+
+        Integer actorId = currentUser.requireId();
+        userAccountWriteLock.writeTranslatingConflicts(userId, () -> {
+            account.passwordHash = passwordHash;
+            // Sin la subida, un refresh emitido con la clave reemplazada seguiria renovando.
+            account.sessionVersion = account.sessionVersion + 1;
+            account.markChangedBy(actorId);
+            userAuditLogRepository.persist(passwordReset(userId, actorId));
+        });
+        return new UserAccountTemporaryPasswordResponse(getUserAccount(userId), temporaryPassword);
+    }
+
     private static UserAuditLog statusChange(Integer userId, UserAuditChangeType changeType, boolean oldValue,
             boolean newValue, Integer actorId) {
         UserAuditLog log = new UserAuditLog();
@@ -111,6 +139,16 @@ public class UserAccountService {
         log.fieldLabel = UserAuditField.IS_ACTIVE.label();
         log.oldValue = String.valueOf(oldValue);
         log.newValue = String.valueOf(newValue);
+        log.changedBy = actorId;
+        return log;
+    }
+
+    private static UserAuditLog passwordReset(Integer userId, Integer actorId) {
+        UserAuditLog log = new UserAuditLog();
+        log.userId = userId;
+        log.changeType = UserAuditChangeType.PASSWORD_RESET.name();
+        log.fieldName = UserAuditLog.PASSWORD_FIELD;
+        log.fieldLabel = UserAuditLog.PASSWORD_LABEL;
         log.changedBy = actorId;
         return log;
     }

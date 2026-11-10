@@ -3,6 +3,7 @@ package com.scaramutti.tms.users.api;
 import com.scaramutti.tms.shared.util.CacheHeaders;
 import com.scaramutti.tms.users.dto.UserAccountDetailResponse;
 import com.scaramutti.tms.users.dto.UserAccountSummaryResponse;
+import com.scaramutti.tms.users.dto.UserAccountTemporaryPasswordResponse;
 import com.scaramutti.tms.users.service.UserAccountService;
 import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.RolesAllowed;
@@ -65,5 +66,12 @@ public class UserAccountResource {
     @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
     public RestResponse<UserAccountDetailResponse> reactivateUserAccount(@PathParam("id") Integer id) {
         return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.reactivateUserAccount(id)));
+    }
+
+    @POST
+    @Path("/{id}/reset-password")
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public RestResponse<UserAccountTemporaryPasswordResponse> resetUserAccountPassword(@PathParam("id") Integer id) {
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.resetUserAccountPassword(id)));
     }
 }

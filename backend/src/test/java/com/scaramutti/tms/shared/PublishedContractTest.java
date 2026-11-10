@@ -448,6 +448,41 @@ class PublishedContractTest {
             endsWith("/UserAccountDetailResponse"));
     }
 
+    @Test
+    void publishedContract_declaresWhoResetsAPasswordAndWhatItAnswers() {
+        JsonPath contract = publishedContract();
+        String path = "paths.'/users/{id}/reset-password'.";
+        String post = path + "post.";
+        assertEquals("resetUserAccountPassword", contract.getString(post + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(post + "'x-required-roles'"));
+        assertEquals(List.of("id"), contract.getList(path + "parameters.name"));
+        assertEquals("path|true|integer", contract.getString(path + "parameters[0].in") + "|"
+            + contract.getString(path + "parameters[0].required") + "|"
+            + contract.getString(path + "parameters[0].schema.type"));
+        assertThat(contract.get(post + "requestBody"), nullValue());
+        assertEquals(Set.of("200", "401", "403", "404", "409"), contract.getMap(post + "responses").keySet());
+        assertEquals("#/components/responses/Unauthorized", contract.getString(post + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(post + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/NotFound", contract.getString(post + "responses.'404'.$ref"));
+        assertEquals("#/components/responses/Conflict", contract.getString(post + "responses.'409'.$ref"));
+        String headers = post + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(post + "responses.'200'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountTemporaryPasswordResponse"));
+
+        String response = "components.schemas.UserAccountTemporaryPasswordResponse.";
+        assertEquals(List.of("account", "temporaryPassword"), contract.getList(response + "required"));
+        assertEquals(Set.of("account", "temporaryPassword"), contract.getMap(response + "properties").keySet());
+        assertThat(contract.getString(response + "properties.account.$ref"), endsWith("/UserAccountDetailResponse"));
+        String temporary = response + "properties.temporaryPassword.";
+        assertEquals("string|password|12|12|^[A-HJ-NP-Za-hjkmnp-z2-9]{12}$", contract.getString(temporary + "type")
+            + "|" + contract.getString(temporary + "format") + "|" + contract.getString(temporary + "minLength")
+            + "|" + contract.getString(temporary + "maxLength") + "|" + contract.getString(temporary + "pattern"));
+    }
+
     /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
