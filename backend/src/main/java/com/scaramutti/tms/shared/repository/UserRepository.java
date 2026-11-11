@@ -38,12 +38,11 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
         return find("worker.id", workerId).singleResultOptional();
     }
 
-    /**
-     * Si el trabajador tiene usuario, sin cargarlo. NO filtra por vigente a proposito: quien
-     * pregunta decide si un cambio de cargo dejaria una cuenta con un rol sin permisos.
-     */
-    public boolean existsByWorkerId(Integer workerId) {
-        return count("worker.id", workerId) > 0;
+    /** Sin cargar la cuenta: quien lo pide la toma antes de leerla. */
+    public Optional<Integer> findIdByWorkerId(Integer workerId) {
+        return getEntityManager()
+            .createQuery("SELECT u.id FROM User u WHERE u.worker.id = :workerId", Integer.class)
+            .setParameter("workerId", workerId).getResultStream().findFirst();
     }
 
     /**

@@ -356,8 +356,8 @@ public class WorkerService {
 
 
     /**
-     * Edita un trabajador y su ficha de conductor EN UNA SOLA TRANSACCION. Si tiene usuario, la
-     * cuenta no se escribe: su rol es este cargo.
+     * Edita un trabajador y su ficha de conductor EN UNA SOLA TRANSACCION. Si tiene usuario, su rol es
+     * este cargo.
      *
      * <p>Es un REEMPLAZO y no un parche: cada campo del cuerpo pisa al guardado, y un opcional
      * que no viene queda vacio. Por eso no hay comprobaciones de nulo antes de asignar; tratarlas
@@ -374,12 +374,6 @@ public class WorkerService {
      * bloqueo relee la fila, asi que tiene que ocurrir antes de tocar la entidad: quien mute primero
      * y bloquee despues pierde su cambio sin ningun error y deja un rastro que afirma algo que en la
      * fila no esta.
-     *
-     * <p>DEUDA ANOTADA: WRK-011 mira si hay cuenta sin bloquear la tabla de cuentas. Una cuenta
-     * creada o pasada a este trabajador mientras la edicion lo tiene tomado no la espera (salvo
-     * que ya haya escrito un documento nuevo, y ni asi se vuelve a mirar) y puede quedar en un
-     * cargo sin sesion. Hoy ninguna ruta crea ni mueve cuentas; la primera que lo haga tiene que
-     * tomar antes la fila del trabajador y mirar el cargo y la vigencia.
      */
     @Transactional
     public WorkerDetailResponse updateWorker(UpdateWorkerCommand updateWorkerCommand) {
@@ -394,7 +388,6 @@ public class WorkerService {
         workerRankPolicy.assertCanActOn(newRole);
 
         workerRankPolicy.assertCanChangeRoleOf(worker, newRole);
-        assertUserKeepsLogin(worker, newRole);
 
         DocumentType newDocumentType =
             documentTypeRepository.findByIdOptional(updateWorkerCommand.documentTypeId())
@@ -432,6 +425,8 @@ public class WorkerService {
             throw WorkersError.DUPLICATE_LICENSE.toException();
         }
 
+        User accountLosingLogin = losesLogin(worker, newRole)
+            ? workerRowLock.findAccountForUpdate(worker.id).orElse(null) : null;
         Integer currentUserId = currentUser.requireId();
         WorkerFieldChanges changes = new WorkerFieldChanges();
         // TODA la fase de escritura bajo el traductor del bloqueo, no solo la descarga final. La
@@ -447,6 +442,11 @@ public class WorkerService {
         workerRowLock.runTranslatingLockConflicts(() -> {
             applyWorkerChanges(worker, updateWorkerCommand, newRole, newDocumentType, changes, currentUserId);
             applyDriverProfile(worker, existingDriver, transition, updateWorkerCommand.driver(), changes);
+            if (accountLosingLogin != null && Boolean.TRUE.equals(accountLosingLogin.isActive)) {
+                changes.compare(WorkerAuditField.USER_IS_ACTIVE, "true", "false");
+                accountLosingLogin.isActive = false;
+                accountLosingLogin.markChangedBy(currentUserId);
+            }
 
             writeAuditLogs(worker.id, WorkerAuditChangeType.FIELD_EDIT, changes.asList(),
                 updateWorkerCommand.reason(), currentUserId);
@@ -576,20 +576,11 @@ public class WorkerService {
     }
 
     /**
-     * Una cuenta no puede quedar con un cargo que no inicia sesion: quedaria activa pero sin poder
-     * entrar ni renovar (401 AUTH-002), y nada en pantalla diria por que. El camino para dejar a
-     * alguien sin acceso es darlo de baja, que apaga la cuenta y deja rastro.
-     *
-     * <p>Solo aplica si el cargo cambia. Sin esa condicion, alguien que ya estuviera en ese estado
-     * no se podria editar nunca mas, ni para corregirle una errata en el telefono.
+     * Solo si el cargo cambia: reenviar el mismo, aunque no inicie sesion, no toca una cuenta que alguien
+     * dejo encendida a mano.
      */
-    private void assertUserKeepsLogin(Worker worker, Role newRole) {
-        if (worker.role.id.equals(newRole.id) || Boolean.TRUE.equals(newRole.canLogin)) {
-            return;
-        }
-        if (userRepository.existsByWorkerId(worker.id)) {
-            throw WorkersError.ROLE_CANNOT_LOGIN_WITH_USER.toException();
-        }
+    private static boolean losesLogin(Worker worker, Role newRole) {
+        return !worker.role.id.equals(newRole.id) && !Boolean.TRUE.equals(newRole.canLogin);
     }
 
     /**

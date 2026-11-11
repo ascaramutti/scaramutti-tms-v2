@@ -17,6 +17,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -24,6 +25,9 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.List;
 
+import static com.scaramutti.tms.support.LockWaiters.UNTIL_IT_ARRIVES_MILLIS;
+import static com.scaramutti.tms.support.LockWaiters.awaitWaiters;
+import static com.scaramutti.tms.support.LockWaiters.backendPid;
 import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
 import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.adminToken;
@@ -37,9 +41,11 @@ import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -1016,11 +1022,11 @@ class WorkerUpdateResourceTest {
     // ---------- el cargo y la cuenta ----------
 
     /**
-     * El cambio de cargo deja UNA fila de rastro, aunque el trabajador tenga cuenta: la cuenta no
-     * tiene un rol propio que auditar. Y su sesion ya sale con el cargo nuevo.
+     * Entre cargos que inician sesion, el cambio deja UNA fila de rastro aunque el trabajador tenga
+     * cuenta: la cuenta no tiene un rol propio que auditar. Y su sesion ya sale con el cargo nuevo.
      */
     @Test
-    void update_changingTheRoleOfAWorkerWithUser_leavesOneRow_andItsSessionTakesTheNewRole() {
+    void update_toARoleThatLogsIn_onAWorkerWithUser_leavesOneRow_andItsSessionTakesTheNewRole() {
         var actor = fixtures.seedActor("general_manager", "93");
         int id = seedWorker("ZTESTE060", "sales");
         int userId = fixtures.seedUserFor(id, "ztestuser94", "sales");
@@ -1036,26 +1042,226 @@ class WorkerUpdateResourceTest {
         .then().statusCode(200).body("role", equalTo("finance_manager"));
     }
 
+    // ---------- el cargo sin sesion apaga la cuenta ----------
+
+    private void assertAccountTurnedOffRow(WarehouseTestData.WorkerAuditRow row, String reason, int changedBy) {
+        assertEquals("FIELD_EDIT", row.changeType(), "es una fila de la edicion, no una baja");
+        assertEquals("user.isActive", row.fieldName());
+        assertEquals("Usuario del sistema", row.fieldLabel());
+        assertEquals("true", row.oldValue());
+        assertEquals("false", row.newValue());
+        assertEquals(reason, row.reason(), "con el motivo de la edicion");
+        assertEquals(changedBy, row.changedBy(), "firma quien tiene la sesion");
+    }
+
     /**
-     * Una cuenta no puede quedar con un cargo que no inicia sesion.
-     *
-     * <p>Fija ademas el orden: el cuerpo no manda ficha y el cargo destino la EXIGE, asi que si
-     * este chequeo fuera despues del de la ficha saldria el otro codigo.
+     * La cuenta activa se apaga en la misma edicion, firmada por la sesion y con su fila en el rastro
+     * del trabajador. La version de las sesiones no sube: apagada ya no renueva, y reactivarla la sube.
+     */
+    @ParameterizedTest(name = "a {0}")
+    @CsvSource(delimiter = '|', value = {
+        "operator | ",
+        "driver   | {\"licenseNumber\":\"ZTESTLB101\"}",
+    })
+    void update_toARoleThatCannotLogin_turnsTheActiveAccountOff_signedBySession_withAnEditRowOnlyInTheWorkerTrail_andTheSameSessionVersion(
+            String role, String driverJson) {
+        // La ficha nace disponible, y una base recien migrada no trae ese estado.
+        QuarkusTransaction.requiringNew().run(() -> fixtures.resourceStatusId());
+        var actor = fixtures.seedActor("general_manager", "b1a");
+        int id = seedWorker("ZTESTB101", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuserb101", "sales");
+        var before = fixtures.userAuthorshipOf(userId);
+        int versionBefore = fixtures.userSessionVersionOf(userId);
+
+        put(fabricateTokenForUser(actor.userId(), "ztestuserb1a", "general_manager"))
+            .body(body("Juan", "Pérez", "ZTESTB101", null, role, "2024-03-01", driverJson, "Cambio de puesto"))
+        .when().put("/workers/" + id)
+        .then().statusCode(200).body("role.name", equalTo(role)).body("hasUser", equalTo(true));
+
+        assertFalse(fixtures.userIsActive(userId));
+        var after = fixtures.userAuthorshipOf(userId);
+        assertEquals(actor.userId(), after.updatedBy());
+        assertTrue(after.updatedAt().isAfter(before.updatedAt()), "la marca del cambio se mueve");
+        assertEquals(versionBefore, fixtures.userSessionVersionOf(userId), "la version de las sesiones no sube");
+        assertEquals(List.of(), fixtures.userAuditRows(userId), "la fila es del trabajador");
+        var rows = fixtures.workerAuditRows(id);
+        assertEquals("role", rows.get(0).fieldName());
+        assertEquals(1, rows.stream().filter(row -> "user.isActive".equals(row.fieldName())).count());
+        assertAccountTurnedOffRow(rows.get(rows.size() - 1), "Cambio de puesto", actor.userId());
+    }
+
+    /** Una cuenta ya apagada no se toca: ni su firma, ni una fila que diga que se apago otra vez. */
+    @Test
+    void update_toARoleThatCannotLogin_leavesAnInactiveAccountAlone() {
+        int id = seedWorker("ZTESTB102", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuserb102", "sales", false);
+        var before = fixtures.userAuthorshipOf(userId);
+
+        put(adminToken()).body(unchangedBody("ZTESTB102", "operator"))
+        .when().put("/workers/" + id).then().statusCode(200);
+
+        assertFalse(fixtures.userIsActive(userId));
+        assertEquals(before, fixtures.userAuthorshipOf(userId));
+        assertEquals(List.of("role"), auditFieldNames(id));
+    }
+
+    /**
+     * La sesion abierta deja de servir, y volver a un cargo con sesion no reabre la cuenta. Ese ultimo
+     * ingreso es el que mide la cascada: con el cargo sin sesion, el ingreso ya se rechaza por el cargo.
      */
     @Test
-    void update_toARoleThatCannotLogin_onAWorkerWithUser_returns400_WRK011() {
-        int id = seedWorker("ZTESTE062", "sales");
-        int userId = fixtures.seedUserFor(id, "ztestuser96", "sales");
+    void update_toARoleThatCannotLogin_closesTheSession_andComingBackDoesNotReopenIt() {
+        int id = seedWorker("ZTESTB103", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuserb103", "sales");
+        fixtures.copyPasswordHashFrom(userId, "sales");
+        String loginBody = "{\"username\":\"ztestuserb103\",\"password\":\"Sales1234\"}";
+        var login = given().contentType("application/json").body(loginBody)
+            .when().post("/auth/login").then().statusCode(200).extract();
+        String access = login.path("token");
+        String refresh = login.path("refreshToken");
 
-        put(adminToken()).body(unchangedBody("ZTESTE062", "driver"))
-        .when().put("/workers/" + id)
-        .then().statusCode(400).body("code", equalTo("WRK-011"));
+        put(adminToken()).body(unchangedBody("ZTESTB103", "operator"))
+        .when().put("/workers/" + id).then().statusCode(200);
 
+        given().header("Authorization", "Bearer " + access)
+            .when().get("/auth/me").then().statusCode(401).body("code", equalTo("AUTH-002"));
+        given().contentType("application/json").body("{\"refreshToken\":\"" + refresh + "\"}")
+            .when().post("/auth/refresh").then().statusCode(401).body("code", equalTo("AUTH-002"));
+
+        put(adminToken()).body(unchangedBody("ZTESTB103", "sales"))
+        .when().put("/workers/" + id).then().statusCode(200);
+
+        assertFalse(fixtures.userIsActive(userId), "volver a un cargo con sesion no la reactiva");
+        given().contentType("application/json").body(loginBody)
+            .when().post("/auth/login").then().statusCode(401).body("code", equalTo("AUTH-002"));
+    }
+
+    /** El rango se mira antes, como siempre: la cascada no abre un camino para apagar a un par. */
+    @Test
+    void update_toARoleThatCannotLogin_staysWithinTheRankOfTheSession() {
+        var actor = fixtures.seedActor("finance_manager", "b1f");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserb1f", "finance_manager");
+        int peer = seedWorker("ZTESTB104", "sales");
+        int peerAccount = fixtures.seedUserFor(peer, "ztestuserb104", "sales");
+        int below = seedWorker("ZTESTB105", "warehouse_keeper");
+        int belowAccount = fixtures.seedUserFor(below, "ztestuserb105", "warehouse_keeper");
+
+        put(token).body(unchangedBody("ZTESTB104", "operator"))
+        .when().put("/workers/" + peer).then().statusCode(403).body("code", equalTo("WRK-006"));
+        put(token).body(unchangedBody("ZTESTB105", "operator"))
+        .when().put("/workers/" + below).then().statusCode(200);
+
+        assertTrue(fixtures.userIsActive(peerAccount), "el par sigue entrando");
+        assertFalse(fixtures.userIsActive(belowAccount));
+    }
+
+    /**
+     * La cuenta ya escrita vuelve atras si la edicion se rinde al guardar: otra transaccion retiene
+     * el documento nuevo, el guardado espera su tope y da 409, y la cuenta sigue encendida.
+     */
+    @Test
+    void update_toARoleThatCannotLogin_thatGivesUpWhenSaving_leavesTheAccountOn() throws Exception {
+        int id = seedWorker("ZTESTB107", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuserb107", "sales");
+        int other = seedWorker("ZTESTB108", "operator");
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        try (Connection holder = dataSource.getConnection(); Connection observer = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            observer.setAutoCommit(true);
+            try {
+                try (PreparedStatement taken = holder.prepareStatement(
+                    "UPDATE public.workers SET document_number = 'ZTESTB109' WHERE id = ?")) {
+                    taken.setInt(1, other);
+                    assertEquals(1, taken.executeUpdate(), "precondicion: la otra sesion retiene el documento nuevo");
+                }
+
+                Future<Respuesta> response = executor.submit(() -> {
+                    var extracted = put(adminToken())
+                        .body(body("Juan", "Pérez", "ZTESTB109", null, "operator", "2024-03-01", null,
+                            "Cambio de documento"))
+                        .when().put("/workers/" + id).then().extract();
+                    String code = extracted.path("code");
+                    return new Respuesta(extracted.statusCode(), code);
+                });
+
+                assertTrue(awaitWaiters(observer, backendPid(holder), 1, response, UNTIL_IT_ARRIVES_MILLIS),
+                    "precondicion: la edicion espera el documento");
+                SQLException busy = assertThrows(SQLException.class, () -> {
+                    try (PreparedStatement probe = observer.prepareStatement(
+                        "SELECT id FROM public.users WHERE id = ? FOR NO KEY UPDATE NOWAIT")) {
+                        probe.setInt(1, userId);
+                        probe.executeQuery().close();
+                    }
+                }, "mientras espera el documento, la edicion ya tiene la cuenta");
+                assertEquals("55P03", busy.getSQLState());
+
+                var result = response.get(30, TimeUnit.SECONDS);
+                assertEquals(409, result.statusCode(), "codigo " + result.code());
+                assertEquals("WRK-013", result.code());
+            } finally {
+                holder.rollback();
+            }
+        } finally {
+            executor.shutdownNow();
+            if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                System.err.println("AVISO: quedo un hilo vivo del caso del guardado que se rinde");
+            }
+        }
+
+        assertTrue(fixtures.userIsActive(userId), "la cuenta escrita volvio atras");
         assertEquals("sales", fixtures.userRoleNameOf(userId));
         assertEquals(List.of(), auditFieldNames(id));
     }
 
-    /** El mismo cambio SIN usuario pasa: el par mata "se dispara siempre" y "nunca". */
+    /**
+     * La cuenta se toma antes de decidir, tambien apagada: si otra operacion la retiene, la edicion se
+     * rinde con el conflicto del contrato y nada cambia. Leida sin tomarla, una reactivacion en curso
+     * quedaria encendida sobre el cargo sin sesion.
+     */
+    @ParameterizedTest(name = "cuenta activa: {0}")
+    @ValueSource(booleans = {true, false})
+    void update_toARoleThatCannotLogin_whenAnotherTransactionHoldsTheAccount_returns409_WRK013(boolean accountOn)
+            throws Exception {
+        int id = seedWorker("ZTESTB106", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuserb106", "sales", accountOn);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+
+        try (Connection holder = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            try {
+                try (PreparedStatement lock = holder.prepareStatement(
+                    "SELECT id FROM public.users WHERE id = ? FOR NO KEY UPDATE")) {
+                    lock.setInt(1, userId);
+                    lock.executeQuery().close();
+                }
+
+                Future<Respuesta> response = executor.submit(() -> {
+                    var extracted = put(adminToken()).body(unchangedBody("ZTESTB106", "operator"))
+                        .when().put("/workers/" + id).then().extract();
+                    String code = extracted.path("code");
+                    return new Respuesta(extracted.statusCode(), code);
+                });
+
+                var result = response.get(30, TimeUnit.SECONDS);
+                assertEquals(409, result.statusCode(), "el choque es transitorio, no un error interno");
+                assertEquals("WRK-013", result.code());
+            } finally {
+                holder.rollback();
+            }
+        } finally {
+            executor.shutdownNow();
+            if (!executor.awaitTermination(10, TimeUnit.SECONDS)) {
+                System.err.println("AVISO: quedo un hilo vivo del caso de bloqueo de la cuenta");
+            }
+        }
+
+        assertEquals("sales", fixtures.userRoleNameOf(userId), "el cargo no cambio");
+        assertEquals(accountOn, fixtures.userIsActive(userId), "ni la cuenta");
+        assertEquals(List.of(), auditFieldNames(id), "ni quedo rastro");
+    }
+
+    /** El mismo cambio SIN usuario pasa: no hay cuenta que tomar. */
     @Test
     void update_toARoleThatCannotLogin_onAWorkerWithoutUser_returns200() {
         int id = seedWorker("ZTESTE063", "operator");
@@ -1067,27 +1273,21 @@ class WorkerUpdateResourceTest {
         assertNotNull(fixtures.driverRowOf(id));
     }
 
+    /** Reenviar el MISMO cargo sin sesion no toca la cuenta, aunque alguien la haya dejado encendida. */
     @Test
-    void update_anInactiveUserStillCounts_returns400_WRK011() {
-        int id = seedWorker("ZTESTE064", "sales");
-        int userId = fixtures.seedUserFor(id, "ztestuser97", "sales");
-        fixtures.setUserActive(userId, false);
-
-        put(adminToken()).body(unchangedBody("ZTESTE064", "driver"))
-        .when().put("/workers/" + id)
-        .then().statusCode(400).body("code", equalTo("WRK-011"));
-    }
-
-    /** Reenviar el MISMO cargo no dispara la regla, aunque ese cargo no inicie sesion. */
-    @Test
-    void update_resendingTheSameRoleThatCannotLogin_returns200() {
+    void update_resendingTheSameRoleThatCannotLogin_leavesTheAccountAlone() {
         int id = seedWorker("ZTESTE065", "driver");
         fixtures.seedDriverProfileFor(id, "ZTESTL065", null, WarehouseTestData.STATUS_AVAILABLE, true);
-        fixtures.seedUserFor(id, "ztestuser98", "driver");
+        int userId = fixtures.seedUserFor(id, "ztestuser98", "driver");
+        var before = fixtures.userAuthorshipOf(userId);
 
         put(adminToken()).body(body("Ana", "Pérez", "ZTESTE065", null, "driver", "2024-03-01",
                 "{\"licenseNumber\":\"ZTESTL065\"}", null))
         .when().put("/workers/" + id).then().statusCode(200);
+
+        assertTrue(fixtures.userIsActive(userId));
+        assertEquals(before, fixtures.userAuthorshipOf(userId));
+        assertEquals(List.of("firstName"), auditFieldNames(id));
     }
 
 
@@ -1321,13 +1521,11 @@ class WorkerUpdateResourceTest {
     }
 
     /**
-     * Cambiar el cargo de quien tiene cuenta no espera por la fila de la cuenta: su rol es el cargo
-     * y la edicion no la escribe. Por eso la cuenta salio del presupuesto de esperas de la
-     * edicion; si algo vuelve a escribirla, este caso da 409 en vez de 200. El control es la baja,
-     * que si la escribe: con la misma fila tomada, da 409.
+     * Pasar a un cargo que inicia sesion no toma la cuenta: solo la toma el cargo sin sesion. El
+     * control es la baja, que la escribe: con la misma fila tomada, da 409.
      */
     @Test
-    void update_changingTheRoleWhileAnotherTransactionHoldsTheAccountRow_doesNotWaitForIt()
+    void update_toARoleThatLogsIn_whileAnotherTransactionHoldsTheAccountRow_doesNotWaitForIt()
             throws Exception {
         int id = seedWorker("ZTESTE161", "sales");
         int userId = fixtures.seedUserFor(id, "ztestuser161", "sales");
@@ -2079,12 +2277,9 @@ class WorkerUpdateResourceTest {
         .then().statusCode(400).body("code", equalTo("WRK-004"));
     }
 
-    /**
-     * Nadie cambia su propio cargo se decide antes que la cuenta sin sesion: un admin que se pasa
-     * a un cargo sin sesion, con su cuenta, ve WRK-012 y no WRK-011.
-     */
+    /** Nadie se pasa a si mismo a un cargo sin sesion: un admin ve WRK-012 y su cuenta sigue encendida. */
     @Test
-    void order_theOwnRoleChangeBeatsTheAccountWithoutLogin() {
+    void update_ownRoleToOneThatCannotLogin_returns403_WRK012_andTheAccountStaysOn() {
         var actor = fixtures.seedActor("admin", "9A");
         fixtures.setWorkerDocumentType(actor.workerId(), documentTypeId());
         fixtures.setWorkerHireDate(actor.workerId(), LocalDate.of(2024, 3, 1));
@@ -2093,19 +2288,24 @@ class WorkerUpdateResourceTest {
             .body(body("Actor", "admin", "ZTESTA9A", null, "operator", "2024-03-01", null, null))
         .when().put("/workers/" + actor.workerId())
         .then().statusCode(403).body("code", equalTo("WRK-012"));
+
+        assertTrue(fixtures.userIsActive(actor.userId()));
     }
 
-    /** El rechazo por cuenta sin sesion se decide antes que el tipo de documento. */
+    /** Una regla que corta antes (aca, el tipo de documento) frena la edicion sin tocar la cuenta. */
     @Test
-    void order_theAccountWithoutLoginBeatsAnInvalidDocumentType() {
+    void update_toARoleThatCannotLogin_rejectedByAnEarlierRule_leavesTheAccountOn() {
         int id = seedWorker("ZTESTE144", "sales");
-        fixtures.seedUserFor(id, "ztestuser144", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestuser144", "sales");
 
         put(adminToken()).body("""
             {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":999999,
-             "documentNumber":"ZTESTE144","role":"driver","hireDate":"2024-03-01"}""")
+             "documentNumber":"ZTESTE144","role":"operator","hireDate":"2024-03-01"}""")
         .when().put("/workers/" + id)
-        .then().statusCode(400).body("code", equalTo("WRK-011"));
+        .then().statusCode(400).body("code", equalTo("WRK-003"));
+
+        assertTrue(fixtures.userIsActive(userId));
+        assertEquals(List.of(), auditFieldNames(id));
     }
 
     /** Crear la ficha con un estado explicito lo guarda, y lo deja dicho en el rastro. */

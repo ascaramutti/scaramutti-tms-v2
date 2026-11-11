@@ -21,7 +21,8 @@ import java.util.Set;
  * de lo ya cargado o pendiente, el lock antes de la lectura y la traduccion del choque. Cada llamador
  * pone su propiedad del tope, su presupuesto de esperas y su codigo. El lock es {@code FOR NO KEY
  * UPDATE}, como el de trabajadores: no choca con el {@code FOR KEY SHARE} del alta de una fila que la
- * cuenta firma. {@code WorkerRowLock} y el de viajes siguen con la suya (pasarlos es otro refactor).
+ * cuenta firma. {@code WorkerRowLock} (salvo la cuenta) y el de viajes siguen con la suya (pasarlos es
+ * otro refactor).
  */
 @ApplicationScoped
 public class RowLockSupport {
