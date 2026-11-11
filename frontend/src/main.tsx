@@ -1,3 +1,6 @@
+// Antes que todo: zod decide si compila al construir cada schema, y los de módulo se
+// construyen al importarse.
+import './shared/zodConfig'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
