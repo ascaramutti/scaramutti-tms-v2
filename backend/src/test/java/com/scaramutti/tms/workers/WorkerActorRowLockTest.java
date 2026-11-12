@@ -116,8 +116,8 @@ class WorkerActorRowLockTest {
             String actorRole, String operation, String adminAction) throws Exception {
         var actor = seedEditableActor(actorRole, "H5");
         var admin = seedEditableActor("admin", "H6");
-        String actorToken = fabricateTokenForUser(actor.userId(), "ztestuserH5", actorRole);
-        String adminToken = fabricateTokenForUser(admin.userId(), "ztestuserH6", "admin");
+        String actorToken = fabricateTokenForUser(actor.userId(), "ztestuserh5", actorRole);
+        String adminToken = fabricateTokenForUser(admin.userId(), "ztestuserh6", "admin");
         // La pausa: el alta espera el numero de documento que otra transaccion no confirmo; reactivar
         // espera la ficha del destino, que otra transaccion tiene tomada.
         int spare = fixtures.seedWorker("ZTESTH911", "Juan", "Pérez", "operator", true);
@@ -185,7 +185,7 @@ class WorkerActorRowLockTest {
             case "trabajador_apagado" -> fixtures.setWorkerActive(actor.workerId(), false);
             default -> fixtures.setUserRole(actor.userId(), "sales");
         }
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserH7", "general_manager");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserh7", "general_manager");
         int target = fixtures.seedWorker("ZTESTH913", "Juan", "Pérez", "operator", !"reactivate".equals(operation));
         fixtures.setWorkerDocumentType(target, documentTypeId());
         fixtures.setWorkerHireDate(target, LocalDate.of(2024, 3, 1));
@@ -212,7 +212,7 @@ class WorkerActorRowLockTest {
     void create_whenTheDocumentNumberIsHeldPastTheTimeout_returns409_WRK013_andNothingIsCreated() throws Exception {
         var actor = seedEditableActor("admin", "H8");
         int spare = fixtures.seedWorker("ZTESTH915", "Juan", "Pérez", "operator", true);
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserH8", "admin");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserh8", "admin");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try (Connection holder = dataSource.getConnection()) {
             holder.setAutoCommit(false);
@@ -243,7 +243,7 @@ class WorkerActorRowLockTest {
     void aWriterDisabledWhileItWaitsForItsOwnRow_isRejected_notWritten(String condition, String operation)
             throws Exception {
         var actor = seedEditableActor("general_manager", "H9");
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserH9", "general_manager");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserh9", "general_manager");
         int target = fixtures.seedWorker("ZTESTH917", "Juan", "Pérez", "operator", false);
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try (Connection holder = dataSource.getConnection(); Connection observer = dataSource.getConnection()) {
@@ -276,7 +276,7 @@ class WorkerActorRowLockTest {
     void create_whenTheLicenseIsHeldPastTheTimeout_returns409_WRK013_andNothingIsCreated() throws Exception {
         var actor = seedEditableActor("admin", "H8");
         int other = fixtures.seedWorker("ZTESTH919", "Juan", "Pérez", "driver", true);
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserH8", "admin");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserh8", "admin");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try (Connection holder = dataSource.getConnection()) {
             holder.setAutoCommit(false);

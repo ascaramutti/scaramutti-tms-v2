@@ -574,14 +574,14 @@ class WarehouseProductsResourceTest {
         try {
             int actorUserId = fixtures.seedActorUser("warehouse_keeper", "P1");
             given()
-                .header("Authorization", "Bearer " + fabricateTokenForUser(actorUserId, "ztestuserP1", "warehouse_keeper"))
+                .header("Authorization", "Bearer " + fabricateTokenForUser(actorUserId, "ztestuserp1", "warehouse_keeper"))
                 .contentType(ContentType.JSON)
                 .body(productJson("ZTEST_Rol del creador", CATEGORY_FILTROS, UNIT_UND, null, null, null, "1", null, null))
             .when()
                 .post("/warehouse/products")
             .then()
                 .statusCode(201)
-                .body("createdBy.username", equalTo("ztestuserP1"))
+                .body("createdBy.username", equalTo("ztestuserp1"))
                 .body("createdBy.role", equalTo("warehouse_keeper"));
         } finally {
             QuarkusTransaction.requiringNew().run(() -> fixtures.deleteWarehouseTestData());

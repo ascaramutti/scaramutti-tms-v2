@@ -95,7 +95,7 @@ class WorkerActorFromDatabaseTest {
     @MethodSource("actorConditionOperation")
     void anActorNotEnabledToday_cannotWrite(String actorRole, String condition, String operation) {
         var actor = fixtures.seedActor(actorRole, "H1");
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserH1", actorRole);
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserh1", actorRole);
         boolean blocked = !"ninguna".equals(condition);
         int target = "alta".equals(operation) ? 0 : seedTarget("ZTESTH001", !"reactivar".equals(operation));
         apply(condition, actor);
@@ -135,7 +135,7 @@ class WorkerActorFromDatabaseTest {
     @ValueSource(strings = {"general_manager", "admin", "finance_manager"})
     void anAdminLoweredToGeneralManager_isMeasuredByTheRowRank(String targetRole) {
         var actor = fixtures.seedActor("admin", "H1");
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserH1", "admin");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserh1", "admin");
         fixtures.setUserRole(actor.userId(), "general_manager");
         int target = fixtures.seedWorker("ZTESTH001", "Juan", "Pérez", targetRole, true);
 
@@ -161,7 +161,7 @@ class WorkerActorFromDatabaseTest {
     @ValueSource(strings = {"alta", "edicion", "desactivar", "reactivar"})
     void order_whatIsDecidedBeforeTheRankBeatsAnActorNotEnabledToday(String operation) {
         var actor = fixtures.seedActor("general_manager", "H1");
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserH1", "general_manager");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserh1", "general_manager");
         apply("trabajador_apagado", actor);
 
         var request = given().header("Authorization", "Bearer " + token);
