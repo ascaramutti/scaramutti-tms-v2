@@ -145,15 +145,6 @@ class UserAccountsResourceTest {
             .body("find { it.id == " + accountId + " }.worker.fullName", equalTo("Ana Ztborde Ztmaterno"));
     }
 
-    /** El usuario sale tal como lo guarda la base, sin pasarlo a minusculas. */
-    @Test
-    void listUserAccounts_bringsTheUsernameAsStored() {
-        int accountId = seedAccount("ZTESTCTA13", "Iris", "Ztmayus", null, "sales", true, "ztestuserListaMay", true);
-
-        listAs("admin", null).then().statusCode(200)
-            .body("find { it.id == " + accountId + " }.username", equalTo("ztestuserListaMay"));
-    }
-
     /**
      * Todas las cuentas, tambien la de un cargo que el catalogo ya no ofrece: la lista cuenta el cargo
      * que tiene el trabajador, y el catalogo de cargos es el que filtra por vigente.

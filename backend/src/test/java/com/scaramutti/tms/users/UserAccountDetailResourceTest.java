@@ -166,14 +166,6 @@ class UserAccountDetailResourceTest {
         assertEquals("Ana Ztsolo", worker.get("fullName"));
     }
 
-    /** El usuario sale tal como lo guarda la base, sin pasarlo a minusculas. */
-    @Test
-    void getUserAccount_bringsTheUsernameAsStored() {
-        int accountId = seedAccount("ZTESTCTD13", "Iris", "Ztmayus", null, "sales", true, "ztestuserDetMay", true);
-
-        getAs("admin", accountId).then().statusCode(200).body("username", equalTo("ztestuserDetMay"));
-    }
-
     /**
      * La cuenta de un cargo que el catalogo ya no ofrece tambien se lee: el detalle cuenta el cargo que
      * tiene el trabajador, y el catalogo de cargos es el que filtra por vigente.

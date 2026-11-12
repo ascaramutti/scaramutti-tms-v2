@@ -97,7 +97,7 @@ class WorkerStatusResourceTest {
     void deactivate_workerWithProfileAndAccount_turnsTheThreeOff_andAuditsEach() {
         int id = fixtures.seedWorker("ZTESTS001", "Juan", "Pérez", "sales", true);
         fixtures.seedDriverProfileFor(id, "ZTESTLS001", "A-IIb", WarehouseTestData.STATUS_AVAILABLE, true);
-        int userId = fixtures.seedUserFor(id, "ztestuserS001", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestusers001", "sales");
         int driverId = fixtures.driverRowOf(id).id();
 
         post(adminToken(), id, DEACTIVATE).statusCode(200)
@@ -150,7 +150,7 @@ class WorkerStatusResourceTest {
                 "si".equals(profileOn));
         }
         Integer userId = "si".equals(hasAccount)
-            ? fixtures.seedUserFor(id, "ztestuserS002", role, "si".equals(accountOn)) : null;
+            ? fixtures.seedUserFor(id, "ztestusers002", role, "si".equals(accountOn)) : null;
 
         post(adminToken(), id, DEACTIVATE).statusCode(200).body("isActive", equalTo(false));
 
@@ -171,10 +171,10 @@ class WorkerStatusResourceTest {
     void deactivate_theAuditAuthor_isTheSessionUser() {
         var actor = fixtures.seedActor("general_manager", "S01");
         int id = fixtures.seedWorker("ZTESTS003", "Juan", "Pérez", "sales", true);
-        int userId = fixtures.seedUserFor(id, "ztestuserS003", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestusers003", "sales");
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS01", "general_manager"), id, DEACTIVATE)
-            .statusCode(200).body("updatedBy.username", equalTo("ztestuserS01"));
+        post(fabricateTokenForUser(actor.userId(), "ztestusers01", "general_manager"), id, DEACTIVATE)
+            .statusCode(200).body("updatedBy.username", equalTo("ztestusers01"));
 
         assertEquals(actor.userId(), fixtures.workerRowOf(id).updatedBy());
         assertEquals(List.of("isActive", "user.isActive"), auditFieldNames(id));
@@ -205,10 +205,10 @@ class WorkerStatusResourceTest {
     void deactivate_signsTheAccountItTurnsOff_withTheSessionUser() {
         var actor = fixtures.seedActor("general_manager", "S08");
         int id = fixtures.seedWorker("ZTESTS080", "Juan", "Pérez", "sales", true);
-        int userId = fixtures.seedUserFor(id, "ztestuserS080", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestusers080", "sales");
         var before = fixtures.userAuthorshipOf(userId);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS08", "general_manager"), id, DEACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers08", "general_manager"), id, DEACTIVATE)
             .statusCode(200);
 
         var after = fixtures.userAuthorshipOf(userId);
@@ -226,7 +226,7 @@ class WorkerStatusResourceTest {
     void deactivate_whenItTurnsNoAccountOff_movesNoAuthorship(String account) {
         int id = fixtures.seedWorker("ZTESTS081", "Juan", "Pérez", "sales", true);
         if ("apagada".equals(account)) {
-            fixtures.seedUserFor(id, "ztestuserS081", "sales", false);
+            fixtures.seedUserFor(id, "ztestusers081", "sales", false);
         }
         List<String> before = fixtures.authorshipOfEveryAccount();
 
@@ -294,7 +294,7 @@ class WorkerStatusResourceTest {
     @ValueSource(booleans = {false, true})
     void reactivate_neverTouchesTheAccount(boolean accountOn) {
         int id = fixtures.seedWorker("ZTESTS011", "Juan", "Pérez", "sales", false);
-        int userId = fixtures.seedUserFor(id, "ztestuserS011", "sales", accountOn);
+        int userId = fixtures.seedUserFor(id, "ztestusers011", "sales", accountOn);
 
         post(adminToken(), id, REACTIVATE).statusCode(200).body("isActive", equalTo(true));
 
@@ -313,7 +313,7 @@ class WorkerStatusResourceTest {
     void deactivate_anInactiveWorker_returns200_withoutAnyWrite() {
         int id = fixtures.seedWorker("ZTESTS020", "Juan", "Pérez", "sales", false);
         fixtures.seedDriverProfileFor(id, "ZTESTLS020", null, WarehouseTestData.STATUS_AVAILABLE, true);
-        int userId = fixtures.seedUserFor(id, "ztestuserS020", "sales", true);
+        int userId = fixtures.seedUserFor(id, "ztestusers020", "sales", true);
         var antes = fixtures.workerRowOf(id);
 
         post(adminToken(), id, DEACTIVATE).statusCode(200)
@@ -349,7 +349,7 @@ class WorkerStatusResourceTest {
         int id = fixtures.seedWorker("ZTESTS022", "Juan", "Pérez", "operator", true);
         var antes = fixtures.workerRowOf(id);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS02", "general_manager"), id, DEACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers02", "general_manager"), id, DEACTIVATE)
             .statusCode(200);
 
         var despues = fixtures.workerRowOf(id);
@@ -364,8 +364,8 @@ class WorkerStatusResourceTest {
         int id = fixtures.seedWorker("ZTESTS023", "Juan", "Pérez", "operator", false);
         var antes = fixtures.workerRowOf(id);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS04", "general_manager"), id, REACTIVATE)
-            .statusCode(200).body("updatedBy.username", equalTo("ztestuserS04"));
+        post(fabricateTokenForUser(actor.userId(), "ztestusers04", "general_manager"), id, REACTIVATE)
+            .statusCode(200).body("updatedBy.username", equalTo("ztestusers04"));
 
         var despues = fixtures.workerRowOf(id);
         assertNotEquals(antes.updatedAt(), despues.updatedAt(), "la marca se mueve");
@@ -415,11 +415,11 @@ class WorkerStatusResourceTest {
     @Test
     void roundTrip_workerWithProfileAndAccount() {
         var actor = fixtures.seedActor("general_manager", "S03");
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserS03", "general_manager");
+        String token = fabricateTokenForUser(actor.userId(), "ztestusers03", "general_manager");
         int id = fixtures.seedWorker("ZTESTS030", "Juan", "Pérez", "driver", true);
         fixtures.seedDriverProfileFor(id, "ZTESTLS030", null, WarehouseTestData.STATUS_AVAILABLE, true);
         int driverId = fixtures.driverRowOf(id).id();
-        int userId = fixtures.seedUserFor(id, "ztestuserS030", "driver");
+        int userId = fixtures.seedUserFor(id, "ztestusers030", "driver");
 
         post(token, id, DEACTIVATE).statusCode(200);
         assertTrue(!fixtures.workerRowOf(id).isActive());
@@ -514,7 +514,7 @@ class WorkerStatusResourceTest {
         boolean startsActive = DEACTIVATE.equals(operation);
         int id = fixtures.seedWorker("ZTESTS100", "Juan", "Pérez", targetRole, startsActive);
 
-        var response = post(fabricateTokenForUser(actor.userId(), "ztestuserS10", actorRole), id, operation)
+        var response = post(fabricateTokenForUser(actor.userId(), "ztestusers10", actorRole), id, operation)
             .statusCode(expected);
 
         if (expected == 403) {
@@ -538,7 +538,7 @@ class WorkerStatusResourceTest {
         boolean alreadyInTheRequestedState = REACTIVATE.equals(operation);
         int id = fixtures.seedWorker("ZTESTS105", "Juan", "Pérez", "general_manager", alreadyInTheRequestedState);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS16", "operations_manager"), id, operation)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers16", "operations_manager"), id, operation)
             .statusCode(403).body("code", equalTo("WRK-006"));
     }
 
@@ -548,7 +548,7 @@ class WorkerStatusResourceTest {
         var a = fixtures.seedActor("admin", "S11");
         var b = fixtures.seedActor("admin", "S12");
 
-        post(fabricateTokenForUser(a.userId(), "ztestuserS11", "admin"), b.workerId(), DEACTIVATE).statusCode(200);
+        post(fabricateTokenForUser(a.userId(), "ztestusers11", "admin"), b.workerId(), DEACTIVATE).statusCode(200);
 
         assertTrue(!fixtures.userIsActive(b.userId()), "la cuenta del otro administrador");
         assertTrue(fixtures.userIsActive(a.userId()), "la del que actua sigue viva");
@@ -562,7 +562,7 @@ class WorkerStatusResourceTest {
         var actor = fixtures.seedActor("general_manager", "S15");
         int id = fixtures.seedWorker("ZTESTS103", "Juan", "Pérez", "operations_manager", true);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS15", "admin"), id, DEACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers15", "admin"), id, DEACTIVATE)
             .statusCode(403).body("code", equalTo("WRK-006"));
         assertTrue(fixtures.workerRowOf(id).isActive());
     }
@@ -578,8 +578,8 @@ class WorkerStatusResourceTest {
             cleanupFixtures();
             var a = fixtures.seedActor("admin", "S17");
             var b = fixtures.seedActor("admin", "S18");
-            String tokenA = fabricateTokenForUser(a.userId(), "ztestuserS17", "admin");
-            String tokenB = fabricateTokenForUser(b.userId(), "ztestuserS18", "admin");
+            String tokenA = fabricateTokenForUser(a.userId(), "ztestusers17", "admin");
+            String tokenB = fabricateTokenForUser(b.userId(), "ztestusers18", "admin");
             var largada = new java.util.concurrent.CountDownLatch(1);
             ExecutorService executor = Executors.newFixedThreadPool(2);
             try {
@@ -623,7 +623,7 @@ class WorkerStatusResourceTest {
         var actor = fixtures.seedActor(role, "S20");
         assertNotEquals(actor.userId(), actor.workerId(), "precondicion: ids distintos");
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS20", role), actor.workerId(), DEACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers20", role), actor.workerId(), DEACTIVATE)
             .statusCode(403)
             .body("code", equalTo("WRK-010"))
             .body("detail", equalTo("No puedes darte de baja a ti mismo"));
@@ -642,7 +642,7 @@ class WorkerStatusResourceTest {
         var actor = fixtures.seedActor("admin", "S21");
         fixtures.setWorkerActive(actor.workerId(), false);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS21", "admin"), actor.workerId(), DEACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers21", "admin"), actor.workerId(), DEACTIVATE)
             .statusCode(403).body("code", equalTo("COM-003"));
         assertEquals(List.of(), auditFieldNames(actor.workerId()));
     }
@@ -658,7 +658,7 @@ class WorkerStatusResourceTest {
         var actor = fixtures.seedActor(role, "S22");
         fixtures.setWorkerActive(actor.workerId(), false);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS22", role), actor.workerId(), REACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers22", role), actor.workerId(), REACTIVATE)
             .statusCode(403).body("code", equalTo("COM-003"));
         assertTrue(!fixtures.workerRowOf(actor.workerId()).isActive(), "sigue dado de baja");
         assertEquals(List.of(), auditFieldNames(actor.workerId()));
@@ -673,7 +673,7 @@ class WorkerStatusResourceTest {
         boolean startsActive = DEACTIVATE.equals(operation);
         int id = fixtures.seedWorker("ZTESTS104", "Juan", "Pérez", "sales", startsActive);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS23", "general_manager"), id, operation)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers23", "general_manager"), id, operation)
             .statusCode(403).body("code", equalTo("COM-003"));
         assertEquals(startsActive, fixtures.workerRowOf(id).isActive());
     }
@@ -694,7 +694,7 @@ class WorkerStatusResourceTest {
         var actor = fixtures.seedActor("general_manager", "S24");
         fixtures.setUserActive(actor.userId(), false);
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS24", "general_manager"), 999999, DEACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers24", "general_manager"), 999999, DEACTIVATE)
             .statusCode(404).body("code", equalTo("WRK-001"));
     }
 
@@ -708,9 +708,9 @@ class WorkerStatusResourceTest {
     @Test
     void deactivate_liveSession_refreshAndLoginFail_theAccessTokenStillAnswers_andReactivateDoesNotReopen() {
         int id = fixtures.seedWorker("ZTESTS040", "Juan", "Pérez", "sales", true);
-        int userId = fixtures.seedUserFor(id, "ztestuserS040", "sales");
+        int userId = fixtures.seedUserFor(id, "ztestusers040", "sales");
         fixtures.copyPasswordHashFrom(userId, "sales");
-        String loginBody = "{\"username\":\"ztestuserS040\",\"password\":\"Sales1234\"}";
+        String loginBody = "{\"username\":\"ztestusers040\",\"password\":\"Sales1234\"}";
         var login = given().contentType("application/json").body(loginBody)
             .when().post("/auth/login").then().statusCode(200).extract();
         String access = login.path("token");
@@ -751,7 +751,7 @@ class WorkerStatusResourceTest {
         var actor = fixtures.seedActor(role, "S51");
         int id = fixtures.seedWorker("ZTESTS051", "Juan", "Pérez", "operator", DEACTIVATE.equals(operation));
 
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS51", role), id, operation)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers51", role), id, operation)
             .statusCode(403).body("code", equalTo("COM-003"));
         assertEquals(DEACTIVATE.equals(operation), fixtures.workerRowOf(id).isActive());
     }
@@ -766,7 +766,7 @@ class WorkerStatusResourceTest {
     @Test
     void order_theRoleBeatsNotFound() {
         var actor = fixtures.seedActor("sales", "S52");
-        post(fabricateTokenForUser(actor.userId(), "ztestuserS52", "sales"), 999999, DEACTIVATE)
+        post(fabricateTokenForUser(actor.userId(), "ztestusers52", "sales"), 999999, DEACTIVATE)
             .statusCode(403).body("code", equalTo("COM-003"));
     }
 
@@ -833,7 +833,7 @@ class WorkerStatusResourceTest {
                 lock.executeQuery().close();
             }
             Future<String> response = executor.submit(() ->
-                outcome(post(fabricateTokenForUser(actor.userId(), "ztestuserS25", "admin"), id, DEACTIVATE)));
+                outcome(post(fabricateTokenForUser(actor.userId(), "ztestusers25", "admin"), id, DEACTIVATE)));
             assertEquals("409 WRK-013", response.get(30, TimeUnit.SECONDS));
             holder.rollback();
         } finally {
@@ -858,7 +858,7 @@ class WorkerStatusResourceTest {
         boolean startsActive = DEACTIVATE.equals(operation);
         int id = fixtures.seedWorker("ZTESTS070", "Juan", "Pérez", "driver", startsActive);
         fixtures.seedDriverProfileFor(id, "ZTESTLS070", null, WarehouseTestData.STATUS_AVAILABLE, startsActive);
-        int userId = fixtures.seedUserFor(id, "ztestuserS070", "driver", startsActive);
+        int userId = fixtures.seedUserFor(id, "ztestusers070", "driver", startsActive);
         String sql = switch (table) {
             case "workers" -> "SELECT id FROM public.workers WHERE id = ? FOR NO KEY UPDATE";
             case "drivers" -> "SELECT id FROM public.drivers WHERE worker_id = ? FOR UPDATE";

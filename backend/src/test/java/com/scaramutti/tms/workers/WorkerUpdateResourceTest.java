@@ -2284,7 +2284,7 @@ class WorkerUpdateResourceTest {
         fixtures.setWorkerDocumentType(actor.workerId(), documentTypeId());
         fixtures.setWorkerHireDate(actor.workerId(), LocalDate.of(2024, 3, 1));
 
-        put(fabricateTokenForUser(actor.userId(), "ztestuser9A", "admin"))
+        put(fabricateTokenForUser(actor.userId(), "ztestuser9a", "admin"))
             .body(body("Actor", "admin", "ZTESTA9A", null, "operator", "2024-03-01", null, null))
         .when().put("/workers/" + actor.workerId())
         .then().statusCode(403).body("code", equalTo("WRK-012"));

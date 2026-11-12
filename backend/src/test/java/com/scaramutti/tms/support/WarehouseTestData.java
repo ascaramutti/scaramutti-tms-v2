@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -522,6 +523,10 @@ public class WarehouseTestData {
      */
     public int seedUserFor(int workerId, String username, String roleName, boolean isActive) {
         requirePrefix(username, "ztestuser", "seedUserFor");
+        if (!username.equals(username.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException(
+                "seedUserFor exige el nombre en minúsculas porque la base rechaza las mayúsculas; recibió: " + username);
+        }
         return QuarkusTransaction.requiringNew().call(() -> {
             Object[] seeded = (Object[]) entityManager.createNativeQuery(
                 "INSERT INTO public.users (username, password_hash, worker_id, is_active, created_at) "
@@ -830,7 +835,8 @@ public class WarehouseTestData {
      */
     public ActorSeed seedActor(String roleName, String suffix) {
         int workerId = seedWorker("ZTESTA" + suffix, "Actor", roleName.replace('_', ' '), roleName, true);
-        return new ActorSeed(seedUserFor(workerId, "ztestuser" + suffix, roleName), workerId);
+        // Solo el usuario va en minusculas: el documento del trabajador sale del mismo sufijo.
+        return new ActorSeed(seedUserFor(workerId, "ztestuser" + suffix.toLowerCase(Locale.ROOT), roleName), workerId);
     }
 
     /** El nombre de sistema del rol de un usuario, que es el cargo de su trabajador. */
