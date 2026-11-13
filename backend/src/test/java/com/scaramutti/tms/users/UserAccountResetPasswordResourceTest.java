@@ -10,7 +10,6 @@ import io.restassured.http.ContentType;
 import io.restassured.response.Response;
 import jakarta.inject.Inject;
 import jakarta.persistence.EntityManager;
-import org.jboss.logmanager.ExtLogRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,12 +22,8 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.logging.Handler;
-import java.util.logging.Level;
-import java.util.logging.LogRecord;
-import java.util.logging.Logger;
 
+import static com.scaramutti.tms.support.LogCapture.logsWhile;
 import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
 import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
 import static com.scaramutti.tms.support.TestAuth.fabricateAccessToken;
@@ -465,35 +460,6 @@ class UserAccountResetPasswordResourceTest {
                 "SELECT id || '|' || coalesce(updated_by::text, '-') || '|' || updated_at::text || '|' "
                     + "|| password_hash || '|' || session_version FROM public.users WHERE id <> ?1 ORDER BY id")
             .setParameter(1, accountId).getResultList();
-    }
-
-    private static List<String> logsWhile(Runnable requests) {
-        List<String> lines = new CopyOnWriteArrayList<>();
-        Handler handler = new Handler() {
-            @Override
-            public void publish(LogRecord record) {
-                String message = record instanceof ExtLogRecord ext ? ext.getFormattedMessage() : record.getMessage();
-                lines.add(record.getLoggerName() + " " + message
-                    + (record.getThrown() == null ? "" : " " + record.getThrown()));
-            }
-
-            @Override
-            public void flush() {
-            }
-
-            @Override
-            public void close() {
-            }
-        };
-        handler.setLevel(Level.ALL);
-        Logger root = Logger.getLogger("");
-        root.addHandler(handler);
-        try {
-            requests.run();
-        } finally {
-            root.removeHandler(handler);
-        }
-        return lines;
     }
 
     private static Response login(String username, String password) {

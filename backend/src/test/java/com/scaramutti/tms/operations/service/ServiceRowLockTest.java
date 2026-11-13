@@ -4,9 +4,14 @@ import com.scaramutti.tms.shared.exception.ApiException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
 import org.junit.jupiter.api.Test;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.PSQLState;
+import org.postgresql.util.ServerErrorMessage;
 
 import java.sql.SQLException;
+import java.util.List;
 
+import static com.scaramutti.tms.support.LogCapture.logsWhile;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -93,6 +98,40 @@ class ServiceRowLockTest {
         PersistenceException noSqlCause = new PersistenceException("algo se rompió arriba");
 
         assertSame(noSqlCause, rowLock.asLockConflictOrRethrow(noSqlCause, 42L));
+    }
+
+    /** El contexto del motor va solo si vino: sin él, el log no tiene que cerrar con un "(null)". */
+    @Test
+    void asLockConflictOrRethrow_withoutTheEngineContext_logsThePrimaryMessageAlone() {
+        String end = String.valueOf((char) 0);
+        PSQLException withoutContext = new PSQLException(new ServerErrorMessage(
+            "SERROR" + end + "C40001" + end + "Mcould not serialize access due to concurrent update" + end));
+
+        List<String> logs = logsWhile(() -> rowLock.asLockConflictOrRethrow(
+            new PersistenceException(withoutContext), 42L));
+
+        assertTrue(logs.stream().anyMatch(
+                line -> line.endsWith("could not serialize access due to concurrent update")),
+            "el conflicto con otro final: " + logs);
+    }
+
+    @Test
+    void asLockConflictOrRethrow_withAnExceptionOutsideTheDriver_logsItsMessage() {
+        List<String> logs = logsWhile(() -> rowLock.asLockConflictOrRethrow(
+            new PersistenceException(new SQLException("ztest fuera del driver", "55P03")), 42L));
+
+        assertTrue(logs.stream().anyMatch(line -> line.endsWith("ztest fuera del driver")),
+            "el conflicto sin su mensaje: " + logs);
+    }
+
+    /** El driver también arma errores propios, sin mensaje del servidor. */
+    @Test
+    void asLockConflictOrRethrow_withADriverErrorWithoutTheServerMessage_logsItsMessage() {
+        List<String> logs = logsWhile(() -> rowLock.asLockConflictOrRethrow(new PersistenceException(
+            new PSQLException("ztest sin el servidor", PSQLState.SERIALIZATION_FAILURE)), 42L));
+
+        assertTrue(logs.stream().anyMatch(line -> line.endsWith("ztest sin el servidor")),
+            "el conflicto sin su mensaje: " + logs);
     }
 
     /**

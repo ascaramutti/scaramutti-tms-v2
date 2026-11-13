@@ -12,6 +12,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.hibernate.Session;
 import org.hibernate.engine.spi.EntityKey;
 import org.jboss.logging.Logger;
+import org.postgresql.util.PSQLException;
+import org.postgresql.util.ServerErrorMessage;
 
 import java.sql.SQLException;
 import java.util.Set;
@@ -247,14 +249,25 @@ public class ServiceRowLock {
                     && LOCK_CONFLICT_SQL_STATES.contains(sqlException.getSQLState())) {
                 // El tope rige TODA la transaccion, asi que el conflicto puede haber sido con
                 // otra fila (la moneda o el usuario que el volcado referencia). Por eso el log
-                // habla de la transaccion y arrastra el mensaje del motor, que nombra la relacion.
+                // habla de la transaccion y lleva la relacion que nombra el motor.
                 LOG.warnf("Conflicto de lock (%s) en la transaccion que escribe el servicio id=%d "
                         + "con un tope de %ds: %s",
                     sqlException.getSQLState(), serviceId, lockTimeoutSeconds,
-                    sqlException.getMessage());
+                    engineMessageOf(sqlException));
                 return OperationsError.SERVICE_LOCKED.toException();
             }
         }
         return e;
+    }
+
+    /** El contexto del motor es el que nombra la relacion, y el mensaje del driver va sin el. */
+    private static String engineMessageOf(SQLException sqlException) {
+        if (sqlException instanceof PSQLException psql && psql.getServerErrorMessage() != null) {
+            ServerErrorMessage server = psql.getServerErrorMessage();
+            return server.getWhere() == null
+                ? server.getMessage()
+                : server.getMessage() + " (" + server.getWhere() + ")";
+        }
+        return sqlException.getMessage();
     }
 }

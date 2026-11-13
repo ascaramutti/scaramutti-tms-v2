@@ -338,16 +338,11 @@ public class WorkerService {
         String constraintName = ConstraintViolations.nameOf(cve);
         WorkersError known = constraintName == null ? null : knownConstraints.get(constraintName);
         if (known != null) {
-            // El nombre de la restriccion y la operacion, y NADA de la persona: este nivel
-            // se emite en produccion y el mensaje del servidor trae el valor que choco.
             LOG.warnf("Race condition: UNIQUE %s violation on worker %s", constraintName, what);
             return known.toException();
         }
-        // SIN la excepcion como argumento, y no es un descuido: el mensaje del servidor trae
-        // el VALOR que choco ("Key (document_number)=(...) already exists"), asi que volcar la
-        // cadena de causas escribiria el documento de una persona en el registro de produccion,
-        // que es justo lo que el aviso de arriba se cuida de no hacer. El estado SQL y el nombre
-        // de la restriccion alcanzan para que operaciones sepa que paso.
+        // SIN la excepcion como argumento: el estado SQL y el nombre de la restriccion alcanzan
+        // para que operaciones sepa que paso.
         LOG.errorf("Unhandled DB constraint violation [constraint=%s, sqlState=%s]",
             constraintName, cve.getSQLState());
         return ex;
