@@ -280,11 +280,8 @@ public class WorkerRowLock {
     /**
      * El mensaje PRIMARIO del error, sin los campos de detalle.
      *
-     * <p>El mensaje compuesto arrastra el campo de detalle, y ahi es donde el motor pone los
-     * VALORES de la fila que choco. Para los tres estados que esta clase traduce ese campo viene
-     * vacio, pero eso lo garantiza la lista de estados y no el logueo: la lista esta a cien lineas
-     * de aca, y el dia que alguien le sume uno, el documento de una persona entraria al registro
-     * de produccion sin que falle ningun caso. Tomando el primario, la garantia vive aca.
+     * <p>El motor pone en el detalle los VALORES de la fila que choco. Con el primario, que no
+     * lleguen al registro no depende de la lista de estados ni de que el driver omita el detalle.
      */
     private String primaryMessageOf(SQLException sqlException) {
         if (sqlException instanceof org.postgresql.util.PSQLException psql

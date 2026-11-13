@@ -16,10 +16,15 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import javax.sql.DataSource;
+import java.sql.Connection;
+import java.sql.Statement;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
+import static com.scaramutti.tms.support.LogCapture.logsWhile;
 import static io.restassured.RestAssured.given;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
@@ -46,6 +51,7 @@ class ServiceRowLockIntegrationTest {
     @Inject OperationsTestData operationsFixtures;
     @Inject ServiceRowLock serviceRowLock;
     @Inject EntityManager entityManager;
+    @Inject DataSource dataSource;
 
     private int clientId;
     private int cargoTypeId;
@@ -89,6 +95,29 @@ class ServiceRowLockIntegrationTest {
             assertEquals("55P03", sqlStateOf(e),
                 "la otra transacción no chocó contra el lock, falló por otra cosa: " + e);
         });
+    }
+
+    /** El tope rige la transacción entera: el log tiene que decir con qué relación chocó. */
+    @Test
+    void findByIdForUpdate_whenTheWaitTimesOut_logsTheRelation() throws Exception {
+        long id = createService();
+
+        try (Connection holder = dataSource.getConnection()) {
+            holder.setAutoCommit(false);
+            try (Statement lock = holder.createStatement()) {
+                lock.execute("SELECT id FROM operaciones.services WHERE id = " + id + " FOR UPDATE");
+            }
+            try {
+                List<String> logs = logsWhile(() -> assertThrows(ApiException.class,
+                    () -> QuarkusTransaction.requiringNew().run(() -> serviceRowLock.findByIdForUpdate(id))));
+
+                assertTrue(logs.stream().anyMatch(line -> line.contains("Conflicto de lock (55P03)")
+                    && line.contains("canceling statement due to lock timeout")
+                    && line.contains("relation \"services\"")), "el conflicto sin el motivo o la relación: " + logs);
+            } finally {
+                holder.rollback();
+            }
+        }
     }
 
     /** Y al terminar la transacción la suelta: el bloqueo es de la transacción, no del proceso. */
