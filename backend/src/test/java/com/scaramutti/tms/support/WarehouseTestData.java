@@ -517,9 +517,8 @@ public class WarehouseTestData {
      * ser el cargo de ese trabajador, porque la cuenta no tiene rol propio: si no, falla.
      *
      * <p>El nombre DEBE empezar con el prefijo que usa la limpieza. Se comprueba acá y no se
-     * confía en quien llama: la limpieza borra por prefijo, así que un nombre fuera de él
-     * queda para siempre, y desde ese momento el borrado de trabajadores falla por la clave
-     * foránea y se lleva puesta también la clase de al lado.
+     * confía en quien llama: sobre un trabajador que no es de prueba, la limpieza encuentra la
+     * cuenta solo por el prefijo, y un nombre fuera de él queda para siempre.
      */
     public int seedUserFor(int workerId, String username, String roleName, boolean isActive) {
         requirePrefix(username, "ztestuser", "seedUserFor");
@@ -542,6 +541,13 @@ public class WarehouseTestData {
             return ((Number) seeded[0]).intValue();
         });
     }
+
+    /**
+     * Las cuentas de prueba: las sembradas con el prefijo, y las que el alta crea, con el nombre generado,
+     * sobre un trabajador de prueba.
+     */
+    private static final String TEST_ACCOUNTS = "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%' "
+        + "OR worker_id IN (SELECT id FROM public.workers WHERE document_number LIKE 'ZTEST%'))";
 
     /**
      * Borra lo que cuelga de los trabajadores de prueba y despues los trabajadores.
@@ -567,27 +573,27 @@ public class WarehouseTestData {
             // trabajador ajeno escrita por un usuario de prueba traba este borrado.
             entityManager.createNativeQuery(
                 "DELETE FROM public.worker_audit_logs WHERE changed_by IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+                    + TEST_ACCOUNTS).executeUpdate();
             // Lo mismo un producto de prueba que creo un usuario de prueba, si una corrida cortada
             // no llego a la limpieza de almacen.
             entityManager.createNativeQuery(
                 "DELETE FROM almacen.products WHERE name LIKE ?1 AND created_by IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')")
+                    + TEST_ACCOUNTS)
                 .setParameter(1, PREFIX + "%").executeUpdate();
             // El rastro de las cuentas apunta a la cuenta y a su autor, y la autoria de una cuenta a
             // otra: una fila de una cuenta de prueba, o firmada por una, traba el borrado de abajo.
             entityManager.createNativeQuery(
                 "DELETE FROM public.user_audit_logs WHERE user_id IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%') OR changed_by IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+                    + TEST_ACCOUNTS + " OR changed_by IN "
+                    + TEST_ACCOUNTS).executeUpdate();
             entityManager.createNativeQuery(
                 "UPDATE public.users SET created_by = NULL WHERE created_by IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+                    + TEST_ACCOUNTS).executeUpdate();
             entityManager.createNativeQuery(
                 "UPDATE public.users SET updated_by = NULL WHERE updated_by IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+                    + TEST_ACCOUNTS).executeUpdate();
             entityManager.createNativeQuery(
-                "DELETE FROM public.users WHERE username LIKE 'ztestuser%'").executeUpdate();
+                "DELETE FROM public.users WHERE id IN " + TEST_ACCOUNTS).executeUpdate();
         });
     }
 

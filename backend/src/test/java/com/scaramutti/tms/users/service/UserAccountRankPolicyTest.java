@@ -76,7 +76,7 @@ class UserAccountRankPolicyTest {
             assertEquals(UserAccountRankPolicy.WRITE_ROLES, Set.of(allowed.value()), method.getName());
             checked++;
         }
-        assertEquals(3, checked, "desactivar, reactivar y restablecer");
+        assertEquals(4, checked, "el alta, desactivar, reactivar y restablecer");
     }
 
     @ParameterizedTest(name = "nivel {0} sobre nivel {1} -> permitido {2}")

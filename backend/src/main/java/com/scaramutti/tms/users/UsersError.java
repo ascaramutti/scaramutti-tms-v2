@@ -10,6 +10,12 @@ public enum UsersError implements ApiError {
 
     NOT_FOUND         ("USR-001", 404, "Not Found",
         "Cuenta no encontrada"),
+    USERNAME_TAKEN    ("USR-002", 409, "Conflict",
+        "Ya existe una cuenta con ese nombre de usuario"),
+    WORKER_HAS_ACCOUNT("USR-003", 409, "Conflict",
+        "El trabajador ya tiene una cuenta"),
+    WORKER_NOT_FOUND  ("USR-004", 400, "Bad Request",
+        "El trabajador no existe"),
     WORKER_INACTIVE   ("USR-005", 409, "Conflict",
         "El trabajador está dado de baja"),
     ROLE_CANNOT_LOGIN ("USR-006", 400, "Bad Request",

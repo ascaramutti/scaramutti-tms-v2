@@ -1,6 +1,7 @@
 package com.scaramutti.tms.users.api;
 
 import com.scaramutti.tms.shared.util.CacheHeaders;
+import com.scaramutti.tms.users.dto.UserAccountCreateRequest;
 import com.scaramutti.tms.users.dto.UserAccountDetailResponse;
 import com.scaramutti.tms.users.dto.UserAccountSummaryResponse;
 import com.scaramutti.tms.users.dto.UserAccountTemporaryPasswordResponse;
@@ -8,6 +9,9 @@ import com.scaramutti.tms.users.service.UserAccountService;
 import io.quarkus.security.Authenticated;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -21,8 +25,9 @@ import java.util.List;
 
 /**
  * Las cuentas del sistema ({@code public.users}). La lista no lleva texto de busqueda ni paginas: son
- * decenas de filas y se filtran solo por estado. Sin {@code @Consumes}: nada lleva cuerpo, y un GET
- * con otro {@code Content-Type} no tiene por que responder 415.
+ * decenas de filas y se filtran solo por estado. Sin {@code @Consumes} en la clase: solo el alta lleva
+ * cuerpo y lo declara ella; las demas no tienen por que responder 415 a un {@code Content-Type} que no
+ * leen.
  */
 @Authenticated
 @Path("/users")
@@ -52,6 +57,15 @@ public class UserAccountResource {
     public RestResponse<UserAccountDetailResponse> getUserAccount(@PathParam("id") Integer id) {
         // Ademas del padron, trae quien creo y modifico la cuenta: ninguna cache lo guarda.
         return CacheHeaders.notStored(RestResponse.ResponseBuilder.ok(userAccountService.getUserAccount(id)));
+    }
+
+    @POST
+    @Consumes(MediaType.APPLICATION_JSON)
+    @RolesAllowed({"admin", "general_manager", "operations_manager", "finance_manager"})
+    public RestResponse<UserAccountTemporaryPasswordResponse> createUserAccount(
+            @Valid @NotNull UserAccountCreateRequest userAccountCreateRequest) {
+        return CacheHeaders.notStored(RestResponse.ResponseBuilder.create(RestResponse.Status.CREATED,
+            userAccountService.createUserAccount(userAccountCreateRequest.workerId())));
     }
 
     @POST

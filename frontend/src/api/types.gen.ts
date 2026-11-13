@@ -1402,9 +1402,9 @@ export type UserAccountWorkerDetailRef = UserAccountWorkerRef & {
 /**
  * Una cuenta completa: lo de la fila de la lista, el trabajador con su
  * nombre en partes y quién la creó y la modificó por última vez.
- * `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
- * `updatedBy` es nulo hasta el primer cambio que deja rastro. Instantes
- * en UTC.
+ * `createdBy` es nulo en las cuentas que no se dieron de alta por la API.
+ * `updatedBy` es nulo hasta el primer cambio posterior al alta que deja
+ * rastro. Instantes en UTC.
  * Sin hash ni versión de las sesiones.
  *
  */
@@ -1418,6 +1418,16 @@ export type UserAccountDetailResponse = {
     createdBy: UserRef | null;
     updatedAt: string;
     updatedBy: UserRef | null;
+};
+
+/**
+ * Alta de una cuenta: solo el trabajador. El nombre y la contraseña
+ * temporal los genera el servidor; el cargo es el del trabajador; nace
+ * activa. Cualquier otro campo se ignora, también un `temporaryPassword`.
+ *
+ */
+export type UserAccountCreateRequest = {
+    workerId: number;
 };
 
 /**
@@ -4143,6 +4153,43 @@ export type ListUserAccountsResponses = {
 };
 
 export type ListUserAccountsResponse = ListUserAccountsResponses[keyof ListUserAccountsResponses];
+
+export type CreateUserAccountData = {
+    body: UserAccountCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/users';
+};
+
+export type CreateUserAccountErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type CreateUserAccountError = CreateUserAccountErrors[keyof CreateUserAccountErrors];
+
+export type CreateUserAccountResponses = {
+    /**
+     * Cuenta creada, con la temporal generada (se muestra una sola vez)
+     */
+    201: UserAccountTemporaryPasswordResponse;
+};
+
+export type CreateUserAccountResponse = CreateUserAccountResponses[keyof CreateUserAccountResponses];
 
 export type GetUserAccountData = {
     body?: never;

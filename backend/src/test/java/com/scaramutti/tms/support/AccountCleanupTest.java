@@ -23,6 +23,7 @@ class AccountCleanupTest {
 
     private static final String[] KEEPERS = {"zlimpiaqueda1", "zlimpiaqueda2"};
     private static final String[] KEEPER_DOCUMENTS = {"ZLIMPQ001", "ZLIMPQ002"};
+    private static final String GENERATED = "zlimpiagenerada";
 
     @Inject WarehouseTestData fixtures;
     @Inject EntityManager entityManager;
@@ -30,6 +31,7 @@ class AccountCleanupTest {
     @BeforeEach
     @AfterEach
     void cleanupFixtures() {
+        QuarkusTransaction.requiringNew().run(this::deleteGenerated);
         fixtures.deleteTestWorkerDependents();
         QuarkusTransaction.requiringNew().run(() -> fixtures.deleteTestWorkers());
         QuarkusTransaction.requiringNew().run(this::deleteKeepers);
@@ -63,6 +65,39 @@ class AccountCleanupTest {
         assertEquals("null|" + adminId, second.createdBy() + "|" + second.updatedBy(), "en las dos columnas");
     }
 
+    /** El alta pone el nombre generado: la cuenta de un trabajador de prueba se va igual. */
+    @Test
+    void theCleanup_alsoRemovesAnAccountOutsideThePrefix_onATestWorker() {
+        int adminId = fixtures.adminId();
+        int workerId = fixtures.seedWorker("ZTESTLIM2", "Limpia", "Generada", "sales", true);
+        int generated = QuarkusTransaction.requiringNew().call(() -> ((Number) entityManager.createNativeQuery(
+                "INSERT INTO public.users (username, password_hash, worker_id, is_active, created_at) "
+                    + "VALUES (?1, 'ztest-no-login', ?2, true, CURRENT_TIMESTAMP) RETURNING id")
+            .setParameter(1, GENERATED).setParameter(2, workerId).getSingleResult()).intValue());
+        int keeper = seedKeeper(0);
+        QuarkusTransaction.requiringNew().run(() -> signAccount(keeper, generated, generated));
+        long created = trailRow(generated, "CREATED", adminId);
+        long signed = trailRow(keeper, "PASSWORD_RESET", generated);
+        int product = fixtures.seedProduct(WarehouseTestData.PREFIX + "limpiagenerada");
+        QuarkusTransaction.requiringNew().run(() -> {
+            entityManager.createNativeQuery("UPDATE almacen.products SET created_by = ?1 WHERE id = ?2")
+                .setParameter(1, generated).setParameter(2, product).executeUpdate();
+            entityManager.createNativeQuery(
+                    "INSERT INTO public.worker_audit_logs (worker_id, change_type, changed_by) "
+                        + "SELECT worker_id, 'FIELD_EDIT', ?1 FROM public.users WHERE id = ?2")
+                .setParameter(1, generated).setParameter(2, keeper).executeUpdate();
+        });
+
+        assertDoesNotThrow(() -> fixtures.deleteTestWorkerDependents());
+
+        assertEquals(0, countOf("SELECT count(*) FROM public.users WHERE id = ?1", generated));
+        assertEquals("se fue|se fue", stateOf(created) + "|" + stateOf(signed));
+        assertEquals(0, countOf("SELECT count(*) FROM almacen.products WHERE id = ?1", product));
+        assertEquals(0, countOf("SELECT count(*) FROM public.worker_audit_logs WHERE changed_by = ?1", generated));
+        var authorship = fixtures.userAuthorshipOf(keeper);
+        assertEquals("null|null", authorship.createdBy() + "|" + authorship.updatedBy());
+    }
+
     // ---------- fixtures ----------------------------------------------------------
 
     /** Una cuenta apagada y sin clave usable, con su trabajador, fuera de los prefijos de la limpieza. */
@@ -87,6 +122,23 @@ class AccountCleanupTest {
             + String.join("', '", KEEPERS) + "')").executeUpdate();
         entityManager.createNativeQuery("DELETE FROM public.workers WHERE document_number IN ('"
             + String.join("', '", KEEPER_DOCUMENTS) + "')").executeUpdate();
+    }
+
+    /** Lo que se prueba es la limpieza compartida: si se rompe, esta no deja la cuenta para la clase siguiente. */
+    private void deleteGenerated() {
+        String generated = "(SELECT id FROM public.users WHERE username = '" + GENERATED + "')";
+        entityManager.createNativeQuery("DELETE FROM public.worker_audit_logs WHERE changed_by IN " + generated)
+            .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM almacen.products WHERE created_by IN " + generated)
+            .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM public.user_audit_logs WHERE user_id IN " + generated
+            + " OR changed_by IN " + generated).executeUpdate();
+        entityManager.createNativeQuery("UPDATE public.users SET created_by = NULL WHERE created_by IN " + generated)
+            .executeUpdate();
+        entityManager.createNativeQuery("UPDATE public.users SET updated_by = NULL WHERE updated_by IN " + generated)
+            .executeUpdate();
+        entityManager.createNativeQuery("DELETE FROM public.users WHERE username = '" + GENERATED + "'")
+            .executeUpdate();
     }
 
     /** Los dos son enteros de una fila sembrada, o nulos; en el texto, un nulo queda NULL. */

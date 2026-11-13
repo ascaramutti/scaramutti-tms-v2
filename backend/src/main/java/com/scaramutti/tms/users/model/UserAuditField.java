@@ -2,7 +2,8 @@ package com.scaramutti.tms.users.model;
 
 public enum UserAuditField {
 
-    IS_ACTIVE ("isActive", "Cuenta");
+    IS_ACTIVE ("isActive", "Cuenta"),
+    USERNAME  ("username", "Usuario");
 
     private final String fieldName;
     private final String label;

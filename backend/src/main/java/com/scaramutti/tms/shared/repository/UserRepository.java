@@ -11,15 +11,12 @@ import jakarta.persistence.Tuple;
 
 import java.time.OffsetDateTime;
 import java.util.Collection;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
-/**
- * Las cuentas de {@code public.users}. Vive en {@code shared} porque las leen y escriben varios
- * modulos: auth (la sesion y los autores que embeben las demas respuestas), trabajadores (en sus
- * escrituras, la cuenta de quien escribe y la del trabajador que cambia) y usuarios (su lista y su
- * detalle).
- */
+/** Las cuentas de {@code public.users}. Vive en {@code shared} porque las leen y escriben varios modulos. */
 @ApplicationScoped
 public class UserRepository implements PanacheRepositoryBase<User, Integer> {
 
@@ -38,11 +35,18 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
         return find("worker.id", workerId).singleResultOptional();
     }
 
-    /** Sin cargar la cuenta: quien lo pide la toma antes de leerla. */
+    /** Sin cargar la cuenta: una cuenta en memoria haria fallar su toma posterior. */
     public Optional<Integer> findIdByWorkerId(Integer workerId) {
         return getEntityManager()
             .createQuery("SELECT u.id FROM User u WHERE u.worker.id = :workerId", Integer.class)
             .setParameter("workerId", workerId).getResultStream().findFirst();
+    }
+
+    public Set<String> findUsernamesStartingWith(String prefix) {
+        return new HashSet<>(getEntityManager()
+            .createQuery("SELECT u.username FROM User u WHERE SUBSTRING(u.username, 1, LENGTH(:prefix)) = :prefix",
+                String.class)
+            .setParameter("prefix", prefix).getResultList());
     }
 
     /**
