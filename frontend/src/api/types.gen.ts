@@ -1421,6 +1421,24 @@ export type UserAccountDetailResponse = {
 };
 
 /**
+ * Un trabajador elegible para una cuenta. `fullName` une nombres, paterno
+ * y materno con un espacio, sin el materno si es nulo, y recorta los
+ * espacios de los extremos; `maternalLastName` es nulo si no tiene
+ * materno. `proposedUsername` es el nombre que
+ * generaría el alta ahora: orientativo, el alta lo recalcula.
+ *
+ */
+export type UserAccountCandidateResponse = {
+    workerId: number;
+    fullName: string;
+    firstName: string;
+    paternalLastName: string;
+    maternalLastName: string | null;
+    role: RoleResponse;
+    proposedUsername: string;
+};
+
+/**
  * Alta de una cuenta: solo el trabajador. El nombre y la contraseña
  * temporal los genera el servidor; el cargo es el del trabajador; nace
  * activa. Cualquier otro campo se ignora, también un `temporaryPassword`.
@@ -4346,6 +4364,48 @@ export type ResetUserAccountPasswordResponses = {
 };
 
 export type ResetUserAccountPasswordResponse = ResetUserAccountPasswordResponses[keyof ResetUserAccountPasswordResponses];
+
+export type ListUserAccountCandidatesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Búsqueda por nombre o apellidos. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         */
+        q?: string;
+        /**
+         * Solo ese trabajador, si es elegible.
+         */
+        workerId?: number;
+    };
+    url: '/user-account-candidates';
+};
+
+export type ListUserAccountCandidatesErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListUserAccountCandidatesError = ListUserAccountCandidatesErrors[keyof ListUserAccountCandidatesErrors];
+
+export type ListUserAccountCandidatesResponses = {
+    /**
+     * Trabajadores elegibles
+     */
+    200: Array<UserAccountCandidateResponse>;
+};
+
+export type ListUserAccountCandidatesResponse = ListUserAccountCandidatesResponses[keyof ListUserAccountCandidatesResponses];
 
 export type ListServicesData = {
     body?: never;

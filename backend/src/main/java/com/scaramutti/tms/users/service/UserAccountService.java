@@ -9,6 +9,7 @@ import com.scaramutti.tms.shared.repository.UserAuditLogRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
 import com.scaramutti.tms.shared.repository.WorkerRepository;
 import com.scaramutti.tms.users.UsersError;
+import com.scaramutti.tms.users.dto.UserAccountCandidateResponse;
 import com.scaramutti.tms.users.dto.UserAccountDetailResponse;
 import com.scaramutti.tms.users.dto.UserAccountSummaryResponse;
 import com.scaramutti.tms.users.dto.UserAccountTemporaryPasswordResponse;
@@ -20,11 +21,10 @@ import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 
 import java.util.List;
+import java.util.Set;
+import java.util.function.IntPredicate;
 
-/**
- * Las cuentas del sistema. La lectura no abre transaccion, como los listados de trabajadores: el
- * filtro y el orden los resuelve el repositorio, y la forma de la respuesta, el mapper.
- */
+/** Las cuentas del sistema. La lectura no abre transaccion, como los listados de trabajadores. */
 @ApplicationScoped
 public class UserAccountService {
 
@@ -49,6 +49,21 @@ public class UserAccountService {
         return userRepository.findDetailById(userId)
             .map(userAccountServiceMapper::toUserAccountDetailResponse)
             .orElseThrow(UsersError.NOT_FOUND::toException);
+    }
+
+    /**
+     * Con todos los nombres a la vista la propuesta es la del alta: cada candidato de una base empieza
+     * con el prefijo que lee el alta.
+     */
+    public List<UserAccountCandidateResponse> listUserAccountCandidates(String q, Integer workerId) {
+        IntPredicate inRank = userAccountRankPolicy.levelsTheActorActsOn();
+        Set<String> taken = userRepository.findAllUsernames();
+        return userRepository.listAccountCandidates(q, workerId).stream()
+            .filter(candidate -> inRank.test(candidate.role().level()))
+            .map(candidate -> userAccountServiceMapper.toUserAccountCandidateResponse(candidate,
+                usernameGenerator.choose(usernameGenerator.baseOf(candidate.firstName(),
+                    candidate.paternalLastName(), candidate.maternalLastName(), candidate.workerId()), taken)))
+            .toList();
     }
 
     /**

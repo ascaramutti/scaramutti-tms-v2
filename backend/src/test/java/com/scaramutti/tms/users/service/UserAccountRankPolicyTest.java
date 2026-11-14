@@ -24,11 +24,14 @@ import java.lang.annotation.Annotation;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.IntPredicate;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
@@ -98,6 +101,52 @@ class UserAccountRankPolicyTest {
                 () -> userAccountRankPolicy.assertCanActOn(role("cuenta", accountLevel)));
             assertEquals("USR-008", thrown.code());
         }
+    }
+
+    @ParameterizedTest(name = "nivel {0} sobre nivel {1} -> en la lista {2}")
+    @CsvSource({
+        "3, 2, true",
+        "3, 3, false",
+        "2, 3, false",
+        "2, 1, true",
+        "2, 2, false",
+        "3, 4, false",
+    })
+    void levelsTheActorActsOn_keepsOnlyStrictlyLowerLevels(int actorLevel, int accountLevel, boolean kept) {
+        actorIs("general_manager", actorLevel);
+
+        assertEquals(kept, userAccountRankPolicy.levelsTheActorActsOn().test(accountLevel));
+    }
+
+    @Test
+    void levelsTheActorActsOn_admin_keepsItsOwnLevelAndAbove() {
+        actorIs("admin", 4);
+
+        IntPredicate kept = userAccountRankPolicy.levelsTheActorActsOn();
+
+        assertTrue(kept.test(4));
+        assertTrue(kept.test(9));
+    }
+
+    @Test
+    void levelsTheActorActsOn_theExemptionIsTheRoleName_notItsLevel() {
+        actorIs("general_manager", 4);
+
+        assertFalse(userAccountRankPolicy.levelsTheActorActsOn().test(4));
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @CsvSource({"cuenta apagada", "trabajador de baja", "cargo que no escribe"})
+    void levelsTheActorActsOn_withTheActorNoLongerEnabled_isForbidden(String why) {
+        User actor = actorIs("admin", 4);
+        switch (why) {
+            case "cuenta apagada" -> actor.isActive = false;
+            case "trabajador de baja" -> actor.worker.isActive = false;
+            default -> actor.worker.role = role("sales", 4);
+        }
+
+        ApiException thrown = assertThrows(ApiException.class, () -> userAccountRankPolicy.levelsTheActorActsOn());
+        assertEquals("COM-003", thrown.code());
     }
 
     @Test

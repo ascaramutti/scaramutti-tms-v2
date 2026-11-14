@@ -2038,8 +2038,9 @@ paths:
       description: |
         Crea la cuenta del trabajador `workerId`. El nombre de usuario y la
         contraseña temporal los genera el servidor. El nombre: inicial del
-        nombre y apellido paterno entero, normalizados; si está tomado, `1`,
-        `2`…; el materno entra solo en el respaldo para nombres cortos. La
+        nombre y apellido paterno, normalizados y recortados a 50 caracteres
+        con el sufijo incluido; si está tomado, `1`, `2`…; el materno entra
+        solo en el respaldo para nombres cortos. La
         temporal: 12 caracteres al azar (`SecureRandom`) de un alfabeto sin
         caracteres ambiguos (sin `0`, `O`, `o`, `1`, `l`, `I` ni `i`). El cuerpo
         no trae nombre, contraseña, cargo ni estado, y si los trae se ignoran.
@@ -2337,6 +2338,63 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
+
+  /user-account-candidates:
+    get:
+      tags: [Users]
+      operationId: listUserAccountCandidates
+      summary: Listar los trabajadores elegibles para una cuenta
+      description: |
+        Los trabajadores **activos, sin cuenta** (ni activa ni inactiva), **con
+        cargo que inicia sesión** y **de nivel estrictamente menor** al del cargo
+        de la sesión (`admin`: de cualquier nivel). El nivel de la sesión se lee
+        de la base; es un filtro de presentación: la autoridad es el `403
+        USR-008` del alta. Quien pregunta se relee de la base, como en el alta:
+        cuenta activa, trabajador activo y uno de los cuatro cargos; si no,
+        `403 COM-003`.
+
+        Cada uno trae `proposedUsername`, el nombre que generaría el alta si se
+        hiciera ahora. **Es orientativo:** el alta lo recalcula y, si otra cuenta
+        lo tomó en el medio, sale el siguiente; dos homónimos muestran la misma
+        propuesta.
+
+        `q` es multi-palabra, sin distinguir mayúsculas, con mínimo 3
+        caracteres: cada palabra calza en el nombre o en un apellido. `workerId`
+        limita a ese trabajador (cero o un elemento); si no es un entero, `404`
+        sin cuerpo. Los dos se combinan. Sin parámetros, todos los elegibles, en
+        el orden de la búsqueda del padrón y, entre homónimos, por id. Sin
+        paginar.
+
+        Orden: `401` → `403 COM-003` → `404` (`workerId` no entero) → `400
+        COM-001` → `403 COM-003` (quien pregunta) → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      parameters:
+        - name: q
+          in: query
+          description: Búsqueda por nombre o apellidos. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          schema: { type: string, minLength: 3, maxLength: 200 }
+        - name: workerId
+          in: query
+          description: Solo ese trabajador, si es elegible.
+          schema: { type: integer, format: int32 }
+      responses:
+        '200':
+          description: Trabajadores elegibles
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo depende del cargo de quien pregunta'
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserAccountCandidateResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   # ----- Warehouse: catálogos del módulo (schema almacen) ---------------------
   # Prefijo /warehouse/* para todo lo propio del módulo (evita colisiones de
@@ -5667,6 +5725,24 @@ components:
           anyOf:
             - $ref: '#/components/schemas/UserRef'
             - type: 'null'
+
+    UserAccountCandidateResponse:
+      type: object
+      description: |
+        Un trabajador elegible para una cuenta. `fullName` une nombres, paterno
+        y materno con un espacio, sin el materno si es nulo, y recorta los
+        espacios de los extremos; `maternalLastName` es nulo si no tiene
+        materno. `proposedUsername` es el nombre que
+        generaría el alta ahora: orientativo, el alta lo recalcula.
+      required: [workerId, fullName, firstName, paternalLastName, maternalLastName, role, proposedUsername]
+      properties:
+        workerId:         { type: integer, format: int32, example: 31 }
+        fullName:         { type: string, example: 'Juan Pérez Quispe' }
+        firstName:        { type: string, example: 'Juan' }
+        paternalLastName: { type: string, example: 'Pérez' }
+        maternalLastName: { type: [string, 'null'], example: 'Quispe' }
+        role:             { $ref: '#/components/schemas/RoleResponse' }
+        proposedUsername: { type: string, pattern: '^[a-z0-9]{3,50}$', example: 'jperez' }
 
     UserAccountCreateRequest:
       type: object

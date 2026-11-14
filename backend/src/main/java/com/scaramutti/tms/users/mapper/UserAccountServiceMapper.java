@@ -1,6 +1,7 @@
 package com.scaramutti.tms.users.mapper;
 
 import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
+import com.scaramutti.tms.shared.repository.UserRepository.UserAccountCandidateRow;
 import com.scaramutti.tms.shared.repository.UserRepository.UserAccountDetailRow;
 import com.scaramutti.tms.shared.repository.UserRepository.UserAccountRoleRow;
 import com.scaramutti.tms.shared.repository.UserRepository.UserAccountRow;
@@ -8,6 +9,7 @@ import com.scaramutti.tms.shared.repository.UserRepository.UserAccountWorkerDeta
 import com.scaramutti.tms.shared.repository.UserRepository.UserAccountWorkerRow;
 import com.scaramutti.tms.shared.repository.WorkerRepository.UserRefRow;
 import com.scaramutti.tms.users.dto.UserAccountAuthorRef;
+import com.scaramutti.tms.users.dto.UserAccountCandidateResponse;
 import com.scaramutti.tms.users.dto.UserAccountDetailResponse;
 import com.scaramutti.tms.users.dto.UserAccountRoleResponse;
 import com.scaramutti.tms.users.dto.UserAccountSummaryResponse;
@@ -37,4 +39,7 @@ public interface UserAccountServiceMapper {
     UserAccountWorkerDetailRef toUserAccountWorkerDetailRef(UserAccountWorkerDetailRow userAccountWorkerDetailRow);
 
     UserAccountAuthorRef toUserAccountAuthorRef(UserRefRow userRefRow);
+
+    UserAccountCandidateResponse toUserAccountCandidateResponse(
+        UserAccountCandidateRow userAccountCandidateRow, String proposedUsername);
 }
