@@ -4,8 +4,10 @@ import com.scaramutti.tms.auth.security.CurrentUser;
 import com.scaramutti.tms.auth.service.PasswordService;
 import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.UserAuditLog;
+import com.scaramutti.tms.shared.entity.Worker;
 import com.scaramutti.tms.shared.repository.UserAuditLogRepository;
 import com.scaramutti.tms.shared.repository.UserRepository;
+import com.scaramutti.tms.shared.repository.WorkerRepository;
 import com.scaramutti.tms.users.UsersError;
 import com.scaramutti.tms.users.dto.UserAccountDetailResponse;
 import com.scaramutti.tms.users.dto.UserAccountSummaryResponse;
@@ -27,11 +29,13 @@ import java.util.List;
 public class UserAccountService {
 
     @Inject UserRepository userRepository;
+    @Inject WorkerRepository workerRepository;
     @Inject UserAuditLogRepository userAuditLogRepository;
     @Inject UserAccountServiceMapper userAccountServiceMapper;
     @Inject UserAccountRankPolicy userAccountRankPolicy;
     @Inject UserAccountWriteLock userAccountWriteLock;
     @Inject TemporaryPasswordGenerator temporaryPasswordGenerator;
+    @Inject UsernameGenerator usernameGenerator;
     @Inject PasswordService passwordService;
     @Inject CurrentUser currentUser;
 
@@ -45,6 +49,48 @@ public class UserAccountService {
         return userRepository.findDetailById(userId)
             .map(userAccountServiceMapper::toUserAccountDetailResponse)
             .orElseThrow(UsersError.NOT_FOUND::toException);
+    }
+
+    /**
+     * La cuenta todavia no existe: se toma la fila del trabajador antes de cargarlo. La temporal
+     * se hashea antes de tomarla: el BCrypt con la fila tomada retendria a quien edita al trabajador.
+     */
+    @Transactional
+    public UserAccountTemporaryPasswordResponse createUserAccount(Integer workerId) {
+        if (workerRepository.count("id", workerId) == 0) {
+            throw UsersError.WORKER_NOT_FOUND.toException();
+        }
+        userAccountRankPolicy.rejectDisabledActorBeforeLocking();
+        String temporaryPassword = temporaryPasswordGenerator.generate();
+        String passwordHash = passwordService.hash(temporaryPassword);
+        Worker worker = userAccountWriteLock.lockWorkerThenFind(workerId)
+            .orElseThrow(UsersError.WORKER_NOT_FOUND::toException);
+        userAccountRankPolicy.assertCanActOn(worker.role);
+        if (!Boolean.TRUE.equals(worker.isActive)) {
+            throw UsersError.WORKER_INACTIVE.toException();
+        }
+        if (!Boolean.TRUE.equals(worker.role.canLogin)) {
+            throw UsersError.ROLE_CANNOT_LOGIN.toException();
+        }
+        if (userRepository.findIdByWorkerId(workerId).isPresent()) {
+            throw UsersError.WORKER_HAS_ACCOUNT.toException();
+        }
+
+        String base = usernameGenerator.baseOf(worker.firstName, worker.paternalLastName, worker.maternalLastName,
+            workerId);
+        String username = usernameGenerator.choose(base,
+            userRepository.findUsernamesStartingWith(usernameGenerator.takenPrefixOf(base)));
+        Integer actorId = currentUser.requireId();
+        User account = new User();
+        account.worker = worker;
+        account.username = username;
+        account.passwordHash = passwordHash;
+        account.createdBy = actorId;
+        userAccountWriteLock.insertTranslatingConflicts(workerId, () -> {
+            userRepository.persist(account);
+            userAuditLogRepository.persist(accountCreated(account.id, username, actorId));
+        });
+        return new UserAccountTemporaryPasswordResponse(getUserAccount(account.id), temporaryPassword);
     }
 
     /**
@@ -139,6 +185,17 @@ public class UserAccountService {
         log.fieldLabel = UserAuditField.IS_ACTIVE.label();
         log.oldValue = String.valueOf(oldValue);
         log.newValue = String.valueOf(newValue);
+        log.changedBy = actorId;
+        return log;
+    }
+
+    private static UserAuditLog accountCreated(Integer userId, String username, Integer actorId) {
+        UserAuditLog log = new UserAuditLog();
+        log.userId = userId;
+        log.changeType = UserAuditChangeType.CREATED.name();
+        log.fieldName = UserAuditField.USERNAME.fieldName();
+        log.fieldLabel = UserAuditField.USERNAME.label();
+        log.newValue = username;
         log.changedBy = actorId;
         return log;
     }

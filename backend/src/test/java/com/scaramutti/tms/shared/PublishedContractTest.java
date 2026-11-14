@@ -448,6 +448,41 @@ class PublishedContractTest {
             endsWith("/UserAccountDetailResponse"));
     }
 
+    /** El alta: quien la pide, su cuerpo, sus respuestas y el ejemplo de cada codigo propio. */
+    @Test
+    void publishedContract_declaresWhoCreatesAnAccountAndWhatItAnswers() {
+        JsonPath contract = publishedContract();
+        String post = "paths.'/users'.post.";
+        assertEquals("createUserAccount", contract.getString(post + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(post + "'x-required-roles'"));
+        assertEquals(true, contract.getBoolean(post + "requestBody.required"));
+        assertThat(contract.getString(post + "requestBody.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountCreateRequest"));
+        assertEquals(Set.of("201", "400", "401", "403", "409"), contract.getMap(post + "responses").keySet());
+        assertEquals("#/components/responses/BadRequest", contract.getString(post + "responses.'400'.$ref"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(post + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(post + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/Conflict", contract.getString(post + "responses.'409'.$ref"));
+        String headers = post + "responses.'201'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(post + "responses.'201'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountTemporaryPasswordResponse"));
+
+        String request = "components.schemas.UserAccountCreateRequest.";
+        assertEquals(List.of("workerId"), contract.getList(request + "required"));
+        assertEquals(Set.of("workerId"), contract.getMap(request + "properties").keySet());
+        assertEquals("integer|int32", contract.getString(request + "properties.workerId.type") + "|"
+            + contract.getString(request + "properties.workerId.format"));
+
+        String examples = "components.responses.%s.content.'application/problem+json'.examples.%s.value.code";
+        assertEquals("USR-004", contract.getString(examples.formatted("BadRequest", "workerNotFoundForAccount")));
+        assertEquals("USR-002", contract.getString(examples.formatted("Conflict", "usernameTaken")));
+        assertEquals("USR-003", contract.getString(examples.formatted("Conflict", "workerHasAccount")));
+    }
+
     @Test
     void publishedContract_declaresWhoResetsAPasswordAndWhatItAnswers() {
         JsonPath contract = publishedContract();

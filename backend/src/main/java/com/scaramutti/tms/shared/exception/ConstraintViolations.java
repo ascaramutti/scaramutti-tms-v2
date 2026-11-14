@@ -22,7 +22,7 @@ import java.util.Optional;
  * bases de desarrollo y de staging estan en ingles, asi que ningun test ni ningun humo puede
  * delatarlo: por eso se lee del campo del protocolo, que no se traduce nunca.
  *
- * <p>La clase existe para que el tipo del driver no aparezca en nueve servicios.
+ * <p>La clase existe para que el tipo del driver no aparezca en cada servicio que traduce un choque.
  */
 public final class ConstraintViolations {
 

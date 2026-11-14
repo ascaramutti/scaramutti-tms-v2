@@ -6,8 +6,7 @@ import java.time.OffsetDateTime;
 
 /**
  * Una cuenta completa: lo de la fila de la lista, el trabajador con su nombre en partes y la
- * autoria. Sin el hash ni la version de las sesiones. {@code createdBy} es nulo: hoy ninguna cuenta
- * registra quien la creo. {@code updatedBy} es nulo hasta el primer cambio que la firma.
+ * autoria. Sin el hash ni la version de las sesiones.
  */
 public record UserAccountDetailResponse(
     @Schema(example = "12") Integer id,

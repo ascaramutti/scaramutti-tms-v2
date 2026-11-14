@@ -282,7 +282,7 @@ class UserAccountsResourceTest {
         assertNotSent(response, "Pragma");
     }
 
-    /** Nada lleva cuerpo: un GET con otro tipo de contenido no es un 415. */
+    /** Un GET no lee cuerpo: otro tipo de contenido no es un 415. */
     @Test
     void listUserAccounts_withAnotherContentType_returns200() {
         given().header("Authorization", "Bearer " + tokenFor("admin")).contentType("text/plain").body("x")

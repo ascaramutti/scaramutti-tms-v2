@@ -55,7 +55,7 @@ tags:
   - name: Workers
     description: 'Trabajadores: el padrón. El alta, la edición, el detalle, el cambio de estado y sus catálogos (tipos de documento y roles)'
   - name: Users
-    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, el detalle de una cuenta, con quién la creó y la modificó, y desactivarla, reactivarla y restablecer su contraseña
+    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, el detalle de una cuenta, con quién la creó y la modificó, el alta con el nombre generado, y desactivarla, reactivarla y restablecer su contraseña
 
 # =============================================================================
 paths:
@@ -2584,6 +2584,73 @@ paths:
                 items: { $ref: '#/components/schemas/UserAccountSummaryResponse' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      operationId: createUserAccount
+      summary: Crear la cuenta de un trabajador, con el nombre de usuario generado
+      description: |
+        Crea la cuenta del trabajador `workerId`. El nombre de usuario y la
+        contraseña temporal los genera el servidor. El nombre: inicial del
+        nombre y apellido paterno entero, normalizados; si está tomado, `1`,
+        `2`…; el materno entra solo en el respaldo para nombres cortos. La
+        temporal: 12 caracteres al azar (`SecureRandom`) de un alfabeto sin
+        caracteres ambiguos (sin `0`, `O`, `o`, `1`, `l`, `I` ni `i`). El cuerpo
+        no trae nombre, contraseña, cargo ni estado, y si los trae se ignoran.
+        La cuenta nace activa, con el cargo del trabajador, con la versión
+        inicial de las sesiones y con `createdBy` igual a la sesión. Deja una
+        fila de rastro de alta, sin la contraseña.
+
+        La temporal sale **una sola vez**, en `temporaryPassword` de esta
+        respuesta, para quien hizo el alta: se guarda solo su hash y ninguna
+        otra respuesta, log ni rastro la contiene. Si la respuesta se pierde,
+        no se recupera: el reintento responde `409 USR-003` y se restablece con
+        `resetUserAccountPassword`. Nada obliga a cambiarla al entrar: la
+        persona la cambia con `changePassword`.
+
+        Tomado es cualquier cuenta actual, activa o inactiva, sin distinguir
+        mayúsculas. Dos altas simultáneas que generan el mismo nombre: la
+        segunda responde `409 USR-002`, sin fila nueva, o `409 USR-009` si la
+        primera no confirma antes del tope; se reintenta y sale el siguiente.
+
+        El trabajador: inexistente → `400 USR-004`; fuera del rango de la
+        sesión (su cargo de nivel igual o mayor; `admin` exento) → `403
+        USR-008`; dado de baja → `409 USR-005`; cargo que no inicia sesión →
+        `400 USR-006`; con cuenta, activa o inactiva → `409 USR-003`.
+
+        Quien escribe se relee de la base: cuenta activa, trabajador activo y
+        uno de los cuatro cargos; si no, `403 COM-003`. Toma antes la fila del
+        trabajador; si otra operación retiene más allá del tope esa fila, lo que
+        el alta escribe o la cuenta de quien escribe → `409 USR-009`,
+        transitorio.
+
+        Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+        `400 COM-001` → `400 USR-004` → `403 COM-003` (actor) → `403 USR-008` →
+        `409 USR-005` → `400 USR-006` → `409 USR-003` → `409 USR-002` → `201`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserAccountCreateRequest' }
+            example:
+              workerId: 31
+      responses:
+        '201':
+          description: Cuenta creada, con la temporal generada (se muestra una sola vez)
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountTemporaryPasswordResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /users/{id}:
     parameters:
@@ -2596,14 +2663,15 @@ paths:
         La cuenta con ese `id`, activa o inactiva: lo de la lista más el nombre
         del trabajador en partes (nombres, paterno y materno, este nulo si no
         tiene), y quién la creó y la modificó por última vez y cuándo.
-        `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
-        `updatedBy` es nulo hasta el primer cambio que deja rastro. Hoy dejan
-        rastro el cambio propio de contraseña, que firma la propia cuenta,
-        desactivarla, reactivarla y restablecer su contraseña, que firma quien
-        lo hace, la baja de su trabajador desde Trabajadores cuando apaga la
-        cuenta, que firma quien la da, y la edición que pasa a su trabajador a
-        un rol que no inicia sesión con la cuenta activa, que firma quien edita.
-        La respuesta no trae el hash ni la versión de las sesiones.
+        `createdBy` es nulo en las cuentas que no se dieron de alta por la API.
+        `updatedBy` es nulo hasta el primer cambio posterior al alta que deja
+        rastro. Hoy dejan rastro el cambio propio de contraseña, que firma la
+        propia cuenta, desactivarla, reactivarla y restablecer su contraseña,
+        que firma quien lo hace, la baja de su trabajador desde Trabajadores
+        cuando apaga la cuenta, que firma quien la da, y la edición que pasa a
+        su trabajador a un rol que no inicia sesión con la cuenta activa, que
+        firma quien edita. La respuesta no trae el hash ni la versión de las
+        sesiones.
 
         Lectura plana para los cuatro cargos que administran cuentas, por el
         cargo del token; el resto → `403 COM-003`, también con un `id` que no
@@ -3796,8 +3864,18 @@ components:
                   - field: 'ruc'
                     message: 'debe tener exactamente 11 dígitos'
                     code: 'PATTERN'
+            workerNotFoundForAccount:
+              summary: El trabajador del alta no existe
+              value:
+                type: 'urn:tms:error:usr-004'
+                title: 'Bad Request'
+                status: 400
+                detail: 'El trabajador no existe'
+                instance: '/api/v1/users'
+                code: 'USR-004'
+                traceId: '7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a'
             roleCannotLoginForAccount:
-              summary: El cargo del trabajador no inicia sesión (reactivación)
+              summary: El cargo del trabajador no inicia sesión (alta o reactivación)
               value:
                 type: 'urn:tms:error:usr-006'
                 title: 'Bad Request'
@@ -3900,8 +3978,28 @@ components:
                 instance: '/api/v1/workers/8'
                 code: 'WRK-013'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            usernameTaken:
+              summary: El nombre generado lo tomó otra alta a la vez (se reintenta y sale el siguiente)
+              value:
+                type: 'urn:tms:error:usr-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe una cuenta con ese nombre de usuario'
+                instance: '/api/v1/users'
+                code: 'USR-002'
+                traceId: '5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e'
+            workerHasAccount:
+              summary: El trabajador ya tiene cuenta, activa o inactiva
+              value:
+                type: 'urn:tms:error:usr-003'
+                title: 'Conflict'
+                status: 409
+                detail: 'El trabajador ya tiene una cuenta'
+                instance: '/api/v1/users'
+                code: 'USR-003'
+                traceId: '6c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e9f'
             userAccountLocked:
-              summary: La cuenta la tiene otra operación (conflicto transitorio; se reintenta)
+              summary: La cuenta o su trabajador los tiene otra operación (conflicto transitorio; se reintenta)
               value:
                 type: 'urn:tms:error:usr-009'
                 title: 'Conflict'
@@ -3911,7 +4009,7 @@ components:
                 code: 'USR-009'
                 traceId: '2c3d4e5f-6a7b-4c8d-9e9f-0a1b2c3d4e5a'
             workerInactiveForAccount:
-              summary: El trabajador de la cuenta está dado de baja (reactivación)
+              summary: El trabajador está dado de baja (alta o reactivación)
               value:
                 type: 'urn:tms:error:usr-005'
                 title: 'Conflict'
@@ -5629,9 +5727,9 @@ components:
       description: |
         Una cuenta completa: lo de la fila de la lista, el trabajador con su
         nombre en partes y quién la creó y la modificó por última vez.
-        `createdBy` es nulo: hoy ninguna cuenta registra quién la creó.
-        `updatedBy` es nulo hasta el primer cambio que deja rastro. Instantes
-        en UTC.
+        `createdBy` es nulo en las cuentas que no se dieron de alta por la API.
+        `updatedBy` es nulo hasta el primer cambio posterior al alta que deja
+        rastro. Instantes en UTC.
         Sin hash ni versión de las sesiones.
       required: [id, username, worker, role, isActive, createdAt, createdBy, updatedAt, updatedBy]
       properties:
@@ -5650,6 +5748,19 @@ components:
           anyOf:
             - $ref: '#/components/schemas/UserRef'
             - type: 'null'
+
+    UserAccountCreateRequest:
+      type: object
+      description: |
+        Alta de una cuenta: solo el trabajador. El nombre y la contraseña
+        temporal los genera el servidor; el cargo es el del trabajador; nace
+        activa. Cualquier otro campo se ignora, también un `temporaryPassword`.
+      required: [workerId]
+      properties:
+        workerId:
+          type: integer
+          format: int32
+          example: 31
 
     UserAccountTemporaryPasswordResponse:
       type: object
