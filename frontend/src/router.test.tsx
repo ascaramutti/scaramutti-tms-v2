@@ -6,6 +6,7 @@ import {
   USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
+  userAccountCreatePath,
   userAccountDetailPath,
   workerDetailPath,
   workerEditPath,
@@ -570,6 +571,42 @@ describe('router - URL viejas y la raíz del dominio', () => {
       renderRouteAs('admin', USERS_BASE)
       await screen.findByRole('heading', { level: 1, name: /^usuarios$/i })
       expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('aria-current', 'page')
+    })
+
+    it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(
+      '%s abre el alta de una cuenta',
+      async (role) => {
+        renderRouteAs(role, userAccountCreatePath())
+        expect(await screen.findByRole('heading', { level: 1, name: 'Nuevo usuario' })).toBeInTheDocument()
+      },
+    )
+
+    it.each(['sales', 'dispatcher', 'warehouse_keeper'] as const)(
+      '%s recibe Sin acceso a Usuarios en el alta',
+      async (role) => {
+        renderRouteAs(role, userAccountCreatePath())
+        expect(await screen.findByText(/sin acceso a usuarios/i)).toBeInTheDocument()
+        expect(screen.queryByRole('heading', { name: 'Nuevo usuario' })).not.toBeInTheDocument()
+      },
+    )
+
+    it('sin sesión el alta lleva al login', async () => {
+      const router = goTo(null, userAccountCreatePath())
+      await waitFor(() => expect(router.state.location.pathname).toBe(LOGIN_PATH))
+    })
+
+    it('en el alta, Usuarios queda marcado en el menú', async () => {
+      renderRouteAs('admin', userAccountCreatePath())
+      await screen.findByRole('heading', { level: 1, name: 'Nuevo usuario' })
+      expect(screen.getByRole('link', { name: /^usuarios$/i })).toHaveAttribute('aria-current', 'page')
+    })
+
+    it('"nuevo" no se toma como el id de una cuenta', async () => {
+      const sink: { ids?: number[] } = {}
+      server.use(getUserAccountCapture(sink))
+      renderRouteAs('admin', userAccountCreatePath())
+      await screen.findByRole('heading', { level: 1, name: 'Nuevo usuario' })
+      expect(sink.ids).toEqual([])
     })
 
     it.each(['admin', 'general_manager', 'operations_manager', 'finance_manager'] as const)(

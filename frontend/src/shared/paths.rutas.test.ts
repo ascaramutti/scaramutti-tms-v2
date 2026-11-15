@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { RouteObject } from 'react-router-dom'
 import { routes } from '../router'
-import { userAccountDetailPath, workerDetailPath, workerEditPath } from './paths'
+import { userAccountCreatePath, userAccountDetailPath, workerDetailPath, workerEditPath } from './paths'
 
 /**
  * El contrato de URL de la aplicación, escrito a mano.
@@ -31,6 +31,7 @@ const RUTAS = [
   '/trabajadores/:id',
   '/trabajadores/:id/editar',
   '/usuarios',
+  '/usuarios/nuevo',
   '/usuarios/:id',
   '/almacen',
   '/almacen/entradas/nueva',
@@ -85,5 +86,9 @@ describe('las URL de la aplicación', () => {
   it('el detalle de una cuenta cuelga de la raíz de usuarios', () => {
     expect(userAccountDetailPath(12)).toBe('/usuarios/12')
     expect(userAccountDetailPath('12')).toBe('/usuarios/12')
+  })
+
+  it('el alta de una cuenta cuelga de la raíz de usuarios', () => {
+    expect(userAccountCreatePath()).toBe('/usuarios/nuevo')
   })
 })

@@ -20,6 +20,29 @@ const RESET_PASSWORD_ERRORS: Record<string, string> = {
   'USR-009': 'Otra operación estaba en curso y no se pudo restablecer la contraseña. Intenta de nuevo.',
 }
 
+const CREATE_ACCOUNT_ERRORS: Record<string, string> = {
+  ...COMMON_ACCOUNT_ERRORS,
+  'USR-002': 'No se pudo asignar el nombre de usuario. Intenta de nuevo.',
+  'USR-003':
+    'Este trabajador ya tiene cuenta. Si la acabas de crear y no viste la contraseña, restablécela desde el detalle de la cuenta.',
+  'USR-004': 'Ese trabajador no existe.',
+  'USR-005': 'Este trabajador está dado de baja.',
+  'USR-006': 'El cargo de este trabajador no inicia sesión.',
+  'USR-009': 'Otra operación estaba en curso y no se pudo crear la cuenta. Intenta de nuevo.',
+}
+
+/** Los que dicen que el trabajador ya no está pendiente de cuenta para quien la pide. */
+const WORKER_REJECTIONS = new Set(['USR-003', 'USR-004', 'USR-005', 'USR-006', 'USR-008'])
+
+export function createAccountErrorMessage(error: unknown): string {
+  return accountErrorMessage(error, CREATE_ACCOUNT_ERRORS, 'No se pudo crear la cuenta. Intenta de nuevo.')
+}
+
+export function rejectsWorker(error: unknown): boolean {
+  const code = problemCodeOf(error)
+  return code !== undefined && WORKER_REJECTIONS.has(code)
+}
+
 export function accountStatusErrorMessage(error: unknown): string {
   return accountErrorMessage(error, ACCOUNT_STATUS_ERRORS, 'No se pudo cambiar el estado de la cuenta. Intenta de nuevo.')
 }

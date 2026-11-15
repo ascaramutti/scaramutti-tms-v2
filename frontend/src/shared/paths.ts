@@ -70,3 +70,7 @@ export function workerEditPath(id: number | string): string {
 export function userAccountDetailPath(id: number | string): string {
   return `${USERS_BASE}/${id}`
 }
+
+export function userAccountCreatePath(): string {
+  return `${USERS_BASE}/nuevo`
+}

@@ -7,4 +7,6 @@ export const userAccountKeys = {
   lists: () => [...userAccountKeys.all, 'list'] as const,
   list: (params: UserAccountListParams) => [...userAccountKeys.lists(), params] as const,
   detail: (id: number) => [...userAccountKeys.all, 'detail', id] as const,
+  candidates: () => [...userAccountKeys.all, 'candidates'] as const,
+  create: () => [...userAccountKeys.all, 'create'] as const,
 }
