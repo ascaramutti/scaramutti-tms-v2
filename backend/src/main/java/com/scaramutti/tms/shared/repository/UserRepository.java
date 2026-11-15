@@ -4,15 +4,19 @@ import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.entity.User_;
 import com.scaramutti.tms.shared.repository.WorkerRepository.UserRefRow;
 import com.scaramutti.tms.shared.util.DateUtils;
+import com.scaramutti.tms.shared.util.MultiWordSearch;
 import io.quarkus.hibernate.orm.panache.PanacheRepositoryBase;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.Query;
 import jakarta.persistence.Tuple;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -47,6 +51,11 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
             .createQuery("SELECT u.username FROM User u WHERE SUBSTRING(u.username, 1, LENGTH(:prefix)) = :prefix",
                 String.class)
             .setParameter("prefix", prefix).getResultList());
+    }
+
+    public Set<String> findAllUsernames() {
+        return new HashSet<>(getEntityManager().createQuery("SELECT u.username FROM User u", String.class)
+            .getResultList());
     }
 
     /**
@@ -125,6 +134,50 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
                 (Boolean) row.get("role_can_login"),
                 (String) row.get("role_driver_profile")),
             (Boolean) row.get("u_is_active"));
+    }
+
+    /** Sin el rango, para no copiar en SQL la comparacion de la politica de rango. */
+    public List<UserAccountCandidateRow> listAccountCandidates(String q, Integer workerId) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        List<String> conditions = new ArrayList<>(List.of("w.is_active = true", "r.can_login = true",
+            "NOT EXISTS (SELECT 1 FROM public.users u WHERE u.worker_id = w.id)"));
+        if (workerId != null) {
+            conditions.add("w.id = :workerId");
+            params.put("workerId", workerId);
+        }
+        if (q != null) {
+            conditions.addAll(MultiWordSearch.conditions(q, WorkerRepository.nameSearchColumns("w"), "qtok", params));
+        }
+        String sql = "SELECT w.id AS w_id, " + WorkerRepository.fullNameExpression("w") + " AS w_full_name, "
+            + WorkerRepository.namePartsColumns("w", "w") + ", "
+            + "r.name AS role_name, r.description AS role_description, r.level AS role_level, "
+            + "r.can_login AS role_can_login, r.driver_profile AS role_driver_profile "
+            + "FROM public.workers w "
+            + "JOIN public.roles r ON r.id = w.role_id "
+            + "WHERE " + String.join(" AND ", conditions) + " "
+            + "ORDER BY " + WorkerRepository.fullNameOrder("w") + ", w.id";
+
+        Query query = getEntityManager().createNativeQuery(sql, Tuple.class);
+        params.forEach(query::setParameter);
+
+        @SuppressWarnings("unchecked")
+        List<Tuple> rows = query.getResultList();
+        return rows.stream().map(UserRepository::toUserAccountCandidateRow).toList();
+    }
+
+    private static UserAccountCandidateRow toUserAccountCandidateRow(Tuple row) {
+        return new UserAccountCandidateRow(
+            intOf(row, "w_id"),
+            (String) row.get("w_full_name"),
+            (String) row.get("w_first_name"),
+            (String) row.get("w_paternal_last_name"),
+            (String) row.get("w_maternal_last_name"),
+            new UserAccountRoleRow(
+                (String) row.get("role_name"),
+                (String) row.get("role_description"),
+                intOf(row, "role_level"),
+                (Boolean) row.get("role_can_login"),
+                (String) row.get("role_driver_profile")));
     }
 
     /**
@@ -228,6 +281,10 @@ public class UserRepository implements PanacheRepositoryBase<User, Integer> {
     public record UserAccountWorkerDetailRow(
         Integer id, String fullName, Boolean isActive, String firstName, String paternalLastName,
         String maternalLastName) {}
+
+    public record UserAccountCandidateRow(
+        Integer workerId, String fullName, String firstName, String paternalLastName, String maternalLastName,
+        UserAccountRoleRow role) {}
 
     /** {@code driverProfile} es el texto crudo de la columna, que la respuesta lleva tal cual. */
     public record UserAccountRoleRow(

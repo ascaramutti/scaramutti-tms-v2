@@ -40,9 +40,8 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
 
     /**
      * El nombre completo en SQL, con la regla de {@link Worker#fullName()}. Es un metodo y no un
-     * literal repetido porque lo componen los conductores, los viajes y su reporte, la asignacion
-     * de recursos, el kardex, el detalle (tres veces, de ahi el alias) y la lista de cuentas: dos
-     * formas de armarlo harian que la misma persona se llame distinto segun por donde se la mire. Los
+     * literal repetido: dos formas de armarlo harian que la misma persona se llame distinto segun por
+     * donde se la mire; el alias es porque una consulta lo compone mas de una vez. Los
      * nombres van con {@code ||} y fuera del {@code concat_ws}: sin fila de trabajador (un LEFT JOIN
      * que no encontro) da nulo, y el reporte de viajes rechaza esa fila por el nulo.
      */
@@ -52,8 +51,8 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
-     * El orden por nombre de los listados de trabajadores y de conductores: nombres, paterno y
-     * materno, y entre dos con los mismos nombres y paterno, el que no tiene materno primero.
+     * El orden por nombre: nombres, paterno y materno, y entre dos con los mismos nombres y paterno,
+     * el que no tiene materno primero.
      */
     public static String fullNameOrder(String workersAlias) {
         return workersAlias + ".first_name ASC, " + workersAlias + ".paternal_last_name ASC, "
@@ -69,6 +68,11 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
         return workersAlias + ".first_name AS " + aliasPrefix + "_first_name, "
             + workersAlias + ".paternal_last_name AS " + aliasPrefix + "_paternal_last_name, "
             + workersAlias + ".maternal_last_name AS " + aliasPrefix + "_maternal_last_name";
+    }
+
+    public static List<String> nameSearchColumns(String workersAlias) {
+        return List.of(workersAlias + ".first_name", workersAlias + ".paternal_last_name",
+            workersAlias + ".maternal_last_name");
     }
 
     /**

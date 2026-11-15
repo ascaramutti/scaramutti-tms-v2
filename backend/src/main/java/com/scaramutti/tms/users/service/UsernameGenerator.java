@@ -9,9 +9,9 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 /**
- * El nombre de usuario de una cuenta nueva: la inicial del nombre y el apellido paterno entero, y si
- * esta tomado, el primer sufijo libre. No lee la base: lo tomado lo trae quien llama, leido con
- * {@link #takenPrefixOf}.
+ * El nombre de usuario de una cuenta nueva: la inicial del nombre y el apellido paterno, recortados para
+ * que el sufijo entre en el largo maximo, y si esta tomado, el primer sufijo libre. No lee la base: lo
+ * tomado lo trae quien llama.
  */
 @ApplicationScoped
 public class UsernameGenerator {
@@ -20,7 +20,7 @@ public class UsernameGenerator {
     static final int MIN_LENGTH = 3;
     static final String FALLBACK_PREFIX = "usuario";
 
-    /** Agotar nueve cifras pide mil millones de homonimos: la lectura de lo tomado no mira mas alla. */
+    /** Agotar nueve cifras pide mil millones de homonimos: el prefijo de lo tomado no mira mas alla. */
     static final int MAX_SUFFIX_DIGITS = 9;
 
     private static final Pattern MARKS = Pattern.compile("\\p{M}+");

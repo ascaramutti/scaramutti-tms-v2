@@ -10,6 +10,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 
 import java.util.Set;
+import java.util.function.IntPredicate;
 
 /**
  * Quien escribe cuentas actua solo sobre las de un cargo de nivel estrictamente menor al suyo, y
@@ -43,16 +44,21 @@ public class UserAccountRankPolicy {
     }
 
     public void assertCanActOn(Role accountRole) {
-        User actor = requireActor();
-        if (EXEMPT_ROLE.equals(actor.worker.role.name)) {
-            return;
-        }
-        if (accountRole.level >= actor.worker.role.level) {
+        if (!actsOn(requireActor(), accountRole.level)) {
             throw UsersError.OUT_OF_RANK.toException();
         }
     }
 
-    /** Releido despues de tomar la fila: el corte de antes no carga la cuenta y puede quedar viejo. */
+    public IntPredicate levelsTheActorActsOn() {
+        User actor = requireActor();
+        return accountLevel -> actsOn(actor, accountLevel);
+    }
+
+    private static boolean actsOn(User actor, int accountLevel) {
+        return EXEMPT_ROLE.equals(actor.worker.role.name) || accountLevel < actor.worker.role.level;
+    }
+
+    /** Tambien despues de tomar la fila: el corte de antes no carga la cuenta y puede quedar viejo. */
     private User requireActor() {
         return userRepository.findByIdOptional(currentUser.requireId())
             .filter(user -> Boolean.TRUE.equals(user.isActive))

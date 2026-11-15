@@ -314,6 +314,51 @@ class PublishedContractTest {
         assertEquals("boolean", contract.getString(worker + "properties.isActive.type"));
     }
 
+    @Test
+    void publishedContract_declaresWhoReadsTheAccountCandidatesAndWhatEachOneBrings() {
+        JsonPath contract = publishedContract();
+        String get = "paths.'/user-account-candidates'.get.";
+        assertEquals("listUserAccountCandidates", contract.getString(get + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(get + "'x-required-roles'"));
+        assertEquals(Set.of("200", "400", "401", "403"), contract.getMap(get + "responses").keySet());
+        assertEquals("#/components/responses/BadRequest", contract.getString(get + "responses.'400'.$ref"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(get + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(get + "responses.'403'.$ref"));
+        String headers = get + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertEquals("array", contract.getString(get + "responses.'200'.content.'application/json'.schema.type"));
+        assertThat(contract.getString(get + "responses.'200'.content.'application/json'.schema.items.$ref"),
+            endsWith("/UserAccountCandidateResponse"));
+        assertEquals(List.of("q", "workerId"), contract.getList(get + "parameters.name"));
+        assertEquals("query|string|3|200", contract.getString(get + "parameters[0].in") + "|"
+            + contract.getString(get + "parameters[0].schema.type") + "|"
+            + contract.getString(get + "parameters[0].schema.minLength") + "|"
+            + contract.getString(get + "parameters[0].schema.maxLength"));
+        assertEquals("query|integer|int32", contract.getString(get + "parameters[1].in") + "|"
+            + contract.getString(get + "parameters[1].schema.type") + "|"
+            + contract.getString(get + "parameters[1].schema.format"));
+        assertThat(contract.get(get + "parameters[0].required"), nullValue());
+        assertThat(contract.get(get + "parameters[1].required"), nullValue());
+
+        String row = "components.schemas.UserAccountCandidateResponse.";
+        List<String> keys = List.of("workerId", "fullName", "firstName", "paternalLastName", "maternalLastName",
+            "role", "proposedUsername");
+        assertEquals(keys, contract.getList(row + "required"));
+        assertEquals(Set.copyOf(keys), contract.getMap(row + "properties").keySet());
+        assertEquals("integer|int32", contract.getString(row + "properties.workerId.type") + "|"
+            + contract.getString(row + "properties.workerId.format"));
+        assertEquals(List.of("string", "null"), contract.getList(row + "properties.maternalLastName.type"));
+        for (String name : List.of("fullName", "firstName", "paternalLastName")) {
+            assertEquals("string", contract.get(row + "properties." + name + ".type"), name);
+        }
+        assertThat(contract.getString(row + "properties.role.$ref"), endsWith("/RoleResponse"));
+        assertEquals("string|^[a-z0-9]{3,50}$", contract.getString(row + "properties.proposedUsername.type") + "|"
+            + contract.getString(row + "properties.proposedUsername.pattern"));
+    }
+
     /**
      * El detalle de una cuenta: quién lo lee, sus respuestas de error con el ejemplo de {@code USR-001},
      * las cabeceras de caché y las claves exactas, con los autores obligatorios y anulables. El
