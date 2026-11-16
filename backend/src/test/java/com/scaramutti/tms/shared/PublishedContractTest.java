@@ -651,6 +651,25 @@ class PublishedContractTest {
         assertEquals("string", contract.get(schema + "properties.fullName.type"));
     }
 
+    /** Con la clave en required, el cliente no la tipa opcional: sin cuenta es un nulo, no una ausencia. */
+    @Test
+    void publishedContract_requiresTheAccountOfTheWorkerDetail_nullWithoutOne() {
+        JsonPath contract = publishedContract();
+        String schema = "components.schemas.WorkerDetailResponse.";
+        assertTrue(contract.getList(schema + "required").contains("account"), "account no está en required");
+        assertThat(contract.getString(schema + "properties.account.anyOf[0].$ref"), endsWith("/WorkerAccountRef"));
+        assertEquals("null", contract.getString(schema + "properties.account.anyOf[1].type"));
+        String account = "components.schemas.WorkerAccountRef.";
+        List<String> keys = List.of("id", "username", "isActive");
+        assertEquals(Set.copyOf(keys), contract.getMap(account + "properties").keySet());
+        assertEquals(keys, contract.getList(account + "required"));
+        assertEquals("integer|int32", contract.getString(account + "properties.id.type") + "|"
+            + contract.getString(account + "properties.id.format"));
+        assertEquals("string", contract.getString(account + "properties.username.type"));
+        assertEquals(50, contract.getInt(account + "properties.username.maxLength"));
+        assertEquals("boolean", contract.getString(account + "properties.isActive.type"));
+    }
+
     /**
      * La edición hereda el alta: un allOf de WorkerRequest y un objeto con solo {@code reason},
      * texto o nulo hasta 500, sin otra regla. Sin copia no hay dos definiciones que se separen, y un

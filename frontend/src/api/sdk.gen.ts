@@ -1051,8 +1051,8 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * permitir correcciones a mano; la guarda es del formulario. Deja una fila
  * de auditoría `CREATED`. `isActive`, `createdAt`, `createdBy`,
  * `updatedAt` y `updatedBy` los pone el servidor y el cuerpo no los mueve;
- * `hasUser` sale en `false` (el usuario lo crea el módulo de usuarios,
- * con el rol del trabajador).
+ * `account` sale nula y `hasUser` en `false` (la cuenta la crea el
+ * módulo de usuarios, con el rol del trabajador).
  *
  * Orden de evaluación: `401` → `403 COM-003` → `400 COM-001` (cuerpo
  * vacío, nulo o campo inválido, incluida la ficha) → `400 WRK-005` →
@@ -1086,8 +1086,9 @@ export const createWorker = <ThrowOnError extends boolean = false>(options: Opti
  * Devuelve el trabajador con ese `id`, esté activo o inactivo, con su tipo
  * de documento, su rol (`role`: nombre de sistema, nombre visible, nivel,
  * si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
- * de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
- * usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
+ * de conductor (`driver`, nula si no hay fila en `drivers`), su cuenta
+ * del sistema (`account`, activa o inactiva, nula si no tiene; `hasUser`
+ * es lo mismo que `account` no nula) y quién lo creó y lo modificó por
  * última vez. En las filas anteriores a esta unidad, `createdBy` es el
  * usuario `admin`, que las cargó (nulo si no había admin al migrar), y
  * `updatedBy` es nulo hasta su primera edición, baja o reactivación
@@ -1150,7 +1151,8 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * Si el rol nuevo no inicia sesión y la cuenta está activa, la cuenta se
  * desactiva en la MISMA transacción y deja una fila en el rastro del
  * trabajador (`user.isActive`, de `true` a `false`, con el motivo si
- * vino), además de la del cargo. Una cuenta ya inactiva no se toca. Reenviar el mismo rol
+ * vino), además de la del cargo, y la respuesta ya la trae apagada
+ * (`account.isActive` en `false`). Una cuenta ya inactiva no se toca. Reenviar el mismo rol
  * no toca la cuenta, y volver a un rol que inicia sesión no la reactiva:
  * eso se hace desde Usuarios.
  *
@@ -1220,10 +1222,11 @@ export const updateWorker = <ThrowOnError extends boolean = false>(options: Opti
  * (`users.is_active`), si existen: quien se fue no inicia sesión ni se
  * asigna a un viaje (la sesión abierta, si la hay, sigue hasta que venza
  * su access token donde no se mira la cuenta; la renovación, `/auth/me` y
- * el cambio de contraseña ya la frenan). Idempotente: sobre un
- * inactivo responde `200` sin cambio, sin código de error, sin fila de
- * auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si llega uno,
- * o cualquier `Content-Type`, se ignora.
+ * el cambio de contraseña ya la frenan). Si la baja apaga la cuenta, la
+ * respuesta ya la trae apagada (`account.isActive` en `false`).
+ * Idempotente: sobre un inactivo responde `200` sin cambio, sin código de
+ * error, sin fila de auditoría y sin mover `updatedAt`/`updatedBy`. Sin
+ * cuerpo: si llega uno, o cualquier `Content-Type`, se ignora.
  *
  * Nadie desactiva su propio trabajador (el de `users.worker_id` de la
  * sesión), tampoco `admin` → `403 WRK-010`. Organigrama (RN-09): el nivel
@@ -1263,8 +1266,9 @@ export const deactivateWorker = <ThrowOnError extends boolean = false>(options: 
  *
  * Marca `isActive = true` y enciende su ficha de conductor solo si existe
  * y el rol actual la lleva; un rol `OPTIONAL` la enciende aunque una
- * edición anterior la haya apagado. **No reactiva el usuario**: eso lo
- * hace el módulo de usuarios, que exige trabajador activo. Tampoco crea
+ * edición anterior la haya apagado. **No reactiva el usuario** (`account`
+ * sale como estaba): eso lo hace el módulo de usuarios, que exige
+ * trabajador activo. Tampoco crea
  * una ficha que no existe. Idempotente: sobre un activo responde `200` sin
  * cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
  * llega uno, o cualquier `Content-Type`, se ignora.

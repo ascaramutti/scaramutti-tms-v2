@@ -103,6 +103,8 @@ class WorkerStatusResourceTest {
         post(adminToken(), id, DEACTIVATE).statusCode(200)
             .body("isActive", equalTo(false))
             .body("driver.isActive", equalTo(false))
+            .body("account.id", equalTo(userId))
+            .body("account.isActive", equalTo(false))
             .body("hasUser", equalTo(true));
 
         var row = fixtures.workerRowOf(id);
@@ -296,7 +298,8 @@ class WorkerStatusResourceTest {
         int id = fixtures.seedWorker("ZTESTS011", "Juan", "Pérez", "sales", false);
         int userId = fixtures.seedUserFor(id, "ztestusers011", "sales", accountOn);
 
-        post(adminToken(), id, REACTIVATE).statusCode(200).body("isActive", equalTo(true));
+        post(adminToken(), id, REACTIVATE).statusCode(200).body("isActive", equalTo(true))
+            .body("account.isActive", equalTo(accountOn));
 
         assertEquals(accountOn, fixtures.userIsActive(userId), "la cuenta quedo como estaba");
         assertEquals(List.of("isActive"), auditFieldNames(id), "y el rastro no la nombra");

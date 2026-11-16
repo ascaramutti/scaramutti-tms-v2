@@ -1,6 +1,7 @@
 package com.scaramutti.tms.workers.mapper;
 
 import com.scaramutti.tms.shared.dto.WorkerResponse;
+import com.scaramutti.tms.shared.repository.WorkerRepository.AccountRefRow;
 import com.scaramutti.tms.shared.repository.WorkerRepository.DocumentTypeRow;
 import com.scaramutti.tms.shared.repository.WorkerRepository.DriverProfileRow;
 import com.scaramutti.tms.shared.repository.WorkerRepository.RoleRow;
@@ -11,6 +12,7 @@ import com.scaramutti.tms.shared.mapper.SharedMapperConfig;
 import com.scaramutti.tms.sharedcatalogs.model.FleetResourceStatus;
 import com.scaramutti.tms.workers.dto.DocumentTypeResponse;
 import com.scaramutti.tms.workers.dto.RoleResponse;
+import com.scaramutti.tms.workers.dto.WorkerAccountRef;
 import com.scaramutti.tms.workers.dto.WorkerDetailResponse;
 import com.scaramutti.tms.workers.dto.WorkerDriverProfileResponse;
 import com.scaramutti.tms.workers.dto.WorkerUserRef;
@@ -40,10 +42,11 @@ public interface WorkerServiceMapper {
     /**
      * El detalle, desde la fila que devuelve la consulta.
      *
-     * <p>Los cuatro sub-objetos se declaran a mano aunque el generador los deduciria: con la
+     * <p>Los sub-objetos se declaran a mano aunque el generador los deduciria: con la
      * politica de destino sin origen en error, declararlos hace que el compilador verifique
      * cada uno por separado y que el error senale el record culpable en vez de la raiz.
      */
+    @Mapping(target = "hasUser", expression = "java(workerDetailRow.account() != null)")
     WorkerDetailResponse toWorkerDetailResponse(WorkerDetailRow workerDetailRow);
 
     DocumentTypeResponse toDocumentTypeResponse(DocumentTypeRow documentTypeRow);
@@ -51,6 +54,8 @@ public interface WorkerServiceMapper {
     RoleResponse toRoleResponse(RoleRow roleRow);
 
     WorkerUserRef toWorkerUserRef(UserRefRow userRefRow);
+
+    WorkerAccountRef toWorkerAccountRef(AccountRefRow accountRefRow);
 
     @Mapping(target = "status", source = "statusName")
     WorkerDriverProfileResponse toWorkerDriverProfileResponse(DriverProfileRow driverProfileRow);

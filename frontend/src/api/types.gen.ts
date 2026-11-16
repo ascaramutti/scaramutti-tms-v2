@@ -1183,10 +1183,19 @@ export type WorkerUpdateRequest = WorkerRequest & {
 };
 
 /**
- * Ficha completa de un trabajador. `role` es su rol (la misma fila que
- * lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
- * `public.users` para él (el usuario lo administra el módulo de
- * usuarios). En los trabajadores cargados antes de que existiera esta
+ * La cuenta del sistema de un trabajador, para enlazarla desde su ficha.
+ */
+export type WorkerAccountRef = {
+    id: number;
+    username: string;
+    isActive: boolean;
+};
+
+/**
+ * Ficha completa de un trabajador. `role` es su cargo. `account` es su
+ * cuenta del sistema, activa o inactiva, o nula si no tiene (la
+ * administra el módulo de usuarios); `hasUser` es lo mismo que
+ * `account` no nula. En los trabajadores cargados antes de que existiera esta
  * unidad, `createdBy` es el usuario `admin`, que los cargó (nulo si no
  * había admin al migrar, o en un trabajador creado por SQL antes que el
  * primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
@@ -1214,6 +1223,7 @@ export type WorkerDetailResponse = {
     updatedAt: string;
     updatedBy?: UserRef | null;
     driver?: WorkerDriverProfileResponse | null;
+    account: WorkerAccountRef | null;
     hasUser: boolean;
 };
 
