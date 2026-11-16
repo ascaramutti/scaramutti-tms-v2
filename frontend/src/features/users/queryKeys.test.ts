@@ -27,4 +27,12 @@ describe('userAccountKeys', () => {
     expect(userAccountKeys.detail(42).slice(0, 2)).not.toEqual(userAccountKeys.lists())
     expect(userAccountKeys.detail(7)).not.toEqual(userAccountKeys.detail(12))
   })
+
+  it('los elegibles cuelgan de la raíz, fuera de las listas', () => {
+    expect(userAccountKeys.candidates()).toEqual(['users', 'candidates'])
+  })
+
+  it('el alta tiene su clave, para saber si está en vuelo', () => {
+    expect(userAccountKeys.create()).toEqual(['users', 'create'])
+  })
 })

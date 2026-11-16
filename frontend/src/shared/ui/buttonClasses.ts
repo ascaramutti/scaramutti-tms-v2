@@ -17,8 +17,7 @@ const VARIANTES: Record<ButtonVariant, string> = {
     'border border-border-strong bg-surface text-fg-body hover:bg-surface-subtle focus:ring-focus',
   danger:
     'bg-danger text-on-solid shadow-sm hover:bg-danger-hover focus:ring-danger focus:ring-offset-2 focus:ring-offset-surface',
-  // La transición que da algo por bueno (aceptar una cotización). Su anillo se separa sobre el
-  // lienzo y no sobre la tarjeta: sus botones viven en el encabezado de la página.
+  // Lo que da algo por bueno o lo pone en marcha.
   success:
     'bg-transition text-on-solid shadow-sm hover:bg-transition-hover focus:ring-focus focus:ring-offset-2 focus:ring-offset-canvas',
 }

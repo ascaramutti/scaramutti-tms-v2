@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { delay, http, HttpResponse } from 'msw'
 import { axe } from 'vitest-axe'
 import { UsersListPage } from './UsersListPage'
-import { USERS_BASE, userAccountDetailPath } from '../../../shared/paths'
+import { USERS_BASE, userAccountCreatePath, userAccountDetailPath } from '../../../shared/paths'
 import { server } from '../../../test/mocks/server'
 import { fakeUserAccount } from '../../../test/mocks/handlers/users'
 import type { UserAccountSummaryResponse } from '../../../api'
@@ -54,6 +54,7 @@ function renderPage(queryClient = newQueryClient()) {
   const router = createMemoryRouter(
     [
       { path: USERS_BASE, element: <UsersListPage /> },
+      { path: userAccountCreatePath(), element: <p>Alta de cuenta</p> },
       { path: `${USERS_BASE}/:id`, element: <p>Detalle de la cuenta</p> },
       { path: '/otra', element: <Link to={USERS_BASE}>Volver</Link> },
     ],
@@ -278,12 +279,23 @@ describe('UsersListPage', () => {
     await waitFor(() => expect(pedidos).toEqual(['true', 'true']))
   })
 
-  it('con filas no hay enlaces y las filas son los únicos botones', async () => {
+  it('con filas, el único enlace es "Nuevo usuario" y las filas son los únicos botones', async () => {
     usersByStatus({ true: [JPEREZ, MRIOS], false: [], none: [] })
     renderPage()
     await esperarFilas(2)
-    expect(screen.queryAllByRole('link')).toHaveLength(0)
+    expect(screen.getAllByRole('link').map((enlace) => enlace.textContent)).toEqual(['Nuevo usuario'])
     expect(screen.getAllByRole('button')).toEqual(filas())
+  })
+
+  it('"Nuevo usuario" va en el encabezado de la lista y abre el alta', async () => {
+    const user = userEvent.setup()
+    usersByStatus({ true: [JPEREZ], false: [], none: [] })
+    const { router } = renderPage()
+    const enlace = screen.getByRole('link', { name: 'Nuevo usuario' })
+    expect(enlace.closest('header')).toBe(screen.getByRole('heading', { level: 1 }).closest('header'))
+    await user.click(enlace)
+    expect(router.state.location.pathname).toBe(userAccountCreatePath())
+    expect(await screen.findByText('Alta de cuenta')).toBeInTheDocument()
   })
 
   describe('la fila abre el detalle', () => {

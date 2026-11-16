@@ -1,5 +1,10 @@
 import { delay, http, HttpResponse } from 'msw'
-import type { UserAccountDetailResponse, UserAccountSummaryResponse, UserAccountTemporaryPasswordResponse } from '../../../api'
+import type {
+  UserAccountCandidateResponse,
+  UserAccountDetailResponse,
+  UserAccountSummaryResponse,
+  UserAccountTemporaryPasswordResponse,
+} from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -60,6 +65,7 @@ export const usersHandlers = [
     return HttpResponse.json(accounts.filter((account) => String(account.isActive) === isActive))
   }),
   http.get(`${API}/users/:id`, ({ params }) => HttpResponse.json(fakeUserAccountDetail({ id: Number(params.id) }))),
+  http.get(`${API}/user-account-candidates`, () => HttpResponse.json([fakeAccountCandidate()])),
 ]
 
 function problema(code: string, status: number, detail: string) {
@@ -199,4 +205,85 @@ function writeNetworkError(write: AccountWrite) {
 
 function writeEmpty(write: AccountWrite) {
   return http.post(`${API}/users/:id/${write}`, () => new HttpResponse(null, { status: 200 }))
+}
+
+export function fakeAccountCandidate(overrides: Partial<UserAccountCandidateResponse> = {}): UserAccountCandidateResponse {
+  return {
+    workerId: 31,
+    fullName: 'Juan Pérez Quispe',
+    firstName: 'Juan',
+    paternalLastName: 'Pérez',
+    maternalLastName: 'Quispe',
+    role: {
+      name: 'warehouse_keeper',
+      description: 'Almacenero',
+      level: 1,
+      canLogin: true,
+      driverProfile: 'NONE',
+    },
+    proposedUsername: 'jperez',
+    ...overrides,
+  }
+}
+
+/**
+ * Anota la consulta de cada pedido: distingue "no la pidió" de "la pidió dos veces", y que va sin
+ * filtro. El pedido n responde la lista n; los que siguen, la última.
+ */
+export function accountCandidatesCapture(
+  sink: { searches?: string[] },
+  responses: UserAccountCandidateResponse[][] = [[fakeAccountCandidate()]],
+  ms = 0,
+) {
+  sink.searches = []
+  return http.get(`${API}/user-account-candidates`, async ({ request }) => {
+    const call = sink.searches?.length ?? 0
+    sink.searches = [...(sink.searches ?? []), new URL(request.url).search]
+    if (ms) await delay(ms)
+    return HttpResponse.json(responses[Math.min(call, responses.length - 1)])
+  })
+}
+
+/** Cuenta los pedidos fallidos: distingue "no reintentó" de "reintentó una vez". Después de `failures`, responde bien. */
+export function accountCandidatesError(
+  sink: { count?: number } = {},
+  status = 500,
+  detail = 'Error interno del servidor',
+  failures = Infinity,
+) {
+  sink.count = 0
+  return http.get(`${API}/user-account-candidates`, () => {
+    sink.count = (sink.count ?? 0) + 1
+    if (sink.count > failures) return HttpResponse.json([fakeAccountCandidate()])
+    return problema(status === 403 ? 'COM-003' : 'COM-500', status, detail)
+  })
+}
+
+export function accountCandidatesEmpty() {
+  return http.get(`${API}/user-account-candidates`, () => new HttpResponse(null, { status: 200 }))
+}
+
+export function createUserAccountCapture(
+  sink: { bodies?: string[] },
+  response: UserAccountTemporaryPasswordResponse = fakeTemporaryPasswordResponse(),
+  ms = 0,
+) {
+  sink.bodies = []
+  return http.post(`${API}/users`, async ({ request }) => {
+    sink.bodies = [...(sink.bodies ?? []), await request.text()]
+    if (ms) await delay(ms)
+    return HttpResponse.json(response, { status: 201 })
+  })
+}
+
+export function createUserAccountProblem(code: string, status: number, detail = 'detail del backend') {
+  return http.post(`${API}/users`, () => problema(code, status, detail))
+}
+
+export function createUserAccountNetworkError() {
+  return http.post(`${API}/users`, () => HttpResponse.error())
+}
+
+export function createUserAccountEmpty() {
+  return http.post(`${API}/users`, () => new HttpResponse(null, { status: 201 }))
 }

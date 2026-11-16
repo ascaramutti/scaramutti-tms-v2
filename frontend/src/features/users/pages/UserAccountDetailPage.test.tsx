@@ -36,6 +36,7 @@ import {
   resetPasswordProblem,
   TEMPORARY_PASSWORD,
 } from '../../../test/mocks/handlers/users'
+import { browserLeftovers } from '../../../test/browserLeftovers'
 import { hidePageAndReadText } from '../../../test/pagehide'
 import type { SessionUser, UserAccountDetailResponse, UserRole } from '../../../api'
 
@@ -843,16 +844,10 @@ describe('UserAccountDetailPage', () => {
 
     /** Todo lo que el navegador guarda fuera de la pantalla: la temporal no tiene que estar en nada. */
     function fueraDeLaPantalla(queryClient: QueryClient, router: ReturnType<typeof renderPage>['router']) {
-      return JSON.stringify({
-        ruta: router.state.location,
-        queries: queryClient.getQueryCache().getAll().map((query) => [query.queryKey, query.state]),
-        mutations: queryClient.getMutationCache().getAll().map((mutation) => mutation.state),
-        href: window.location.href,
-        history: window.history.state,
-        local: { ...localStorage },
-        session: { ...sessionStorage },
-        avisos: [vi.mocked(toast.success).mock.calls, vi.mocked(toast.error).mock.calls],
-      })
+      return browserLeftovers(queryClient, router.state.location, [
+        vi.mocked(toast.success).mock.calls,
+        vi.mocked(toast.error).mock.calls,
+      ])
     }
 
     it('en rango va antes del botón de estado, como secundario', async () => {

@@ -36,6 +36,7 @@ import { WorkerCreatePage } from './features/workers/pages/WorkerCreatePage'
 import { WorkerEditPage } from './features/workers/pages/WorkerEditPage'
 import { UsersListPage } from './features/users/pages/UsersListPage'
 import { UserAccountDetailPage } from './features/users/pages/UserAccountDetailPage'
+import { UserCreatePage } from './features/users/pages/UserCreatePage'
 import { CotizacionWizardPage } from './features/quotations/pages/CotizacionWizardPage'
 import { StockListPage } from './features/warehouse/pages/StockListPage'
 import { ProductDetailPage } from './features/warehouse/pages/ProductDetailPage'
@@ -193,6 +194,14 @@ export const routes: RouteObject[] = [
         element: (
           <ProtectedRoute allowedRoles={USER_ACCOUNT_ADMIN_ROLES} moduleName="Usuarios">
             <UsersListPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: `${USERS_BASE}/nuevo`,
+        element: (
+          <ProtectedRoute allowedRoles={USER_ACCOUNT_ADMIN_ROLES} moduleName="Usuarios">
+            <UserCreatePage />
           </ProtectedRoute>
         ),
       },

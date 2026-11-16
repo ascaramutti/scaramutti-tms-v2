@@ -1,5 +1,10 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
+import { UserPlus } from 'lucide-react'
+import { userAccountCreatePath } from '../../../shared/paths'
+import { buttonClasses } from '../../../shared/ui/buttonClasses'
 import { PageHeader } from '../../../shared/ui/PageHeader'
+import { cn } from '../../../shared/utils/cn'
 import { getApiErrorMessage, isForbiddenError } from '../../../shared/utils/getApiErrorMessage'
 import { AccountsFilterBar } from '../components/AccountsFilterBar'
 import { AccountsTable } from '../components/AccountsTable'
@@ -41,6 +46,12 @@ export function UsersListPage() {
         title="Usuarios"
         description="Las cuentas con las que se entra al sistema. Cada una es de un trabajador y tiene su cargo."
         divider
+        action={
+          <Link to={userAccountCreatePath()} className={cn(buttonClasses({ variant: 'primary' }), 'gap-1.5')}>
+            <UserPlus className="h-4 w-4" aria-hidden="true" />
+            Nuevo usuario
+          </Link>
+        }
       />
 
       <AccountsFilterBar status={status} onStatusChange={setStatus} announcement={announcement} />
