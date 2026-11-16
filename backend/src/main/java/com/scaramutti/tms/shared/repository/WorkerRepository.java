@@ -135,11 +135,11 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
      * conserva y muestra un cargo o un tipo retirados. El que filtra por activo es el
      * catalogo, que ofrece lo que se puede elegir hoy; el detalle cuenta lo que hay.
      *
-     * <p>{@code hasUser} es verdadero tambien con el usuario inactivo: desactivar un
-     * trabajador apaga la cuenta y no la borra, y la pantalla necesita saber que sigue ahi.
+     * <p>La cuenta viaja activa o inactiva: desactivar un trabajador la apaga y no la borra, y
+     * la pantalla necesita saber que sigue ahi.
      *
-     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y cinco: leerlas por
-     * numero es el modo de falla obvio el dia que alguien agregue una en el medio.
+     * <p>Las columnas se leen por ALIAS y no por posicion: son decenas, y leerlas por numero es
+     * el modo de falla obvio el dia que alguien agregue una en el medio.
      */
     public Optional<WorkerDetailRow> findDetailById(Integer workerId) {
         String sql = "SELECT w.id AS w_id, w.first_name AS w_first_name, "
@@ -158,7 +158,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             + fullNameExpression("cw") + " AS created_by_full_name, cr.description AS created_by_position, "
             + "uu.id AS updated_by_id, uu.username AS updated_by_username, "
             + fullNameExpression("uw") + " AS updated_by_full_name, ur.description AS updated_by_position, "
-            + "(hu.id IS NOT NULL) AS has_user "
+            + "hu.id AS account_id, hu.username AS account_username, hu.is_active AS account_is_active "
             + "FROM public.workers w "
             + "JOIN public.document_types dt ON dt.id = w.document_type_id "
             + "JOIN public.roles r ON r.id = w.role_id "
@@ -209,7 +209,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             DateUtils.toOffsetDateTime(row.get("w_updated_at")),
             userRefOf(row, "updated_by"),
             driverProfileOf(row),
-            (Boolean) row.get("has_user"));
+            accountRefOf(row));
     }
 
     /**
@@ -242,6 +242,17 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             (Boolean) row.get("driver_is_active"));
     }
 
+    private static AccountRefRow accountRefOf(Tuple row) {
+        Integer accountId = intOf(row, "account_id");
+        if (accountId == null) {
+            return null;
+        }
+        return new AccountRefRow(
+            accountId,
+            (String) row.get("account_username"),
+            (Boolean) row.get("account_is_active"));
+    }
+
     /** Postgres devuelve los enteros con anchos distintos segun la columna; se normalizan aca. */
     private static Integer intOf(Tuple row, String alias) {
         Object value = row.get(alias);
@@ -266,7 +277,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
         OffsetDateTime updatedAt,
         UserRefRow updatedBy,
         DriverProfileRow driver,
-        Boolean hasUser
+        AccountRefRow account
     ) {}
 
     public record DocumentTypeRow(
@@ -281,4 +292,6 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     /** {@code statusName} es el nombre crudo del catalogo; lo traduce el mapper. */
     public record DriverProfileRow(
         Integer id, String licenseNumber, String licenseCategory, String statusName, Boolean isActive) {}
+
+    public record AccountRefRow(Integer id, String username, Boolean isActive) {}
 }

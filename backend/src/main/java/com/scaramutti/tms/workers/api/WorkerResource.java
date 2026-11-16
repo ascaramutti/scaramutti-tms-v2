@@ -72,6 +72,9 @@ public class WorkerResource {
      * <p>Sin regla de organigrama: la lectura es plana. Quien puede abrir esta pantalla ve
      * cualquier ficha, incluso la de alguien de cargo superior; el organigrama gobierna
      * quien ESCRIBE.
+     *
+     * <p>La cuenta del trabajador viaja en la ficha porque quien lee la ficha lee tambien la lista
+     * de cuentas: no le muestra a nadie nada que no vea ya.
      */
     @GET
     @Path("/{id}")

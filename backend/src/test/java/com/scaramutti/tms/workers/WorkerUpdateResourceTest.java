@@ -130,7 +130,7 @@ class WorkerUpdateResourceTest {
     // ---------- el reemplazo, que es lo que distingue este endpoint de un parche ----------
 
     @Test
-    void update_withTheFullBody_returns200WithTheSeventeenKeys() {
+    void update_withTheFullBody_returns200WithEveryKeyOfTheDetail() {
         int id = seedWorker("ZTESTE001", "operator");
 
         put(adminToken()).body(body("Ana", "Silva", "ZTESTE001", "987654321", "operator",
@@ -140,7 +140,7 @@ class WorkerUpdateResourceTest {
             .body("keySet()", containsInAnyOrder(
                 "id", "firstName", "paternalLastName", "maternalLastName", "fullName",
                 "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
-                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
+                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "account", "hasUser"))
             .body("id", equalTo(id))
             .body("firstName", equalTo("Ana"))
             .body("paternalLastName", equalTo("Silva"))
@@ -823,7 +823,8 @@ class WorkerUpdateResourceTest {
         put(fabricateTokenForUser(actor.userId(), "ztestuser72", "general_manager")).body("""
             {"id":999999,"firstName":"Ana","paternalLastName":"Pérez","documentTypeId":%d,
              "documentNumber":"ZTESTE047","role":"operator","hireDate":"2024-03-01",
-             "isActive":true,"hasUser":true,"createdAt":"2000-01-01T00:00:00Z",
+             "isActive":true,"hasUser":true,"account":{"id":1,"username":"ztestuser1","isActive":true},
+             "createdAt":"2000-01-01T00:00:00Z",
              "createdBy":{"id":1},"updatedBy":{"id":1}}""".formatted(documentTypeId()))
         .when().put("/workers/" + id)
         .then().statusCode(200)
@@ -832,6 +833,7 @@ class WorkerUpdateResourceTest {
             .body("createdBy.id", equalTo(otherActor.userId()))
             .body("updatedBy.id", equalTo(actor.userId()))
             .body("hasUser", equalTo(false))
+            .body("account", nullValue())
             .body("createdAt", not(org.hamcrest.Matchers.startsWith("2000")));
     }
 
@@ -1076,7 +1078,8 @@ class WorkerUpdateResourceTest {
         put(fabricateTokenForUser(actor.userId(), "ztestuserb1a", "general_manager"))
             .body(body("Juan", "Pérez", "ZTESTB101", null, role, "2024-03-01", driverJson, "Cambio de puesto"))
         .when().put("/workers/" + id)
-        .then().statusCode(200).body("role.name", equalTo(role)).body("hasUser", equalTo(true));
+        .then().statusCode(200).body("role.name", equalTo(role)).body("hasUser", equalTo(true))
+            .body("account.id", equalTo(userId)).body("account.isActive", equalTo(false));
 
         assertFalse(fixtures.userIsActive(userId));
         var after = fixtures.userAuthorshipOf(userId);

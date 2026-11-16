@@ -1,9 +1,12 @@
 package com.scaramutti.tms.workers;
 
 import com.scaramutti.tms.support.WarehouseTestData;
+import com.scaramutti.tms.users.api.UserAccountResource;
+import com.scaramutti.tms.workers.api.WorkerResource;
 import io.quarkus.narayana.jta.QuarkusTransaction;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.response.Response;
+import jakarta.annotation.security.RolesAllowed;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -13,6 +16,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.time.LocalDate;
+import java.util.Set;
 
 import static com.scaramutti.tms.support.ResponseHeaders.assertNotSent;
 import static com.scaramutti.tms.support.ResponseHeaders.assertSentOnce;
@@ -25,6 +29,7 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Integration tests de GET /workers/{id}.
@@ -54,7 +59,7 @@ class WorkerDetailResourceTest {
     // ---------- la ficha completa ------------------------------------------------
 
     @Test
-    void get_returnsTheSeventeenFieldsOfTheContract() {
+    void get_returnsEveryFieldOfTheContract() {
         int id = fixtures.seedWorker("ZTESTB001", "Juan", "Pérez Huamán", "driver", true);
         fixtures.setWorkerPhone(id, "987654321");
         fixtures.setWorkerHireDate(id, LocalDate.of(2024, 3, 1));
@@ -69,7 +74,7 @@ class WorkerDetailResourceTest {
             .body("keySet()", containsInAnyOrder(
                 "id", "firstName", "paternalLastName", "maternalLastName", "fullName",
                 "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
-                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
+                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "account", "hasUser"))
             .body("id", equalTo(id))
             .body("firstName", equalTo("Juan"))
             .body("paternalLastName", equalTo("Pérez Huamán"))
@@ -269,6 +274,82 @@ class WorkerDetailResourceTest {
         .then().statusCode(200).body("hasUser", equalTo(true));
     }
 
+    @Test
+    void get_workerWithAnActiveAccount_carriesItsIdUsernameAndState() {
+        int id = fixtures.seedWorker("ZTESTB026", "Diana", "Rojas", "operator", true);
+        int accountId = fixtures.seedUserFor(id, "ztestuser26", "operator");
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("account.keySet()", containsInAnyOrder("id", "username", "isActive"))
+            .body("account.id", equalTo(accountId))
+            .body("account.username", equalTo("ztestuser26"))
+            .body("account.isActive", equalTo(true))
+            .body("hasUser", equalTo(true));
+    }
+
+    @Test
+    void get_activeWorkerWithAnInactiveAccount_carriesTheStateOfTheAccount() {
+        int id = fixtures.seedWorker("ZTESTB027", "Cuenta", "Apagada", "operator", true);
+        int accountId = fixtures.seedUserFor(id, "ztestuser27", "operator", false);
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("isActive", equalTo(true))
+            .body("account.id", equalTo(accountId))
+            .body("account.isActive", equalTo(false))
+            .body("hasUser", equalTo(true));
+    }
+
+    @Test
+    void get_inactiveWorkerWithAnActiveAccount_carriesTheStateOfTheAccount() {
+        int id = fixtures.seedWorker("ZTESTB028", "Cuenta", "Encendida", "operator", false);
+        int accountId = fixtures.seedUserFor(id, "ztestuser28", "operator", true);
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("isActive", equalTo(false))
+            .body("account.id", equalTo(accountId))
+            .body("account.isActive", equalTo(true))
+            .body("hasUser", equalTo(true));
+    }
+
+    @Test
+    void get_workerWithoutAccount_sendsTheAccountKeyAsNull_andHasUserFalse() {
+        int id = fixtures.seedWorker("ZTESTB029", "Sin", "Cuenta", "operator", true);
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + id)
+        .then().statusCode(200)
+            .body("$", hasKey("account"))
+            .body("account", nullValue())
+            .body("hasUser", equalTo(false));
+    }
+
+    @Test
+    void get_twoWorkersWithAccounts_eachCarriesItsOwn() {
+        int first = fixtures.seedWorker("ZTESTB033", "Primera", "Ficha", "operator", true);
+        int second = fixtures.seedWorker("ZTESTB034", "Segunda", "Ficha", "operator", true);
+        // En orden inverso: asi el id de una cuenta no puede coincidir con el de su trabajador en las dos.
+        int secondAccount = fixtures.seedUserFor(second, "ztestuser34", "operator");
+        int firstAccount = fixtures.seedUserFor(first, "ztestuser33", "operator");
+        assertTrue(firstAccount != first || secondAccount != second, "un id de cuenta distinto del de su trabajador");
+
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + first)
+        .then().statusCode(200)
+            .body("account.id", equalTo(firstAccount))
+            .body("account.username", equalTo("ztestuser33"));
+        given().header("Authorization", "Bearer " + adminToken())
+        .when().get("/workers/" + second)
+        .then().statusCode(200)
+            .body("account.id", equalTo(secondAccount))
+            .body("account.username", equalTo("ztestuser34"));
+    }
+
     /**
      * Una fila sin autor (sin admin al migrar, o el primer trabajador de una base vacia)
      * viaja como nulo y no como un usuario inventado por la lectura.
@@ -359,10 +440,22 @@ class WorkerDetailResourceTest {
     @ValueSource(strings = {"admin", "general_manager", "operations_manager", "finance_manager"})
     void get_withEachMaintenanceRole_returns200(String role) {
         int id = fixtures.seedWorker("ZTESTB031", "Con", "Acceso", "operator", true);
+        int accountId = fixtures.seedUserFor(id, "ztestuser31", "operator");
 
         given().header("Authorization", "Bearer " + fabricateAccessToken("ztest-" + role, role))
         .when().get("/workers/" + id)
-        .then().statusCode(200).body("id", equalTo(id));
+        .then().statusCode(200).body("id", equalTo(id)).body("account.id", equalTo(accountId));
+    }
+
+    /** La ficha trae la cuenta porque quien la lee ya lee la lista de cuentas: las dos listas no se separan. */
+    @Test
+    void get_isReadByTheSameRolesAsTheAccountList() throws NoSuchMethodException {
+        RolesAllowed detail = WorkerResource.class.getMethod("getWorker", Integer.class)
+            .getAnnotation(RolesAllowed.class);
+        RolesAllowed accounts = UserAccountResource.class.getMethod("listUserAccounts", Boolean.class)
+            .getAnnotation(RolesAllowed.class);
+
+        assertEquals(Set.of(accounts.value()), Set.of(detail.value()));
     }
 
     /**

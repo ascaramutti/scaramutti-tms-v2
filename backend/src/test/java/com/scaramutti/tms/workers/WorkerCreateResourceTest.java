@@ -115,7 +115,7 @@ class WorkerCreateResourceTest {
     // ---------- camino feliz -----------------------------------------------------
 
     @Test
-    void create_withTheFullBody_returns201WithTheSeventeenKeys() {
+    void create_withTheFullBody_returns201WithEveryKeyOfTheDetail() {
         post(adminToken()).body("""
             {"firstName":"Juan","paternalLastName":"Pérez Huamán","documentTypeId":%d,
              "documentNumber":"ZTESTC001","phone":"987654321","role":"operator",
@@ -128,7 +128,7 @@ class WorkerCreateResourceTest {
             .body("keySet()", containsInAnyOrder(
                 "id", "firstName", "paternalLastName", "maternalLastName", "fullName",
                 "documentType", "documentNumber", "phone", "role", "hireDate", "isActive",
-                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "hasUser"))
+                "createdAt", "createdBy", "updatedAt", "updatedBy", "driver", "account", "hasUser"))
             .body("id", notNullValue())
             .body("firstName", equalTo("Juan"))
             .body("paternalLastName", equalTo("Pérez Huamán"))
@@ -140,6 +140,7 @@ class WorkerCreateResourceTest {
             .body("role.driverProfile", equalTo("NONE"))
             .body("hireDate", equalTo("2024-03-01"))
             .body("isActive", equalTo(true))
+            .body("account", nullValue())
             .body("hasUser", equalTo(false))
             .body("driver", nullValue());
     }

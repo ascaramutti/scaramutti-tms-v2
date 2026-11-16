@@ -39,6 +39,7 @@ export function fakeWorkerDetail(overrides: Partial<WorkerDetailResponse> = {}):
     updatedAt: '2026-09-01T04:30:00Z',
     updatedBy: { id: 3, username: 'psalas', fullName: 'Pedro Salas Vega', position: 'Gerente General' },
     driver: null,
+    account: overrides.hasUser === false ? null : { id: 12, username: 'atorres', isActive: true },
     hasUser: true,
     ...overrides,
   }

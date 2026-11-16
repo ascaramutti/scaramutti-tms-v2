@@ -7,16 +7,15 @@ import java.time.OffsetDateTime;
 
 /**
  * Un trabajador completo. No reusa la respuesta del listado: esa tiene cuatro campos para un
- * combobox y esta tiene diecisiete, entre ellos el documento, que el combobox nunca muestra y por
- * eso el detalle lo leen menos roles.
+ * combobox y esta es la ficha entera, con el documento, que el combobox nunca muestra y por eso el
+ * detalle lo leen menos roles.
  *
  * <p>Sin materno, {@code maternalLastName} viaja nulo, nunca vacio; {@code fullName} lo compone la
  * consulta, con {@code WorkerRepository.fullNameExpression}.
  *
- * <p>{@code hasUser} no es una columna: se deriva de que exista una fila de usuario apuntando
- * a este trabajador. Es verdadero tambien cuando ese usuario esta inactivo, porque desactivar
- * un trabajador apaga su usuario pero no lo borra, y la pantalla necesita saber que la cuenta
- * sigue ahi.
+ * <p>{@code hasUser} es {@code account} no nulo: verdadero tambien con la cuenta inactiva, porque
+ * desactivar un trabajador apaga su cuenta pero no la borra, y la pantalla necesita saber que la
+ * cuenta sigue ahi.
  *
  * <p>En las filas anteriores a este modulo, {@code createdBy} es el usuario admin, que las cargo
  * (nulo si no habia admin al migrar), y {@code updatedBy} es nulo hasta su primera edicion, baja
@@ -41,6 +40,8 @@ public record WorkerDetailResponse(
     @Schema(nullable = true) WorkerUserRef updatedBy,
     @Schema(description = "La ficha de conductor, o nulo si el trabajador no tiene", nullable = true)
         WorkerDriverProfileResponse driver,
+    @Schema(description = "Su cuenta del sistema, activa o no, o nulo si no tiene", nullable = true)
+        WorkerAccountRef account,
     @Schema(description = "Si existe un usuario para este trabajador, activo o no", example = "false")
         Boolean hasUser
 ) {}
