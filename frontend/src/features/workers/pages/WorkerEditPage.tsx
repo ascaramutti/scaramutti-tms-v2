@@ -3,7 +3,7 @@ import { useIsMutating } from '@tanstack/react-query'
 import { UserX } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import type { RoleResponse, WorkerDetailResponse } from '../../../api'
+import type { WorkerDetailResponse } from '../../../api'
 import { Alert } from '../../../shared/ui/Alert'
 import { BackLink } from '../../../shared/ui/BackLink'
 import { Button } from '../../../shared/ui/Button'
@@ -112,7 +112,7 @@ export function WorkerEditPage() {
         worker={data}
         documentTypes={documentTypes.data}
         roles={roles.data}
-        roleOptions={ownRecord ? [data.role] : editableRoles(roles.data, level, data)}
+        roleOptions={ownRecord ? [data.role] : assignableRoles(roles.data, level)}
         roleLockedReason={ownRecord ? WORKER_UPDATE_ERRORS['WRK-012'].message : undefined}
         handleOwnError={(error) => {
           if (!isNotFoundError(error)) return false
@@ -135,12 +135,6 @@ export function WorkerEditPage() {
       />
     </Shell>
   )
-}
-
-/** Los cargos que se le pueden dar: los de la sesión y, si tiene usuario, solo los que inician sesión. */
-function editableRoles(roles: readonly RoleResponse[], level: number, worker: WorkerDetailResponse): RoleResponse[] {
-  const assignable = assignableRoles(roles, level)
-  return worker.hasUser ? assignable.filter((role) => role.canLogin) : assignable
 }
 
 interface ShellProps {

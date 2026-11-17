@@ -45,7 +45,6 @@ export const WORKER_UPDATE_ERRORS: Record<string, WorkerApiError> = {
   ...WORKER_CREATE_ERRORS,
   'WRK-006': { message: 'No puedes modificar a un trabajador de tu nivel o superior.' },
   'WRK-009': { field: 'reason', message: 'Indica el motivo del cambio, de al menos 10 caracteres.' },
-  'WRK-011': { field: 'role', message: 'Este cargo no inicia sesión y el trabajador tiene usuario. Elige otro.' },
   'WRK-012': { field: 'role', message: 'No puedes cambiar tu propio cargo.' },
 }
 

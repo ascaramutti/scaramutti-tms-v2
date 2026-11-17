@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import type { WorkerDetailResponse } from '../../../api'
+import { SESSION_WINDOW_NOTICE } from '../../../shared/auth/sessionNotice'
 import { ConfirmActionDialog } from '../../../shared/ui/ConfirmActionDialog'
 import { isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { useChangeWorkerStatus, type WorkerStatusAction } from '../hooks/useChangeWorkerStatus'
@@ -80,11 +81,13 @@ const COPY = {
   },
 } as const
 
-/** La baja apaga en cascada el usuario y la licencia activa; con licencia, avisa de los viajes. */
+/** La baja apaga en cascada la cuenta y la licencia, si están activas; con licencia, avisa de los viajes. */
 function DeactivateNotes({ worker }: { worker: WorkerDetailResponse }) {
+  const activeAccount = worker.account?.isActive === true
   return (
     <>
-      <DraggedByDeactivation hasUser={worker.hasUser} activeLicense={worker.driver?.isActive === true} />
+      <DraggedByDeactivation activeAccount={activeAccount} activeLicense={worker.driver?.isActive === true} />
+      {activeAccount && <p className="text-sm text-fg-body">{SESSION_WINDOW_NOTICE}</p>}
       {worker.driver && (
         <p className="text-sm text-fg-body">
           Si tiene viajes pendientes asignados, quedarán marcados para reasignar en Operaciones.
@@ -95,11 +98,11 @@ function DeactivateNotes({ worker }: { worker: WorkerDetailResponse }) {
 }
 
 /** La licencia con la palabra de la ficha ("Deshabilitada"); el usuario, con la del estado. */
-function DraggedByDeactivation({ hasUser, activeLicense }: { hasUser: boolean; activeLicense: boolean }) {
+function DraggedByDeactivation({ activeAccount, activeLicense }: { activeAccount: boolean; activeLicense: boolean }) {
   const text =
-    hasUser && activeLicense
+    activeAccount && activeLicense
       ? 'Se desactiva también su usuario del sistema, y su licencia de conducir queda deshabilitada.'
-      : hasUser
+      : activeAccount
         ? 'Se desactiva también su usuario del sistema.'
         : activeLicense
           ? 'Su licencia de conducir queda deshabilitada.'
@@ -108,15 +111,16 @@ function DraggedByDeactivation({ hasUser, activeLicense }: { hasUser: boolean; a
 }
 
 /**
- * La reactivación no toca la cuenta: se dice para que nadie espere que vuelva a entrar. La
- * licencia sí vuelve, con la misma condición que el backend: la tiene apagada y el cargo la lleva.
+ * La reactivación no toca la cuenta: si está apagada, se dice para que nadie espere que vuelva a
+ * entrar. La licencia sí vuelve, con la misma condición que el backend: la tiene apagada y el
+ * cargo la lleva.
  */
 function ReactivateNotes({ worker }: { worker: WorkerDetailResponse }) {
   const licenseComesBack = worker.driver?.isActive === false && worker.role.driverProfile !== 'NONE'
   return (
     <>
       {licenseComesBack && <p className="text-sm text-fg-body">Su licencia de conducir vuelve a quedar activa.</p>}
-      {worker.hasUser && (
+      {worker.account?.isActive === false && (
         <p className="text-sm text-fg-body">
           Su usuario sigue inactivo: reactivar al trabajador no le devuelve el acceso.
         </p>
