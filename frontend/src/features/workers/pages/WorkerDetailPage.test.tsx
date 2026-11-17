@@ -680,10 +680,13 @@ describe('WorkerDetailPage', () => {
 
     describe('lo que arrastra la baja', () => {
       const VIAJES = 'Si tiene viajes pendientes asignados, quedarán marcados para reasignar en Operaciones.'
+      const SESION = 'Si tiene una sesión abierta, deja de funcionar en 16 minutos como máximo.'
+      const apagada = { id: 7, username: 'jquispe', isActive: false }
 
       it.each([
         ['sin usuario ni licencia', trabajador(), null, false],
         ['con usuario', trabajador({ role: ALMACEN, hasUser: true }), 'Se desactiva también su usuario del sistema.', false],
+        ['con la cuenta apagada', trabajador({ role: ALMACEN, account: apagada }), null, false],
         [
           'con licencia activa',
           trabajador({ role: CONDUCTOR, driver: fakeDriverProfile() }),
@@ -702,6 +705,12 @@ describe('WorkerDetailPage', () => {
           'Se desactiva también su usuario del sistema.',
           true,
         ],
+        [
+          'con la cuenta apagada y licencia activa',
+          trabajador({ role: CONDUCTOR, account: apagada, driver: fakeDriverProfile() }),
+          'Su licencia de conducir queda deshabilitada.',
+          true,
+        ],
       ] as const)('%s', async (_caso, worker, arrastra, viajes) => {
         const user = userEvent.setup()
         await abrirComo(worker)
@@ -713,17 +722,43 @@ describe('WorkerDetailPage', () => {
         else expect(within(panel).queryByText(/Se desactiva también|queda deshabilitada/)).not.toBeInTheDocument()
         if (viajes) expect(within(panel).getByText(VIAJES)).toBeInTheDocument()
         else expect(within(panel).queryByText(VIAJES)).not.toBeInTheDocument()
+        if (worker.account?.isActive) expect(within(panel).getByText(SESION)).toBeInTheDocument()
+        else expect(within(panel).queryByText(/sesión abierta/)).not.toBeInTheDocument()
+      })
+
+      it('el aviso de la sesión va después de lo que arrastra y antes de los viajes', async () => {
+        const user = userEvent.setup()
+        await abrirComo(trabajador({ role: CONDUCTOR, hasUser: true, driver: fakeDriverProfile() }))
+        const panel = await abrirDialogo(user, 'Desactivar')
+        const textos = within(panel)
+          .getAllByText(/Se desactiva también|sesión abierta|viajes pendientes/)
+          .map((parrafo) => parrafo.textContent)
+        expect(textos).toEqual([
+          'Se desactiva también su usuario del sistema, y su licencia de conducir queda deshabilitada.',
+          SESION,
+          VIAJES,
+        ])
       })
     })
 
-    it('reactivar con usuario aclara que su usuario sigue inactivo', async () => {
+    it('reactivar con la cuenta apagada aclara que su usuario sigue inactivo', async () => {
       const user = userEvent.setup()
-      await abrirComo(trabajador({ role: ALMACEN, hasUser: true, isActive: false }))
+      await abrirComo(
+        trabajador({ role: ALMACEN, account: { id: 7, username: 'jquispe', isActive: false }, isActive: false }),
+      )
       const panel = await abrirDialogo(user, 'Reactivar')
       expect(within(panel).getByText('¿Reactivas a Juan Carlos Quispe?')).toBeInTheDocument()
       expect(
         within(panel).getByText('Su usuario sigue inactivo: reactivar al trabajador no le devuelve el acceso.'),
       ).toBeInTheDocument()
+    })
+
+    it('reactivar con la cuenta encendida no dice que siga inactiva', async () => {
+      const user = userEvent.setup()
+      await abrirComo(trabajador({ role: ALMACEN, hasUser: true, isActive: false }))
+      const panel = await abrirDialogo(user, 'Reactivar')
+      expect(within(panel).getByText('¿Reactivas a Juan Carlos Quispe?')).toBeInTheDocument()
+      expect(within(panel).queryByText(/usuario/)).not.toBeInTheDocument()
     })
 
     it('reactivar sin usuario no habla de usuarios ni de licencias', async () => {

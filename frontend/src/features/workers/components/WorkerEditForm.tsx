@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { useFormContext, useWatch } from 'react-hook-form'
-import type { DocumentTypeResponse, RoleResponse, WorkerDetailResponse } from '../../../api'
+import type { DocumentTypeResponse, RoleResponse, WorkerAccountRef, WorkerDetailResponse } from '../../../api'
+import { SESSION_WINDOW_NOTICE } from '../../../shared/auth/sessionNotice'
 import { Alert } from '../../../shared/ui/Alert'
 import { Textarea } from '../../../shared/ui/Textarea'
 import { useUpdateWorker } from '../hooks/useUpdateWorker'
@@ -45,7 +46,7 @@ export function WorkerEditForm({ worker, roles, ...props }: WorkerEditFormProps)
       errors={WORKER_UPDATE_ERRORS}
       fallbackMessage="No se pudieron guardar los cambios. Intenta de nuevo."
       isUnchanged={(values) => comparableBody(values, roles, original) === loaded}
-      notice={worker.hasUser && <WorkerRoleChangeNotice roles={roles} originalRole={worker.role} />}
+      notice={worker.account && <WorkerRoleChangeNotice roles={roles} originalRole={worker.role} account={worker.account} />}
     >
       <WorkerReasonField original={original} />
     </WorkerForm>
@@ -96,18 +97,33 @@ function WorkerReasonField({ original }: { original: Pick<WorkerFormValues, 'doc
 interface WorkerRoleChangeNoticeProps {
   roles: readonly RoleResponse[]
   originalRole: RoleResponse
+  account: WorkerAccountRef
 }
 
-/** A quien tiene usuario, el cambio de cargo le cambia los permisos: se avisa cuál, con los nombres visibles. */
-function WorkerRoleChangeNotice({ roles, originalRole }: WorkerRoleChangeNoticeProps) {
+/**
+ * A quien tiene usuario, el cambio de cargo le cambia los permisos y, a un cargo que no inicia
+ * sesión, le apaga la cuenta activa: se avisa cuál, con los nombres visibles. Una cuenta ya apagada
+ * no cambia con un cargo sin sesión, así que no hay nada que avisar.
+ */
+function WorkerRoleChangeNotice({ roles, originalRole, account }: WorkerRoleChangeNoticeProps) {
   const { control } = useFormContext<WorkerFormValues>()
   const role = useWatch({ control, name: 'role' })
   const newRole = roles.find((candidate) => candidate.name === role)
   if (!newRole || newRole.name === originalRole.name) return null
+  if (!newRole.canLogin && !account.isActive) return null
   return (
     <Alert variant="warning" role="status" className="px-4 py-3 text-sm">
-      Este trabajador tiene usuario: al cambiar su cargo de {originalRole.description} a {newRole.description},
-      cambian sus permisos en el sistema.
+      {newRole.canLogin ? (
+        <>
+          Este trabajador tiene usuario: al cambiar su cargo de {originalRole.description} a {newRole.description},
+          cambian sus permisos en el sistema.
+        </>
+      ) : (
+        <>
+          Este trabajador tiene usuario y el cargo {newRole.description} no inicia sesión. Su cuenta se desactivará.{' '}
+          {SESSION_WINDOW_NOTICE}
+        </>
+      )}
     </Alert>
   )
 }
