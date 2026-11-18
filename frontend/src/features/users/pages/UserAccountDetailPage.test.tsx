@@ -689,18 +689,25 @@ describe('UserAccountDetailPage', () => {
       expect(toast.success).toHaveBeenCalledWith('Se reactivó la cuenta jperez.')
     })
 
-    it('al confirmar siembra el detalle con lo devuelto, marca vieja la lista y no toca la ficha del trabajador', async () => {
+    // La ficha 42 tiene el id de la cuenta y no el de su trabajador: marcarla sería confundir los dos ids.
+    it.each([
+      ['Desactivar', 'deactivate', true, false],
+      ['Reactivar', 'reactivate', false, true],
+    ] as const)('%s: al confirmar siembra el detalle con lo devuelto, marca vieja la lista y la ficha de su trabajador', async (accion, operacion, antes, despues) => {
       const user = userEvent.setup()
-      const devuelto = cuenta({ isActive: false, username: 'jperez.devuelto' })
-      server.use(changeAccountStatusCapture('deactivate', {}, devuelto))
-      const { queryClient } = await renderAccount(cuenta())
+      const devuelto = cuenta({ isActive: despues, username: 'jperez.devuelto' })
+      server.use(changeAccountStatusCapture(operacion, {}, devuelto))
+      const { queryClient } = await renderAccount(cuenta({ isActive: antes }))
       queryClient.setQueryData(userAccountKeys.list({ isActive: true }), [])
       queryClient.setQueryData(workerKeys.detail(31), {})
-      await confirmar(user, 'Desactivar')
+      queryClient.setQueryData(workerKeys.detail(42), {})
+      await confirmar(user, accion)
 
-      await waitFor(() => expect(queryClient.getQueryData(userAccountKeys.detail(42))).toEqual(devuelto))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+      expect(queryClient.getQueryData(userAccountKeys.detail(42))).toEqual(devuelto)
       expect(queryClient.getQueryState(userAccountKeys.list({ isActive: true }))?.isInvalidated).toBe(true)
-      expect(queryClient.getQueryState(workerKeys.detail(31))?.isInvalidated).toBe(false)
+      expect(queryClient.getQueryState(workerKeys.detail(31))).toMatchObject({ isInvalidated: true, status: 'success', fetchStatus: 'idle' })
+      expect(queryClient.getQueryState(workerKeys.detail(42))?.isInvalidated).toBe(false)
     })
 
     describe('foco', () => {
@@ -791,12 +798,14 @@ describe('UserAccountDetailPage', () => {
       ])('%s se avisa con el texto genérico', async (_caso, handler) => {
         const user = userEvent.setup()
         server.use(handler())
-        await renderAccount(cuenta())
+        const { queryClient } = await renderAccount(cuenta())
+        queryClient.setQueryData(userAccountKeys.list({ isActive: true }), [])
         await confirmar(user, 'Desactivar')
         expect((await within(dialogo()).findByRole('alert')).textContent).toBe(
           'No se pudo cambiar el estado de la cuenta. Intenta de nuevo.',
         )
         expect(estado()).toBe('Activa')
+        expect(queryClient.getQueryState(userAccountKeys.list({ isActive: true }))?.isInvalidated).toBe(false)
       })
 
       it('USR-001 avisa que no existe y vuelve a la lista reemplazando la entrada', async () => {
@@ -1015,6 +1024,18 @@ describe('UserAccountDetailPage', () => {
 
       expect(queryClient.getQueryData(userAccountKeys.detail(42))).toEqual(devuelta)
       expect(queryClient.getQueryState(userAccountKeys.list({ isActive: true }))?.isInvalidated).toBe(true)
+    })
+
+    it('no marca vieja la ficha de su trabajador: la contraseña no cambia el usuario ni el estado', async () => {
+      const user = userEvent.setup()
+      server.use(resetPasswordCapture({}))
+      const { queryClient } = await renderAccount(cuenta())
+      queryClient.setQueryData(workerKeys.detail(31), {})
+      await abrirYConfirmar(user)
+      await user.click(within(await screen.findByRole('dialog', { name: 'Contraseña restablecida' })).getByRole('button', { name: 'Listo' }))
+      await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+
+      expect(queryClient.getQueryState(workerKeys.detail(31))?.isInvalidated).toBe(false)
     })
 
     it('con el paso 2 abierto, la temporal está solo en la pantalla', async () => {
