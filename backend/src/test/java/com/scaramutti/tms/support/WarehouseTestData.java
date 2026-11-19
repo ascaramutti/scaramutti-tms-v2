@@ -444,17 +444,17 @@ public class WarehouseTestData {
             .setParameter(1, firstName).setParameter(2, workerId).executeUpdate());
     }
 
-    /** El materno puesto por SQL, sin pasar por la API: el disparador recompone last_name. */
+    /** El materno puesto por SQL, sin pasar por la API. */
     public void setWorkerMaternalLastName(int workerId, String maternalLastName) {
         QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
             "UPDATE public.workers SET maternal_last_name = ?1 WHERE id = ?2")
             .setParameter(1, maternalLastName).setParameter(2, workerId).executeUpdate());
     }
 
-    /** Los apellidos como estan en la fila: last_name, el paterno y el materno ("nulo" si no tiene). */
+    /** Los apellidos como estan en la fila: el paterno y el materno ("nulo" si no tiene). */
     public String workerSurnames(int workerId) {
         return QuarkusTransaction.requiringNew().call(() -> (String) entityManager.createNativeQuery(
-            "SELECT last_name || '|' || paternal_last_name || '|' || coalesce(maternal_last_name, 'nulo') "
+            "SELECT paternal_last_name || '|' || coalesce(maternal_last_name, 'nulo') "
                 + "FROM public.workers WHERE id = ?1")
             .setParameter(1, workerId).getSingleResult());
     }
@@ -611,12 +611,12 @@ public class WarehouseTestData {
 
     /** Lo que quedo en la fila del trabajador. */
     public record WorkerRow(int roleId, LocalDate hireDate, Integer createdBy, Integer updatedBy,
-        String firstName, String lastName, String documentNumber, String phone,
+        String firstName, String paternalLastName, String documentNumber, String phone,
         boolean isActive, OffsetDateTime createdAt, OffsetDateTime updatedAt, int documentTypeId) {}
 
     public WorkerRow workerRowOf(int workerId) {
         Object[] row = (Object[]) entityManager.createNativeQuery(
-            "SELECT role_id, hire_date, created_by, updated_by, first_name, last_name, "
+            "SELECT role_id, hire_date, created_by, updated_by, first_name, paternal_last_name, "
                 + "document_number, phone, is_active, created_at, updated_at, document_type_id "
                 + "FROM public.workers WHERE id = ?1")
             .setParameter(1, workerId).getSingleResult();

@@ -27,11 +27,11 @@ class DevDataSeederTest {
             "SELECT worker_id FROM public.users WHERE username = 'inactivo'").getSingleResult()).intValue());
         try {
             fixtures.setWorkerMaternalLastName(workerId, "Núñez");
-            assertEquals("Inactivo Núñez|Inactivo|Núñez", fixtures.workerSurnames(workerId), "precondicion");
+            assertEquals("Inactivo|Núñez", fixtures.workerSurnames(workerId), "precondicion");
 
             devDataSeeder.onStart(null);
 
-            assertEquals("Inactivo|Inactivo|nulo", fixtures.workerSurnames(workerId));
+            assertEquals("Inactivo|nulo", fixtures.workerSurnames(workerId));
         } finally {
             fixtures.setWorkerMaternalLastName(workerId, null);
         }
