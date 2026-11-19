@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { deactivateUserAccount, reactivateUserAccount, type UserAccountDetailResponse } from '../../../api'
+import { workerKeys } from '../../workers/queryKeys'
 import { refreshAfterAccountSaved } from './refreshAfterAccountSaved'
 
 export type AccountStatusAction = 'deactivate' | 'reactivate'
@@ -15,6 +16,9 @@ export function useChangeUserAccountStatus(id: number) {
       }
       return data
     },
-    onSuccess: (changed) => refreshAfterAccountSaved(queryClient, changed),
+    onSuccess: async (changed) => {
+      await refreshAfterAccountSaved(queryClient, changed)
+      await queryClient.invalidateQueries({ queryKey: workerKeys.detail(changed.worker.id), refetchType: 'none' })
+    },
   })
 }

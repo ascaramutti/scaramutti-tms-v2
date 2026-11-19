@@ -8,9 +8,11 @@ import { http, HttpResponse } from 'msw'
 import { toast } from 'sonner'
 import { axe } from 'vitest-axe'
 import { WorkerDetailPage } from './WorkerDetailPage'
-import { WORKERS_BASE, workerDetailPath, workerEditPath } from '../../../shared/paths'
+import { WORKERS_BASE, userAccountDetailPath, workerDetailPath, workerEditPath } from '../../../shared/paths'
 import { server } from '../../../test/mocks/server'
 import { AuthProvider } from '../../../shared/auth/AuthContext'
+import { canRoleOpenPath } from '../../../shared/auth/canRoleOpenPath'
+import { ALL_ROLES } from '../../../shared/auth/roleLanding'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import type { SessionUser, UserRole, WorkerDetailResponse } from '../../../api'
@@ -110,9 +112,13 @@ function par(rotulo: string, dentro: HTMLElement = document.body) {
   return within(dentro).getByText(rotulo, { selector: 'dt' }).parentElement as HTMLElement
 }
 
-function tarjetaLicencia() {
-  return screen.getByRole('heading', { level: 2, name: 'Licencia de conducir' }).closest('section') as HTMLElement
+function tarjeta(titulo: string) {
+  return screen.getByRole('heading', { level: 2, name: titulo }).closest('section') as HTMLElement
 }
+
+const tarjetaDatos = () => tarjeta('Datos del trabajador')
+const tarjetaCuenta = () => tarjeta('Usuario del sistema')
+const tarjetaLicencia = () => tarjeta('Licencia de conducir')
 
 describe('WorkerDetailPage', () => {
   it('muestra la carga mientras trae al trabajador', async () => {
@@ -134,7 +140,7 @@ describe('WorkerDetailPage', () => {
   it('cada dato va bajo su rótulo, en este orden', async () => {
     await renderWorker(fakeWorkerDetail())
 
-    const datos = screen.getByRole('heading', { level: 2, name: 'Datos del trabajador' }).closest('section') as HTMLElement
+    const datos = tarjetaDatos()
     const rotulos = within(datos).getAllByRole('term').map((dt) => dt.textContent)
     expect(rotulos).toEqual([
       'Nombres',
@@ -145,7 +151,6 @@ describe('WorkerDetailPage', () => {
       'Cargo',
       'Fecha de ingreso',
       'Teléfono',
-      'Tiene usuario',
       'Estado',
     ])
     const valores: Array<[string, string]> = [
@@ -157,11 +162,10 @@ describe('WorkerDetailPage', () => {
       ['Cargo', 'Jefe de Operaciones'],
       ['Fecha de ingreso', '01/03/2026'],
       ['Teléfono', '987654321'],
-      ['Tiene usuario', 'Sí'],
       ['Estado', 'Activo'],
     ]
     for (const [rotulo, valor] of valores) {
-      expect(within(par(rotulo)).getByRole('definition')).toHaveTextContent(new RegExp(`^${valor}$`))
+      expect(within(par(rotulo, datos)).getByRole('definition')).toHaveTextContent(new RegExp(`^${valor}$`))
     }
   })
 
@@ -231,7 +235,7 @@ describe('WorkerDetailPage', () => {
     await renderWorker(fakeWorkerDetail())
 
     const datos = screen.getByRole('heading', { level: 2, name: 'Datos del trabajador' }).closest('section') as HTMLElement
-    expect(within(datos).getAllByRole('term')).toHaveLength(10)
+    expect(within(datos).getAllByRole('term')).toHaveLength(9)
     expect(new Set(within(datos).getAllByRole('term').map((dt) => dt.className)).size).toBe(1)
     expect(new Set(within(datos).getAllByRole('definition').map((dd) => dd.className)).size).toBe(1)
   })
@@ -271,16 +275,84 @@ describe('WorkerDetailPage', () => {
   it('un trabajador inactivo se ve como tal', async () => {
     await renderWorker(fakeWorkerDetail({ isActive: false }))
 
-    expect(within(par('Estado')).getByRole('definition')).toHaveTextContent(/^Inactivo$/)
+    expect(within(par('Estado', tarjetaDatos())).getByRole('definition')).toHaveTextContent(/^Inactivo$/)
   })
 
-  it.each([
-    [true, 'Sí'],
-    [false, 'No'],
-  ])('con hasUser %s dice %s', async (hasUser, texto) => {
-    await renderWorker(fakeWorkerDetail({ hasUser }))
+  describe('usuario del sistema', () => {
+    const CON_SESION = fakeWorkerDetail().role
+    const SIN_SESION = { name: 'operator', description: 'Operador', level: 1, canLogin: false, driverProfile: 'NONE' } as const
 
-    expect(within(par('Tiene usuario')).getByRole('definition')).toHaveTextContent(new RegExp(`^${texto}$`))
+    it('con cuenta activa, el usuario enlaza a su cuenta y el estado dice Activa', async () => {
+      await renderWorker(fakeWorkerDetail({ id: 42, account: { id: 12, username: 'atorres', isActive: true } }))
+
+      const cuenta = tarjetaCuenta()
+      expect(within(cuenta).getAllByRole('term').map((dt) => dt.textContent)).toEqual(['Usuario', 'Estado'])
+      const enlace = within(par('Usuario', cuenta)).getByRole('link', { name: 'atorres' })
+      expect(enlace).toHaveAttribute('href', userAccountDetailPath(12))
+      expect(within(par('Estado', cuenta)).getByRole('definition')).toHaveTextContent(/^Activa$/)
+      expect(within(par('Estado', cuenta)).getByText('Activa')).toHaveClass('rounded-full', 'bg-success-soft')
+    })
+
+    it('con cuenta inactiva, el mismo enlace y el estado dice Inactiva', async () => {
+      await renderWorker(fakeWorkerDetail({ account: { id: 12, username: 'atorres', isActive: false } }))
+
+      const cuenta = tarjetaCuenta()
+      expect(within(par('Usuario', cuenta)).getByRole('link', { name: 'atorres' })).toHaveAttribute('href', userAccountDetailPath(12))
+      expect(within(par('Estado', cuenta)).getByRole('definition')).toHaveTextContent(/^Inactiva$/)
+      expect(within(par('Estado', cuenta)).getByText('Inactiva')).toHaveClass('rounded-full', 'bg-surface-muted')
+    })
+
+    it('el usuario va en monoespaciada, con el anillo de foco del enlace', async () => {
+      await renderWorker(fakeWorkerDetail())
+
+      const clases = within(tarjetaCuenta()).getByRole('link', { name: 'atorres' }).className.split(/\s+/)
+      expect(clases).toEqual(
+        expect.arrayContaining([
+          'rounded',
+          'font-mono',
+          'font-medium',
+          'text-accent',
+          'hover:text-accent-hover',
+          'hover:underline',
+          'focus:outline-none',
+          'focus-visible:ring-2',
+          'focus-visible:ring-focus',
+        ]),
+      )
+    })
+
+    it('usuario y estado van en una columna en móvil y dos desde el ancho chico', async () => {
+      await renderWorker(fakeWorkerDetail())
+
+      const lista = within(tarjetaCuenta()).getByText('Usuario', { selector: 'dt' }).closest('dl') as HTMLElement
+      expect(lista.className.split(/\s+/)).toEqual(expect.arrayContaining(['mt-4', 'grid-cols-1', 'sm:grid-cols-2', 'gap-4']))
+    })
+
+    const QUIENES_ABREN_LA_FICHA = ALL_ROLES.filter((role) => canRoleOpenPath(workerDetailPath(42), role))
+
+    it('la ficha la abren hoy los cuatro cargos del padrón', () => {
+      expect([...QUIENES_ABREN_LA_FICHA].sort()).toEqual(['admin', 'finance_manager', 'general_manager', 'operations_manager'])
+    })
+
+    it.each(QUIENES_ABREN_LA_FICHA)('el cargo %s, que abre la ficha, abre también la cuenta del enlace', (role) => {
+      expect(canRoleOpenPath(userAccountDetailPath(12), role)).toBe(true)
+    })
+
+    it.each([
+      ['activo y con un cargo que inicia sesión', 'No tiene usuario.', CON_SESION, true],
+      ['de baja y con un cargo que inicia sesión', 'No tiene usuario. Está dado de baja.', CON_SESION, false],
+      ['activo y con un cargo que no inicia sesión', 'No tiene usuario. Su cargo no inicia sesión.', SIN_SESION, true],
+      ['de baja y con un cargo que no inicia sesión', 'No tiene usuario. Su cargo no inicia sesión.', SIN_SESION, false],
+    ] as const)('sin cuenta, %s: %s', async (_caso, texto, role, isActive) => {
+      await renderWorker(fakeWorkerDetail({ account: null, role, isActive }))
+
+      const cuenta = tarjetaCuenta()
+      const parrafo = within(cuenta).getByText(/^No tiene usuario\./)
+      expect(parrafo.textContent).toBe(texto)
+      expect(parrafo).toHaveClass('mt-4', 'text-sm', 'text-fg-body')
+      expect(within(cuenta).queryByRole('link')).not.toBeInTheDocument()
+      expect(within(cuenta).queryByRole('term')).not.toBeInTheDocument()
+    })
   })
 
   describe('licencia de conducir', () => {
@@ -450,13 +522,15 @@ describe('WorkerDetailPage', () => {
   })
 
   describe('orden de las secciones', () => {
-    it('los datos, después la licencia y al final el pie', async () => {
+    it('los datos, el usuario del sistema, la licencia y al final el pie', async () => {
       await renderWorker(fakeWorkerDetail({ driver: fakeDriverProfile() }))
 
       const datos = screen.getByRole('heading', { level: 2, name: 'Datos del trabajador' })
+      const cuenta = screen.getByRole('heading', { level: 2, name: 'Usuario del sistema' })
       const conductor = screen.getByRole('heading', { level: 2, name: 'Licencia de conducir' })
       const pie = screen.getByText(/^Creado por/)
-      expect(datos.compareDocumentPosition(conductor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(datos.compareDocumentPosition(cuenta) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+      expect(cuenta.compareDocumentPosition(conductor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
       expect(conductor.compareDocumentPosition(pie) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     })
 
@@ -495,6 +569,7 @@ describe('WorkerDetailPage', () => {
   /**
    * Sobre un cargo de su nivel, la ficha es de solo lectura. Se afirma el conjunto entero, cualquier
    * botón que se cuele, y recién con los cargos cargados: sin ellos Editar faltaría por otra razón.
+   * El enlace a la cuenta queda: leerla no depende del nivel.
    */
   it('sobre un cargo de su nivel es de solo lectura', async () => {
     server.use(getWorkerOk(fakeWorkerDetail({ driver: fakeDriverProfile() })))
@@ -503,7 +578,7 @@ describe('WorkerDetailPage', () => {
     await waitFor(() => expect(queryClient.getQueryState(workerKeys.roles())?.status).toBe('success'))
 
     expect(screen.queryAllByRole('button')).toEqual([])
-    expect(screen.getAllByRole('link').map((enlace) => enlace.textContent)).toEqual(['Volver a trabajadores'])
+    expect(screen.getAllByRole('link').map((enlace) => enlace.textContent)).toEqual(['Volver a trabajadores', 'atorres'])
   })
 
   describe('editar', () => {
@@ -589,7 +664,7 @@ describe('WorkerDetailPage', () => {
     }
 
     const dialogo = () => screen.getByRole('dialog')
-    const estado = () => within(par('Estado')).getByText(/Activo|Inactivo/).textContent
+    const estado = () => within(par('Estado', tarjetaDatos())).getByText(/Activo|Inactivo/).textContent
 
     async function abrirDialogo(user: ReturnType<typeof userEvent.setup>, accion: 'Desactivar' | 'Reactivar') {
       await user.click(screen.getByRole('button', { name: accion }))
@@ -1108,6 +1183,11 @@ describe('WorkerDetailPage', () => {
 
     it('sin violaciones sin ficha y sin teléfono', async () => {
       const { container } = await renderWorker(fakeWorkerDetail({ driver: null, phone: null }))
+      expect(await axe(container)).toHaveNoViolations()
+    })
+
+    it('sin violaciones sin usuario', async () => {
+      const { container } = await renderWorker(fakeWorkerDetail({ account: null, isActive: false }))
       expect(await axe(container)).toHaveNoViolations()
     })
 

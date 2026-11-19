@@ -11,6 +11,7 @@ import { Spinner } from '../../../shared/ui/Spinner'
 import { WORKERS_BASE, workerEditPath } from '../../../shared/paths'
 import { useAuth } from '../../../shared/auth/AuthContext'
 import { getApiErrorMessage, isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
+import { WorkerAccountCard } from '../../users/components/WorkerAccountCard'
 import { WorkerAuditFooter } from '../components/WorkerAuditFooter'
 import { WorkerDetailCard } from '../components/WorkerDetailCard'
 import { WorkerDriverCard } from '../components/WorkerDriverCard'
@@ -103,6 +104,7 @@ export function WorkerDetailPage() {
         }
       />
       <WorkerDetailCard worker={data} />
+      <WorkerAccountCard worker={data} />
       {data.driver && <WorkerDriverCard driver={data.driver} />}
       <WorkerAuditFooter
         createdAt={data.createdAt}
