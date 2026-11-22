@@ -484,7 +484,7 @@ class WorkerUpdateResourceTest {
             .body("errors.field", containsInAnyOrder("paternalLastName"))
             .body("errors.message", hasItem("Indica el apellido paterno."));
 
-        assertEquals("Pérez Núñez|Pérez|Núñez", fixtures.workerSurnames(id));
+        assertEquals("Pérez|Núñez", fixtures.workerSurnames(id));
         assertEquals(List.of(), auditFieldNames(id));
     }
 
@@ -497,7 +497,7 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200).body("paternalLastName", equalTo("pérez"));
 
-        assertEquals("pérez|pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("pérez|nulo", fixtures.workerSurnames(id));
         assertEquals(List.of("paternalLastName"), auditFieldNames(id));
     }
 
@@ -542,7 +542,7 @@ class WorkerUpdateResourceTest {
 
         assertEquals(200, updated.statusCode());
         assertSameAsTheNextGet(updated, id, "Rojas", "Vega", "Juan Rojas Vega");
-        assertEquals("Rojas Vega|Rojas|Vega", fixtures.workerSurnames(id));
+        assertEquals("Rojas|Vega", fixtures.workerSurnames(id));
         var rows = fixtures.workerAuditRows(id);
         assertEquals(List.of("paternalLastName", "maternalLastName"),
             rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
@@ -569,7 +569,7 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200).body("maternalLastName", nullValue());
 
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(id));
         var rows = fixtures.workerAuditRows(id);
         assertEquals(List.of("maternalLastName"),
             rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
@@ -592,7 +592,7 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200).body("paternalLastName", equalTo("Rojas"));
 
-        assertEquals("Rojas|Rojas|nulo", fixtures.workerSurnames(id));
+        assertEquals("Rojas|nulo", fixtures.workerSurnames(id));
         assertEquals(List.of("paternalLastName", "maternalLastName"), auditFieldNames(id));
     }
 
@@ -605,7 +605,7 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200);
 
-        assertEquals("Rojas|Rojas|nulo", fixtures.workerSurnames(id));
+        assertEquals("Rojas|nulo", fixtures.workerSurnames(id));
     }
 
     /**
@@ -624,7 +624,7 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200);
 
-        assertEquals("Pérez Huamán|Pérez|Huamán", fixtures.workerSurnames(id));
+        assertEquals("Pérez|Huamán", fixtures.workerSurnames(id));
         var rows = fixtures.workerAuditRows(id);
         assertEquals(List.of("paternalLastName", "maternalLastName"),
             rows.stream().map(WarehouseTestData.WorkerAuditRow::fieldName).toList());
@@ -651,7 +651,7 @@ class WorkerUpdateResourceTest {
             .body("errors.field", containsInAnyOrder("paternalLastName"))
             .body("errors.message", hasItem("Indica el apellido paterno."));
 
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(id));
         assertEquals(List.of(), auditFieldNames(id));
     }
 
@@ -667,7 +667,7 @@ class WorkerUpdateResourceTest {
             .body("code", equalTo("COM-001"))
             .body("errors.message", hasItem("Indica el apellido paterno."));
 
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(id));
     }
 
     /**
@@ -684,7 +684,7 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200);
 
-        assertEquals("P\u00e9rez Huam\u00e1n|P\u00e9rez|Huam\u00e1n", fixtures.workerSurnames(id));
+        assertEquals("P\u00e9rez|Huam\u00e1n", fixtures.workerSurnames(id));
         assertEquals(List.of(), auditFieldNames(id));
     }
 
@@ -716,7 +716,7 @@ class WorkerUpdateResourceTest {
             .body("errors.field", hasItem(field))
             .body("errors.field", everyItem(equalTo(field)));
 
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(id));
     }
 
     /** Las dos partes, como en el alta: el tope se mide antes del recorte. */
@@ -735,7 +735,7 @@ class WorkerUpdateResourceTest {
             .body("code", equalTo("COM-001"))
             .body("errors.field", containsInAnyOrder(part));
 
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(id));
     }
 
     /**
@@ -757,7 +757,7 @@ class WorkerUpdateResourceTest {
         .when().put("/workers/" + id)
         .then().statusCode(200).body("paternalLastName", equalTo(paternal));
 
-        assertEquals(paternal + " " + maternal + "|" + paternal + "|" + maternal, fixtures.workerSurnames(id));
+        assertEquals(paternal + "|" + maternal, fixtures.workerSurnames(id));
         assertEquals(List.of(), fixtures.workerAuditRows(id).stream()
             .filter(row -> "FIELD_EDIT".equals(row.changeType())).toList());
     }
@@ -1746,7 +1746,7 @@ class WorkerUpdateResourceTest {
             .body("errors.message", hasItem("Solo letras, espacios, apóstrofo o guion."));
 
         assertEquals("Juan", fixtures.workerRowOf(id).firstName());
-        assertEquals("Pérez", fixtures.workerRowOf(id).lastName());
+        assertEquals("Pérez", fixtures.workerRowOf(id).paternalLastName());
     }
 
     /** Sin ninguna letra no es un nombre, aunque cada signo por separado este permitido. */
@@ -1779,7 +1779,7 @@ class WorkerUpdateResourceTest {
             .body("errors.field", hasItem(field));
 
         assertEquals("Juan", fixtures.workerRowOf(id).firstName());
-        assertEquals("Pérez", fixtures.workerRowOf(id).lastName());
+        assertEquals("Pérez", fixtures.workerRowOf(id).paternalLastName());
     }
 
     /** Una tilde que llega como letra mas marca combinante entra, y se guarda en NFC. */
@@ -1793,7 +1793,7 @@ class WorkerUpdateResourceTest {
             .body("firstName", equalTo("Jos\u00e9"));
 
         assertEquals("Jos\u00e9", fixtures.workerRowOf(id).firstName());
-        assertEquals("P\u00e9rez", fixtures.workerRowOf(id).lastName());
+        assertEquals("P\u00e9rez", fixtures.workerRowOf(id).paternalLastName());
     }
 
     // ---------- el cuerpo nuevo no perdio anotaciones ----------
@@ -1945,7 +1945,7 @@ class WorkerUpdateResourceTest {
 
         var row = fixtures.workerRowOf(id);
         assertEquals("Ana", row.firstName());
-        assertEquals("Silva", row.lastName());
+        assertEquals("Silva", row.paternalLastName());
         assertEquals("ZTESTE112", row.documentNumber(),
             "sin recortar, el documento se leería como distinto del guardado y pediría motivo");
         assertEquals(List.of("firstName", "paternalLastName"), auditFieldNames(id),

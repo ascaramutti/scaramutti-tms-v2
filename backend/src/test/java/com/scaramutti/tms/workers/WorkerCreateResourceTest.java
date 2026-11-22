@@ -639,7 +639,7 @@ class WorkerCreateResourceTest {
             .extract().path("id");
 
         assertEquals("Jos\u00e9", fixtures.workerRowOf(id).firstName());
-        assertEquals("P\u00e9rez", fixtures.workerRowOf(id).lastName());
+        assertEquals("P\u00e9rez", fixtures.workerRowOf(id).paternalLastName());
     }
 
     // ---------- los apellidos ------------------------------------------------------
@@ -653,7 +653,7 @@ class WorkerCreateResourceTest {
     }
 
     @Test
-    void create_withBothSurnames_storesEachPart_andComposesTheSurname() {
+    void create_withBothSurnames_storesEachPart_andComposesTheFullName() {
         Response created = post(adminToken())
             .body(bodyWithSurnames("\"paternalLastName\":\"Pérez\",\"maternalLastName\":\"Huamán\"", "ZTESTC201"))
         .when().post("/workers");
@@ -661,7 +661,8 @@ class WorkerCreateResourceTest {
         assertEquals(201, created.statusCode());
         int id = created.path("id");
         assertSameAsTheNextGet(created, id, "Pérez", "Huamán", "Juan Pérez Huamán");
-        assertEquals("Pérez Huamán|Pérez|Huamán", fixtures.workerSurnames(id));
+        assertEquals("Pérez|Huamán", fixtures.workerSurnames(id));
+        assertEquals("Pérez", fixtures.workerRowOf(id).paternalLastName());
     }
 
     /** El apellido de antes en un solo campo ya no es parte del cuerpo: al lado del paterno, no se guarda. */
@@ -674,7 +675,7 @@ class WorkerCreateResourceTest {
         assertEquals(201, created.statusCode());
         int id = created.path("id");
         assertSameAsTheNextGet(created, id, "Pérez", null, "Juan Pérez");
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(id));
     }
 
     /** El cuerpo de antes, solo con el apellido entero, ya no da de alta: falta el paterno. */
@@ -730,7 +731,7 @@ class WorkerCreateResourceTest {
         .when().post("/workers");
 
         assertEquals(201, created.statusCode());
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(created.path("id")));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(created.path("id")));
     }
 
     static Stream<String> partsOutsideTheRule() {
@@ -779,7 +780,7 @@ class WorkerCreateResourceTest {
         assertEquals(201, created.statusCode());
         int id = created.path("id");
         assertSameAsTheNextGet(created, id, "Pérez", null, "Juan Pérez");
-        assertEquals("Pérez|Pérez|nulo", fixtures.workerSurnames(id));
+        assertEquals("Pérez|nulo", fixtures.workerSurnames(id));
     }
 
     static Stream<String> maternalsOutsideTheRule() {
@@ -810,7 +811,7 @@ class WorkerCreateResourceTest {
         assertEquals(201, created.statusCode());
         int id = created.path("id");
         assertSameAsTheNextGet(created, id, "P\u00e9rez", "Huam\u00e1n", "Juan P\u00e9rez Huam\u00e1n");
-        assertEquals("P\u00e9rez Huam\u00e1n|P\u00e9rez|Huam\u00e1n", fixtures.workerSurnames(id));
+        assertEquals("P\u00e9rez|Huam\u00e1n", fixtures.workerSurnames(id));
     }
 
     /** Las dos partes, como el nombre: el tope se mide antes del recorte. */
