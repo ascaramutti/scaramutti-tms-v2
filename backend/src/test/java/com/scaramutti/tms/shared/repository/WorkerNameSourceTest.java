@@ -101,10 +101,11 @@ class WorkerNameSourceTest {
     }
 
     /**
-     * Ninguna consulta de esta imagen nombra la columna de antes del apellido, ni con un comodin sobre
-     * {@code workers} (sin alias, con {@code w} o con el que le da el archivo), cuyo plan preparado
-     * cambiaria el dia que se borre. Mide cada linea sin mayusculas: marca de mas un {@code w.*} de otra
-     * tabla; se le escapan lo partido en dos lineas y el {@code RETURNING *} que el driver suma al alta.
+     * Ninguna consulta de esta imagen nombra la columna borrada del apellido, ni usa un comodin sobre
+     * {@code workers} (sin alias, con {@code w} o con el que le da el archivo): el plan preparado de un
+     * comodin cambia con cualquier columna que una migracion sume o borre. Mide cada linea sin
+     * mayusculas: marca de mas un {@code w.*} de otra tabla; se le escapan lo partido en dos lineas y el
+     * {@code RETURNING *} que el driver suma al alta.
      */
     @Test
     void theOldSurnameColumn_isNotNamedByThisImage() throws IOException {
@@ -138,6 +139,6 @@ class WorkerNameSourceTest {
 
         assertTrue(fileCount > 50,
             "El barrido leyo solo " + fileCount + " archivos: el alcance quedo mal derivado");
-        assertEquals(List.of(), findings, "Hay codigo que lee la columna de antes del apellido");
+        assertEquals(List.of(), findings, "Hay codigo que nombra la columna borrada del apellido o un comodin sobre workers");
     }
 }

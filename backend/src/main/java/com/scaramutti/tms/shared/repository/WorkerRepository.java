@@ -76,8 +76,8 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
-     * Las columnas que mapea {@link Worker}, nombradas: un {@code w.*} traeria tambien la de antes
-     * del apellido, y el dia que se borre, el plan preparado de esa consulta cambiaria de forma.
+     * Las columnas que mapea {@link Worker}, nombradas: el plan preparado de un {@code w.*} cambia de
+     * forma con cualquier columna que una migracion sume o borre.
      */
     private static final String WORKER_COLUMNS = "w.id, w.first_name, w.paternal_last_name, w.maternal_last_name, "
         + "w.document_type_id, w.document_number, w.phone, w.role_id, w.hire_date, w.is_active, "
