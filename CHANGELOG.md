@@ -9,6 +9,115 @@ major. Cada sección se escribe desde los commits convencionales del rango
 Las versiones anteriores a 2.5.0 se etiquetaron sin este archivo; su resumen sale del mensaje de
 cada tag anotado.
 
+## [2.11.0] - 2026-11-23
+
+Las cuentas del sistema se administran desde la aplicación: la lista, el detalle, el alta con el
+usuario y la contraseña temporal que genera el servidor, desactivar, reactivar y restablecer la
+contraseña. Cambiar la propia contraseña deja sin renovar las sesiones anteriores y la SPA sale con
+una Content-Security-Policy: PRs #299 a #302, #307 a #313, #315 a #324 y #326 a #330. Cuatro
+migraciones, V016 a V019. Las tres primeras agregan columnas, una tabla y restricciones; la V019
+borra `workers.last_name`, que era la composición de las dos partes del apellido. Volver a 2.10.1 es
+cambiar las imágenes del backend y del frontend, con Flyway ignorando las migraciones futuras;
+volver a 2.9.1 o a 2.9.0 es restaurar el respaldo tomado antes de este release. El contrato suma las
+operaciones de `/users` y `/user-account-candidates` y el campo `account` en la ficha del
+trabajador; el cambio de contraseña pasa de 204 a 200 con la sesión nueva, y `WRK-011` se retira.
+
+### Added
+
+- Módulo de usuarios, de solo lectura primero: `GET /users` lista las cuentas con su trabajador, su
+  cargo y su estado, filtrable por activas o inactivas (#307), y `GET /users/{id}` devuelve una con
+  el nombre del trabajador en partes y quién la creó y la modificó; una cuenta que no existe
+  responde `404 USR-001` (#308). Las leen administración, las dos gerencias y finanzas, y salen con
+  `Cache-Control: no-store` y `Vary: Authorization`. Ninguna respuesta trae el hash.
+- `POST /users/{id}/deactivate` y `POST /users/{id}/reactivate`: los mismos cuatro cargos, solo
+  sobre cuentas de un cargo de nivel menor al propio (administración, exenta) y nunca desactivando
+  la propia (`USR-007`; fuera de rango, `USR-008`). Reactivar exige el trabajador activo
+  (`409 USR-005`) y un cargo que inicia sesión (`400 USR-006`). Repetir la operación responde 200
+  sin cambios; si la fila está tomada más allá del tope, `409 USR-009` (#311, #312).
+- `POST /users/{id}/reset-password`: el servidor genera una contraseña temporal de 12 caracteres,
+  sin los que se confunden al dictar, la responde una sola vez y guarda solo su hash. Las mismas
+  reglas de cargo y rango, y nunca sobre la propia cuenta (#316).
+- `POST /users`: crea la cuenta de un trabajador. El cuerpo trae solo el trabajador; el usuario es
+  la inicial del nombre y el apellido paterno, en minúsculas y sin tildes, con el primer sufijo
+  libre si ya está tomado, y la contraseña temporal sale una sola vez en el 201. Rechaza al
+  trabajador que no existe (`USR-004`), de un cargo fuera de rango (`USR-008`), de baja (`USR-005`),
+  con un cargo sin sesión (`USR-006`) o que ya tiene cuenta (`USR-003`); dos altas que compiten por
+  el mismo usuario dan `USR-002` (#322).
+- `GET /user-account-candidates`: los trabajadores activos, sin cuenta, con un cargo que inicia
+  sesión y dentro del rango de quien pregunta, cada uno con el usuario que le generaría el alta
+  (#323).
+- Las pantallas de Usuarios, en Administración después de Trabajadores: la lista en `/usuarios`
+  (#309), el detalle en `/usuarios/:id` (#310) con "Desactivar" o "Reactivar" (#315) y "Restablecer
+  contraseña", que muestra la temporal una sola vez y no la deja en la URL, el historial, los
+  almacenamientos ni las cachés (#317), y "Nuevo usuario" en `/usuarios/nuevo`, con la tabla de
+  trabajadores sin cuenta y una confirmación por fila (#324).
+- La ficha del trabajador trae `account` (el id, el usuario y el estado de su cuenta, o nulo si no
+  tiene) en las cinco respuestas que la devuelven; `hasUser` se conserva (#326). La pantalla cambia
+  "Tiene usuario: Sí/No" por la tarjeta "Usuario del sistema", con el enlace a la cuenta y su
+  estado, y desactivar o reactivar una cuenta desde Usuarios refresca esa ficha (#328).
+- Migración V016: `users.session_version`, en 0 para las cuentas existentes, con su CHECK (#300).
+  Migración V017: `users` suma quién creó cada cuenta y quién y cuándo la cambió por última vez, y
+  nace `user_audit_logs`, el rastro de las cuentas, que nunca guarda una contraseña ni su hash; las
+  cuentas existentes quedan sin autores (#302). Migración V018: un CHECK validado exige el nombre de
+  usuario en minúsculas; si encuentra una cuenta con mayúsculas, aborta listando solo sus ids, sin
+  corregir nada (#320). Las tres toman `users` en exclusivo sin hacer cola, reintentan hasta 30
+  segundos y, si no lo logran, fallan sin aplicar nada.
+- El alta, la baja, la reactivación y el restablecimiento de una cuenta, y el cambio de la propia
+  contraseña, dejan una fila en ese rastro, firmada por quien lo hizo, y firman la cuenta (#302,
+  #311, #312, #316, #322). La cuenta que apaga la baja o la edición de su trabajador queda
+  firmada, y el cambio se anota en el historial del trabajador, no en ese rastro (#302, #318).
+
+### Changed
+
+- Cambiar la propia contraseña responde 200 con una sesión nueva, en lugar de 204, con
+  `Cache-Control: no-store`, `Pragma: no-cache` y `Vary: Authorization`; si la fila de la cuenta
+  está tomada más allá del tope, `409 AUTH-010` (#300). La pantalla guarda esa sesión y la persona
+  sigue donde estaba, sin volver a ingresar (#301).
+- Pasar a un trabajador con cuenta a un cargo que no inicia sesión ya no se rechaza: la edición
+  apaga su cuenta activa en la misma transacción y lo anota en el historial del trabajador. Volver
+  a un cargo con sesión no la reactiva. El tope de esperas de una edición sube de nueve a once, con
+  `app.workers.edit-lock-timeout-ms` en los mismos 380 ms (#318).
+- Las pantallas de trabajadores leen el estado real de la cuenta: la edición ofrece también los
+  cargos sin sesión a quien tiene cuenta y avisa que se desactivará, y la baja y la reactivación
+  dicen qué pasa con el usuario solo cuando corresponde (#327).
+- El autor de un cambio publica su cargo como texto; el usuario de la sesión conserva la lista de
+  los siete cargos que inician sesión (#318).
+- `app.accounts.lock-timeout-ms`, en 380 ms, es el tope de espera por la fila de una cuenta; se
+  valida al arrancar contra la espera del pool de conexiones. `mp.jwt.verify.clock.skew` queda
+  fijado en 60 segundos, que era su valor por omisión (#300).
+- El diálogo de confirmación de desactivar y reactivar un trabajador pasa a un componente
+  compartido, sin cambio de comportamiento ni de textos (#313). Los ayudantes de los tests del
+  backend leen el apellido paterno y el materno en lugar de la columna vieja (#329).
+
+### Removed
+
+- Migración V019: borra `workers.last_name`, el disparador que la componía desde el paterno y el
+  materno y su función. Toma `workers` en exclusivo sin hacer cola, reintenta hasta 30 segundos y,
+  si no lo logra, falla sin aplicar nada; va sin `CASCADE` ni `IF EXISTS`, así que aborta si una
+  vista depende de la columna o si falta alguno de los tres. La imagen de 2.10.1 ya no leía esa
+  columna; las de 2.9.1 y anteriores, sí (#330).
+- `WRK-011`, el rechazo al pasar a un trabajador con cuenta a un cargo sin sesión, sale del servicio
+  y del contrato, y no se reutiliza (#318).
+
+### Security
+
+- El ingreso, la renovación, el cambio de contraseña y `/auth/me` exigen una cuenta utilizable: la
+  cuenta activa, su trabajador activo y un cargo que inicia sesión. Si falla cualquiera, responden
+  `401 AUTH-002` con el mismo cuerpo. El ingreso verifica la contraseña antes, así que una
+  equivocada sigue dando `AUTH-001` (#299).
+- Las sesiones anteriores dejan de renovarse cuando cambia la contraseña o se reactiva la cuenta: el
+  token de renovación lleva la versión de las sesiones de la cuenta, y cambiar la propia contraseña
+  (#300), reactivar la cuenta (#312) o restablecerle la contraseña (#316) la suben; uno emitido
+  antes responde `401 AUTH-003`. El token de acceso ya emitido sigue valiendo hasta que vence.
+- La SPA sale con `Content-Security-Policy`, que se aplica y no solo se informa: los scripts se
+  limitan al propio origen y a la huella del script del tema, los pedidos de datos al propio origen,
+  y nadie puede enmarcar la aplicación. Se permiten los estilos en línea y las fuentes de Google
+  Fonts. La misma política va en las tres configuraciones de nginx (la imagen, staging y producción)
+  y una prueba las ata entre sí y al `index.html` (#319).
+- El log del backend ya no guarda el detalle que el motor de la base agrega a un error: el valor
+  que chocó contra un índice único o, si falla un CHECK, la fila entera. El driver deja solo la
+  línea principal, que sigue nombrando la restricción (#321).
+
 ## [2.10.1] - 2026-10-29
 
 Dependencias al día: Quarkus 3.33.4.1, el release de emergencia de la LTS, surefire 3.6.1, el
