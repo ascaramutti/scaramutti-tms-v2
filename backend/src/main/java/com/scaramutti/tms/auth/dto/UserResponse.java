@@ -15,7 +15,7 @@ public record UserResponse(
     @Schema(description = "Cargo: el nombre visible del rol del trabajador", example = "Ejecutivo de Ventas")
     String position,
 
-    @Schema(description = "Rol del sistema", example = "sales")
+    @Schema(description = "El nombre de sistema del cargo del trabajador; puede ser uno que no inicia sesion", example = "sales")
     String role,
 
     @Schema(description = "Indica si el usuario esta activo", example = "true")

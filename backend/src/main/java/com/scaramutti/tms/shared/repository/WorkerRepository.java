@@ -40,11 +40,10 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
 
     /**
      * El nombre completo en SQL, con la regla de {@link Worker#fullName()}. Es un metodo y no un
-     * literal repetido porque lo componen los conductores, los viajes y su reporte, la asignacion
-     * de recursos, el kardex y el detalle (tres veces, de ahi el alias): dos formas de armarlo harian
-     * que la misma persona se llame distinto segun por donde se la mire. Los nombres van con
-     * {@code ||} y fuera del {@code concat_ws}: sin fila de trabajador (un LEFT JOIN que no
-     * encontro) da nulo, y el reporte de viajes rechaza esa fila por el nulo.
+     * literal repetido: dos formas de armarlo harian que la misma persona se llame distinto segun por
+     * donde se la mire; el alias es porque una consulta lo compone mas de una vez. Los
+     * nombres van con {@code ||} y fuera del {@code concat_ws}: sin fila de trabajador (un LEFT JOIN
+     * que no encontro) da nulo, y el reporte de viajes rechaza esa fila por el nulo.
      */
     public static String fullNameExpression(String workersAlias) {
         return "trim(" + workersAlias + ".first_name || ' ' || concat_ws(' ', "
@@ -52,8 +51,8 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
-     * El orden por nombre de los listados de trabajadores y de conductores: nombres, paterno y
-     * materno, y entre dos con los mismos nombres y paterno, el que no tiene materno primero.
+     * El orden por nombre: nombres, paterno y materno, y entre dos con los mismos nombres y paterno,
+     * el que no tiene materno primero.
      */
     public static String fullNameOrder(String workersAlias) {
         return workersAlias + ".first_name ASC, " + workersAlias + ".paternal_last_name ASC, "
@@ -61,8 +60,24 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     }
 
     /**
-     * Las columnas que mapea {@link Worker}, nombradas: un {@code w.*} traeria tambien la de antes
-     * del apellido, y el dia que se borre, el plan preparado de esa consulta cambiaria de forma.
+     * Las tres partes del nombre tal como estan, sin componer, con los alias {@code <prefijo>_first_name},
+     * {@code <prefijo>_paternal_last_name} y {@code <prefijo>_maternal_last_name}: quien las muestra fuera
+     * de este archivo las pide aca, y fuera de el y de la entidad nadie nombra las columnas del nombre.
+     */
+    public static String namePartsColumns(String workersAlias, String aliasPrefix) {
+        return workersAlias + ".first_name AS " + aliasPrefix + "_first_name, "
+            + workersAlias + ".paternal_last_name AS " + aliasPrefix + "_paternal_last_name, "
+            + workersAlias + ".maternal_last_name AS " + aliasPrefix + "_maternal_last_name";
+    }
+
+    public static List<String> nameSearchColumns(String workersAlias) {
+        return List.of(workersAlias + ".first_name", workersAlias + ".paternal_last_name",
+            workersAlias + ".maternal_last_name");
+    }
+
+    /**
+     * Las columnas que mapea {@link Worker}, nombradas: el plan preparado de un {@code w.*} cambia de
+     * forma con cualquier columna que una migracion sume o borre.
      */
     private static final String WORKER_COLUMNS = "w.id, w.first_name, w.paternal_last_name, w.maternal_last_name, "
         + "w.document_type_id, w.document_number, w.phone, w.role_id, w.hire_date, w.is_active, "
@@ -120,11 +135,11 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
      * conserva y muestra un cargo o un tipo retirados. El que filtra por activo es el
      * catalogo, que ofrece lo que se puede elegir hoy; el detalle cuenta lo que hay.
      *
-     * <p>{@code hasUser} es verdadero tambien con el usuario inactivo: desactivar un
-     * trabajador apaga la cuenta y no la borra, y la pantalla necesita saber que sigue ahi.
+     * <p>La cuenta viaja activa o inactiva: desactivar un trabajador la apaga y no la borra, y
+     * la pantalla necesita saber que sigue ahi.
      *
-     * <p>Las columnas se leen por ALIAS y no por posicion. Son treinta y cinco: leerlas por
-     * numero es el modo de falla obvio el dia que alguien agregue una en el medio.
+     * <p>Las columnas se leen por ALIAS y no por posicion: son decenas, y leerlas por numero es
+     * el modo de falla obvio el dia que alguien agregue una en el medio.
      */
     public Optional<WorkerDetailRow> findDetailById(Integer workerId) {
         String sql = "SELECT w.id AS w_id, w.first_name AS w_first_name, "
@@ -143,7 +158,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             + fullNameExpression("cw") + " AS created_by_full_name, cr.description AS created_by_position, "
             + "uu.id AS updated_by_id, uu.username AS updated_by_username, "
             + fullNameExpression("uw") + " AS updated_by_full_name, ur.description AS updated_by_position, "
-            + "(hu.id IS NOT NULL) AS has_user "
+            + "hu.id AS account_id, hu.username AS account_username, hu.is_active AS account_is_active "
             + "FROM public.workers w "
             + "JOIN public.document_types dt ON dt.id = w.document_type_id "
             + "JOIN public.roles r ON r.id = w.role_id "
@@ -194,7 +209,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             DateUtils.toOffsetDateTime(row.get("w_updated_at")),
             userRefOf(row, "updated_by"),
             driverProfileOf(row),
-            (Boolean) row.get("has_user"));
+            accountRefOf(row));
     }
 
     /**
@@ -227,6 +242,17 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
             (Boolean) row.get("driver_is_active"));
     }
 
+    private static AccountRefRow accountRefOf(Tuple row) {
+        Integer accountId = intOf(row, "account_id");
+        if (accountId == null) {
+            return null;
+        }
+        return new AccountRefRow(
+            accountId,
+            (String) row.get("account_username"),
+            (Boolean) row.get("account_is_active"));
+    }
+
     /** Postgres devuelve los enteros con anchos distintos segun la columna; se normalizan aca. */
     private static Integer intOf(Tuple row, String alias) {
         Object value = row.get(alias);
@@ -251,7 +277,7 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
         OffsetDateTime updatedAt,
         UserRefRow updatedBy,
         DriverProfileRow driver,
-        Boolean hasUser
+        AccountRefRow account
     ) {}
 
     public record DocumentTypeRow(
@@ -266,4 +292,6 @@ public class WorkerRepository implements PanacheRepositoryBase<Worker, Integer> 
     /** {@code statusName} es el nombre crudo del catalogo; lo traduce el mapper. */
     public record DriverProfileRow(
         Integer id, String licenseNumber, String licenseCategory, String statusName, Boolean isActive) {}
+
+    public record AccountRefRow(Integer id, String username, Boolean isActive) {}
 }

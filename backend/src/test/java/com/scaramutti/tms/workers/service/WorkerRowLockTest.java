@@ -2,13 +2,17 @@ package com.scaramutti.tms.workers.service;
 
 import org.junit.jupiter.api.Test;
 
+import com.scaramutti.tms.shared.entity.User;
 import com.scaramutti.tms.shared.exception.ApiException;
+import com.scaramutti.tms.shared.repository.RowLockSupport;
+import com.scaramutti.tms.shared.repository.UserRepository;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
 
 import java.io.InputStream;
 import java.sql.SQLException;
 import java.time.Duration;
+import java.util.Optional;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
@@ -17,6 +21,9 @@ import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 /**
  * La BANDA valida del tope de espera del bloqueo.
@@ -82,9 +89,9 @@ class WorkerRowLockTest {
 
     /**
      * El presupuesto multiplica por las esperas REALES, y por eso un valor que parece chico puede
-     * no entrar: con nueve topes, 600ms ya se comen 5,4s de los 5s que el pool tolera. Este es el
-     * caso que separa la cuenta buena de la anterior: contando seis esperas, sin el doble gasto de
-     * la cola, 600ms daban 3,6s y el guarda lo aprobaba.
+     * no entrar: con once topes, 600ms ya se comen 6,6s de los 5s que el pool tolera. Este es el
+     * caso que separa la cuenta buena de la anterior: contando siete esperas, sin el doble gasto de
+     * la cola, 600ms daban 4,2s y el guarda lo aprobaba.
      */
     @Test
     void requireUsableLockTimeout_rejectsAValueThatOnlyFitsIfTheWaitsAreMiscounted() {
@@ -116,15 +123,15 @@ class WorkerRowLockTest {
 
     /**
      * IGUALAR la espera del pool ya invierte el orden de las rendiciones, asi que el limite se
-     * rechaza tambien cuando da exacto. Se elige un techo divisible por los topes (4,5s / 9 =
-     * 500ms) para que el caso mida la igualdad y no un redondeo: con 5s el cociente entero cae 5ms
+     * rechaza tambien cuando da exacto. Se elige un techo divisible por los topes (4,4s / 11 =
+     * 400ms) para que el caso mida la igualdad y no un redondeo: con 5s el cociente entero cae 6ms
      * por debajo, la guarda lo acepta y el caso falla sin haber medido el borde.
      */
     @Test
     void requireUsableLockTimeout_rejectsAValueWhoseBudgetExactlyReachesThePoolWait() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 4500 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4500);
+        lock.lockTimeoutMillis = 4400 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4400);
         assertThrows(IllegalStateException.class, lock::requireUsableLockTimeout);
     }
 
@@ -132,9 +139,9 @@ class WorkerRowLockTest {
     @Test
     void requireUsableLockTimeout_acceptsABudgetOneMillisecondBelowThePoolWait() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 4500 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
-        lock.poolAcquisitionTimeout = Duration.ofMillis(4501);
-        assertEquals(500, lock.requireUsableLockTimeout());
+        lock.lockTimeoutMillis = 4400 / WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION;
+        lock.poolAcquisitionTimeout = Duration.ofMillis(4401);
+        assertEquals(400, lock.requireUsableLockTimeout());
     }
 
     @Test
@@ -144,28 +151,28 @@ class WorkerRowLockTest {
 
     /**
      * El techo del pool se compara en MILISEGUNDOS: redondearlo a segundos perdia la fraccion que
-     * decide si el presupuesto entra. Con un pool de 4,5s, 450ms x 9 = 4,05s entra; truncando el
+     * decide si el presupuesto entra. Con un pool de 4,5s, 400ms x 11 = 4,4s entra; truncando el
      * techo a 4s, no entraria. La otra direccion, redondear hacia arriba, la mide el caso del borde.
      */
     @Test
     void requireUsableLockTimeout_comparesAgainstThePoolWaitWithoutTruncatingItToSeconds() {
         WorkerRowLock lock = new WorkerRowLock();
-        lock.lockTimeoutMillis = 450;
+        lock.lockTimeoutMillis = 400;
         lock.poolAcquisitionTimeout = Duration.ofMillis(4500);
-        assertEquals(450, lock.requireUsableLockTimeout());
+        assertEquals(400, lock.requireUsableLockTimeout());
     }
 
     /**
      * El presupuesto se multiplica por los topes que una transaccion de este modulo puede gastar.
-     * Son NUEVE en la edicion, y el numero no es la cantidad de sentencias ni de filas: con cola, tomar
+     * Son ONCE en la edicion, y el numero no es la cantidad de sentencias ni de filas: con cola, tomar
      * una fila gasta dos. El dia que se sume uno, la misma configuracion deja de servir y este caso
      * es el que lo dice.
      */
     @Test
     void theBudget_countsTheWaitsThisModuleCanAccumulate() {
-        assertEquals(9, WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION,
+        assertEquals(11, WorkerRowLock.MAX_LOCK_WAITS_PER_TRANSACTION,
             "destino 2; quien actua 2; documento: tupla 1 e indice 1; ficha: tupla 2 e indice de la "
-                + "licencia 1");
+                + "licencia 1; la cuenta, con un cargo sin sesion, 2");
     }
 
     /**
@@ -256,6 +263,22 @@ class WorkerRowLockTest {
         PersistenceException original = new PersistenceException("sin causa de base");
 
         assertSame(original, lockWith(1, 5).asLockConflictOrRethrow(original, 42));
+    }
+
+    /**
+     * Con el tope de trabajadores y no con otro: la toma lo deja puesto para el resto de la edicion,
+     * y las once esperas se cuentan con ese.
+     */
+    @Test
+    void findAccountForUpdate_takesTheAccountWithTheWorkersTope() {
+        WorkerRowLock lock = lockWith(400, 5);
+        lock.userRepository = mock(UserRepository.class);
+        lock.rowLockSupport = mock(RowLockSupport.class);
+        when(lock.userRepository.findIdByWorkerId(7)).thenReturn(Optional.of(70));
+
+        lock.findAccountForUpdate(7);
+
+        verify(lock.rowLockSupport).lockThenFind(User.class, 70, 400);
     }
 
 }

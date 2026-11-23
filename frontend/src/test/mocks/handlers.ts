@@ -6,6 +6,7 @@ import { clientsHandlers } from './handlers/clients'
 import { operationsHandlers } from './handlers/operations'
 import { quotationsHandlers } from './handlers/quotations'
 import { sharedCatalogsHandlers } from './handlers/shared-catalogs'
+import { usersHandlers } from './handlers/users'
 import { warehouseHandlers } from './handlers/warehouse'
 import { workersHandlers } from './handlers/workers'
 
@@ -23,4 +24,5 @@ export const handlers: HttpHandler[] = [
   ...operationsHandlers,
   ...sharedCatalogsHandlers,
   ...workersHandlers,
+  ...usersHandlers,
 ]

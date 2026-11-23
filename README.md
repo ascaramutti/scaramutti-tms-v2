@@ -1,6 +1,6 @@
 # Scaramutti TMS
 
-Sistema de gestión para Transportes Scaramutti S.A.C. Cubre la operación de servicios de transporte, la emisión de cotizaciones comerciales, el control de almacén (entradas, retiros, stock y reportes) y la administración del maestro de clientes y del padrón de trabajadores.
+Sistema de gestión para Transportes Scaramutti S.A.C. Cubre la operación de servicios de transporte, la emisión de cotizaciones comerciales, el control de almacén (entradas, retiros, stock y reportes) y la administración del maestro de clientes, del padrón de trabajadores y de las cuentas con las que cada uno entra al sistema.
 
 ## Stack
 
@@ -29,7 +29,7 @@ scaramutti-tms-v2/
 └── README.md
 ```
 
-Módulos del backend (vertical por dominio): `auth`, `clients`, `quotations`, `operations` (operaciones), `catalogs`, `cargotypes`, `settings`, `warehouse` (almacén), `workers` (trabajadores), `sharedcatalogs` (catálogos compartidos read-only) y `shared` (infra transversal).
+Módulos del backend (vertical por dominio): `auth`, `clients`, `quotations`, `operations` (operaciones), `catalogs`, `cargotypes`, `settings`, `warehouse` (almacén), `workers` (trabajadores), `users` (cuentas del sistema), `sharedcatalogs` (catálogos compartidos read-only) y `shared` (infra transversal).
 
 ## Requisitos
 
@@ -46,7 +46,7 @@ Módulos del backend (vertical por dominio): `auth`, `clients`, `quotations`, `o
 docker compose up -d
 ```
 
-Levanta PostgreSQL 16 vacío en `localhost:5432`. El schema NO se aplica a mano: lo crea Flyway al arrancar el backend (paso 2), ejecutando la cadena de `backend/src/main/resources/db/migration/` (`V001` = baseline con los schemas `public` y `cotizaciones`; `V002+` agrega `almacen`, `V007+` agrega `operaciones`, `V010` amplía `public` para el padrón de trabajadores, `V011` completa sus datos, `V012` hace que el rol de cada cuenta siga el cargo de su trabajador, `V013` borra las columnas que repetían el cargo, `V014` borra las tablas de viajes de la v1 y `V015` da al apellido paterno y al materno una columna propia a cada uno). Reglas de la cadena en el `README.md` de esa carpeta.
+Levanta PostgreSQL 16 vacío en `localhost:5432`. El schema NO se aplica a mano: lo crea Flyway al arrancar el backend (paso 2), ejecutando la cadena de `backend/src/main/resources/db/migration/` (`V001` = baseline con los schemas `public` y `cotizaciones`; `V002+` agrega `almacen`, `V007+` agrega `operaciones`, `V010` amplía `public` para el padrón de trabajadores, `V011` completa sus datos, `V012` hace que el rol de cada cuenta siga el cargo de su trabajador, `V013` borra las columnas que repetían el cargo, `V014` borra las tablas de viajes de la v1, `V015` da al apellido paterno y al materno una columna propia a cada uno, `V016` da a cada cuenta la versión de sus sesiones, `V017` registra quién creó y quién cambió cada cuenta y suma el rastro de sus cambios, `V018` exige el nombre de usuario en minúsculas y `V019` borra la columna que guardaba el apellido entero). Reglas de la cadena en el `README.md` de esa carpeta.
 
 Credenciales locales (definidas en `docker-compose.yml`):
 - DB: `scaramutti_tms_dev`
@@ -102,7 +102,7 @@ npm ci        # instala exactamente el lockfile
 npm run dev
 ```
 
-Levanta Vite en `http://localhost:5173`. La aplicación se sirve desde la raíz del dominio: `/` lleva al login o a la pantalla principal del rol, y los módulos viven en `/operaciones`, `/almacen`, `/cotizaciones`, `/clientes` y `/trabajadores`, en el orden del menú.
+Levanta Vite en `http://localhost:5173`. La aplicación se sirve desde la raíz del dominio: `/` lleva al login o a la pantalla principal del rol, y los módulos viven en `/operaciones`, `/almacen`, `/cotizaciones`, `/clientes`, `/trabajadores` y `/usuarios`, en el orden del menú.
 
 ## Comandos útiles
 
@@ -125,7 +125,7 @@ Tres workflows corren en cada PR y en cada push a `develop`:
 | `.github/workflows/frontend.yml` | `checks` | Lint, tests y build de producción del frontend. Un job aparte, `api-drift`, regenera el cliente TypeScript de la API y falla si difiere del commiteado |
 | `.github/workflows/gitleaks.yml` | `gitleaks` | Escáner de secretos |
 
-Los tres jobs (`test`, `checks` y `gitleaks`) son checks requeridos para mergear en `develop` y en `main`. Los de backend y frontend se saltan cuando el PR no toca su carpeta, y un job saltado cuenta como éxito.
+Los tres jobs (`test`, `checks` y `gitleaks`) son checks requeridos para mergear en `develop` y en `main`. Los de backend y frontend se saltan cuando el PR no toca su carpeta ni su propio workflow, y un job saltado cuenta como éxito. El del frontend corre también si cambia la spec runtime del backend, de la que sale el cliente generado, o una de las dos configuraciones de nginx que viven fuera de `frontend/` (`deploy/staging/nginx-staging.conf` y `.github/workflows/deploy-frontend.yml`, que trae la de producción): cualquier cambio de esos dos archivos lo dispara.
 
 Dependabot propone actualizaciones semanales de Maven, npm y las acciones de GitHub.
 
@@ -143,3 +143,4 @@ git config core.hooksPath .githooks
 - **Contrato:** `api/openapi.yaml` es el contrato de diseño; la spec runtime (`META-INF/openapi.yaml`) refleja lo implementado y es la que sirve Swagger
 - **Modularización:** vertical por dominio. Ver `backend/src/main/java/com/scaramutti/tms/`
 - **Schemas BD:** `public` (compartido), `cotizaciones` (módulo comercial), `almacen` (módulo de almacén) y `operaciones` (viajes y despacho)
+- **Content-Security-Policy:** el nginx que sirve la SPA la manda con el documento. La misma línea vive en `frontend/nginx.conf`, en `deploy/staging/nginx-staging.conf` y en la plantilla de `.github/workflows/deploy-frontend.yml`, y nombra la huella del script en línea de `frontend/index.html`: si ese script cambia, los tests del frontend fallan hasta actualizar la huella en las tres. El servidor de desarrollo de Vite no manda la cabecera.

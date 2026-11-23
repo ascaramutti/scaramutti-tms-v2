@@ -11,7 +11,11 @@ import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { server } from '../../../test/mocks/server'
-import { changePasswordErrorResponse, fakeUser } from '../../../test/mocks/handlers/auth'
+import {
+  changePasswordErrorResponse,
+  fakeChangedPasswordResponse,
+  fakeUser,
+} from '../../../test/mocks/handlers/auth'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -111,7 +115,7 @@ describe('ChangePasswordPage', () => {
     const spy = vi.fn()
     server.use(http.post(`${API}/auth/change-password`, () => {
       spy()
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json(fakeChangedPasswordResponse)
     }))
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), '        ')
@@ -129,7 +133,7 @@ describe('ChangePasswordPage', () => {
     const spy = vi.fn()
     server.use(http.post(`${API}/auth/change-password`, () => {
       spy()
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json(fakeChangedPasswordResponse)
     }))
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
@@ -151,7 +155,7 @@ describe('ChangePasswordPage', () => {
     const spy = vi.fn()
     server.use(http.post(`${API}/auth/change-password`, () => {
       spy()
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json(fakeChangedPasswordResponse)
     }))
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), actual)
@@ -171,7 +175,7 @@ describe('ChangePasswordPage', () => {
     const cuerpos: unknown[] = []
     server.use(http.post(`${API}/auth/change-password`, async ({ request }) => {
       cuerpos.push(await request.json())
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json(fakeChangedPasswordResponse)
     }))
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
@@ -224,12 +228,24 @@ describe('ChangePasswordPage', () => {
     expect(toastSpy).toHaveBeenCalledWith('Contraseña actualizada')
   })
 
+  it('guarda los dos tokens de la respuesta: el servidor revocó el refresh de antes', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    expect(await screen.findByText('HOME')).toBeInTheDocument()
+    expect(tokenStorage.getAccessToken()).toBe(fakeChangedPasswordResponse.token)
+    expect(tokenStorage.getRefreshToken()).toBe(fakeChangedPasswordResponse.refreshToken)
+  })
+
   it('manda la contraseña actual y la nueva, cada una en su lugar y sin la confirmación', async () => {
     const user = userEvent.setup()
     const cuerpos: unknown[] = []
     server.use(http.post(`${API}/auth/change-password`, async ({ request }) => {
       cuerpos.push(await request.json())
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json(fakeChangedPasswordResponse)
     }))
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
@@ -245,7 +261,7 @@ describe('ChangePasswordPage', () => {
     const cuerpos: unknown[] = []
     server.use(http.post(`${API}/auth/change-password`, async ({ request }) => {
       cuerpos.push(await request.json())
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json(fakeChangedPasswordResponse)
     }))
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), ' Clave con espacios ')
@@ -264,7 +280,7 @@ describe('ChangePasswordPage', () => {
     server.use(http.post(`${API}/auth/change-password`, async () => {
       pedidos++
       await suelta
-      return new HttpResponse(null, { status: 204 })
+      return HttpResponse.json(fakeChangedPasswordResponse)
     }))
     renderPage()
     await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
@@ -282,9 +298,11 @@ describe('ChangePasswordPage', () => {
     // El dispatcher es el caso que motivó goToLanding: navegar al módulo
     // comercial lo dejaba en la vista "Sin acceso" (no tiene rol para él). Su
     // landing dejó de estar en v1, pero sigue sin ser el módulo comercial.
+    const despachador = { ...fakeUser, username: 'jdiaz', role: 'dispatcher' as const }
     server.use(
-      http.get(`${API}/auth/me`, () =>
-        HttpResponse.json({ ...fakeUser, username: 'jdiaz', role: 'dispatcher' }),
+      http.get(`${API}/auth/me`, () => HttpResponse.json(despachador)),
+      http.post(`${API}/auth/change-password`, () =>
+        HttpResponse.json({ ...fakeChangedPasswordResponse, user: despachador }),
       ),
     )
     const assignSpy = vi.fn()
@@ -294,8 +312,8 @@ describe('ChangePasswordPage', () => {
     vi.stubGlobal('location', { assign: assignSpy } as unknown as Location)
     const user = userEvent.setup()
     const { queryClient } = renderPage()
-    // goToLanding lee user del render vigente al click: esperar la sesión
-    // ANTES de interactuar (sin esto el rol podría no estar cargado).
+    // El éxito vuelve por el cargo de la respuesta, que acá es el mismo de la sesión. Por el de la
+    // sesión vuelven Cancelar y el 204, cada uno con su caso.
     await waitFor(() =>
       expect(queryClient.getQueryData(currentUserQueryKey)).toMatchObject({ role: 'dispatcher' }),
     )
@@ -308,6 +326,21 @@ describe('ChangePasswordPage', () => {
     // Operaciones vive en esta SPA: navega el router, sin full page load.
     expect(assignSpy).not.toHaveBeenCalled()
     expect(screen.queryByText('HOME')).not.toBeInTheDocument()
+  })
+
+  it('dispatcher: cancelar lo devuelve a operaciones, por el cargo de su sesión', async () => {
+    server.use(
+      http.get(`${API}/auth/me`, () =>
+        HttpResponse.json({ ...fakeUser, username: 'jdiaz', role: 'dispatcher' }),
+      ),
+    )
+    const user = userEvent.setup()
+    const { queryClient } = renderPage()
+    await waitFor(() =>
+      expect(queryClient.getQueryData(currentUserQueryKey)).toMatchObject({ role: 'dispatcher' }),
+    )
+    await user.click(screen.getByRole('button', { name: /cancelar/i }))
+    expect(await screen.findByText('OPERACIONES')).toBeInTheDocument()
   })
 
   it('AUTH-004 (contraseña actual incorrecta) asigna error al campo correspondiente', async () => {
@@ -388,6 +421,39 @@ describe('ChangePasswordPage', () => {
     await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
     await waitFor(() => expect(toastSpy).toHaveBeenCalledWith(propio))
     expect(toastSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('AUTH-010 avisa con un texto propio, conserva lo escrito y no reintenta', async () => {
+    const user = userEvent.setup()
+    const toastSpy = vi.spyOn(toast, 'error').mockImplementation(() => 'id')
+    let pedidos = 0
+    server.use(
+      http.post(`${API}/auth/change-password`, () => {
+        pedidos++
+        return HttpResponse.json(
+          {
+            type: 'urn:tms:error:auth-010',
+            title: 'Account busy',
+            status: 409,
+            detail: 'La cuenta está siendo modificada por otra operación',
+            code: 'AUTH-010',
+          },
+          { status: 409, headers: { 'Content-Type': 'application/problem+json' } },
+        )
+      }),
+    )
+    renderPage()
+    await user.type(screen.getByLabelText(/^contraseña actual$/i), 'Password123')
+    await user.type(screen.getByLabelText(/^nueva contraseña$/i), 'NuevoPassword456')
+    await user.type(screen.getByLabelText(/^confirmar nueva contraseña$/i), 'NuevoPassword456')
+    await user.click(screen.getByRole('button', { name: /cambiar contraseña/i }))
+    await waitFor(() =>
+      expect(toastSpy).toHaveBeenCalledWith('Tu cuenta se está modificando en este momento. Intenta de nuevo en unos segundos.'),
+    )
+    expect(toastSpy).toHaveBeenCalledTimes(1)
+    expect(screen.getByLabelText(/^contraseña actual$/i)).toHaveValue('Password123')
+    expect(screen.getByLabelText(/^nueva contraseña$/i)).toHaveValue('NuevoPassword456')
+    expect(pedidos).toBe(1)
   })
 
   // ----- A11y -----

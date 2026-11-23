@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, CreateWorkerData, CreateWorkerErrors, CreateWorkerResponses, DeactivateWorkerData, DeactivateWorkerErrors, DeactivateWorkerResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, ReactivateWorkerData, ReactivateWorkerErrors, ReactivateWorkerResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses, UpdateWorkerData, UpdateWorkerErrors, UpdateWorkerResponses } from './types.gen';
+import type { AddServiceResourcesData, AddServiceResourcesErrors, AddServiceResourcesResponses, AssignServiceResourcesData, AssignServiceResourcesErrors, AssignServiceResourcesResponses, CancelWarehousePurchaseInvoiceData, CancelWarehousePurchaseInvoiceErrors, CancelWarehousePurchaseInvoiceResponses, CancelWarehouseWithdrawalData, CancelWarehouseWithdrawalErrors, CancelWarehouseWithdrawalResponses, ChangePasswordData, ChangePasswordErrors, ChangePasswordResponses, ChangeServiceStatusData, ChangeServiceStatusErrors, ChangeServiceStatusResponses, CreateCargoTypeData, CreateCargoTypeErrors, CreateCargoTypeResponses, CreateClientData, CreateClientErrors, CreateClientResponses, CreateQuotationData, CreateQuotationErrors, CreateQuotationResponses, CreateServiceData, CreateServiceErrors, CreateServiceResponses, CreateUserAccountData, CreateUserAccountErrors, CreateUserAccountResponses, CreateWarehouseOpeningBalanceData, CreateWarehouseOpeningBalanceErrors, CreateWarehouseOpeningBalanceResponses, CreateWarehouseProductCategoryData, CreateWarehouseProductCategoryErrors, CreateWarehouseProductCategoryResponses, CreateWarehouseProductData, CreateWarehouseProductErrors, CreateWarehouseProductResponses, CreateWarehousePurchaseInvoiceData, CreateWarehousePurchaseInvoiceErrors, CreateWarehousePurchaseInvoiceResponses, CreateWarehouseSupplierData, CreateWarehouseSupplierErrors, CreateWarehouseSupplierResponses, CreateWarehouseWithdrawalData, CreateWarehouseWithdrawalErrors, CreateWarehouseWithdrawalResponses, CreateWorkerData, CreateWorkerErrors, CreateWorkerResponses, DeactivateUserAccountData, DeactivateUserAccountErrors, DeactivateUserAccountResponses, DeactivateWorkerData, DeactivateWorkerErrors, DeactivateWorkerResponses, DownloadQuotationPdfData, DownloadQuotationPdfErrors, DownloadQuotationPdfResponses, GetClientData, GetClientErrors, GetClientResponses, GetCurrentUserData, GetCurrentUserErrors, GetCurrentUserResponses, GetQuotationConfigData, GetQuotationConfigErrors, GetQuotationConfigResponses, GetQuotationData, GetQuotationErrors, GetQuotationResponses, GetServiceData, GetServiceErrors, GetServiceResponses, GetServicesReportData, GetServicesReportErrors, GetServicesReportResponses, GetServiceStatsData, GetServiceStatsErrors, GetServiceStatsResponses, GetUserAccountData, GetUserAccountErrors, GetUserAccountResponses, GetWarehouseProductData, GetWarehouseProductErrors, GetWarehouseProductKardexData, GetWarehouseProductKardexErrors, GetWarehouseProductKardexResponses, GetWarehouseProductResponses, GetWarehouseProductStockData, GetWarehouseProductStockErrors, GetWarehouseProductStockResponses, GetWarehousePurchaseInvoiceData, GetWarehousePurchaseInvoiceErrors, GetWarehousePurchaseInvoiceResponses, GetWarehouseReportData, GetWarehouseReportErrors, GetWarehouseReportResponses, GetWarehouseStatsData, GetWarehouseStatsErrors, GetWarehouseStatsResponses, GetWarehouseWithdrawalData, GetWarehouseWithdrawalErrors, GetWarehouseWithdrawalResponses, GetWorkerData, GetWorkerErrors, GetWorkerResponses, ListCargoTypesData, ListCargoTypesErrors, ListCargoTypesResponses, ListClientsData, ListClientsErrors, ListClientsResponses, ListCurrenciesData, ListCurrenciesErrors, ListCurrenciesResponses, ListDocumentTypesData, ListDocumentTypesErrors, ListDocumentTypesResponses, ListDriversData, ListDriversErrors, ListDriversResponses, ListFleetUnitsData, ListFleetUnitsErrors, ListFleetUnitsResponses, ListPaymentTermsData, ListPaymentTermsErrors, ListPaymentTermsResponses, ListQuotationConditionsData, ListQuotationConditionsErrors, ListQuotationConditionsResponses, ListQuotationsData, ListQuotationsErrors, ListQuotationServiceTypesData, ListQuotationServiceTypesErrors, ListQuotationServiceTypesResponses, ListQuotationsResponses, ListRolesData, ListRolesErrors, ListRolesResponses, ListServicesData, ListServicesErrors, ListServicesResponses, ListUserAccountCandidatesData, ListUserAccountCandidatesErrors, ListUserAccountCandidatesResponses, ListUserAccountsData, ListUserAccountsErrors, ListUserAccountsResponses, ListWarehouseOpeningBalancesData, ListWarehouseOpeningBalancesErrors, ListWarehouseOpeningBalancesResponses, ListWarehouseProductCategoriesData, ListWarehouseProductCategoriesErrors, ListWarehouseProductCategoriesResponses, ListWarehouseProductsData, ListWarehouseProductsErrors, ListWarehouseProductsResponses, ListWarehousePurchaseInvoicesData, ListWarehousePurchaseInvoicesErrors, ListWarehousePurchaseInvoicesResponses, ListWarehouseSuppliersData, ListWarehouseSuppliersErrors, ListWarehouseSuppliersResponses, ListWarehouseUnitsOfMeasureData, ListWarehouseUnitsOfMeasureErrors, ListWarehouseUnitsOfMeasureResponses, ListWarehouseWithdrawalsData, ListWarehouseWithdrawalsErrors, ListWarehouseWithdrawalsResponses, ListWorkersData, ListWorkersErrors, ListWorkersResponses, LoginData, LoginErrors, LoginResponses, ReactivateUserAccountData, ReactivateUserAccountErrors, ReactivateUserAccountResponses, ReactivateWorkerData, ReactivateWorkerErrors, ReactivateWorkerResponses, RefreshTokenData, RefreshTokenErrors, RefreshTokenResponses, RemoveServiceResourceData, RemoveServiceResourceErrors, RemoveServiceResourceResponses, ResetUserAccountPasswordData, ResetUserAccountPasswordErrors, ResetUserAccountPasswordResponses, UpdateClientData, UpdateClientErrors, UpdateClientResponses, UpdateQuotationData, UpdateQuotationErrors, UpdateQuotationResponses, UpdateQuotationStatusData, UpdateQuotationStatusErrors, UpdateQuotationStatusResponses, UpdateServiceData, UpdateServiceErrors, UpdateServiceResponses, UpdateWarehouseProductData, UpdateWarehouseProductErrors, UpdateWarehouseProductResponses, UpdateWarehousePurchaseInvoiceData, UpdateWarehousePurchaseInvoiceErrors, UpdateWarehousePurchaseInvoiceResponses, UpdateWarehouseWithdrawalData, UpdateWarehouseWithdrawalErrors, UpdateWarehouseWithdrawalResponses, UpdateWorkerData, UpdateWorkerErrors, UpdateWorkerResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -20,6 +20,19 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
 
 /**
  * Iniciar sesión
+ *
+ * Verifica la contraseña antes que la vigencia: con la clave equivocada
+ * responde `401 AUTH-001` aunque la cuenta no sea utilizable. Con la
+ * clave correcta, la cuenta tiene que ser **utilizable**: la cuenta
+ * activa, su trabajador activo y su cargo con `canLogin`. Si falla
+ * cualquiera de las tres, `401 AUTH-002`, con el mismo cuerpo en los tres
+ * casos.
+ *
+ * El refresh emitido lleva la versión de las sesiones de la cuenta (ver
+ * `refreshToken`).
+ *
+ * Orden: `400 COM-001` → `401 AUTH-001` → `401 AUTH-002` → `200`.
+ *
  */
 export const login = <ThrowOnError extends boolean = false>(options: Options<LoginData, ThrowOnError>): RequestResult<LoginResponses, LoginErrors, ThrowOnError> => (options.client ?? client).post<LoginResponses, LoginErrors, ThrowOnError>({
     responseType: 'json',
@@ -33,6 +46,26 @@ export const login = <ThrowOnError extends boolean = false>(options: Options<Log
 
 /**
  * Renovar token de acceso
+ *
+ * Renueva la sesión con un refresh emitido por `login`, `refreshToken` o
+ * `changePassword`. La cuenta tiene que ser utilizable, igual que en el
+ * ingreso: si no, o si la cuenta del token ya no existe, `401 AUTH-002`.
+ *
+ * Revocación: el refresh lleva la versión de las sesiones de la cuenta y
+ * se compara por igualdad con la actual. Cambiar la propia contraseña,
+ * reactivar la cuenta o restablecer su contraseña sube la versión: un
+ * refresh anterior responde `401 AUTH-003`, también si se emitió en el
+ * mismo segundo. Un refresh sin la
+ * versión (emitido antes de que existiera), o con ella nula, cuenta como
+ * la inicial y renueva hasta el primer cambio; una versión que no es un
+ * entero sin decimales, `401 AUTH-003`. El token de acceso vigente no se
+ * revoca: vale hasta su vencimiento (`expiresAt`) y 60 s más de
+ * tolerancia de reloj.
+ *
+ * Orden: `400 COM-001` → `401 AUTH-009` o `AUTH-003` (vencido, mal
+ * formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `401 AUTH-003`
+ * (versión) → `200`.
+ *
  */
 export const refreshToken = <ThrowOnError extends boolean = false>(options: Options<RefreshTokenData, ThrowOnError>): RequestResult<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError> => (options.client ?? client).post<RefreshTokenResponses, RefreshTokenErrors, ThrowOnError>({
     responseType: 'json',
@@ -45,9 +78,31 @@ export const refreshToken = <ThrowOnError extends boolean = false>(options: Opti
 });
 
 /**
- * Cambiar contraseña del usuario actual
+ * Cambiar la contraseña de la cuenta de la sesión
+ *
+ * Cambia la contraseña de la cuenta de la sesión y responde con una
+ * **sesión nueva**: quien la cambia sigue trabajando con esos tokens, y
+ * los refresh emitidos antes dejan de renovar (`401 AUTH-003` en
+ * `refreshToken`). Deja una fila de rastro "cambió su contraseña",
+ * firmada por la propia cuenta y sin valores.
+ *
+ * La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
+ * `401 AUTH-002`, sin cambio, también con la actual equivocada (gana
+ * sobre `AUTH-004`). Si la actual verifica, la fila de la cuenta se toma y
+ * se decide contra la confirmada: si otra escritura cambió la contraseña en
+ * el medio, responde `400 AUTH-004` en vez de pisarla. Si otra operación
+ * retiene la fila, o una de sus tablas (también la del rastro) mientras el
+ * cambio la toma, la lee o la escribe, más allá del tope de espera, `409
+ * AUTH-010`, sin cambio:
+ * se reintenta. La tabla de cuentas ya tomada en `ACCESS EXCLUSIVE` al
+ * llegar el pedido (una migración) lo hace esperar, como al ingreso.
+ *
+ * Orden (el `409 AUTH-010` no entra en la cadena): `401` (token) → `400
+ * COM-001` → `404 AUTH-005` → `401 AUTH-002` → `400 AUTH-004` → `200`.
+ *
  */
 export const changePassword = <ThrowOnError extends boolean = false>(options: Options<ChangePasswordData, ThrowOnError>): RequestResult<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError> => (options.client ?? client).post<ChangePasswordResponses, ChangePasswordErrors, ThrowOnError>({
+    responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/auth/change-password',
     ...options,
@@ -58,7 +113,13 @@ export const changePassword = <ThrowOnError extends boolean = false>(options: Op
 });
 
 /**
- * Obtener datos del usuario autenticado
+ * Obtener la cuenta de la sesión
+ *
+ * La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
+ * `401 AUTH-002`.
+ *
+ * Orden: `401` (token) → `404 AUTH-005` → `401 AUTH-002` → `200`.
+ *
  */
 export const getCurrentUser = <ThrowOnError extends boolean = false>(options?: Options<GetCurrentUserData, ThrowOnError>): RequestResult<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError> => (options?.client ?? client).get<GetCurrentUserResponses, GetCurrentUserErrors, ThrowOnError>({
     responseType: 'json',
@@ -886,7 +947,7 @@ export const getWarehouseReport = <ThrowOnError extends boolean = false>(options
  * (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
  * que viaja en `role` del request y en el rol de la sesión), nombre visible
  * (`description`, el cargo que muestran el pie del menú y el PDF),
- * nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
+ * nivel, si el rol inicia sesión (`canLogin`) y modalidad de ficha
  * de conductor. El mismo catálogo para todos los roles: el cliente
  * esconde los de nivel igual o mayor al del rol de la sesión (para
  * `admin` ofrece todos); la autoridad es el `403 WRK-006` de las
@@ -990,8 +1051,8 @@ export const listWorkers = <ThrowOnError extends boolean = false>(options?: Opti
  * permitir correcciones a mano; la guarda es del formulario. Deja una fila
  * de auditoría `CREATED`. `isActive`, `createdAt`, `createdBy`,
  * `updatedAt` y `updatedBy` los pone el servidor y el cuerpo no los mueve;
- * `hasUser` sale en `false` (el usuario lo crea el módulo de usuarios,
- * con el rol del trabajador).
+ * `account` sale nula y `hasUser` en `false` (la cuenta la crea el
+ * módulo de usuarios, con el rol del trabajador).
  *
  * Orden de evaluación: `401` → `403 COM-003` → `400 COM-001` (cuerpo
  * vacío, nulo o campo inválido, incluida la ficha) → `400 WRK-005` →
@@ -1025,8 +1086,9 @@ export const createWorker = <ThrowOnError extends boolean = false>(options: Opti
  * Devuelve el trabajador con ese `id`, esté activo o inactivo, con su tipo
  * de documento, su rol (`role`: nombre de sistema, nombre visible, nivel,
  * si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
- * de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
- * usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
+ * de conductor (`driver`, nula si no hay fila en `drivers`), su cuenta
+ * del sistema (`account`, activa o inactiva, nula si no tiene; `hasUser`
+ * es lo mismo que `account` no nula) y quién lo creó y lo modificó por
  * última vez. En las filas anteriores a esta unidad, `createdBy` es el
  * usuario `admin`, que las cargó (nulo si no había admin al migrar), y
  * `updatedBy` es nulo hasta su primera edición, baja o reactivación
@@ -1085,12 +1147,14 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * su trabajador. Si `role` cambia, la cuenta queda con el rol nuevo en la
  * MISMA transacción (los grupos del token rigen hasta el próximo inicio de
  * sesión o refresco; `/auth/me` y las escrituras de trabajadores ya leen el
- * cargo nuevo), y el cambio de cargo deja una sola fila de auditoría, la
- * del cargo: la cuenta no suma otra.
- * Cambiar a un rol que no inicia sesión a alguien que tiene usuario →
- * `400 WRK-011`: una cuenta no puede quedar con un rol sin permisos; el
- * camino para dejar a alguien sin acceso es desactivarlo. Cuenta que la
- * fila de usuario EXISTA, esté activa o no.
+ * cargo nuevo).
+ * Si el rol nuevo no inicia sesión y la cuenta está activa, la cuenta se
+ * desactiva en la MISMA transacción y deja una fila en el rastro del
+ * trabajador (`user.isActive`, de `true` a `false`, con el motivo si
+ * vino), además de la del cargo, y la respuesta ya la trae apagada
+ * (`account.isActive` en `false`). Una cuenta ya inactiva no se toca. Reenviar el mismo rol
+ * no toca la cuenta, y volver a un rol que inicia sesión no la reactiva:
+ * eso se hace desde Usuarios.
  *
  * Ficha (RN-11): si hay fila en `drivers`, `driver` la actualiza
  * (`status` ausente → se conserva el actual, a diferencia del alta); si
@@ -1119,8 +1183,10 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * trabajador se serializan, y dos ediciones cruzadas también. La segunda
  * relee el cargo actual de quien actúa: si dos administradores se bajan el
  * cargo entre sí a la vez, la segunda sale `403 WRK-006` si su cargo nuevo
- * todavía escribe, o `403 COM-003` si ya no. Si otra operación
- * retiene una de las dos más allá del tope de espera → `409 WRK-013`, que
+ * todavía escribe, o `403 COM-003` si ya no. Si el rol cambia a uno
+ * que no inicia sesión y el trabajador tiene cuenta, activa o no, toma
+ * también su fila antes de escribir. Si otra operación retiene una de
+ * esas filas más allá del tope de espera → `409 WRK-013`, que
  * es transitorio y se reintenta. Sin `If-Match`: entre dos escrituras
  * serializadas gana la última.
  *
@@ -1130,8 +1196,8 @@ export const getWorker = <ThrowOnError extends boolean = false>(options: Options
  * vacío, nulo o campo inválido, incluida la ficha) → `404 WRK-001` (el
  * `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
  * actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
- * `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
- * WRK-009` → `409 WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
+ * `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400 WRK-009` → `409
+ * WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
  * puede escribir (cuenta apagada, rol actual en la base fuera de los cuatro de
  * escritura, o trabajador dado de baja) sale como `403 COM-003` en el primer
  * escalón del organigrama, después del `404`.
@@ -1155,10 +1221,12 @@ export const updateWorker = <ThrowOnError extends boolean = false>(options: Opti
  * ficha de conductor (`drivers.is_active`) y su usuario del sistema
  * (`users.is_active`), si existen: quien se fue no inicia sesión ni se
  * asigna a un viaje (la sesión abierta, si la hay, sigue hasta que venza
- * su access token; el refresco ya la frena). Idempotente: sobre un
- * inactivo responde `200` sin cambio, sin código de error, sin fila de
- * auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si llega uno,
- * o cualquier `Content-Type`, se ignora.
+ * su access token donde no se mira la cuenta; la renovación, `/auth/me` y
+ * el cambio de contraseña ya la frenan). Si la baja apaga la cuenta, la
+ * respuesta ya la trae apagada (`account.isActive` en `false`).
+ * Idempotente: sobre un inactivo responde `200` sin cambio, sin código de
+ * error, sin fila de auditoría y sin mover `updatedAt`/`updatedBy`. Sin
+ * cuerpo: si llega uno, o cualquier `Content-Type`, se ignora.
  *
  * Nadie desactiva su propio trabajador (el de `users.worker_id` de la
  * sesión), tampoco `admin` → `403 WRK-010`. Organigrama (RN-09): el nivel
@@ -1198,8 +1266,9 @@ export const deactivateWorker = <ThrowOnError extends boolean = false>(options: 
  *
  * Marca `isActive = true` y enciende su ficha de conductor solo si existe
  * y el rol actual la lleva; un rol `OPTIONAL` la enciende aunque una
- * edición anterior la haya apagado. **No reactiva el usuario**: eso lo
- * hace el módulo de usuarios, que exigirá trabajador activo. Tampoco crea
+ * edición anterior la haya apagado. **No reactiva el usuario** (`account`
+ * sale como estaba): eso lo hace el módulo de usuarios, que exige
+ * trabajador activo. Tampoco crea
  * una ficha que no existe. Idempotente: sobre un activo responde `200` sin
  * cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
  * llega uno, o cualquier `Content-Type`, se ignora.
@@ -1281,6 +1350,294 @@ export const listDrivers = <ThrowOnError extends boolean = false>(options?: Opti
     responseType: 'json',
     security: [{ scheme: 'bearer', type: 'http' }],
     url: '/drivers',
+    ...options
+});
+
+/**
+ * Listar las cuentas del sistema
+ *
+ * Todas las cuentas, sin texto de búsqueda (son decenas), con su
+ * trabajador, su cargo (el del trabajador) y su estado. `isActive=true`
+ * trae las activas; `false`, las inactivas; sin el parámetro, todas.
+ * Orden: nombre de usuario y, a igualdad, `id`. Sin paginar.
+ *
+ * Lectura plana para los cuatro cargos que administran cuentas: cada uno
+ * ve todas, también las de cargos por encima del suyo. Se decide por el
+ * cargo del token. La respuesta no trae el hash ni la versión de las
+ * sesiones.
+ *
+ */
+export const listUserAccounts = <ThrowOnError extends boolean = false>(options?: Options<ListUserAccountsData, ThrowOnError>): RequestResult<ListUserAccountsResponses, ListUserAccountsErrors, ThrowOnError> => (options?.client ?? client).get<ListUserAccountsResponses, ListUserAccountsErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/users',
+    ...options
+});
+
+/**
+ * Crear la cuenta de un trabajador, con el nombre de usuario generado
+ *
+ * Crea la cuenta del trabajador `workerId`. El nombre de usuario y la
+ * contraseña temporal los genera el servidor. El nombre: inicial del
+ * nombre y apellido paterno, normalizados y recortados a 50 caracteres
+ * con el sufijo incluido; si está tomado, `1`, `2`…; el materno entra
+ * solo en el respaldo para nombres cortos. La
+ * temporal: 12 caracteres al azar (`SecureRandom`) de un alfabeto sin
+ * caracteres ambiguos (sin `0`, `O`, `o`, `1`, `l`, `I` ni `i`). El cuerpo
+ * no trae nombre, contraseña, cargo ni estado, y si los trae se ignoran.
+ * La cuenta nace activa, con el cargo del trabajador, con la versión
+ * inicial de las sesiones y con `createdBy` igual a la sesión. Deja una
+ * fila de rastro de alta, sin la contraseña.
+ *
+ * La temporal sale **una sola vez**, en `temporaryPassword` de esta
+ * respuesta, para quien hizo el alta: se guarda solo su hash y ninguna
+ * otra respuesta, log ni rastro la contiene. Si la respuesta se pierde,
+ * no se recupera: el reintento responde `409 USR-003` y se restablece con
+ * `resetUserAccountPassword`. Nada obliga a cambiarla al entrar: la
+ * persona la cambia con `changePassword`.
+ *
+ * Tomado es cualquier cuenta actual, activa o inactiva, sin distinguir
+ * mayúsculas. Dos altas simultáneas que generan el mismo nombre: la
+ * segunda responde `409 USR-002`, sin fila nueva, o `409 USR-009` si la
+ * primera no confirma antes del tope; se reintenta y sale el siguiente.
+ *
+ * El trabajador: inexistente → `400 USR-004`; fuera del rango de la
+ * sesión (su cargo de nivel igual o mayor; `admin` exento) → `403
+ * USR-008`; dado de baja → `409 USR-005`; cargo que no inicia sesión →
+ * `400 USR-006`; con cuenta, activa o inactiva → `409 USR-003`.
+ *
+ * Quien escribe se relee de la base: cuenta activa, trabajador activo y
+ * uno de los cuatro cargos; si no, `403 COM-003`. Toma antes la fila del
+ * trabajador; si otra operación retiene más allá del tope esa fila, lo que
+ * el alta escribe o la cuenta de quien escribe → `409 USR-009`,
+ * transitorio.
+ *
+ * Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+ * `400 COM-001` → `400 USR-004` → `403 COM-003` (actor) → `403 USR-008` →
+ * `409 USR-005` → `400 USR-006` → `409 USR-003` → `409 USR-002` → `201`.
+ *
+ */
+export const createUserAccount = <ThrowOnError extends boolean = false>(options: Options<CreateUserAccountData, ThrowOnError>): RequestResult<CreateUserAccountResponses, CreateUserAccountErrors, ThrowOnError> => (options.client ?? client).post<CreateUserAccountResponses, CreateUserAccountErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/users',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Obtener una cuenta del sistema
+ *
+ * La cuenta con ese `id`, activa o inactiva: lo de la lista más el nombre
+ * del trabajador en partes (nombres, paterno y materno, este nulo si no
+ * tiene), y quién la creó y la modificó por última vez y cuándo.
+ * `createdBy` es nulo en las cuentas que no se dieron de alta por la API.
+ * `updatedBy` es nulo hasta el primer cambio posterior al alta que deja
+ * rastro. Hoy dejan rastro el cambio propio de contraseña, que firma la
+ * propia cuenta, desactivarla, reactivarla y restablecer su contraseña,
+ * que firma quien lo hace, la baja de su trabajador desde Trabajadores
+ * cuando apaga la cuenta, que firma quien la da, y la edición que pasa a
+ * su trabajador a un rol que no inicia sesión con la cuenta activa, que
+ * firma quien edita. La respuesta no trae el hash ni la versión de las
+ * sesiones.
+ *
+ * Lectura plana para los cuatro cargos que administran cuentas, por el
+ * cargo del token; el resto → `403 COM-003`, también con un `id` que no
+ * existe o que no encaja en un entero.
+ *
+ * `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+ * cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+ * sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+ * recurso.
+ *
+ */
+export const getUserAccount = <ThrowOnError extends boolean = false>(options: Options<GetUserAccountData, ThrowOnError>): RequestResult<GetUserAccountResponses, GetUserAccountErrors, ThrowOnError> => (options.client ?? client).get<GetUserAccountResponses, GetUserAccountErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/users/{id}',
+    ...options
+});
+
+/**
+ * Desactivar una cuenta del sistema
+ *
+ * Marca la cuenta inactiva: ya no ingresa ni renueva (`401 AUTH-002`), y
+ * `/auth/me` con su token responde `401 AUTH-002`. No toca al trabajador.
+ * Un token de acceso suyo ya emitido sigue valiendo hasta que vence, más
+ * 60 s de margen de reloj, para leer y para escribir donde no se relee a
+ * quien escribe. Las escrituras de Usuarios y Trabajadores sí lo releen y
+ * responden `403 COM-003`.
+ * Deja una fila `DEACTIVATED` en el rastro de la cuenta (`isActive`, de
+ * `true` a `false`) y la firma quien la desactiva.
+ *
+ * Idempotente: sobre una inactiva responde `200` sin cambio, sin fila de
+ * rastro y sin firma. Sin cuerpo: si llega uno, o cualquier
+ * `Content-Type`, se ignora.
+ *
+ * Nadie desactiva su propia cuenta, tampoco `admin` → `403 USR-007`, antes
+ * del rango. Rango: el cargo de la cuenta tiene que ser de nivel
+ * estrictamente menor al de quien escribe; `admin` exento, y un `admin`
+ * desactiva a otro `admin`. Las guardas corren antes del corte idempotente.
+ *
+ * Quien escribe se relee de la base después de tomar la fila de la cuenta.
+ * Si otra operación retiene esa fila, una de sus tablas o la secuencia del
+ * rastro más allá del tope → `409 USR-009`.
+ *
+ * `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+ * cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+ * sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+ * recurso.
+ *
+ * Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+ * `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-007` →
+ * `403 USR-008` → `200`.
+ *
+ */
+export const deactivateUserAccount = <ThrowOnError extends boolean = false>(options: Options<DeactivateUserAccountData, ThrowOnError>): RequestResult<DeactivateUserAccountResponses, DeactivateUserAccountErrors, ThrowOnError> => (options.client ?? client).post<DeactivateUserAccountResponses, DeactivateUserAccountErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/users/{id}/deactivate',
+    ...options
+});
+
+/**
+ * Reactivar una cuenta del sistema
+ *
+ * Marca la cuenta activa y sube la versión de sus sesiones: un refresh
+ * emitido antes de la baja ya no renueva (`401 AUTH-003`), y uno de un
+ * ingreso posterior sí. Un token de acceso emitido antes de la baja
+ * vuelve a servir hasta que vence, más 60 s de margen de reloj. No toca
+ * la contraseña ni al trabajador.
+ * Deja una fila `REACTIVATED` en el rastro de la cuenta (`isActive`, de
+ * `false` a `true`) y la firma quien la reactiva.
+ *
+ * Exige el trabajador de la cuenta activo → si no, `409 USR-005`; y su
+ * cargo con inicio de sesión → si no, `400 USR-006`. Si coincide con la
+ * baja de su trabajador desde Trabajadores, la cuenta puede quedar activa
+ * sobre el trabajador de baja: no ingresa mientras dure la baja, pero
+ * vuelve a ingresar si Trabajadores reactiva al trabajador, sin pasar por
+ * Usuarios. Se corrige desactivándola.
+ *
+ * Idempotente: sobre una activa responde `200` sin cambio, sin fila de
+ * rastro, sin firma y sin subir la versión. Las guardas y las dos reglas
+ * corren antes del corte: una cuenta activa con su trabajador de baja
+ * responde `409 USR-005`. Sin cuerpo: si llega uno, o cualquier
+ * `Content-Type`, se ignora.
+ *
+ * Rango: el cargo de la cuenta tiene que ser de nivel estrictamente menor
+ * al de quien escribe; `admin` exento. La propia cuenta inactiva no se
+ * reactiva: su sesión ya no escribe (`403 COM-003`).
+ *
+ * Quien escribe y el trabajador de la cuenta se releen de la base después
+ * de tomar la fila de la cuenta. Si otra operación retiene esa fila, una
+ * de sus tablas o la secuencia del rastro más allá del tope →
+ * `409 USR-009`.
+ *
+ * `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+ * cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+ * sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+ * recurso.
+ *
+ * Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+ * `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-008` →
+ * `409 USR-005` → `400 USR-006` → `200`.
+ *
+ */
+export const reactivateUserAccount = <ThrowOnError extends boolean = false>(options: Options<ReactivateUserAccountData, ThrowOnError>): RequestResult<ReactivateUserAccountResponses, ReactivateUserAccountErrors, ThrowOnError> => (options.client ?? client).post<ReactivateUserAccountResponses, ReactivateUserAccountErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/users/{id}/reactivate',
+    ...options
+});
+
+/**
+ * Restablecer la contraseña de una cuenta del sistema
+ *
+ * Genera una contraseña temporal nueva (12 caracteres al azar, sin
+ * caracteres ambiguos), la fija como la de la cuenta y sube la versión de
+ * sus sesiones: un refresh emitido antes ya no renueva (`401 AUTH-003`).
+ * Un token de acceso suyo ya emitido sigue valiendo hasta que vence, más
+ * 60 s de margen de reloj. No toca el estado de la cuenta ni al
+ * trabajador.
+ * Deja una fila `PASSWORD_RESET` en el rastro de la cuenta (`password`,
+ * sin valores) y la firma quien restablece.
+ *
+ * La temporal sale **una sola vez**, en `temporaryPassword` de esta
+ * respuesta: se guarda solo su hash, y ninguna otra respuesta, log ni
+ * rastro la contiene. Nada obliga a cambiarla al entrar: la persona la
+ * cambia con `changePassword`.
+ *
+ * Sin corte idempotente: cada llamada genera una temporal nueva y la
+ * anterior deja de servir. Responde `200` también sobre una cuenta
+ * inactiva, una cuyo trabajador está de baja o una de un cargo sin inicio
+ * de sesión: la temporal sirve cuando la cuenta vuelva a poder ingresar.
+ * Sin cuerpo: si llega uno, o cualquier `Content-Type`, se ignora, también
+ * un `temporaryPassword`, que no entra como clave.
+ *
+ * Nadie restablece su propia cuenta, tampoco `admin` → `403 USR-007`,
+ * antes del rango: la propia se cambia con `changePassword`, que pide la
+ * actual. Rango: el cargo de la cuenta tiene que ser de nivel
+ * estrictamente menor al de quien escribe; `admin` exento, y un `admin`
+ * restablece a otro `admin`.
+ *
+ * Quien escribe se relee de la base después de tomar la fila de la cuenta.
+ * Si otra operación retiene esa fila, una de sus tablas o la secuencia del
+ * rastro más allá del tope → `409 USR-009`, sin cambios. Con un cambio
+ * propio de la contraseña a la vez, los dos se ordenan sobre la fila: si
+ * el restablecimiento responde `200`, queda la temporal, y una sesión
+ * emitida por el cambio propio deja de renovar.
+ *
+ * `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+ * cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+ * sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+ * recurso.
+ *
+ * Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+ * `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-007` →
+ * `403 USR-008` → `200`.
+ *
+ */
+export const resetUserAccountPassword = <ThrowOnError extends boolean = false>(options: Options<ResetUserAccountPasswordData, ThrowOnError>): RequestResult<ResetUserAccountPasswordResponses, ResetUserAccountPasswordErrors, ThrowOnError> => (options.client ?? client).post<ResetUserAccountPasswordResponses, ResetUserAccountPasswordErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/users/{id}/reset-password',
+    ...options
+});
+
+/**
+ * Listar los trabajadores elegibles para una cuenta
+ *
+ * Los trabajadores **activos, sin cuenta** (ni activa ni inactiva), **con
+ * cargo que inicia sesión** y **de nivel estrictamente menor** al del cargo
+ * de la sesión (`admin`: de cualquier nivel). El nivel de la sesión se lee
+ * de la base; es un filtro de presentación: la autoridad es el `403
+ * USR-008` del alta. Quien pregunta se relee de la base, como en el alta:
+ * cuenta activa, trabajador activo y uno de los cuatro cargos; si no,
+ * `403 COM-003`.
+ *
+ * Cada uno trae `proposedUsername`, el nombre que generaría el alta si se
+ * hiciera ahora. **Es orientativo:** el alta lo recalcula y, si otra cuenta
+ * lo tomó en el medio, sale el siguiente; dos homónimos muestran la misma
+ * propuesta.
+ *
+ * `q` es multi-palabra, sin distinguir mayúsculas, con mínimo 3
+ * caracteres: cada palabra calza en el nombre o en un apellido. `workerId`
+ * limita a ese trabajador (cero o un elemento); si no es un entero, `404`
+ * sin cuerpo. Los dos se combinan. Sin parámetros, todos los elegibles, en
+ * el orden de la búsqueda del padrón y, entre homónimos, por id. Sin
+ * paginar.
+ *
+ * Orden: `401` → `403 COM-003` → `404` (`workerId` no entero) → `400
+ * COM-001` → `403 COM-003` (quien pregunta) → `200`.
+ *
+ */
+export const listUserAccountCandidates = <ThrowOnError extends boolean = false>(options?: Options<ListUserAccountCandidatesData, ThrowOnError>): RequestResult<ListUserAccountCandidatesResponses, ListUserAccountCandidatesErrors, ThrowOnError> => (options?.client ?? client).get<ListUserAccountCandidatesResponses, ListUserAccountCandidatesErrors, ThrowOnError>({
+    responseType: 'json',
+    security: [{ scheme: 'bearer', type: 'http' }],
+    url: '/user-account-candidates',
     ...options
 });
 

@@ -28,6 +28,9 @@ public class TokenService {
     /** Nombre del claim que lleva el cargo del usuario. */
     public static final String CLAIM_POSITION = "position";
 
+    /** Nombre del claim del refresh que lleva la version de las sesiones de la cuenta al emitirlo. */
+    public static final String CLAIM_SESSION_VERSION = "sessionVersion";
+
     @ConfigProperty(name = "smallrye.jwt.new-token.lifespan")
     long accessTokenLifespanSeconds;
 
@@ -56,6 +59,7 @@ public class TokenService {
         return Jwt.subject(user.id.toString())
             .upn(user.username)
             .claim(CLAIM_TYPE, TokenType.REFRESH.claimValue())
+            .claim(CLAIM_SESSION_VERSION, user.sessionVersion)
             .issuedAt(now)
             .expiresAt(now.plusSeconds(refreshTokenLifespanSeconds))
             .sign();

@@ -15,22 +15,29 @@ type RetriableRequestConfig = InternalAxiosRequestConfig & {
 // `tryRefresh` durante la ventana del request reciben la misma promesa,
 // pero solo dentro de la misma generación de sesión: la de otra vuelve con
 // null aunque salga bien, y esperarla dejaba afuera al usuario nuevo.
-//
-// Limitacion conocida (multi-tab): el `currentRefreshToken` se captura una
-// vez al iniciar el refresh. Si otra pestaña rota el token a mitad de
-// ejecucion, las llamadas concurrentes pueden recibir un resultado basado
-// en un token viejo. En single-tab esto no se da. Si en el futuro se
-// agrega sincronizacion cross-tab, este punto requiere revision.
+
+// Varias pestañas comparten los tokens, pero no la generación ni la caché. Una renovación que vuelve
+// después de que otra pestaña guardó otros tokens no los pisa (ver `renew`); lo demás de la sesión
+// no se entera hasta recargar. Si se agrega sincronización entre pestañas, este punto requiere
+// revisión.
 let refreshInFlight: { generation: number; result: Promise<string | null> } | null = null
 
 async function renew(refreshToken: string, generation: number): Promise<string | null> {
+  // Si el refresh guardado ya no es el que salió, otro guardó tokens mientras volvía (el cambio de
+  // contraseña, o la renovación, el ingreso o la salida de otra pestaña): manda lo guardado, así que no
+  // escribe y el pedido sigue con eso (sin access guardado, la sesión termina ahí). Tras un cambio, si
+  // hay que terminar la sesión, lo decide la renovación siguiente. Va después de la generación: si la
+  // sesión terminó, lo guardado es de otro.
+  const replacedMeanwhile = () => tokenStorage.getRefreshToken() !== refreshToken
   try {
     const { data } = await refreshTokenRequest({ body: { refreshToken }, throwOnError: true })
     // Si la sesión cambió mientras volvía, los tokens son de otro usuario.
     if (!data || sessionGeneration() !== generation) return null
+    if (replacedMeanwhile()) return tokenStorage.getAccessToken()
     tokenStorage.setTokens(data.token, data.refreshToken ?? null)
     return data.token
   } catch {
+    if (sessionGeneration() === generation && replacedMeanwhile()) return tokenStorage.getAccessToken()
     // Los tokens los borra la rutina de fin de sesión, que corre con el null.
     return null
   }
@@ -111,8 +118,9 @@ export function configureHttpClient(onSessionExpired: () => void): void {
 
       // No renuevan el ingreso (su 401 es de las credenciales o de la cuenta, y renovar ahí podía
       // pisar los tokens con los de una sesión vieja) ni la renovación (sería un bucle). Cambiar la
-      // contraseña sí: su 401 es siempre del token, porque la clave actual equivocada es un 400, y
-      // reintentar es seguro porque el servidor rechaza el token antes de escribir.
+      // contraseña sí: su 401 es del token o de una cuenta que ya no es utilizable (la clave actual
+      // equivocada es un 400), y renovar resuelve el primero y termina la sesión en el segundo.
+      // Reintentar es seguro porque el servidor rechaza antes de escribir.
       const isAuthEndpoint = isLoginOrRefresh(originalRequest?.url)
 
       if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {

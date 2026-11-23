@@ -258,7 +258,7 @@ describe('WorkerEditPage', () => {
       expect(cargo()).toHaveValue('admin')
     })
 
-    it('a un trabajador con usuario no le ofrece cargos que no inician sesión', async () => {
+    it('a un trabajador con cuenta activa le ofrece también los cargos que no inician sesión', async () => {
       renderPage(trabajador({ role: rol('sales'), driver: null, hasUser: true }), 'general_manager')
       await listo()
       const opciones = within(cargo())
@@ -266,8 +266,28 @@ describe('WorkerEditPage', () => {
         .map((option) => option.textContent)
       expect(opciones).toContain('Ejecutivo de Ventas')
       expect(opciones).toContain('Encargado de Almacén')
-      expect(opciones).not.toContain('Conductor')
-      expect(opciones).not.toContain('Operador')
+      expect(opciones).toContain('Conductor')
+      expect(opciones).toContain('Operador')
+    })
+
+    it.each([
+      ['apagada', false],
+      ['encendida', true],
+    ])('con la cuenta %s y un cargo que no inicia sesión, abre con su cargo y guarda', async (_caso, isActive) => {
+      const user = userEvent.setup()
+      const sink = capturar()
+      renderPage(
+        trabajador({ role: rol('operator'), driver: null, account: { id: 7, username: 'jperez', isActive } }),
+        'general_manager',
+      )
+      await listo()
+      expect(cargo()).toHaveValue('operator')
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      await cambiarApellido(user)
+      await user.click(guardar())
+
+      await waitFor(() => expect(sink.bodies).toHaveLength(1))
+      expect(sink.bodies?.[0].role).toBe('operator')
     })
   })
 
@@ -767,12 +787,68 @@ describe('WorkerEditPage', () => {
       expect(aviso.compareDocumentPosition(screen.getByLabelText('Nombres'))).toBe(Node.DOCUMENT_POSITION_FOLLOWING)
     })
 
+    it('con cuenta activa, pasar a un cargo que no inicia sesión avisa que la cuenta se desactiva; volver al suyo lo quita', async () => {
+      const user = userEvent.setup()
+      renderPage(trabajador({ role: rol('sales'), driver: null, hasUser: true }))
+      await listo()
+
+      await user.selectOptions(cargo(), 'Operador')
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Este trabajador tiene usuario y el cargo Operador no inicia sesión. Su cuenta se desactivará. Si tiene una sesión abierta, deja de funcionar en 16 minutos como máximo.',
+      )
+      expect(screen.queryByText(/cambian sus permisos/)).not.toBeInTheDocument()
+
+      await user.selectOptions(cargo(), 'Ejecutivo de Ventas')
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('con la cuenta apagada, un cargo que no inicia sesión no avisa y uno que sí avisa de los permisos', async () => {
+      const user = userEvent.setup()
+      renderPage(
+        trabajador({ role: rol('sales'), driver: null, account: { id: 7, username: 'jperez', isActive: false } }),
+      )
+      await listo()
+
+      await user.selectOptions(cargo(), 'Operador')
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+
+      await user.selectOptions(cargo(), 'Encargado de Almacén')
+      expect(screen.getByRole('status')).toHaveTextContent(
+        'Este trabajador tiene usuario: al cambiar su cargo de Ejecutivo de Ventas a Encargado de Almacén, cambian sus permisos en el sistema.',
+      )
+    })
+
     it('sin usuario, cambiar el cargo no avisa nada', async () => {
       const user = userEvent.setup()
       renderPage(trabajador({ role: rol('operator'), driver: null }))
       await listo()
       await user.selectOptions(cargo(), 'Encargado de Almacén')
-      expect(screen.queryByText(/cambian sus permisos/)).not.toBeInTheDocument()
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      await user.selectOptions(cargo(), 'Ayudante')
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    })
+
+    it('guardar el paso a un cargo que no inicia sesión deja la ficha con la cuenta que devuelve el servidor', async () => {
+      const user = userEvent.setup()
+      const devuelto = trabajador({
+        role: rol('operator'),
+        driver: null,
+        account: { id: 12, username: 'atorres', isActive: false },
+      })
+      const sink: { ids?: number[]; bodies?: WorkerUpdateRequest[] } = {}
+      server.use(updateWorkerCapture(sink, devuelto))
+      const { router, queryClient } = renderPage(trabajador({ role: rol('sales'), driver: null, hasUser: true }))
+      await listo()
+      await user.selectOptions(cargo(), 'Operador')
+      await user.click(guardar())
+
+      await waitFor(() => expect(router.state.location.pathname).toBe(workerDetailPath(ID)))
+      expect(sink.bodies?.[0].role).toBe('operator')
+      expect(queryClient.getQueryData<WorkerDetailResponse>(workerKeys.detail(ID))?.account).toEqual({
+        id: 12,
+        username: 'atorres',
+        isActive: false,
+      })
     })
   })
 
@@ -822,18 +898,15 @@ describe('WorkerEditPage', () => {
       expect(router.state.historyAction).toBe('REPLACE')
     })
 
-    it.each([
-      ['WRK-011', 'Este cargo no inicia sesión y el trabajador tiene usuario. Elige otro.'],
-      ['WRK-012', 'No puedes cambiar tu propio cargo.'],
-    ])('%s va en el campo del cargo', async (code, texto) => {
+    it('WRK-012 va en el campo del cargo', async () => {
       const user = userEvent.setup()
-      server.use(updateWorkerProblem(code, code === 'WRK-011' ? 400 : 403))
+      server.use(updateWorkerProblem('WRK-012', 403))
       renderPage(trabajador())
       await listo()
       await cambiarApellido(user)
       await user.click(guardar())
 
-      await waitFor(() => expect(cargo()).toHaveAccessibleDescription(texto))
+      await waitFor(() => expect(cargo()).toHaveAccessibleDescription('No puedes cambiar tu propio cargo.'))
     })
 
     it.each([
@@ -968,6 +1041,10 @@ describe('WorkerEditPage', () => {
 
       await user.type(screen.getByLabelText('Número de documento'), '9')
       await user.selectOptions(cargo(), 'Encargado de Almacén')
+      expect(await axe(container)).toHaveNoViolations()
+
+      await user.selectOptions(cargo(), 'Operador')
+      await screen.findByText(/Su cuenta se desactivará/)
       expect(await axe(container)).toHaveNoViolations()
     })
   })

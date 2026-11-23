@@ -41,7 +41,7 @@ public class Role {
     public Short level;
 
     /**
-     * Si el rol puede tener usuario. NO se deduce del nivel: el encargado de almacen es de
+     * Si el rol inicia sesion. NO se deduce del nivel: el encargado de almacen es de
      * nivel 1 y si inicia sesion, mientras que conductor, escolta, ayudante y operador, del
      * mismo nivel, no. Son dos cosas distintas y por eso son dos columnas.
      */

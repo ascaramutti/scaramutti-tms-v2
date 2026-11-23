@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -443,17 +444,17 @@ public class WarehouseTestData {
             .setParameter(1, firstName).setParameter(2, workerId).executeUpdate());
     }
 
-    /** El materno puesto por SQL, sin pasar por la API: el disparador recompone last_name. */
+    /** El materno puesto por SQL, sin pasar por la API. */
     public void setWorkerMaternalLastName(int workerId, String maternalLastName) {
         QuarkusTransaction.requiringNew().run(() -> entityManager.createNativeQuery(
             "UPDATE public.workers SET maternal_last_name = ?1 WHERE id = ?2")
             .setParameter(1, maternalLastName).setParameter(2, workerId).executeUpdate());
     }
 
-    /** Los apellidos como estan en la fila: last_name, el paterno y el materno ("nulo" si no tiene). */
+    /** Los apellidos como estan en la fila: el paterno y el materno ("nulo" si no tiene). */
     public String workerSurnames(int workerId) {
         return QuarkusTransaction.requiringNew().call(() -> (String) entityManager.createNativeQuery(
-            "SELECT last_name || '|' || paternal_last_name || '|' || coalesce(maternal_last_name, 'nulo') "
+            "SELECT paternal_last_name || '|' || coalesce(maternal_last_name, 'nulo') "
                 + "FROM public.workers WHERE id = ?1")
             .setParameter(1, workerId).getSingleResult());
     }
@@ -516,12 +517,15 @@ public class WarehouseTestData {
      * ser el cargo de ese trabajador, porque la cuenta no tiene rol propio: si no, falla.
      *
      * <p>El nombre DEBE empezar con el prefijo que usa la limpieza. Se comprueba acá y no se
-     * confía en quien llama: la limpieza borra por prefijo, así que un nombre fuera de él
-     * queda para siempre, y desde ese momento el borrado de trabajadores falla por la clave
-     * foránea y se lleva puesta también la clase de al lado.
+     * confía en quien llama: sobre un trabajador que no es de prueba, la limpieza encuentra la
+     * cuenta solo por el prefijo, y un nombre fuera de él queda para siempre.
      */
     public int seedUserFor(int workerId, String username, String roleName, boolean isActive) {
         requirePrefix(username, "ztestuser", "seedUserFor");
+        if (!username.equals(username.toLowerCase(Locale.ROOT))) {
+            throw new IllegalArgumentException(
+                "seedUserFor exige el nombre en minúsculas porque la base rechaza las mayúsculas; recibió: " + username);
+        }
         return QuarkusTransaction.requiringNew().call(() -> {
             Object[] seeded = (Object[]) entityManager.createNativeQuery(
                 "INSERT INTO public.users (username, password_hash, worker_id, is_active, created_at) "
@@ -537,6 +541,13 @@ public class WarehouseTestData {
             return ((Number) seeded[0]).intValue();
         });
     }
+
+    /**
+     * Las cuentas de prueba: las sembradas con el prefijo, y las que el alta crea, con el nombre generado,
+     * sobre un trabajador de prueba.
+     */
+    private static final String TEST_ACCOUNTS = "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%' "
+        + "OR worker_id IN (SELECT id FROM public.workers WHERE document_number LIKE 'ZTEST%'))";
 
     /**
      * Borra lo que cuelga de los trabajadores de prueba y despues los trabajadores.
@@ -562,15 +573,27 @@ public class WarehouseTestData {
             // trabajador ajeno escrita por un usuario de prueba traba este borrado.
             entityManager.createNativeQuery(
                 "DELETE FROM public.worker_audit_logs WHERE changed_by IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')").executeUpdate();
+                    + TEST_ACCOUNTS).executeUpdate();
             // Lo mismo un producto de prueba que creo un usuario de prueba, si una corrida cortada
             // no llego a la limpieza de almacen.
             entityManager.createNativeQuery(
                 "DELETE FROM almacen.products WHERE name LIKE ?1 AND created_by IN "
-                    + "(SELECT id FROM public.users WHERE username LIKE 'ztestuser%')")
+                    + TEST_ACCOUNTS)
                 .setParameter(1, PREFIX + "%").executeUpdate();
+            // El rastro de las cuentas apunta a la cuenta y a su autor, y la autoria de una cuenta a
+            // otra: una fila de una cuenta de prueba, o firmada por una, traba el borrado de abajo.
             entityManager.createNativeQuery(
-                "DELETE FROM public.users WHERE username LIKE 'ztestuser%'").executeUpdate();
+                "DELETE FROM public.user_audit_logs WHERE user_id IN "
+                    + TEST_ACCOUNTS + " OR changed_by IN "
+                    + TEST_ACCOUNTS).executeUpdate();
+            entityManager.createNativeQuery(
+                "UPDATE public.users SET created_by = NULL WHERE created_by IN "
+                    + TEST_ACCOUNTS).executeUpdate();
+            entityManager.createNativeQuery(
+                "UPDATE public.users SET updated_by = NULL WHERE updated_by IN "
+                    + TEST_ACCOUNTS).executeUpdate();
+            entityManager.createNativeQuery(
+                "DELETE FROM public.users WHERE id IN " + TEST_ACCOUNTS).executeUpdate();
         });
     }
 
@@ -588,12 +611,12 @@ public class WarehouseTestData {
 
     /** Lo que quedo en la fila del trabajador. */
     public record WorkerRow(int roleId, LocalDate hireDate, Integer createdBy, Integer updatedBy,
-        String firstName, String lastName, String documentNumber, String phone,
+        String firstName, String paternalLastName, String documentNumber, String phone,
         boolean isActive, OffsetDateTime createdAt, OffsetDateTime updatedAt, int documentTypeId) {}
 
     public WorkerRow workerRowOf(int workerId) {
         Object[] row = (Object[]) entityManager.createNativeQuery(
-            "SELECT role_id, hire_date, created_by, updated_by, first_name, last_name, "
+            "SELECT role_id, hire_date, created_by, updated_by, first_name, paternal_last_name, "
                 + "document_number, phone, is_active, created_at, updated_at, document_type_id "
                 + "FROM public.workers WHERE id = ?1")
             .setParameter(1, workerId).getSingleResult();
@@ -818,7 +841,8 @@ public class WarehouseTestData {
      */
     public ActorSeed seedActor(String roleName, String suffix) {
         int workerId = seedWorker("ZTESTA" + suffix, "Actor", roleName.replace('_', ' '), roleName, true);
-        return new ActorSeed(seedUserFor(workerId, "ztestuser" + suffix, roleName), workerId);
+        // Solo el usuario va en minusculas: el documento del trabajador sale del mismo sufijo.
+        return new ActorSeed(seedUserFor(workerId, "ztestuser" + suffix.toLowerCase(Locale.ROOT), roleName), workerId);
     }
 
     /** El nombre de sistema del rol de un usuario, que es el cargo de su trabajador. */
@@ -853,6 +877,54 @@ public class WarehouseTestData {
     public boolean userIsActive(int userId) {
         return (Boolean) entityManager.createNativeQuery(
             "SELECT is_active FROM public.users WHERE id = ?1").setParameter(1, userId).getSingleResult();
+    }
+
+    public int userSessionVersionOf(int userId) {
+        return ((Number) entityManager.createNativeQuery(
+            "SELECT session_version FROM public.users WHERE id = ?1").setParameter(1, userId).getSingleResult())
+            .intValue();
+    }
+
+    /** La autoria de una cuenta: quien la creo, quien la cambio por ultima vez y cuando. */
+    public record UserAuthorship(Integer createdBy, Integer updatedBy, OffsetDateTime createdAt,
+        OffsetDateTime updatedAt) {}
+
+    public UserAuthorship userAuthorshipOf(int userId) {
+        Object[] row = (Object[]) entityManager.createNativeQuery(
+            "SELECT created_by, updated_by, created_at, updated_at FROM public.users WHERE id = ?1")
+            .setParameter(1, userId).getSingleResult();
+        return new UserAuthorship(row[0] == null ? null : ((Number) row[0]).intValue(),
+            row[1] == null ? null : ((Number) row[1]).intValue(), timestampOf(row[2]), timestampOf(row[3]));
+    }
+
+    /** Las filas del rastro de una cuenta, de la mas vieja a la mas nueva. */
+    public record UserAuditRow(String changeType, String fieldName, String fieldLabel, String oldValue,
+        String newValue, Integer changedBy, OffsetDateTime loggedAt) {}
+
+    @SuppressWarnings("unchecked")
+    public List<UserAuditRow> userAuditRows(int userId) {
+        List<Object[]> rows = entityManager.createNativeQuery(
+            "SELECT change_type, field_name, field_label, old_value, new_value, changed_by, logged_at "
+                + "FROM public.user_audit_logs WHERE user_id = ?1 ORDER BY id")
+            .setParameter(1, userId).getResultList();
+        return rows.stream().map(row -> new UserAuditRow((String) row[0], (String) row[1], (String) row[2],
+            (String) row[3], (String) row[4], row[5] == null ? null : ((Number) row[5]).intValue(),
+            timestampOf(row[6]))).toList();
+    }
+
+    /** La autoria de todas las cuentas, una linea por cuenta: para afirmar que una escritura no movio ninguna. */
+    @SuppressWarnings("unchecked")
+    public List<String> authorshipOfEveryAccount() {
+        return entityManager.createNativeQuery(
+            "SELECT id || '|' || coalesce(created_by::text, '-') || '|' || coalesce(updated_by::text, '-') "
+                + "|| '|' || updated_at::text FROM public.users ORDER BY id").getResultList();
+    }
+
+    /** Cada fila del rastro de cuentas entera, como texto: para buscar lo que nunca tiene que guardar. */
+    @SuppressWarnings("unchecked")
+    public List<String> userAuditRowsAsText() {
+        return entityManager.createNativeQuery("SELECT row_to_json(l)::text FROM public.user_audit_logs l")
+            .getResultList();
     }
 
     /** Enciende o apaga un trabajador de prueba por SQL, con el guardia de prefijo. */

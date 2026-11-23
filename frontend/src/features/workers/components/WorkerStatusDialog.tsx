@@ -1,16 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import type { WorkerDetailResponse } from '../../../api'
-import { Alert } from '../../../shared/ui/Alert'
-import { Button } from '../../../shared/ui/Button'
-import { Modal } from '../../../shared/ui/Modal'
-import { Spinner } from '../../../shared/ui/Spinner'
+import { SESSION_WINDOW_NOTICE } from '../../../shared/auth/sessionNotice'
+import { ConfirmActionDialog } from '../../../shared/ui/ConfirmActionDialog'
 import { isNotFoundError } from '../../../shared/utils/getApiErrorMessage'
 import { useChangeWorkerStatus, type WorkerStatusAction } from '../hooks/useChangeWorkerStatus'
 import { workerStatusErrorMessage } from '../workerApiErrors'
-
-/** Como en el rechazo de una cotización: mientras envía, los dos botones se ven apagados. */
-const DISABLED = 'disabled:cursor-not-allowed disabled:opacity-60'
 
 interface WorkerStatusDialogProps {
   worker: WorkerDetailResponse
@@ -30,12 +25,6 @@ export function WorkerStatusDialog({ worker, onClose, onNotFound }: WorkerStatus
   const [action] = useState<WorkerStatusAction>(worker.isActive ? 'deactivate' : 'reactivate')
   const changeStatus = useChangeWorkerStatus(worker.id)
   const [error, setError] = useState<string | null>(null)
-  const confirmButton = useRef<HTMLButtonElement>(null)
-  // Al enviar, el botón se deshabilita con el foco encima y el foco cae fuera del diálogo. Con el
-  // error a la vista vuelve a confirmar, como en la salida de un viaje, para reintentar desde ahí.
-  useEffect(() => {
-    if (error && !changeStatus.isPending) confirmButton.current?.focus()
-  }, [error, changeStatus.isPending])
   const name = worker.fullName
   const copy = COPY[action]
 
@@ -57,40 +46,21 @@ export function WorkerStatusDialog({ worker, onClose, onNotFound }: WorkerStatus
   }
 
   return (
-    // Mientras envía no se cierra: la respuesta tiene que verse en la ficha o en el diálogo.
-    <Modal isOpen onClose={changeStatus.isPending ? () => {} : onClose} title={copy.title} size="sm">
-      <div className="space-y-4">
-        <p className="text-sm text-fg-body">
-          {copy.question} a {name}?
-        </p>
-        {action === 'deactivate' ? <DeactivateNotes worker={worker} /> : <ReactivateNotes worker={worker} />}
-        {error && (
-          <Alert as="p" role="alert" className="rounded-lg px-4 py-2.5 text-sm text-danger-fg">
-            {error}
-          </Alert>
-        )}
-        <div className="flex justify-end gap-3">
-          <Button variant="secondary" onClick={onClose} disabled={changeStatus.isPending} className={DISABLED}>
-            Cancelar
-          </Button>
-          <Button
-            ref={confirmButton}
-            variant={action === 'deactivate' ? 'danger' : 'success'}
-            onClick={confirm}
-            disabled={changeStatus.isPending}
-            className={DISABLED}
-          >
-            {changeStatus.isPending ? (
-              <>
-                <Spinner size={16} className="mr-2 text-on-solid" /> {copy.pending}
-              </>
-            ) : (
-              copy.confirm
-            )}
-          </Button>
-        </div>
-      </div>
-    </Modal>
+    <ConfirmActionDialog
+      title={copy.title}
+      confirmLabel={copy.confirm}
+      pendingLabel={copy.pending}
+      confirmVariant={action === 'deactivate' ? 'danger' : 'success'}
+      isPending={changeStatus.isPending}
+      error={error}
+      onConfirm={confirm}
+      onClose={onClose}
+    >
+      <p className="text-sm text-fg-body">
+        {copy.question} a {name}?
+      </p>
+      {action === 'deactivate' ? <DeactivateNotes worker={worker} /> : <ReactivateNotes worker={worker} />}
+    </ConfirmActionDialog>
   )
 }
 
@@ -111,11 +81,13 @@ const COPY = {
   },
 } as const
 
-/** La baja apaga en cascada el usuario y la licencia activa; con licencia, avisa de los viajes. */
+/** La baja apaga en cascada la cuenta y la licencia, si están activas; con licencia, avisa de los viajes. */
 function DeactivateNotes({ worker }: { worker: WorkerDetailResponse }) {
+  const activeAccount = worker.account?.isActive === true
   return (
     <>
-      <DraggedByDeactivation hasUser={worker.hasUser} activeLicense={worker.driver?.isActive === true} />
+      <DraggedByDeactivation activeAccount={activeAccount} activeLicense={worker.driver?.isActive === true} />
+      {activeAccount && <p className="text-sm text-fg-body">{SESSION_WINDOW_NOTICE}</p>}
       {worker.driver && (
         <p className="text-sm text-fg-body">
           Si tiene viajes pendientes asignados, quedarán marcados para reasignar en Operaciones.
@@ -126,11 +98,11 @@ function DeactivateNotes({ worker }: { worker: WorkerDetailResponse }) {
 }
 
 /** La licencia con la palabra de la ficha ("Deshabilitada"); el usuario, con la del estado. */
-function DraggedByDeactivation({ hasUser, activeLicense }: { hasUser: boolean; activeLicense: boolean }) {
+function DraggedByDeactivation({ activeAccount, activeLicense }: { activeAccount: boolean; activeLicense: boolean }) {
   const text =
-    hasUser && activeLicense
+    activeAccount && activeLicense
       ? 'Se desactiva también su usuario del sistema, y su licencia de conducir queda deshabilitada.'
-      : hasUser
+      : activeAccount
         ? 'Se desactiva también su usuario del sistema.'
         : activeLicense
           ? 'Su licencia de conducir queda deshabilitada.'
@@ -139,15 +111,16 @@ function DraggedByDeactivation({ hasUser, activeLicense }: { hasUser: boolean; a
 }
 
 /**
- * La reactivación no toca la cuenta: se dice para que nadie espere que vuelva a entrar. La
- * licencia sí vuelve, con la misma condición que el backend: la tiene apagada y el cargo la lleva.
+ * La reactivación no toca la cuenta: si está apagada, se dice para que nadie espere que vuelva a
+ * entrar. La licencia sí vuelve, con la misma condición que el backend: la tiene apagada y el
+ * cargo la lleva.
  */
 function ReactivateNotes({ worker }: { worker: WorkerDetailResponse }) {
   const licenseComesBack = worker.driver?.isActive === false && worker.role.driverProfile !== 'NONE'
   return (
     <>
       {licenseComesBack && <p className="text-sm text-fg-body">Su licencia de conducir vuelve a quedar activa.</p>}
-      {worker.hasUser && (
+      {worker.account?.isActive === false && (
         <p className="text-sm text-fg-body">
           Su usuario sigue inactivo: reactivar al trabajador no le devuelve el acceso.
         </p>

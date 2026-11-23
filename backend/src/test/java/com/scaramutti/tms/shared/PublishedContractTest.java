@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.endsWith;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
@@ -207,8 +208,8 @@ class PublishedContractTest {
     /**
      * Las cabeceras de caché de la sesión: el ingreso y la renovación traen tokens ({@code no-store}
      * y {@code Pragma}, sin {@code Vary}); {@code /auth/me}, los datos de la cuenta ({@code no-store}
-     * y {@code Vary}). El cliente generado no lleva cabeceras: sin este test, nada notaría que el
-     * contrato las perdió.
+     * y {@code Vary}); el cambio de contraseña, las dos cosas (las tres). El cliente generado no lleva
+     * cabeceras: sin este test, nada notaría que el contrato las perdió.
      */
     @Test
     void publishedContract_declaresTheSessionResponsesNotStored() {
@@ -223,6 +224,23 @@ class PublishedContractTest {
         assertThat(contract.getString(me + "'Cache-Control'.description"), containsString("no-store"));
         assertThat(contract.getString(me + "Vary.description"), containsString("Authorization"));
         assertThat(contract.get(me + "Pragma"), nullValue());
+        String change = "paths.'/auth/change-password'.post.responses.'200'.headers.";
+        assertThat(contract.getString(change + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(change + "Pragma.description"), containsString("no-cache"));
+        assertThat(contract.getString(change + "Vary.description"), containsString("Authorization"));
+    }
+
+    /** El cambio de contraseña responde con una sesión nueva, ya no con un 204, o con el conflicto. */
+    @Test
+    void publishedContract_answersThePasswordChangeWithANewSession() {
+        JsonPath contract = publishedContract();
+        String responses = "paths.'/auth/change-password'.post.responses.";
+        assertThat(contract.getString(responses + "'200'.content.'application/json'.schema.'$ref'"),
+            endsWith("/LoginResponse"));
+        assertThat(contract.get(responses + "'204'"), nullValue());
+        assertThat(contract.getString(responses
+            + "'409'.content.'application/problem+json'.examples.accountBusyOnPasswordChange.value.code"),
+            equalTo("AUTH-010"));
     }
 
     /**
@@ -249,6 +267,303 @@ class PublishedContractTest {
     }
 
     /**
+     * La lista de cuentas: quién la lee, sus respuestas de error, las cabeceras de caché y las claves
+     * exactas de cada fila (sin hash, sin versión de las sesiones y sin bloqueo). El documento servido es
+     * este archivo y no el código: esto fija lo que declara; que el recurso exista lo miden
+     * {@code CodeLayerAuthGuardTest} y {@code UserAccountsResourceTest}.
+     */
+    @Test
+    void publishedContract_declaresWhoReadsTheAccountsAndWhatEachRowBrings() {
+        JsonPath contract = publishedContract();
+        String list = "paths.'/users'.get.";
+        assertEquals("listUserAccounts", contract.getString(list + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(list + "'x-required-roles'"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(list + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(list + "responses.'403'.$ref"));
+        String headers = list + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertEquals("array", contract.getString(list + "responses.'200'.content.'application/json'.schema.type"));
+        assertThat(contract.getString(list + "responses.'200'.content.'application/json'.schema.items.$ref"),
+            endsWith("/UserAccountSummaryResponse"));
+        // El filtro, tal como lo toma el cliente generado: un booleano opcional en la consulta.
+        assertEquals(List.of("isActive"), contract.getList(list + "parameters.name"));
+        assertEquals("query", contract.getString(list + "parameters[0].in"));
+        assertEquals("boolean", contract.getString(list + "parameters[0].schema.type"));
+        assertThat(contract.get(list + "parameters[0].required"), nullValue());
+
+        // Lo que el cliente generado tipa como obligatorio, y con qué tipo.
+        String row = "components.schemas.UserAccountSummaryResponse.";
+        assertEquals(Set.of("id", "username", "worker", "role", "isActive"),
+            contract.getMap(row + "properties").keySet());
+        assertEquals(List.of("id", "username", "worker", "role", "isActive"), contract.getList(row + "required"));
+        assertThat(contract.getString(row + "properties.worker.$ref"), endsWith("/UserAccountWorkerRef"));
+        assertThat(contract.getString(row + "properties.role.$ref"), endsWith("/RoleResponse"));
+        assertEquals("integer|int32", contract.getString(row + "properties.id.type") + "|"
+            + contract.getString(row + "properties.id.format"));
+        assertEquals("string", contract.getString(row + "properties.username.type"));
+        assertEquals("boolean", contract.getString(row + "properties.isActive.type"));
+        String worker = "components.schemas.UserAccountWorkerRef.";
+        assertEquals(Set.of("id", "fullName", "isActive"), contract.getMap(worker + "properties").keySet());
+        assertEquals(List.of("id", "fullName", "isActive"), contract.getList(worker + "required"));
+        assertEquals("integer|int32", contract.getString(worker + "properties.id.type") + "|"
+            + contract.getString(worker + "properties.id.format"));
+        assertEquals("string", contract.getString(worker + "properties.fullName.type"));
+        assertEquals("boolean", contract.getString(worker + "properties.isActive.type"));
+    }
+
+    @Test
+    void publishedContract_declaresWhoReadsTheAccountCandidatesAndWhatEachOneBrings() {
+        JsonPath contract = publishedContract();
+        String get = "paths.'/user-account-candidates'.get.";
+        assertEquals("listUserAccountCandidates", contract.getString(get + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(get + "'x-required-roles'"));
+        assertEquals(Set.of("200", "400", "401", "403"), contract.getMap(get + "responses").keySet());
+        assertEquals("#/components/responses/BadRequest", contract.getString(get + "responses.'400'.$ref"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(get + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(get + "responses.'403'.$ref"));
+        String headers = get + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertEquals("array", contract.getString(get + "responses.'200'.content.'application/json'.schema.type"));
+        assertThat(contract.getString(get + "responses.'200'.content.'application/json'.schema.items.$ref"),
+            endsWith("/UserAccountCandidateResponse"));
+        assertEquals(List.of("q", "workerId"), contract.getList(get + "parameters.name"));
+        assertEquals("query|string|3|200", contract.getString(get + "parameters[0].in") + "|"
+            + contract.getString(get + "parameters[0].schema.type") + "|"
+            + contract.getString(get + "parameters[0].schema.minLength") + "|"
+            + contract.getString(get + "parameters[0].schema.maxLength"));
+        assertEquals("query|integer|int32", contract.getString(get + "parameters[1].in") + "|"
+            + contract.getString(get + "parameters[1].schema.type") + "|"
+            + contract.getString(get + "parameters[1].schema.format"));
+        assertThat(contract.get(get + "parameters[0].required"), nullValue());
+        assertThat(contract.get(get + "parameters[1].required"), nullValue());
+
+        String row = "components.schemas.UserAccountCandidateResponse.";
+        List<String> keys = List.of("workerId", "fullName", "firstName", "paternalLastName", "maternalLastName",
+            "role", "proposedUsername");
+        assertEquals(keys, contract.getList(row + "required"));
+        assertEquals(Set.copyOf(keys), contract.getMap(row + "properties").keySet());
+        assertEquals("integer|int32", contract.getString(row + "properties.workerId.type") + "|"
+            + contract.getString(row + "properties.workerId.format"));
+        assertEquals(List.of("string", "null"), contract.getList(row + "properties.maternalLastName.type"));
+        for (String name : List.of("fullName", "firstName", "paternalLastName")) {
+            assertEquals("string", contract.get(row + "properties." + name + ".type"), name);
+        }
+        assertThat(contract.getString(row + "properties.role.$ref"), endsWith("/RoleResponse"));
+        assertEquals("string|^[a-z0-9]{3,50}$", contract.getString(row + "properties.proposedUsername.type") + "|"
+            + contract.getString(row + "properties.proposedUsername.pattern"));
+    }
+
+    /**
+     * El detalle de una cuenta: quién lo lee, sus respuestas de error con el ejemplo de {@code USR-001},
+     * las cabeceras de caché y las claves exactas, con los autores obligatorios y anulables. El
+     * trabajador del detalle suma las partes del nombre sin redefinir el nombre completo de la lista.
+     */
+    @Test
+    void publishedContract_declaresWhoReadsAnAccountAndWhatItBrings() {
+        JsonPath contract = publishedContract();
+        String get = "paths.'/users/{id}'.get.";
+        assertEquals("getUserAccount", contract.getString(get + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(get + "'x-required-roles'"));
+        assertEquals(List.of("id"), contract.getList("paths.'/users/{id}'.parameters.name"));
+        assertEquals("path|integer", contract.getString("paths.'/users/{id}'.parameters[0].in") + "|"
+            + contract.getString("paths.'/users/{id}'.parameters[0].schema.type"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(get + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(get + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/NotFound", contract.getString(get + "responses.'404'.$ref"));
+        assertEquals("USR-001", contract.getString("components.responses.NotFound.content."
+            + "'application/problem+json'.examples.userAccountNotFound.value.code"));
+        String headers = get + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(get + "responses.'200'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountDetailResponse"));
+
+        // Lo que el cliente generado tipa como obligatorio, y con qué tipo.
+        String detail = "components.schemas.UserAccountDetailResponse.";
+        List<String> keys = List.of(
+            "id", "username", "worker", "role", "isActive", "createdAt", "createdBy", "updatedAt", "updatedBy");
+        assertEquals(Set.copyOf(keys), contract.getMap(detail + "properties").keySet());
+        assertEquals(keys, contract.getList(detail + "required"));
+        assertThat(contract.getString(detail + "properties.worker.$ref"), endsWith("/UserAccountWorkerDetailRef"));
+        assertThat(contract.getString(detail + "properties.role.$ref"), endsWith("/RoleResponse"));
+        assertEquals("integer|int32", contract.getString(detail + "properties.id.type") + "|"
+            + contract.getString(detail + "properties.id.format"));
+        assertEquals("string", contract.getString(detail + "properties.username.type"));
+        assertEquals("boolean", contract.getString(detail + "properties.isActive.type"));
+        for (String author : List.of("createdBy", "updatedBy")) {
+            assertThat(author, contract.getString(detail + "properties." + author + ".anyOf[0].$ref"),
+                endsWith("/UserRef"));
+            assertEquals("null", contract.getString(detail + "properties." + author + ".anyOf[1].type"), author);
+        }
+        for (String instant : List.of("createdAt", "updatedAt")) {
+            assertEquals("string|date-time", contract.getString(detail + "properties." + instant + ".type") + "|"
+                + contract.getString(detail + "properties." + instant + ".format"), instant);
+        }
+        String worker = "components.schemas.UserAccountWorkerDetailRef.";
+        assertThat(contract.getString(worker + "allOf[0].$ref"), endsWith("/UserAccountWorkerRef"));
+        assertEquals(Set.of("firstName", "paternalLastName", "maternalLastName"),
+            contract.getMap(worker + "allOf[1].properties").keySet());
+        assertEquals(List.of("firstName", "paternalLastName", "maternalLastName"),
+            contract.getList(worker + "allOf[1].required"));
+        assertEquals("string", contract.getString(worker + "allOf[1].properties.firstName.type"));
+        assertEquals("string", contract.getString(worker + "allOf[1].properties.paternalLastName.type"));
+        assertEquals(List.of("string", "null"), contract.getList(worker + "allOf[1].properties.maternalLastName.type"));
+    }
+
+    /**
+     * Desactivar una cuenta: quién la desactiva, sus respuestas de error con los ejemplos de los tres
+     * códigos que estrena, las cabeceras de caché y que responde con el detalle de la cuenta.
+     */
+    @Test
+    void publishedContract_declaresWhoDeactivatesAnAccountAndWhatItAnswers() {
+        JsonPath contract = publishedContract();
+        String path = "paths.'/users/{id}/deactivate'.";
+        String post = path + "post.";
+        assertEquals("deactivateUserAccount", contract.getString(post + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(post + "'x-required-roles'"));
+        assertEquals(List.of("id"), contract.getList(path + "parameters.name"));
+        assertEquals("path|true|integer", contract.getString(path + "parameters[0].in") + "|"
+            + contract.getString(path + "parameters[0].required") + "|"
+            + contract.getString(path + "parameters[0].schema.type"));
+        assertThat(contract.get(post + "requestBody"), nullValue());
+        assertEquals(Set.of("200", "401", "403", "404", "409"), contract.getMap(post + "responses").keySet());
+        assertEquals("#/components/responses/Unauthorized", contract.getString(post + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(post + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/NotFound", contract.getString(post + "responses.'404'.$ref"));
+        assertEquals("#/components/responses/Conflict", contract.getString(post + "responses.'409'.$ref"));
+        String examples = "'application/problem+json'.examples.";
+        assertEquals("USR-007", contract.getString("components.responses.Forbidden.content." + examples
+            + "userAccountSelf.value.code"));
+        assertEquals("USR-008", contract.getString("components.responses.Forbidden.content." + examples
+            + "userAccountOutOfRank.value.code"));
+        assertEquals("USR-009", contract.getString("components.responses.Conflict.content." + examples
+            + "userAccountLocked.value.code"));
+        String headers = post + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(post + "responses.'200'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountDetailResponse"));
+    }
+
+    /**
+     * Reactivar una cuenta: quién la reactiva, sus respuestas de error con los ejemplos de los dos
+     * códigos que estrena, las cabeceras de caché y que responde con el detalle de la cuenta.
+     */
+    @Test
+    void publishedContract_declaresWhoReactivatesAnAccountAndWhatItAnswers() {
+        JsonPath contract = publishedContract();
+        String path = "paths.'/users/{id}/reactivate'.";
+        String post = path + "post.";
+        assertEquals("reactivateUserAccount", contract.getString(post + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(post + "'x-required-roles'"));
+        assertEquals(List.of("id"), contract.getList(path + "parameters.name"));
+        assertEquals("path|true|integer", contract.getString(path + "parameters[0].in") + "|"
+            + contract.getString(path + "parameters[0].required") + "|"
+            + contract.getString(path + "parameters[0].schema.type"));
+        assertThat(contract.get(post + "requestBody"), nullValue());
+        assertEquals(Set.of("200", "400", "401", "403", "404", "409"), contract.getMap(post + "responses").keySet());
+        assertEquals("#/components/responses/BadRequest", contract.getString(post + "responses.'400'.$ref"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(post + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(post + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/NotFound", contract.getString(post + "responses.'404'.$ref"));
+        assertEquals("#/components/responses/Conflict", contract.getString(post + "responses.'409'.$ref"));
+        String examples = "'application/problem+json'.examples.";
+        assertEquals("USR-005|409", contract.getString("components.responses.Conflict.content." + examples
+            + "workerInactiveForAccount.value.code") + "|" + contract.getString(
+            "components.responses.Conflict.content." + examples + "workerInactiveForAccount.value.status"));
+        assertEquals("USR-006|400", contract.getString("components.responses.BadRequest.content." + examples
+            + "roleCannotLoginForAccount.value.code") + "|" + contract.getString(
+            "components.responses.BadRequest.content." + examples + "roleCannotLoginForAccount.value.status"));
+        String headers = post + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(post + "responses.'200'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountDetailResponse"));
+    }
+
+    /** El alta: quien la pide, su cuerpo, sus respuestas y el ejemplo de cada codigo propio. */
+    @Test
+    void publishedContract_declaresWhoCreatesAnAccountAndWhatItAnswers() {
+        JsonPath contract = publishedContract();
+        String post = "paths.'/users'.post.";
+        assertEquals("createUserAccount", contract.getString(post + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(post + "'x-required-roles'"));
+        assertEquals(true, contract.getBoolean(post + "requestBody.required"));
+        assertThat(contract.getString(post + "requestBody.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountCreateRequest"));
+        assertEquals(Set.of("201", "400", "401", "403", "409"), contract.getMap(post + "responses").keySet());
+        assertEquals("#/components/responses/BadRequest", contract.getString(post + "responses.'400'.$ref"));
+        assertEquals("#/components/responses/Unauthorized", contract.getString(post + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(post + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/Conflict", contract.getString(post + "responses.'409'.$ref"));
+        String headers = post + "responses.'201'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(post + "responses.'201'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountTemporaryPasswordResponse"));
+
+        String request = "components.schemas.UserAccountCreateRequest.";
+        assertEquals(List.of("workerId"), contract.getList(request + "required"));
+        assertEquals(Set.of("workerId"), contract.getMap(request + "properties").keySet());
+        assertEquals("integer|int32", contract.getString(request + "properties.workerId.type") + "|"
+            + contract.getString(request + "properties.workerId.format"));
+
+        String examples = "components.responses.%s.content.'application/problem+json'.examples.%s.value.code";
+        assertEquals("USR-004", contract.getString(examples.formatted("BadRequest", "workerNotFoundForAccount")));
+        assertEquals("USR-002", contract.getString(examples.formatted("Conflict", "usernameTaken")));
+        assertEquals("USR-003", contract.getString(examples.formatted("Conflict", "workerHasAccount")));
+    }
+
+    @Test
+    void publishedContract_declaresWhoResetsAPasswordAndWhatItAnswers() {
+        JsonPath contract = publishedContract();
+        String path = "paths.'/users/{id}/reset-password'.";
+        String post = path + "post.";
+        assertEquals("resetUserAccountPassword", contract.getString(post + "operationId"));
+        assertEquals(List.of("admin", "general_manager", "operations_manager", "finance_manager"),
+            contract.getList(post + "'x-required-roles'"));
+        assertEquals(List.of("id"), contract.getList(path + "parameters.name"));
+        assertEquals("path|true|integer", contract.getString(path + "parameters[0].in") + "|"
+            + contract.getString(path + "parameters[0].required") + "|"
+            + contract.getString(path + "parameters[0].schema.type"));
+        assertThat(contract.get(post + "requestBody"), nullValue());
+        assertEquals(Set.of("200", "401", "403", "404", "409"), contract.getMap(post + "responses").keySet());
+        assertEquals("#/components/responses/Unauthorized", contract.getString(post + "responses.'401'.$ref"));
+        assertEquals("#/components/responses/Forbidden", contract.getString(post + "responses.'403'.$ref"));
+        assertEquals("#/components/responses/NotFound", contract.getString(post + "responses.'404'.$ref"));
+        assertEquals("#/components/responses/Conflict", contract.getString(post + "responses.'409'.$ref"));
+        String headers = post + "responses.'200'.headers.";
+        assertThat(contract.getString(headers + "'Cache-Control'.description"), containsString("no-store"));
+        assertThat(contract.getString(headers + "Vary.description"), containsString("Authorization"));
+        assertThat(contract.get(headers + "Pragma"), nullValue());
+        assertThat(contract.getString(post + "responses.'200'.content.'application/json'.schema.$ref"),
+            endsWith("/UserAccountTemporaryPasswordResponse"));
+
+        String response = "components.schemas.UserAccountTemporaryPasswordResponse.";
+        assertEquals(List.of("account", "temporaryPassword"), contract.getList(response + "required"));
+        assertEquals(Set.of("account", "temporaryPassword"), contract.getMap(response + "properties").keySet());
+        assertThat(contract.getString(response + "properties.account.$ref"), endsWith("/UserAccountDetailResponse"));
+        String temporary = response + "properties.temporaryPassword.";
+        assertEquals("string|password|12|12|^[A-HJ-NP-Za-hjkmnp-z2-9]{12}$", contract.getString(temporary + "type")
+            + "|" + contract.getString(temporary + "format") + "|" + contract.getString(temporary + "minLength")
+            + "|" + contract.getString(temporary + "maxLength") + "|" + contract.getString(temporary + "pattern"));
+    }
+
+    /**
      * El id del trabajador va solo en el usuario de la sesión. El cliente generado sale de este
      * documento: si {@code /auth/me} o el ingreso apuntaran a UserResponse, la pantalla no tendría
      * el campo; si UserResponse lo declarara, cada autor de cotizaciones y almacén lo prometería.
@@ -267,7 +582,7 @@ class PublishedContractTest {
 
         String sessionUser = "components.schemas.SessionUser.allOf";
         assertEquals("#/components/schemas/UserResponse", contract.getString(sessionUser + "[0].$ref"));
-        assertEquals(List.of("workerId"), contract.getList(sessionUser + "[1].required"));
+        assertEquals(List.of("role", "workerId"), contract.getList(sessionUser + "[1].required"));
         assertEquals("integer", contract.getString(sessionUser + "[1].properties.workerId.type"));
         assertEquals("int32", contract.getString(sessionUser + "[1].properties.workerId.format"));
         assertEquals(2, refsTo(contract.get("$"), "#/components/schemas/SessionUser"),
@@ -277,6 +592,29 @@ class PublishedContractTest {
             assertFalse(contract.getMap("components.schemas." + schema).toString().contains("workerId"),
                 schema + " no puede declarar workerId: es también el autor embebido");
         }
+    }
+
+    /**
+     * El autor puede quedar con un cargo que no inicia sesión si después lo cambiaron; la sesión no,
+     * y la pantalla elige adónde entrar con los siete valores de la sesión.
+     */
+    @Test
+    void publishedContract_givesTheAuthorAnyRole_andTheSessionOnlyOneThatLogsIn() {
+        JsonPath contract = publishedContract();
+        String authorRole = "components.schemas.UserResponse.allOf[1].properties.role.";
+        assertEquals("string", contract.getString(authorRole + "type"));
+        assertThat(contract.get(authorRole + "$ref"), nullValue());
+        assertThat(contract.get(authorRole + "enum"), nullValue());
+        assertEquals("#/components/schemas/UserRole",
+            contract.getString("components.schemas.SessionUser.allOf[1].properties.role.$ref"));
+        assertEquals(List.of("admin", "sales", "dispatcher", "general_manager", "operations_manager",
+            "finance_manager", "warehouse_keeper"), contract.getList("components.schemas.UserRole.enum"));
+    }
+
+    /** Un cliente viejo puede tener el código traducido: no vuelve a aparecer para otro caso. */
+    @Test
+    void publishedContract_noLongerNamesTheRetiredCodeOfTheRoleWithoutLogin() {
+        assertFalse(publishedContract().prettify().contains("WRK-011"));
     }
 
     /**
@@ -311,6 +649,25 @@ class PublishedContractTest {
         assertEquals("string", contract.get(schema + "properties.paternalLastName.type"));
         assertEquals(List.of("string", "null"), contract.get(schema + "properties.maternalLastName.type"));
         assertEquals("string", contract.get(schema + "properties.fullName.type"));
+    }
+
+    /** Con la clave en required, el cliente no la tipa opcional: sin cuenta es un nulo, no una ausencia. */
+    @Test
+    void publishedContract_requiresTheAccountOfTheWorkerDetail_nullWithoutOne() {
+        JsonPath contract = publishedContract();
+        String schema = "components.schemas.WorkerDetailResponse.";
+        assertTrue(contract.getList(schema + "required").contains("account"), "account no está en required");
+        assertThat(contract.getString(schema + "properties.account.anyOf[0].$ref"), endsWith("/WorkerAccountRef"));
+        assertEquals("null", contract.getString(schema + "properties.account.anyOf[1].type"));
+        String account = "components.schemas.WorkerAccountRef.";
+        List<String> keys = List.of("id", "username", "isActive");
+        assertEquals(Set.copyOf(keys), contract.getMap(account + "properties").keySet());
+        assertEquals(keys, contract.getList(account + "required"));
+        assertEquals("integer|int32", contract.getString(account + "properties.id.type") + "|"
+            + contract.getString(account + "properties.id.format"));
+        assertEquals("string", contract.getString(account + "properties.username.type"));
+        assertEquals(50, contract.getInt(account + "properties.username.maxLength"));
+        assertEquals("boolean", contract.getString(account + "properties.isActive.type"));
     }
 
     /**

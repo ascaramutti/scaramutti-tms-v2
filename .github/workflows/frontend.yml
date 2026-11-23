@@ -31,6 +31,8 @@ jobs:
 
       # La spec que dispara el frontend es la RUNTIME del backend, que es la entrada
       # del generador del cliente; el contrato de diseño (api/openapi.yaml) no lo toca.
+      # Las dos confs de nginx que viven fuera de frontend/ también: la prueba de la CSP
+      # las lee, y un cambio solo en ellas tiene que correrla.
       - name: Detectar cambios en frontend/
         id: filter
         env:
@@ -48,10 +50,10 @@ jobs:
               else CHANGED=$(git diff --name-only "$BEFORE" "$SHA"); fi ;;
             *) CHANGED="frontend/" ;;
           esac
-          if echo "$CHANGED" | grep -qE '^(frontend/|backend/src/main/resources/META-INF/openapi\.yaml|\.github/workflows/frontend\.yml)'; then
+          if echo "$CHANGED" | grep -qE '^(frontend/|backend/src/main/resources/META-INF/openapi\.yaml|\.github/workflows/frontend\.yml|deploy/staging/nginx-staging\.conf|\.github/workflows/deploy-frontend\.yml)'; then
             echo "frontend=true" >> "$GITHUB_OUTPUT"
           else
-            echo "frontend=false" >> "$GITHUB_OUTPUT"; echo "El PR no toca frontend/**: se salta."
+            echo "frontend=false" >> "$GITHUB_OUTPUT"; echo "El PR no toca el frontend: se salta."
           fi
 
   # El nombre de este job (`checks`) es el check requerido en la protección de ramas.

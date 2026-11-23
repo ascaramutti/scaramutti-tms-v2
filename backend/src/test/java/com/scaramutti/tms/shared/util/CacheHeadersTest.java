@@ -55,4 +55,22 @@ class CacheHeadersTest {
                 "ETag", List.of("\"v\"")),
             Map.copyOf(response.getStringHeaders()));
     }
+
+    /** La de la sesion nueva: las tres una vez cada una, y el estado y el ETag de quien llama intactos. */
+    @Test
+    void callerTokensNotStored_addsNoStorePragmaAndVaryOnce_keepingWhatTheCallerSet() {
+        RestResponse<String> response = CacheHeaders.callerTokensNotStored(
+            RestResponse.ResponseBuilder.create(RestResponse.Status.CREATED, "cuerpo")
+                .header("ETag", "\"v\""));
+
+        assertEquals(201, response.getStatus());
+        assertEquals("cuerpo", response.getEntity());
+        assertEquals(
+            Map.of(
+                "Cache-Control", List.of("no-store"),
+                "Pragma", List.of("no-cache"),
+                "Vary", List.of("Authorization"),
+                "ETag", List.of("\"v\"")),
+            Map.copyOf(response.getStringHeaders()));
+    }
 }

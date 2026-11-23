@@ -111,8 +111,8 @@ class WorkerEditOrderedLockTest {
             throws Exception {
         var a = seedEditableActor("admin", "K1");
         var b = seedEditableActor("admin", "K2");
-        String tokenA = fabricateTokenForUser(a.userId(), "ztestuserK1", "admin");
-        String tokenB = fabricateTokenForUser(b.userId(), "ztestuserK2", "admin");
+        String tokenA = fabricateTokenForUser(a.userId(), "ztestuserk1", "admin");
+        String tokenB = fabricateTokenForUser(b.userId(), "ztestuserk2", "admin");
         // En caliente: en frio el primer pedido puede llegar despues de que el sondeo se rinda.
         assertEquals("200", edit(tokenA, a.workerId(), actorBody("admin", "K1", "admin")));
         assertEquals("200", edit(tokenB, b.workerId(), actorBody("admin", "K2", "admin")));
@@ -162,7 +162,7 @@ class WorkerEditOrderedLockTest {
         var actor = seedEditableActor("admin", "K3");
         int target = actorFirst ? seedTarget() : early;
         assertEquals(actorFirst, actor.workerId() < target, "precondicion: el orden de ids que se mide");
-        String token = fabricateTokenForUser(actor.userId(), "ztestuserK3", "admin");
+        String token = fabricateTokenForUser(actor.userId(), "ztestuserk3", "admin");
         ExecutorService executor = Executors.newSingleThreadExecutor();
         try (Connection holder = dataSource.getConnection()) {
             holder.setAutoCommit(false);
@@ -219,8 +219,8 @@ class WorkerEditOrderedLockTest {
             {"firstName":"Juan","paternalLastName":"Pérez","documentTypeId":%d,"documentNumber":"ZTESTJ012",
              "role":"%s","hireDate":"2024-03-01","reason":"Correccion del documento"%s}"""
             .formatted(documentTypeId(), targetRole, driver);
-        String actorToken = fabricateTokenForUser(actor.userId(), "ztestuserK5", actorRole);
-        String adminToken = fabricateTokenForUser(admin.userId(), "ztestuserK6", "admin");
+        String actorToken = fabricateTokenForUser(actor.userId(), "ztestuserk5", actorRole);
+        String adminToken = fabricateTokenForUser(admin.userId(), "ztestuserk6", "admin");
         // Los dos caminos, en caliente: el tope de espera de la edicion en pausa no deja margen
         // para que el primer pedido de la clase llegue tarde y se confunda con uno que no espero.
         int warmUp = fixtures.seedWorker("ZTESTJ013", "Juan", "Pérez", "operator", true);

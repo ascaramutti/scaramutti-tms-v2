@@ -60,7 +60,7 @@ export type LoginResponse = {
 
 export type RefreshRequest = {
     /**
-     * JWT firmado emitido previamente por /auth/login o /auth/refresh.
+     * JWT firmado emitido previamente por /auth/login, /auth/refresh o /auth/change-password.
      */
     refreshToken: string;
 };
@@ -90,17 +90,21 @@ export type UserRef = {
 };
 
 export type UserResponse = UserRef & {
-    role: UserRole;
+    /**
+     * El nombre de sistema del cargo del trabajador; puede ser uno que no inicia sesión
+     */
+    role: string;
     isActive: boolean;
 };
 
 /**
- * El usuario de la sesión (login, refresh y /auth/me): el de UserResponse más el id de su
- * trabajador, para reconocer la ficha propia. Los autores embebidos en otras respuestas
- * (UserResponse o UserRef) no lo traen.
+ * El usuario de la sesión (login, refresh, change-password y /auth/me): el de UserResponse
+ * más el id de su trabajador, para reconocer la ficha propia, y con un rol que inicia sesión.
+ * Los autores embebidos en otras respuestas (UserResponse o UserRef) no traen ese id.
  *
  */
 export type SessionUser = UserResponse & {
+    role: UserRole;
     /**
      * ID del trabajador de la cuenta; toda cuenta tiene uno
      */
@@ -1078,7 +1082,7 @@ export type DriverProfileMode = 'REQUIRED' | 'OPTIONAL' | 'NONE';
  * visible del cargo: es el `position` de todo objeto de usuario embebido
  * (sesión, cotizaciones, almacén, operaciones y el detalle de un
  * trabajador) y el `receivedBy` de un retiro; `level` es el nivel del organigrama, de 4 a 1; `canLogin` dice
- * si el rol puede tener usuario. La tabla completa de nivel por rol no se
+ * si el rol inicia sesión. La tabla completa de nivel por rol no se
  * enumera en ningún contrato: este documento se sirve sin sesión, y el nivel
  * de cada cargo es justamente lo que `GET /roles` restringe a los cuatro
  * roles del padrón.
@@ -1179,10 +1183,19 @@ export type WorkerUpdateRequest = WorkerRequest & {
 };
 
 /**
- * Ficha completa de un trabajador. `role` es su rol (la misma fila que
- * lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
- * `public.users` para él (el usuario lo administra el módulo de
- * usuarios). En los trabajadores cargados antes de que existiera esta
+ * La cuenta del sistema de un trabajador, para enlazarla desde su ficha.
+ */
+export type WorkerAccountRef = {
+    id: number;
+    username: string;
+    isActive: boolean;
+};
+
+/**
+ * Ficha completa de un trabajador. `role` es su cargo. `account` es su
+ * cuenta del sistema, activa o inactiva, o nula si no tiene (la
+ * administra el módulo de usuarios); `hasUser` es lo mismo que
+ * `account` no nula. En los trabajadores cargados antes de que existiera esta
  * unidad, `createdBy` es el usuario `admin`, que los cargó (nulo si no
  * había admin al migrar, o en un trabajador creado por SQL antes que el
  * primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
@@ -1210,6 +1223,7 @@ export type WorkerDetailResponse = {
     updatedAt: string;
     updatedBy?: UserRef | null;
     driver?: WorkerDriverProfileResponse | null;
+    account: WorkerAccountRef | null;
     hasUser: boolean;
 };
 
@@ -1355,6 +1369,108 @@ export type WarehouseReportResponse = {
     totalPEN: number;
     totalUSD: number;
     totalCount: number;
+};
+
+/**
+ * El trabajador de una cuenta. Toda cuenta tiene uno, y un trabajador
+ * tiene a lo sumo una cuenta. `fullName` une nombres, paterno y materno
+ * con un espacio, sin el materno si es nulo, y recorta los espacios de
+ * los extremos.
+ *
+ */
+export type UserAccountWorkerRef = {
+    id: number;
+    fullName: string;
+    isActive: boolean;
+};
+
+/**
+ * Una fila de la lista de cuentas. `role` es el cargo del trabajador (la
+ * cuenta no tiene rol propio), con la forma del catálogo de cargos.
+ *
+ */
+export type UserAccountSummaryResponse = {
+    id: number;
+    username: string;
+    worker: UserAccountWorkerRef;
+    role: RoleResponse;
+    isActive: boolean;
+};
+
+/**
+ * El trabajador de una cuenta, en el detalle: lo de UserAccountWorkerRef
+ * más su nombre en partes. `maternalLastName` es nulo si el trabajador no
+ * tiene materno.
+ *
+ */
+export type UserAccountWorkerDetailRef = UserAccountWorkerRef & {
+    firstName: string;
+    paternalLastName: string;
+    maternalLastName: string | null;
+};
+
+/**
+ * Una cuenta completa: lo de la fila de la lista, el trabajador con su
+ * nombre en partes y quién la creó y la modificó por última vez.
+ * `createdBy` es nulo en las cuentas que no se dieron de alta por la API.
+ * `updatedBy` es nulo hasta el primer cambio posterior al alta que deja
+ * rastro. Instantes en UTC.
+ * Sin hash ni versión de las sesiones.
+ *
+ */
+export type UserAccountDetailResponse = {
+    id: number;
+    username: string;
+    worker: UserAccountWorkerDetailRef;
+    role: RoleResponse;
+    isActive: boolean;
+    createdAt: string;
+    createdBy: UserRef | null;
+    updatedAt: string;
+    updatedBy: UserRef | null;
+};
+
+/**
+ * Un trabajador elegible para una cuenta. `fullName` une nombres, paterno
+ * y materno con un espacio, sin el materno si es nulo, y recorta los
+ * espacios de los extremos; `maternalLastName` es nulo si no tiene
+ * materno. `proposedUsername` es el nombre que
+ * generaría el alta ahora: orientativo, el alta lo recalcula.
+ *
+ */
+export type UserAccountCandidateResponse = {
+    workerId: number;
+    fullName: string;
+    firstName: string;
+    paternalLastName: string;
+    maternalLastName: string | null;
+    role: RoleResponse;
+    proposedUsername: string;
+};
+
+/**
+ * Alta de una cuenta: solo el trabajador. El nombre y la contraseña
+ * temporal los genera el servidor; el cargo es el del trabajador; nace
+ * activa. Cualquier otro campo se ignora, también un `temporaryPassword`.
+ *
+ */
+export type UserAccountCreateRequest = {
+    workerId: number;
+};
+
+/**
+ * La cuenta y la contraseña temporal que el servidor acaba de generar. Es
+ * la única vez que sale: se guarda solo su hash y no se puede volver a
+ * pedir. Nada obliga a cambiarla: la persona la cambia con
+ * `changePassword`.
+ *
+ */
+export type UserAccountTemporaryPasswordResponse = {
+    account: UserAccountDetailResponse;
+    /**
+     * 12 caracteres al azar de un alfabeto de 55 sin los ambiguos (0, O, o, 1, l, I, i): mayúsculas, minúsculas y dígitos del 2 al 9. Cumple la regla de newPassword de ChangePasswordRequest.
+     */
+    temporaryPassword: string;
 };
 
 /**
@@ -1864,7 +1980,7 @@ export type LoginErrors = {
      */
     400: Problem;
     /**
-     * Credenciales inválidas o usuario inactivo
+     * Credenciales inválidas, o cuenta no utilizable (cuenta inactiva, trabajador dado de baja o cargo que no inicia sesión), con el mismo cuerpo en los tres casos
      */
     401: Problem;
 };
@@ -1893,7 +2009,7 @@ export type RefreshTokenErrors = {
      */
     400: Problem;
     /**
-     * Refresh token inválido o expirado, o usuario inactivo
+     * Refresh vencido, inválido o revocado, o cuenta no utilizable
      */
     401: Problem;
 };
@@ -1922,22 +2038,26 @@ export type ChangePasswordErrors = {
      */
     400: Problem;
     /**
-     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     * Token de acceso expirado o inválido, o cuenta no utilizable. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
-     * El usuario del token ya no existe
+     * La cuenta del token ya no existe
      */
     404: Problem;
+    /**
+     * Conflicto transitorio: otra operación retuvo la fila de la cuenta, o una de sus tablas (también la del rastro) mientras el cambio la tomaba, la leía o la escribía, más allá del tope; se reintenta
+     */
+    409: Problem;
 };
 
 export type ChangePasswordError = ChangePasswordErrors[keyof ChangePasswordErrors];
 
 export type ChangePasswordResponses = {
     /**
-     * Contraseña actualizada
+     * Contraseña cambiada; la sesión nueva
      */
-    204: void;
+    200: LoginResponse;
 };
 
 export type ChangePasswordResponse = ChangePasswordResponses[keyof ChangePasswordResponses];
@@ -1951,11 +2071,11 @@ export type GetCurrentUserData = {
 
 export type GetCurrentUserErrors = {
     /**
-     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     * Token de acceso expirado o inválido, o cuenta no utilizable. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
      */
     401: Problem;
     /**
-     * El usuario del token ya no existe
+     * La cuenta del token ya no existe
      */
     404: Problem;
 };
@@ -4027,6 +4147,275 @@ export type ListDriversResponses = {
 };
 
 export type ListDriversResponse = ListDriversResponses[keyof ListDriversResponses];
+
+export type ListUserAccountsData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Activas (`true`), inactivas (`false`) o todas (sin el parámetro).
+         */
+        isActive?: boolean;
+    };
+    url: '/users';
+};
+
+export type ListUserAccountsErrors = {
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListUserAccountsError = ListUserAccountsErrors[keyof ListUserAccountsErrors];
+
+export type ListUserAccountsResponses = {
+    /**
+     * Cuentas
+     */
+    200: Array<UserAccountSummaryResponse>;
+};
+
+export type ListUserAccountsResponse = ListUserAccountsResponses[keyof ListUserAccountsResponses];
+
+export type CreateUserAccountData = {
+    body: UserAccountCreateRequest;
+    path?: never;
+    query?: never;
+    url: '/users';
+};
+
+export type CreateUserAccountErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type CreateUserAccountError = CreateUserAccountErrors[keyof CreateUserAccountErrors];
+
+export type CreateUserAccountResponses = {
+    /**
+     * Cuenta creada, con la temporal generada (se muestra una sola vez)
+     */
+    201: UserAccountTemporaryPasswordResponse;
+};
+
+export type CreateUserAccountResponse = CreateUserAccountResponses[keyof CreateUserAccountResponses];
+
+export type GetUserAccountData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/users/{id}';
+};
+
+export type GetUserAccountErrors = {
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+};
+
+export type GetUserAccountError = GetUserAccountErrors[keyof GetUserAccountErrors];
+
+export type GetUserAccountResponses = {
+    /**
+     * OK
+     */
+    200: UserAccountDetailResponse;
+};
+
+export type GetUserAccountResponse = GetUserAccountResponses[keyof GetUserAccountResponses];
+
+export type DeactivateUserAccountData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/users/{id}/deactivate';
+};
+
+export type DeactivateUserAccountErrors = {
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type DeactivateUserAccountError = DeactivateUserAccountErrors[keyof DeactivateUserAccountErrors];
+
+export type DeactivateUserAccountResponses = {
+    /**
+     * La cuenta con el estado resultante
+     */
+    200: UserAccountDetailResponse;
+};
+
+export type DeactivateUserAccountResponse = DeactivateUserAccountResponses[keyof DeactivateUserAccountResponses];
+
+export type ReactivateUserAccountData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/users/{id}/reactivate';
+};
+
+export type ReactivateUserAccountErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type ReactivateUserAccountError = ReactivateUserAccountErrors[keyof ReactivateUserAccountErrors];
+
+export type ReactivateUserAccountResponses = {
+    /**
+     * La cuenta con el estado resultante
+     */
+    200: UserAccountDetailResponse;
+};
+
+export type ReactivateUserAccountResponse = ReactivateUserAccountResponses[keyof ReactivateUserAccountResponses];
+
+export type ResetUserAccountPasswordData = {
+    body?: never;
+    path: {
+        id: number;
+    };
+    query?: never;
+    url: '/users/{id}/reset-password';
+};
+
+export type ResetUserAccountPasswordErrors = {
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+    /**
+     * Recurso no encontrado
+     */
+    404: Problem;
+    /**
+     * Conflicto (recurso ya existe, restricción de unicidad violada)
+     */
+    409: Problem;
+};
+
+export type ResetUserAccountPasswordError = ResetUserAccountPasswordErrors[keyof ResetUserAccountPasswordErrors];
+
+export type ResetUserAccountPasswordResponses = {
+    /**
+     * La cuenta con el estado resultante y la temporal generada, que no se vuelve a mostrar
+     */
+    200: UserAccountTemporaryPasswordResponse;
+};
+
+export type ResetUserAccountPasswordResponse = ResetUserAccountPasswordResponses[keyof ResetUserAccountPasswordResponses];
+
+export type ListUserAccountCandidatesData = {
+    body?: never;
+    path?: never;
+    query?: {
+        /**
+         * Búsqueda por nombre o apellidos. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+         */
+        q?: string;
+        /**
+         * Solo ese trabajador, si es elegible.
+         */
+        workerId?: number;
+    };
+    url: '/user-account-candidates';
+};
+
+export type ListUserAccountCandidatesErrors = {
+    /**
+     * Solicitud inválida (validación, formato, valores fuera de rango)
+     */
+    400: Problem;
+    /**
+     * Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`.
+     */
+    401: Problem;
+    /**
+     * Autenticado pero sin permisos para esta operación
+     */
+    403: Problem;
+};
+
+export type ListUserAccountCandidatesError = ListUserAccountCandidatesErrors[keyof ListUserAccountCandidatesErrors];
+
+export type ListUserAccountCandidatesResponses = {
+    /**
+     * Trabajadores elegibles
+     */
+    200: Array<UserAccountCandidateResponse>;
+};
+
+export type ListUserAccountCandidatesResponse = ListUserAccountCandidatesResponses[keyof ListUserAccountCandidatesResponses];
 
 export type ListServicesData = {
     body?: never;

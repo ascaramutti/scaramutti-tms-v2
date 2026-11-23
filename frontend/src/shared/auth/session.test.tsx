@@ -11,7 +11,7 @@ import { http, HttpResponse } from 'msw'
 import { toast } from 'sonner'
 import { routes } from '../../router'
 import { client } from '../../api/client.gen'
-import { listServices, type LoginRequest, type LoginResponse, type SessionUser } from '../../api'
+import { listServices, type LoginRequest, type LoginResponse, type Problem, type SessionUser } from '../../api'
 import { configureSessionHttpClient } from '../http/client'
 import { queryClient as appQueryClient } from '../query/queryClient'
 import { ThemeProvider } from '../ui/theme/ThemeContext'
@@ -72,6 +72,9 @@ const BETO: Persona = {
 /** Un token que el backend todavía reconoce como de Ana en /auth/me, pero que ya venció. */
 const TOKEN_VENCIDO_DE_ANA = 'tok-ana-vencido'
 
+/** La sesión nueva que el cambio de contraseña le responde a Ana: su refresh lleva la versión nueva. */
+const ANA_TRAS_EL_CAMBIO = { token: 'tok-ana-tras-el-cambio', refresh: 'ref-ana-tras-el-cambio' }
+
 const SERVICIO_DE_ANA = fakeServiceSummary({ id: 501, code: 'SRV-ANA', price: 5800 })
 const SERVICIO_DE_BETO = fakeDispatcherServiceSummary({ id: 502, code: 'SRV-BETO' })
 
@@ -81,6 +84,11 @@ function bearer(request: Request): string | null {
 
 function sesionDe(user: SessionUser, token: string, refresh: string): LoginResponse {
   return { token, refreshToken: refresh, expiresAt: '2027-01-01T00:00:00Z', expiresIn: 3600, user }
+}
+
+/** El 200 del cambio de contraseña de Ana. */
+function sesionNuevaDeAna() {
+  return HttpResponse.json(sesionDe(ANA.user, ANA_TRAS_EL_CAMBIO.token, ANA_TRAS_EL_CAMBIO.refresh))
 }
 
 /** El backend de las dos personas: cada token ve lo suyo, y sin token no hay nada. */
@@ -101,17 +109,25 @@ function backendDeDosPersonas() {
     }),
     http.get(`${API}/auth/me`, ({ request }) => {
       const token = bearer(request)
-      if (token === ANA.token || token === TOKEN_VENCIDO_DE_ANA) return HttpResponse.json(ANA.user)
+      if (token === ANA.token || token === TOKEN_VENCIDO_DE_ANA || token === ANA_TRAS_EL_CAMBIO.token) {
+        return HttpResponse.json(ANA.user)
+      }
       if (token === BETO.token) return HttpResponse.json(BETO.user)
       return new HttpResponse(null, { status: 401 })
     }),
     http.get(`${API}/services`, ({ request }) => {
       const token = bearer(request)
-      if (token === ANA.token) return HttpResponse.json(pageOfServices([SERVICIO_DE_ANA]))
+      if (token === ANA.token || token === ANA_TRAS_EL_CAMBIO.token) {
+        return HttpResponse.json(pageOfServices([SERVICIO_DE_ANA]))
+      }
       if (token === BETO.token) return HttpResponse.json(pageOfServices([SERVICIO_DE_BETO]))
       return new HttpResponse(null, { status: 401 })
     }),
     http.post(`${API}/auth/refresh`, () => new HttpResponse(null, { status: 401 })),
+    // Por omisión solo cambia la clave Ana; el caso del 204 pone el suyo.
+    http.post(`${API}/auth/change-password`, ({ request }) =>
+      bearer(request) === ANA.token ? sesionNuevaDeAna() : new HttpResponse(null, { status: 401 }),
+    ),
     http.post(`${API}/workers/:id/deactivate`, ({ params }) =>
       HttpResponse.json(fakeWorkerDetail({ id: Number(params.id), isActive: false })),
     ),
@@ -138,11 +154,13 @@ function BajaDeUnTrabajador() {
 }
 
 /** Una query de la sesión que sigue montada después de salir: no la corta desmontarse. */
-function ListadoFueraDeLasRutas() {
-  useQuery({
+function ListadoFueraDeLasRutas({ estados }: { estados?: string[] }) {
+  const listado = useQuery({
     queryKey: ['fuera-de-las-rutas', 'servicios'],
     queryFn: async () => (await listServices({ throwOnError: true })).data,
   })
+  // Lo que pinta cada render, para el caso que mira si alguno queda sin datos y sin cargar.
+  estados?.push(`${listado.status}/${listado.fetchStatus}`)
   return null
 }
 
@@ -180,8 +198,8 @@ async function salir(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: 'Cerrar sesión' }))
 }
 
-async function cambiarLaClave(user: ReturnType<typeof userEvent.setup>, nueva: string) {
-  await user.type(await screen.findByLabelText('Contraseña actual'), ANA.password)
+async function cambiarLaClave(user: ReturnType<typeof userEvent.setup>, nueva: string, actual = ANA.password) {
+  await user.type(await screen.findByLabelText('Contraseña actual'), actual)
   await user.type(screen.getByLabelText('Nueva contraseña'), nueva)
   await user.type(screen.getByLabelText('Confirmar nueva contraseña'), nueva)
   await user.click(screen.getByRole('button', { name: 'Cambiar contraseña' }))
@@ -421,6 +439,9 @@ describe('fin de sesión', () => {
       renovacion.abrir()
       await waitFor(() => expect(renovacion.respondida()).toBe(true))
       await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+      // La carga del usuario de antes del ingreso no se reintenta con el token de Beto: es de la sesión
+      // que terminó (lo fija la generación que abre el ingreso, no la comparación de la renovación).
+      expect(pedidos).not.toContain(`GET /api/v1/auth/me Bearer ${BETO.token}`)
       return { router, recarga }
     }
 
@@ -585,7 +606,7 @@ describe('fin de sesión', () => {
     server.use(
       http.post(`${API}/auth/change-password`, async () => {
         await cambio.abierta
-        return new HttpResponse(null, { status: 204 })
+        return sesionNuevaDeAna()
       }),
     )
     tokenStorage.setTokens(ANA.token, ANA.refresh)
@@ -601,6 +622,9 @@ describe('fin de sesión', () => {
 
     expect(screen.queryByText('Contraseña actualizada')).not.toBeInTheDocument()
     expect(router.state.location.pathname).toBe(landingPathFor(BETO.user.role))
+    // Ni guarda la sesión nueva de Ana encima de la de Beto.
+    expect(tokenStorage.getAccessToken()).toBe(BETO.token)
+    expect(tokenStorage.getRefreshToken()).toBe(BETO.refresh)
   })
 
   it('la contraseña del ingreso no queda en la caché de mutaciones', async () => {
@@ -818,7 +842,7 @@ describe('cambiar la contraseña renueva la sesión como cualquier pedido', () =
       http.post(`${API}/auth/refresh`, () => HttpResponse.json(sesionDe(ANA.user, ANA.token, ANA.refresh))),
       http.post(`${API}/auth/change-password`, async ({ request }) => {
         cuerpos.push(await request.json())
-        return bearer(request) === ANA.token ? new HttpResponse(null, { status: 204 }) : tokenVencido()
+        return bearer(request) === ANA.token ? sesionNuevaDeAna() : tokenVencido()
       }),
     )
     tokenStorage.setTokens(TOKEN_VENCIDO_DE_ANA, ANA.refresh)
@@ -835,6 +859,9 @@ describe('cambiar la contraseña renueva la sesión como cualquier pedido', () =
     ])
     // El reintento manda lo mismo que el primer envío.
     expect(cuerpos).toEqual([CUERPO, CUERPO])
+    // Y guarda la sesión de la respuesta, no la de la renovación.
+    expect(tokenStorage.getAccessToken()).toBe(ANA_TRAS_EL_CAMBIO.token)
+    expect(tokenStorage.getRefreshToken()).toBe(ANA_TRAS_EL_CAMBIO.refresh)
   })
 
   it('un 401 que sigue después de renovar no vuelve a renovar: avisa con un texto propio', async () => {
@@ -907,6 +934,56 @@ describe('cambiar la contraseña renueva la sesión como cualquier pedido', () =
     expect(cambiosDeClave()).toHaveLength(2)
   })
 
+  it('con la cuenta ya no utilizable, el AUTH-002 del cambio renueva una vez, que también da AUTH-002, y va al ingreso sin aviso', async () => {
+    const user = userEvent.setup()
+    const recarga = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    const cuentaNoUtilizable = () =>
+      HttpResponse.json(
+        { status: 401, code: 'AUTH-002', detail: 'El usuario está desactivado' },
+        { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+      )
+    server.use(
+      http.post(`${API}/auth/refresh`, () => cuentaNoUtilizable()),
+      http.post(`${API}/auth/change-password`, () => cuentaNoUtilizable()),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    montar(CHANGE_PASSWORD_PATH)
+
+    await cambiarLaClave(user, CLAVE_NUEVA)
+
+    await waitFor(() => expect(recarga).toHaveBeenCalledWith(LOGIN_PATH))
+    await cuandoSeEntregue('POST /api/v1/auth/refresh')
+    expect(renovaciones()).toHaveLength(1)
+    expect(cambiosDeClave()).toHaveLength(1)
+    expect(tokenStorage.getAccessToken()).toBeNull()
+    expect(document.querySelector('[data-sonner-toast]')).toBeNull()
+  })
+
+  it('el AUTH-002 del reintento (la cuenta se apagó entre la renovación y el reintento) avisa con un texto propio', async () => {
+    const user = userEvent.setup()
+    server.use(
+      http.post(`${API}/auth/refresh`, () => HttpResponse.json(sesionDe(ANA.user, ANA.token, ANA.refresh))),
+      http.post(`${API}/auth/change-password`, ({ request }) =>
+        bearer(request) === ANA.token
+          ? HttpResponse.json(
+              { status: 401, code: 'AUTH-002', detail: 'El usuario está desactivado' },
+              { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+            )
+          : tokenVencido(),
+      ),
+    )
+    tokenStorage.setTokens(TOKEN_VENCIDO_DE_ANA, ANA.refresh)
+    montar(CHANGE_PASSWORD_PATH)
+
+    await cambiarLaClave(user, CLAVE_NUEVA)
+
+    expect(
+      await screen.findByText('Tu cuenta ya no puede ingresar al sistema. Cierra sesión y consulta con quien administra las cuentas.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('El usuario está desactivado')).not.toBeInTheDocument()
+    expect(renovaciones()).toHaveLength(1)
+  })
+
   it('la clave actual equivocada no renueva: el error va a su campo', async () => {
     const user = userEvent.setup()
     server.use(
@@ -929,5 +1006,385 @@ describe('cambiar la contraseña renueva la sesión como cualquier pedido', () =
     )
     expect(renovaciones()).toEqual([])
     expect(cambiosDeClave()).toHaveLength(1)
+  })
+})
+
+describe('el cambio de contraseña deja a la persona adentro con la sesión nueva', () => {
+  const CLAVE_NUEVA = 'Clave-nueva-de-Ana-2'
+
+  /** El 401 del refresh que el cambio revocó (la versión vieja). */
+  function refreshRevocado() {
+    return HttpResponse.json(
+      {
+        type: 'urn:tms:error:auth-003',
+        title: 'Invalid refresh token',
+        status: 401,
+        code: 'AUTH-003',
+        detail: 'Refresh token inválido o revocado',
+      } satisfies Problem,
+      { status: 401, headers: { 'Content-Type': 'application/problem+json' } },
+    )
+  }
+
+  function renovaciones(): string[] {
+    return pedidos.filter((pedido) => pedido.startsWith('POST /api/v1/auth/refresh'))
+  }
+
+  async function cambiarYEsperarElAviso(user: ReturnType<typeof userEvent.setup>) {
+    await cambiarLaClave(user, CLAVE_NUEVA)
+    expect(await screen.findByText('Contraseña actualizada')).toBeInTheDocument()
+  }
+
+  it('la renovación siguiente manda el refresh nuevo, el de antes ya no renueva, y la persona sigue adentro', async () => {
+    const user = userEvent.setup()
+    const recarga = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    const mandados: string[] = []
+    server.use(
+      http.post(`${API}/auth/refresh`, async ({ request }) => {
+        const { refreshToken } = (await request.json()) as { refreshToken: string }
+        mandados.push(refreshToken)
+        return refreshToken === ANA_TRAS_EL_CAMBIO.refresh
+          ? HttpResponse.json(sesionDe(ANA.user, 'tok-ana-renovado', 'ref-ana-renovado'))
+          : refreshRevocado()
+      }),
+      // El access del cambio ya venció: el listado solo acepta el renovado.
+      http.get(`${API}/services`, ({ request }) =>
+        bearer(request) === 'tok-ana-renovado'
+          ? HttpResponse.json(pageOfServices([SERVICIO_DE_ANA]))
+          : new HttpResponse(null, { status: 401 }),
+      ),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    const router = montar(CHANGE_PASSWORD_PATH)
+    await cambiarYEsperarElAviso(user)
+
+    await act(() => router.navigate(OPERATIONS_BASE))
+
+    expect(await screen.findByText('SRV-ANA')).toBeInTheDocument()
+    expect(mandados).toEqual([ANA_TRAS_EL_CAMBIO.refresh])
+    expect(tokenStorage.getRefreshToken()).toBe('ref-ana-renovado')
+    expect(screen.getByText(ANA.user.fullName)).toBeInTheDocument()
+    expect(recarga).not.toHaveBeenCalled()
+  })
+
+  it('la caché no se borra: lo que se cargó antes del cambio sigue ahí', async () => {
+    const user = userEvent.setup()
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    const router = montar(OPERATIONS_BASE, { extra: <BajaDeUnTrabajador /> })
+    await screen.findByText('SRV-ANA')
+    await user.click(screen.getByRole('button', { name: 'Desactivar al trabajador 7' }))
+    await waitFor(() => expect(queryClient.getMutationCache().getAll()).toHaveLength(1))
+    const baja = queryClient.getMutationCache().getAll()[0]
+    await act(() => router.navigate(CHANGE_PASSWORD_PATH))
+
+    await cambiarYEsperarElAviso(user)
+
+    expect(memoria()).toContain('SRV-ANA')
+    expect(queryClient.getMutationCache().getAll()).toContain(baja)
+    expect(queryClient.getQueryData(currentUserQueryKey)).toEqual(ANA.user)
+    // Con el mismo cargo, lo cargado sigue valiendo: al volver no se pide de nuevo.
+    const pedidosTrasElCambio = pedidos.length
+    await act(() => router.navigate(OPERATIONS_BASE))
+    expect(await screen.findByText('SRV-ANA')).toBeInTheDocument()
+    expect(pedidos.slice(pedidosTrasElCambio).filter((pedido) => pedido.startsWith('GET /api/v1/services '))).toEqual([])
+  })
+
+  it('lo que estaba en vuelo durante el cambio se entrega: es de la misma persona', async () => {
+    const user = userEvent.setup()
+    const listado = compuerta()
+    server.use(
+      http.get(`${API}/services`, async ({ request }) => {
+        if (bearer(request) !== ANA.token) return new HttpResponse(null, { status: 401 })
+        await listado.abierta
+        return HttpResponse.json(pageOfServices([SERVICIO_DE_ANA]))
+      }),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    montar(CHANGE_PASSWORD_PATH, { extra: <ListadoFueraDeLasRutas /> })
+    await waitFor(() => expect(pedidos).toContain(`GET /api/v1/services Bearer ${ANA.token}`))
+    await cambiarYEsperarElAviso(user)
+
+    listado.abrir()
+    await cuandoSeEntregue('GET /api/v1/services')
+
+    expect(memoria()).toContain('SRV-ANA')
+    expect(queryClient.isFetching()).toBe(0)
+  })
+
+  it('el usuario de la respuesta queda en la sesión, y vuelve al inicio de su cargo de ahora', async () => {
+    const user = userEvent.setup()
+    // Mientras tenía la sesión abierta le cambiaron el cargo: la respuesta trae el de ahora.
+    // Otro trabajador también: así se ve si del usuario de antes queda algún campo.
+    const anaEnDespacho: SessionUser = {
+      ...ANA.user,
+      fullName: 'Ana Despacho',
+      position: 'Despachadora',
+      role: 'dispatcher',
+      workerId: 313,
+    }
+    server.use(
+      http.post(`${API}/auth/change-password`, () =>
+        HttpResponse.json(sesionDe(anaEnDespacho, ANA_TRAS_EL_CAMBIO.token, ANA_TRAS_EL_CAMBIO.refresh)),
+      ),
+      http.get(`${API}/services`, () =>
+        HttpResponse.json(pageOfServices([fakeDispatcherServiceSummary({ id: 503, code: 'SRV-ANA-DESPACHO' })])),
+      ),
+    )
+    expect(landingPathFor(anaEnDespacho.role)).not.toBe(landingPathFor(ANA.user.role))
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    const router = montar(CHANGE_PASSWORD_PATH)
+    await screen.findByText(ANA.user.fullName)
+
+    await cambiarYEsperarElAviso(user)
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(landingPathFor(anaEnDespacho.role)))
+    expect(await screen.findByText('SRV-ANA-DESPACHO')).toBeInTheDocument()
+    expect(screen.getByText('Ana Despacho')).toBeInTheDocument()
+    expect(screen.queryByText(ANA.user.fullName)).not.toBeInTheDocument()
+    expect(screen.getByText('Despachadora')).toBeInTheDocument()
+    expect(screen.queryByText('Jefa de Operaciones')).not.toBeInTheDocument()
+    expect(queryClient.getQueryData(currentUserQueryKey)).toEqual(anaEnDespacho)
+    // El usuario sale de la respuesta: no se vuelve a pedir.
+    expect(pedidos.filter((pedido) => pedido.startsWith('GET /api/v1/auth/me'))).toHaveLength(1)
+  })
+
+  it('con otro cargo en la respuesta, lo cargado con el de antes se vuelve a pedir', async () => {
+    const user = userEvent.setup()
+    // Entró como despachadora: el listado le llegó sin precios. El cambio la trae con su cargo de ahora.
+    const anaEnDespacho: SessionUser = { ...ANA.user, role: 'dispatcher' }
+    server.use(
+      http.get(`${API}/auth/me`, () => HttpResponse.json(anaEnDespacho)),
+      http.get(`${API}/services`, ({ request }) =>
+        bearer(request) === ANA_TRAS_EL_CAMBIO.token
+          ? HttpResponse.json(pageOfServices([SERVICIO_DE_ANA]))
+          : HttpResponse.json(pageOfServices([fakeDispatcherServiceSummary({ id: 501, code: 'SRV-ANA' })])),
+      ),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    const router = montar(OPERATIONS_BASE)
+    await screen.findByText('SRV-ANA')
+    await act(() => router.navigate(CHANGE_PASSWORD_PATH))
+    await cambiarYEsperarElAviso(user)
+    // Vencido, no borrado: lo de antes sigue en la caché, marcado, y sin pedirse hasta que se muestre.
+    expect(memoria()).toContain('SRV-ANA')
+    const listado = queryClient
+      .getQueryCache()
+      .getAll()
+      .find((query) => JSON.stringify(query.state.data ?? null).includes('SRV-ANA'))
+    expect(listado?.state).toMatchObject({ isInvalidated: true, fetchStatus: 'idle' })
+
+    await act(() => router.navigate(OPERATIONS_BASE))
+
+    await waitFor(() => expect(pedidos).toContain(`GET /api/v1/services Bearer ${ANA_TRAS_EL_CAMBIO.token}`))
+    expect(await screen.findByText('S/ 5,800.00')).toBeInTheDocument()
+  })
+
+  it('con otro cargo, una primera carga en vuelo con el de antes se corta y se vuelve a pedir', async () => {
+    const user = userEvent.setup()
+    const anaEnDespacho: SessionUser = { ...ANA.user, role: 'dispatcher' }
+    const primeraCarga = compuerta()
+    server.use(
+      http.get(`${API}/auth/me`, () => HttpResponse.json(anaEnDespacho)),
+      http.get(`${API}/services`, async ({ request }) => {
+        if (bearer(request) === ANA_TRAS_EL_CAMBIO.token) return HttpResponse.json(pageOfServices([SERVICIO_DE_ANA]))
+        await primeraCarga.abierta
+        return HttpResponse.json(pageOfServices([fakeDispatcherServiceSummary({ id: 501, code: 'SRV-ANA' })]))
+      }),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    const estados: string[] = []
+    montar(CHANGE_PASSWORD_PATH, { extra: <ListadoFueraDeLasRutas estados={estados} /> })
+    await waitFor(() => expect(queryClient.getQueryData(currentUserQueryKey)).toEqual(anaEnDespacho))
+    await waitFor(() => expect(pedidos).toContain(`GET /api/v1/services Bearer ${ANA.token}`))
+    await cambiarYEsperarElAviso(user)
+    await waitFor(() => expect(pedidos).toContain(`GET /api/v1/services Bearer ${ANA_TRAS_EL_CAMBIO.token}`))
+
+    // Se suelta recién acá: colgada no toca nada fuera de este caso (no es una renovación).
+    primeraCarga.abrir()
+    // Vuelven las dos: la de antes, al final, y el cliente termina de procesarla.
+    await waitFor(() => expect(entregadas.filter((entregada) => entregada === 'GET /api/v1/services')).toHaveLength(2))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+
+    // La carga de antes ya no se guarda: queda la del cargo nuevo, con su precio. Entre cortar y volver
+    // a pedir, ningún render queda sin datos y sin cargar (la pantalla mostraría el vacío).
+    expect(memoria()).toContain('"price":5800')
+    expect(queryClient.isFetching()).toBe(0)
+    expect(estados).not.toContain('pending/idle')
+  })
+
+  it('una carga del usuario pedida antes del cambio no pisa al de la respuesta', async () => {
+    const user = userEvent.setup()
+    const anaRenombrada: SessionUser = { ...ANA.user, fullName: 'Ana Gerente Nueva' }
+    const segundaCarga = compuerta()
+    let cargas = 0
+    server.use(
+      http.get(`${API}/auth/me`, async () => {
+        cargas++
+        if (cargas > 1) await segundaCarga.abierta
+        return HttpResponse.json(ANA.user)
+      }),
+      http.post(`${API}/auth/change-password`, () =>
+        HttpResponse.json(sesionDe(anaRenombrada, ANA_TRAS_EL_CAMBIO.token, ANA_TRAS_EL_CAMBIO.refresh)),
+      ),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    montar(CHANGE_PASSWORD_PATH)
+    await screen.findByText(ANA.user.fullName)
+    // Hoy nada vuelve a pedir el usuario con la sesión abierta: es la misma defensa que el ingreso.
+    act(() => {
+      void queryClient.refetchQueries({ queryKey: currentUserQueryKey })
+    })
+    await waitFor(() => expect(cargas).toBe(2))
+
+    await cambiarYEsperarElAviso(user)
+    segundaCarga.abrir()
+    await waitFor(() => expect(entregadas.filter((entregada) => entregada === 'GET /api/v1/auth/me')).toHaveLength(2))
+    await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+
+    expect(queryClient.getQueryData(currentUserQueryKey)).toEqual(anaRenombrada)
+    expect(screen.getByText('Ana Gerente Nueva')).toBeInTheDocument()
+  })
+
+  it('salir de la pantalla mientras el cambio vuelve igual guarda la sesión nueva', async () => {
+    const user = userEvent.setup()
+    const cambio = compuerta()
+    server.use(
+      http.post(`${API}/auth/change-password`, async () => {
+        await cambio.abierta
+        return sesionNuevaDeAna()
+      }),
+    )
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    const router = montar(CHANGE_PASSWORD_PATH)
+    await cambiarLaClave(user, CLAVE_NUEVA)
+    await waitFor(() => expect(pedidos.some((pedido) => pedido.startsWith('POST /api/v1/auth/change-password'))).toBe(true))
+    await act(() => router.navigate(OPERATIONS_BASE))
+    expect(await screen.findByText('SRV-ANA')).toBeInTheDocument()
+
+    // Sin finally: si algo falla antes, el cambio queda colgado y no escribe; soltado, su 200 guardaría
+    // la sesión de Ana en el caso siguiente.
+    cambio.abrir()
+    await cuandoSeEntregue('POST /api/v1/auth/change-password')
+
+    expect(tokenStorage.getAccessToken()).toBe(ANA_TRAS_EL_CAMBIO.token)
+    expect(tokenStorage.getRefreshToken()).toBe(ANA_TRAS_EL_CAMBIO.refresh)
+  })
+
+  it('tras el cambio, una renovación que falla de verdad termina la sesión', async () => {
+    const user = userEvent.setup()
+    const recarga = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+    server.use(http.get(`${API}/services`, () => new HttpResponse(null, { status: 401 })))
+    tokenStorage.setTokens(ANA.token, ANA.refresh)
+    const router = montar(CHANGE_PASSWORD_PATH)
+    await cambiarYEsperarElAviso(user)
+
+    // La renovación sale después del cambio, con su refresh, y el servidor la rechaza.
+    await act(() => router.navigate(OPERATIONS_BASE))
+
+    await waitFor(() => expect(recarga).toHaveBeenCalledWith(LOGIN_PATH))
+    expect(tokenStorage.getAccessToken()).toBeNull()
+  })
+
+  it('con la versión anterior del servidor (204, sin sesión) avisa el éxito y deja los tokens como estaban', async () => {
+    const user = userEvent.setup()
+    // Beto y no Ana: su inicio no es el que da un cargo desconocido, así que vuelve por el de su sesión.
+    expect(landingPathFor(BETO.user.role)).not.toBe(landingPathFor(undefined))
+    server.use(http.post(`${API}/auth/change-password`, () => new HttpResponse(null, { status: 204 })))
+    tokenStorage.setTokens(BETO.token, BETO.refresh)
+    const router = montar(CHANGE_PASSWORD_PATH)
+    await screen.findByText(BETO.user.fullName)
+
+    await cambiarLaClave(user, CLAVE_NUEVA, BETO.password)
+    expect(await screen.findByText('Contraseña actualizada')).toBeInTheDocument()
+
+    await waitFor(() => expect(router.state.location.pathname).toBe(landingPathFor(BETO.user.role)))
+    expect(tokenStorage.getAccessToken()).toBe(BETO.token)
+    expect(tokenStorage.getRefreshToken()).toBe(BETO.refresh)
+    expect(screen.getByText(BETO.user.fullName)).toBeInTheDocument()
+  })
+
+  describe('una renovación que salió antes del cambio y vuelve después', () => {
+    /**
+     * El listado ve vencido el access de antes y renueva con el refresh de antes; el cambio sale
+     * mientras tanto y vuelve primero. La renovación la suelta el test.
+     */
+    async function vuelveDespuesDelCambio(respuesta: () => Response, { otraPestana = false } = {}) {
+      const user = userEvent.setup()
+      const recarga = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
+      const renovacion = compuerta()
+      server.use(
+        http.post(`${API}/auth/refresh`, async () => {
+          await renovacion.abierta
+          return respuesta()
+        }),
+        http.get(`${API}/services`, ({ request }) =>
+          bearer(request) === ANA_TRAS_EL_CAMBIO.token
+            ? HttpResponse.json(pageOfServices([SERVICIO_DE_ANA]))
+            : new HttpResponse(null, { status: 401 }),
+        ),
+      )
+      tokenStorage.setTokens(ANA.token, ANA.refresh)
+      // Abierta también si algo falla antes: colgada, la renovación la heredaría el caso siguiente.
+      try {
+        montar(CHANGE_PASSWORD_PATH, { extra: <ListadoFueraDeLasRutas /> })
+        await waitFor(() => expect(renovaciones()).toHaveLength(1))
+        // Otra pestaña de la misma persona cambió la clave: los tokens nuevos llegan por el almacenamiento.
+        if (otraPestana) tokenStorage.setTokens(ANA_TRAS_EL_CAMBIO.token, ANA_TRAS_EL_CAMBIO.refresh)
+        else await cambiarYEsperarElAviso(user)
+      } finally {
+        renovacion.abrir()
+      }
+      await cuandoSeEntregue('POST /api/v1/auth/refresh')
+      return { recarga }
+    }
+
+    /** El listado: el primero con el access de antes y el reintento, ya con el del cambio. */
+    function listados(): string[] {
+      return pedidos.filter((pedido) => pedido.startsWith('GET /api/v1/services'))
+    }
+
+    it('con los tokens de antes, no pisa la sesión nueva: el pedido se reintenta con ella', async () => {
+      // El servidor la renovó antes de que el cambio subiera la versión: su refresh ya está revocado.
+      await vuelveDespuesDelCambio(() => HttpResponse.json(sesionDe(ANA.user, 'tok-ana-de-antes', 'ref-ana-de-antes')))
+
+      expect(tokenStorage.getAccessToken()).toBe(ANA_TRAS_EL_CAMBIO.token)
+      expect(tokenStorage.getRefreshToken()).toBe(ANA_TRAS_EL_CAMBIO.refresh)
+      await waitFor(() => expect(memoria()).toContain('SRV-ANA'))
+      expect(listados()).toEqual([
+        `GET /api/v1/services Bearer ${ANA.token}`,
+        `GET /api/v1/services Bearer ${ANA_TRAS_EL_CAMBIO.token}`,
+      ])
+      expect(pedidos.filter((pedido) => pedido.includes('tok-ana-de-antes'))).toEqual([])
+    })
+
+    it('rechazada porque el cambio ya revocó el refresh, no termina la sesión: sigue con la nueva', async () => {
+      const { recarga } = await vuelveDespuesDelCambio(refreshRevocado)
+
+      expect(tokenStorage.getAccessToken()).toBe(ANA_TRAS_EL_CAMBIO.token)
+      expect(tokenStorage.getRefreshToken()).toBe(ANA_TRAS_EL_CAMBIO.refresh)
+      await waitFor(() => expect(memoria()).toContain('SRV-ANA'))
+      expect(listados()).toEqual([
+        `GET /api/v1/services Bearer ${ANA.token}`,
+        `GET /api/v1/services Bearer ${ANA_TRAS_EL_CAMBIO.token}`,
+      ])
+      expect(recarga).not.toHaveBeenCalled()
+      expect(screen.getByText(ANA.user.fullName)).toBeInTheDocument()
+    })
+
+    it.each([
+      ['con los tokens de antes', () => HttpResponse.json(sesionDe(ANA.user, 'tok-ana-de-antes', 'ref-ana-de-antes'))],
+      ['rechazada', refreshRevocado],
+    ])('si el cambio lo hizo otra pestaña, la renovación %s tampoco pisa ni termina la sesión', async (_caso, respuesta) => {
+      const { recarga } = await vuelveDespuesDelCambio(respuesta, { otraPestana: true })
+
+      expect(tokenStorage.getAccessToken()).toBe(ANA_TRAS_EL_CAMBIO.token)
+      expect(tokenStorage.getRefreshToken()).toBe(ANA_TRAS_EL_CAMBIO.refresh)
+      await waitFor(() => expect(memoria()).toContain('SRV-ANA'))
+      expect(listados()).toEqual([
+        `GET /api/v1/services Bearer ${ANA.token}`,
+        `GET /api/v1/services Bearer ${ANA_TRAS_EL_CAMBIO.token}`,
+      ])
+      expect(recarga).not.toHaveBeenCalled()
+    })
   })
 })

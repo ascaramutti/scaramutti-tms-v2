@@ -16,11 +16,9 @@ import java.util.List;
  * Los roles del sistema (GET /roles), que desde el mantenimiento de trabajadores son
  * tambien los cargos.
  *
- * <p>Vive en este modulo porque es su primer consumidor y el unico que hoy escribe el rol
- * de un trabajador; cuando exista el modulo de usuarios se decide si se muda.
- *
- * <p>Devuelve la tabla entera y no una vista del modulo: el que viene despues la reutiliza
- * quedandose con los roles que pueden tener usuario.
+ * <p>Vive en este modulo porque es su primer consumidor y el unico que escribe el rol de un
+ * trabajador. El modulo de usuarios no lo muda: su lista trae el cargo de cada cuenta con un
+ * record propio, porque no importa este modulo.
  */
 @Authenticated
 @Path("/roles")

@@ -11,7 +11,7 @@ import { AuthProvider } from '../../../shared/auth/AuthContext'
 import { currentUserQueryKey } from '../../../shared/auth/queryKeys'
 import { tokenStorage } from '../../../shared/auth/tokenStorage'
 import { fakeUser } from '../../../test/mocks/handlers/auth'
-import type { UserResponse } from '../../../api'
+import type { SessionUser } from '../../../api'
 import { server } from '../../../test/mocks/server'
 import type {
   BodyCaptureSink,
@@ -43,7 +43,7 @@ vi.mock('sonner', () => ({
 const CORTE_INICIAL_PATH = `${WAREHOUSE_BASE}/corte-inicial`
 
 /** Por defecto admin: es el único rol que registra, y el form es casi toda la pantalla. */
-function renderCorteInicial(role: UserResponse['role'] = 'admin') {
+function renderCorteInicial(role: SessionUser['role'] = 'admin') {
   const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   tokenStorage.setTokens('fake-access', 'fake-refresh')
   queryClient.setQueryData(currentUserQueryKey, { ...fakeUser, role })

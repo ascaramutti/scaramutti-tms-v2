@@ -1,5 +1,5 @@
 import { http, HttpResponse } from 'msw'
-import type { LoginResponse, Problem, SessionUser, UserResponse } from '../../../api'
+import type { LoginResponse, Problem, SessionUser } from '../../../api'
 
 const API = 'http://localhost:8080/api/v1'
 
@@ -23,15 +23,21 @@ export const fakeLoginResponse: LoginResponse = {
   user: fakeUser,
 }
 
+// La sesión nueva que responde el cambio de contraseña: otros tokens, con la versión nueva del refresh.
+export const fakeChangedPasswordResponse: LoginResponse = {
+  ...fakeLoginResponse,
+  token: 'fake-access-token-tras-el-cambio',
+  refreshToken: 'fake-refresh-token-tras-el-cambio',
+}
+
 export const authHandlers = [
   http.post(`${API}/auth/login`, () => HttpResponse.json(fakeLoginResponse)),
   http.get(`${API}/auth/me`, () => HttpResponse.json(fakeUser)),
-  // 204 No Content (success default para change-password)
-  http.post(`${API}/auth/change-password`, () => new HttpResponse(null, { status: 204 })),
+  http.post(`${API}/auth/change-password`, () => HttpResponse.json(fakeChangedPasswordResponse)),
 ]
 
 // Login exitoso con un rol específico (para tests del landing por rol).
-export function loginAsRoleResponse(role: UserResponse['role']) {
+export function loginAsRoleResponse(role: SessionUser['role']) {
   return http.post(`${API}/auth/login`, () =>
     HttpResponse.json({
       ...fakeLoginResponse,

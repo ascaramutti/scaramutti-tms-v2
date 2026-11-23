@@ -3,6 +3,7 @@ import {
   CLIENTS_BASE,
   OPERATIONS_BASE,
   QUOTATIONS_BASE,
+  USERS_BASE,
   WAREHOUSE_BASE,
   WORKERS_BASE,
 } from '../../shared/paths'
@@ -17,6 +18,7 @@ import {
   KeyRound,
   Route,
   Truck,
+  UserCog,
   Users,
   type LucideIcon,
 } from 'lucide-react'
@@ -30,6 +32,7 @@ import {
   OPERATIONS_ROLES,
   QUOTATION_ROLES,
   SERVICES_REPORT_ROLES,
+  USER_ACCOUNT_ADMIN_ROLES,
   WAREHOUSE_ROLES,
   WORKER_MAINTENANCE_ROLES,
 } from '../auth/moduleRoles'
@@ -144,9 +147,8 @@ const MENU: MenuGroup[] = [
   {
     // Los maestros transversales no cuelgan de ningún módulo: a los clientes los
     // consultan cotizaciones y operaciones, y a los trabajadores, almacén (y
-    // operaciones, por sus conductores). Acá va a vivir también el maestro de
-    // usuarios cuando exista. Distinto de "Administrar cuenta", que es lo
-    // personal de quien está usando el sistema.
+    // operaciones, por sus conductores). Distinto de "Administrar cuenta", que es
+    // lo personal de quien está usando el sistema.
     label: 'Administración',
     items: [
       {
@@ -160,6 +162,12 @@ const MENU: MenuGroup[] = [
         label: 'Trabajadores',
         to: WORKERS_BASE,
         allowedRoles: WORKER_MAINTENANCE_ROLES,
+      },
+      {
+        icon: UserCog,
+        label: 'Usuarios',
+        to: USERS_BASE,
+        allowedRoles: USER_ACCOUNT_ADMIN_ROLES,
       },
     ],
   },

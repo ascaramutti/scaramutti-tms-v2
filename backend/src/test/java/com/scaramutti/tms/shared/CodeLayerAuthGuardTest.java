@@ -69,6 +69,8 @@ class CodeLayerAuthGuardTest {
         "/workers",
         "/document-types",
         "/roles",
+        "/users",
+        "/user-account-candidates",
         "/auth/me",
     })
     void withoutToken_andWithoutTheRoutePolicy_returns401(String path) {
@@ -117,6 +119,8 @@ class CodeLayerAuthGuardTest {
         "/workers",
         "/document-types",
         "/roles",
+        "/users",
+        "/user-account-candidates",
         "/auth/me",
     })
     void withAValidToken_theGuardLetsThrough(String path) {
@@ -196,6 +200,8 @@ class CodeLayerAuthGuardTest {
         "/workers",
         "/document-types",
         "/roles",
+        "/users",
+        "/user-account-candidates",
         "/auth/me",
     })
     void withTrickyUrls_andWithoutTheRoutePolicy_returns401(String path) {
@@ -212,6 +218,7 @@ class CodeLayerAuthGuardTest {
     @ValueSource(strings = {
         "/workers/1",
         "/clients/1",
+        "/users/1",
     })
     void withTrickyUrls_onPathsWithId_withoutToken_returns401(String path) {
         RoutePolicyTrickyUrls.assertReachingVariantsReturn401WithoutToken(path);

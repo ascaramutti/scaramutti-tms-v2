@@ -338,16 +338,11 @@ public class WorkerService {
         String constraintName = ConstraintViolations.nameOf(cve);
         WorkersError known = constraintName == null ? null : knownConstraints.get(constraintName);
         if (known != null) {
-            // El nombre de la restriccion y la operacion, y NADA de la persona: este nivel
-            // se emite en produccion y el mensaje del servidor trae el valor que choco.
             LOG.warnf("Race condition: UNIQUE %s violation on worker %s", constraintName, what);
             return known.toException();
         }
-        // SIN la excepcion como argumento, y no es un descuido: el mensaje del servidor trae
-        // el VALOR que choco ("Key (document_number)=(...) already exists"), asi que volcar la
-        // cadena de causas escribiria el documento de una persona en el registro de produccion,
-        // que es justo lo que el aviso de arriba se cuida de no hacer. El estado SQL y el nombre
-        // de la restriccion alcanzan para que operaciones sepa que paso.
+        // SIN la excepcion como argumento: el estado SQL y el nombre de la restriccion alcanzan
+        // para que operaciones sepa que paso.
         LOG.errorf("Unhandled DB constraint violation [constraint=%s, sqlState=%s]",
             constraintName, cve.getSQLState());
         return ex;
@@ -356,8 +351,8 @@ public class WorkerService {
 
 
     /**
-     * Edita un trabajador y su ficha de conductor EN UNA SOLA TRANSACCION. Si tiene usuario, la
-     * cuenta no se escribe: su rol es este cargo.
+     * Edita un trabajador y su ficha de conductor EN UNA SOLA TRANSACCION. Si tiene usuario, su rol es
+     * este cargo.
      *
      * <p>Es un REEMPLAZO y no un parche: cada campo del cuerpo pisa al guardado, y un opcional
      * que no viene queda vacio. Por eso no hay comprobaciones de nulo antes de asignar; tratarlas
@@ -374,12 +369,6 @@ public class WorkerService {
      * bloqueo relee la fila, asi que tiene que ocurrir antes de tocar la entidad: quien mute primero
      * y bloquee despues pierde su cambio sin ningun error y deja un rastro que afirma algo que en la
      * fila no esta.
-     *
-     * <p>DEUDA ANOTADA: WRK-011 mira si hay cuenta sin bloquear la tabla de cuentas. Una cuenta
-     * creada o pasada a este trabajador mientras la edicion lo tiene tomado no la espera (salvo
-     * que ya haya escrito un documento nuevo, y ni asi se vuelve a mirar) y puede quedar en un
-     * cargo sin sesion. Hoy ninguna ruta crea ni mueve cuentas; la primera que lo haga tiene que
-     * tomar antes la fila del trabajador y mirar el cargo y la vigencia.
      */
     @Transactional
     public WorkerDetailResponse updateWorker(UpdateWorkerCommand updateWorkerCommand) {
@@ -394,7 +383,6 @@ public class WorkerService {
         workerRankPolicy.assertCanActOn(newRole);
 
         workerRankPolicy.assertCanChangeRoleOf(worker, newRole);
-        assertUserKeepsLogin(worker, newRole);
 
         DocumentType newDocumentType =
             documentTypeRepository.findByIdOptional(updateWorkerCommand.documentTypeId())
@@ -432,6 +420,8 @@ public class WorkerService {
             throw WorkersError.DUPLICATE_LICENSE.toException();
         }
 
+        User accountLosingLogin = losesLogin(worker, newRole)
+            ? workerRowLock.findAccountForUpdate(worker.id).orElse(null) : null;
         Integer currentUserId = currentUser.requireId();
         WorkerFieldChanges changes = new WorkerFieldChanges();
         // TODA la fase de escritura bajo el traductor del bloqueo, no solo la descarga final. La
@@ -447,6 +437,11 @@ public class WorkerService {
         workerRowLock.runTranslatingLockConflicts(() -> {
             applyWorkerChanges(worker, updateWorkerCommand, newRole, newDocumentType, changes, currentUserId);
             applyDriverProfile(worker, existingDriver, transition, updateWorkerCommand.driver(), changes);
+            if (accountLosingLogin != null && Boolean.TRUE.equals(accountLosingLogin.isActive)) {
+                changes.compare(WorkerAuditField.USER_IS_ACTIVE, "true", "false");
+                accountLosingLogin.isActive = false;
+                accountLosingLogin.markChangedBy(currentUserId);
+            }
 
             writeAuditLogs(worker.id, WorkerAuditChangeType.FIELD_EDIT, changes.asList(),
                 updateWorkerCommand.reason(), currentUserId);
@@ -493,6 +488,8 @@ public class WorkerService {
             if (user != null && Boolean.TRUE.equals(user.isActive)) {
                 changes.compare(WorkerAuditField.USER_IS_ACTIVE, "true", "false");
                 user.isActive = false;
+                // Como el trabajador, la cuenta que se apago queda firmada por quien la apago.
+                user.markChangedBy(currentUserId);
             }
             writeAuditLogs(worker.id, WorkerAuditChangeType.DEACTIVATED, changes.asList(), null,
                 currentUserId);
@@ -505,7 +502,7 @@ public class WorkerService {
 
     /**
      * Reactiva al trabajador y enciende su ficha solo si existe y el cargo actual la lleva. La
-     * cuenta NO: eso lo decide el modulo de usuarios, que exigira trabajador activo. Tampoco
+     * cuenta NO: eso lo decide el modulo de usuarios, que exige trabajador activo. Tampoco
      * crea una ficha que no existe; si el cargo la exige, el siguiente PUT la pide.
      */
     @Transactional
@@ -543,9 +540,7 @@ public class WorkerService {
      * al actor. Sin la segunda, dos administradores que se desactivan o se bajan el cargo entre si
      * a la vez pasaban los dos la validacion y la empresa podia quedar sin administradores; con
      * ella, el segundo espera y relee su propio cargo ya cambiado. El orden por id impide el
-     * abrazo mortal. Protege a la cuenta solo porque quien le escribe la vigencia toma antes la
-     * fila de su trabajador (el cargo ya vive ahi): un escritor nuevo de cuentas tiene que hacer lo
-     * mismo.
+     * abrazo mortal.
      * Antes de bloquear: el 404 y el corte a quien ya no escribe, sin cargar nada, en ese orden.
      */
     private Worker lockTargetAndOwnWorker(Integer targetId) {
@@ -576,23 +571,11 @@ public class WorkerService {
     }
 
     /**
-     * Una cuenta no puede quedar con un cargo que no inicia sesion: iniciaria igual, recibiria un
-     * token con un grupo que ningun endpoint acepta y el frontend no sabria donde llevarla. El
-     * camino para dejar a alguien sin acceso es darlo de baja, que apaga la cuenta y deja rastro.
-     *
-     * <p>Solo aplica si el cargo cambia. Sin esa condicion, alguien que ya estuviera en ese estado
-     * no se podria editar nunca mas, ni para corregirle una errata en el telefono.
-     *
-     * <p>Y cuenta que la fila de usuario EXISTA, no que este vigente: una cuenta apagada se puede
-     * volver a encender, y filtrarla aca dejaria armada justo la cuenta rota que esto previene.
+     * Solo si el cargo cambia: reenviar el mismo, aunque no inicie sesion, no toca una cuenta que alguien
+     * dejo encendida a mano.
      */
-    private void assertUserKeepsLogin(Worker worker, Role newRole) {
-        if (worker.role.id.equals(newRole.id) || Boolean.TRUE.equals(newRole.canLogin)) {
-            return;
-        }
-        if (userRepository.existsByWorkerId(worker.id)) {
-            throw WorkersError.ROLE_CANNOT_LOGIN_WITH_USER.toException();
-        }
+    private static boolean losesLogin(Worker worker, Role newRole) {
+        return !worker.role.id.equals(newRole.id) && !Boolean.TRUE.equals(newRole.canLogin);
     }
 
     /**

@@ -48,8 +48,8 @@ info:
 
     ## Roles
 
-    Siete roles del sistema: `admin`, `sales`, `dispatcher`, `general_manager`, `operations_manager`,
-    `finance_manager`, `warehouse_keeper`.
+    Once cargos; los siete nombrados son roles del sistema e inician sesión: `admin`, `sales`,
+    `dispatcher`, `general_manager`, `operations_manager`, `finance_manager`, `warehouse_keeper`.
     `dispatcher` (Coordinador de Operaciones) opera los viajes: ve el listado y el detalle, asigna
     recursos, inicia y finaliza. No crea ni edita servicios, no los cancela ni los elimina y
     **nunca ve precios** (el servidor los omite de sus respuestas y el reporte le responde 403).
@@ -84,7 +84,9 @@ tags:
   - name: SharedCatalogs
     description: Catálogos compartidos de `public` (el listado de trabajadores, la flota unificada y los conductores); sin prefijo de módulo porque los usan Almacén y Operaciones
   - name: Workers
-    description: Trabajadores — el padrón. Hoy trae el alta de un trabajador, su edición, su detalle y sus catálogos (tipos de documento y roles); el cambio de estado llega con la historia siguiente
+    description: 'Trabajadores: el padrón. El alta, la edición, el detalle, el cambio de estado y sus catálogos (tipos de documento y roles)'
+  - name: Users
+    description: Usuarios. Las cuentas del sistema; hoy trae su lista, con el trabajador, el cargo y el estado de cada una, el detalle de una cuenta, con quién la creó y la modificó, el alta con el nombre generado, y desactivarla, reactivarla y restablecer su contraseña
 
 # =============================================================================
 paths:
@@ -97,6 +99,18 @@ paths:
       tags: [Auth]
       operationId: login
       summary: Iniciar sesión
+      description: |
+        Verifica la contraseña antes que la vigencia: con la clave equivocada
+        responde `401 AUTH-001` aunque la cuenta no sea utilizable. Con la
+        clave correcta, la cuenta tiene que ser **utilizable**: la cuenta
+        activa, su trabajador activo y su cargo con `canLogin`. Si falla
+        cualquiera de las tres, `401 AUTH-002`, con el mismo cuerpo en los tres
+        casos.
+
+        El refresh emitido lleva la versión de las sesiones de la cuenta (ver
+        `refreshToken`).
+
+        Orden: `400 COM-001` → `401 AUTH-001` → `401 AUTH-002` → `200`.
       security: []
       requestBody:
         required: true
@@ -143,7 +157,7 @@ paths:
                         message: 'debe tener al menos 8 caracteres'
                         code: 'MIN_LENGTH'
         '401':
-          description: Credenciales inválidas o usuario inactivo
+          description: Credenciales inválidas, o cuenta no utilizable (cuenta inactiva, trabajador dado de baja o cargo que no inicia sesión), con el mismo cuerpo en los tres casos
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -158,8 +172,8 @@ paths:
                     instance: '/api/v1/auth/login'
                     code: 'AUTH-001'
                     traceId: '3a8b1c5d-7e2f-4a9b-8c3d-6e1f4a5b7c2d'
-                userInactive:
-                  summary: Usuario desactivado
+                accountNotUsable:
+                  summary: Cuenta no utilizable (inactiva, trabajador de baja o cargo sin sesión)
                   value:
                     type: 'urn:tms:error:auth-002'
                     title: 'User inactive'
@@ -174,6 +188,25 @@ paths:
       tags: [Auth]
       operationId: refreshToken
       summary: Renovar token de acceso
+      description: |
+        Renueva la sesión con un refresh emitido por `login`, `refreshToken` o
+        `changePassword`. La cuenta tiene que ser utilizable, igual que en el
+        ingreso: si no, o si la cuenta del token ya no existe, `401 AUTH-002`.
+
+        Revocación: el refresh lleva la versión de las sesiones de la cuenta y
+        se compara por igualdad con la actual. Cambiar la propia contraseña,
+        reactivar la cuenta o restablecer su contraseña sube la versión: un
+        refresh anterior responde `401 AUTH-003`, también si se emitió en el
+        mismo segundo. Un refresh sin la
+        versión (emitido antes de que existiera), o con ella nula, cuenta como
+        la inicial y renueva hasta el primer cambio; una versión que no es un
+        entero sin decimales, `401 AUTH-003`. El token de acceso vigente no se
+        revoca: vale hasta su vencimiento (`expiresAt`) y 60 s más de
+        tolerancia de reloj.
+
+        Orden: `400 COM-001` → `401 AUTH-009` o `AUTH-003` (vencido, mal
+        formado, de otro tipo o sin sujeto) → `401 AUTH-002` → `401 AUTH-003`
+        (versión) → `200`.
       security: []
       requestBody:
         required: true
@@ -195,7 +228,7 @@ paths:
               schema: { $ref: '#/components/schemas/LoginResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401':
-          description: Refresh token inválido o expirado, o usuario inactivo
+          description: Refresh vencido, inválido o revocado, o cuenta no utilizable
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
@@ -220,8 +253,18 @@ paths:
                     instance: '/api/v1/auth/refresh'
                     code: 'AUTH-003'
                     traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
-                userInactiveOnRefresh:
-                  summary: El usuario quedó inactivo desde el último login
+                refreshTokenRevoked:
+                  summary: Refresh emitido antes de un cambio de la propia contraseña
+                  value:
+                    type: 'urn:tms:error:auth-003'
+                    title: 'Invalid refresh token'
+                    status: 401
+                    detail: 'Refresh token inválido o revocado'
+                    instance: '/api/v1/auth/refresh'
+                    code: 'AUTH-003'
+                    traceId: '7e3c4d5f-6a7b-4c8d-9e0f-1a2b3c4d5e6f'
+                accountNotUsableOnRefresh:
+                  summary: La cuenta dejó de ser utilizable desde el ingreso
                   value:
                     type: 'urn:tms:error:auth-002'
                     title: 'User inactive'
@@ -235,15 +278,48 @@ paths:
     post:
       tags: [Auth]
       operationId: changePassword
-      summary: Cambiar contraseña del usuario actual
+      summary: Cambiar la contraseña de la cuenta de la sesión
+      description: |
+        Cambia la contraseña de la cuenta de la sesión y responde con una
+        **sesión nueva**: quien la cambia sigue trabajando con esos tokens, y
+        los refresh emitidos antes dejan de renovar (`401 AUTH-003` en
+        `refreshToken`). Deja una fila de rastro "cambió su contraseña",
+        firmada por la propia cuenta y sin valores.
+
+        La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
+        `401 AUTH-002`, sin cambio, también con la actual equivocada (gana
+        sobre `AUTH-004`). Si la actual verifica, la fila de la cuenta se toma y
+        se decide contra la confirmada: si otra escritura cambió la contraseña en
+        el medio, responde `400 AUTH-004` en vez de pisarla. Si otra operación
+        retiene la fila, o una de sus tablas (también la del rastro) mientras el
+        cambio la toma, la lee o la escribe, más allá del tope de espera, `409
+        AUTH-010`, sin cambio:
+        se reintenta. La tabla de cuentas ya tomada en `ACCESS EXCLUSIVE` al
+        llegar el pedido (una migración) lo hace esperar, como al ingreso.
+
+        Orden (el `409 AUTH-010` no entra en la cadena): `401` (token) → `400
+        COM-001` → `404 AUTH-005` → `401 AUTH-002` → `400 AUTH-004` → `200`.
       requestBody:
         required: true
         content:
           application/json:
             schema: { $ref: '#/components/schemas/ChangePasswordRequest' }
       responses:
-        '204':
-          description: Contraseña actualizada
+        '200':
+          description: Contraseña cambiada; la sesión nueva
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo trae los tokens de la sesión nueva (RFC 6749, §5.1)'
+              schema: { type: string }
+            Pragma:
+              description: 'Siempre `no-cache`: lo pide RFC 6749 (§5.1) junto al `no-store`'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo es el de la cuenta del token, así que ninguna cache puede reusarlo para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoginResponse' }
         '400':
           description: 'Validación de contraseña fallida (también una que BCrypt no acepta: más de 72 bytes, un nulo o un surrogate suelto) o contraseña actual incorrecta'
           content:
@@ -274,15 +350,50 @@ paths:
                     instance: '/api/v1/auth/change-password'
                     code: 'AUTH-004'
                     traceId: '6f4e3d2c-1b0a-9f8e-7d6c-5b4a3f2e1d0c'
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401':
+          description: "Token de acceso expirado o inválido, o cuenta no utilizable. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                tokenExpired:
+                  summary: Token de acceso expirado
+                  value:
+                    type: 'urn:tms:error:auth-007'
+                    title: 'Token expired'
+                    status: 401
+                    detail: 'El token de acceso expiró. Use /auth/refresh para renovarlo.'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-007'
+                    traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
+                tokenInvalid:
+                  summary: Token mal formado, no firmado por este servidor, o que no es de acceso (por ejemplo, el de renovación)
+                  value:
+                    type: 'urn:tms:error:auth-008'
+                    title: 'Token invalid'
+                    status: 401
+                    detail: 'El token de acceso es inválido o está mal formado'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-008'
+                    traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+                accountNotUsable:
+                  summary: La cuenta de la sesión ya no es utilizable (inactiva, trabajador de baja o cargo sin sesión)
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-002'
+                    traceId: '4b9c2d6e-8f3a-4b1c-9d4e-7f2a5b8c1d3e'
         '404':
-          description: El usuario del token ya no existe
+          description: La cuenta del token ya no existe
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
               examples:
                 userNotFound:
-                  summary: El usuario referenciado por el token fue eliminado
+                  summary: La cuenta referenciada por el token no existe
                   value:
                     type: 'urn:tms:error:auth-005'
                     title: 'User not found'
@@ -291,12 +402,33 @@ paths:
                     instance: '/api/v1/auth/change-password'
                     code: 'AUTH-005'
                     traceId: '1a2b3c4d-5e6f-7a8b-9c0d-1e2f3a4b5c6d'
+        '409':
+          description: 'Conflicto transitorio: otra operación retuvo la fila de la cuenta, o una de sus tablas (también la del rastro) mientras el cambio la tomaba, la leía o la escribía, más allá del tope; se reintenta'
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                accountBusyOnPasswordChange:
+                  summary: La cuenta está siendo modificada por otra operación
+                  value:
+                    type: 'urn:tms:error:auth-010'
+                    title: 'Account busy'
+                    status: 409
+                    detail: 'La cuenta está siendo modificada por otra operación'
+                    instance: '/api/v1/auth/change-password'
+                    code: 'AUTH-010'
+                    traceId: '3e4f5a6b-7c8d-4e9f-8a0b-1c2d3e4f5a6b'
 
   /auth/me:
     get:
       tags: [Auth]
       operationId: getCurrentUser
-      summary: Obtener datos del usuario autenticado
+      summary: Obtener la cuenta de la sesión
+      description: |
+        La cuenta tiene que ser utilizable, igual que en el ingreso: si no,
+        `401 AUTH-002`.
+
+        Orden: `401` (token) → `404 AUTH-005` → `401 AUTH-002` → `200`.
       responses:
         '200':
           description: OK
@@ -310,15 +442,50 @@ paths:
           content:
             application/json:
               schema: { $ref: '#/components/schemas/SessionUser' }
-        '401': { $ref: '#/components/responses/Unauthorized' }
+        '401':
+          description: "Token de acceso expirado o inválido, o cuenta no utilizable. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`."
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              examples:
+                tokenExpired:
+                  summary: Token de acceso expirado
+                  value:
+                    type: 'urn:tms:error:auth-007'
+                    title: 'Token expired'
+                    status: 401
+                    detail: 'El token de acceso expiró. Use /auth/refresh para renovarlo.'
+                    instance: '/api/v1/auth/me'
+                    code: 'AUTH-007'
+                    traceId: '8d2e4f6a-1b3c-4d5e-7f8a-9b0c1d2e3f4a'
+                tokenInvalid:
+                  summary: Token mal formado, no firmado por este servidor, o que no es de acceso (por ejemplo, el de renovación)
+                  value:
+                    type: 'urn:tms:error:auth-008'
+                    title: 'Token invalid'
+                    status: 401
+                    detail: 'El token de acceso es inválido o está mal formado'
+                    instance: '/api/v1/auth/me'
+                    code: 'AUTH-008'
+                    traceId: '5c1a2b3d-4e5f-6a7b-8c9d-0e1f2a3b4c5d'
+                accountNotUsable:
+                  summary: La cuenta de la sesión ya no es utilizable (inactiva, trabajador de baja o cargo sin sesión)
+                  value:
+                    type: 'urn:tms:error:auth-002'
+                    title: 'User inactive'
+                    status: 401
+                    detail: 'El usuario está desactivado'
+                    instance: '/api/v1/auth/me'
+                    code: 'AUTH-002'
+                    traceId: '4b9c2d6e-8f3a-4b1c-9d4e-7f2a5b8c1d3e'
         '404':
-          description: El usuario del token ya no existe
+          description: La cuenta del token ya no existe
           content:
             application/problem+json:
               schema: { $ref: '#/components/schemas/Problem' }
               examples:
                 userNotFound:
-                  summary: El usuario referenciado por el token fue eliminado
+                  summary: La cuenta referenciada por el token no existe
                   value:
                     type: 'urn:tms:error:auth-005'
                     title: 'User not found'
@@ -1294,7 +1461,7 @@ paths:
         (nivel 4 a 1; a igual nivel, por `id`): nombre de sistema (`name`, lo
         que viaja en `role` del request y en el rol de la sesión), nombre visible
         (`description`, el cargo que muestran el pie del menú y el PDF),
-        nivel, si el rol puede tener usuario (`canLogin`) y modalidad de ficha
+        nivel, si el rol inicia sesión (`canLogin`) y modalidad de ficha
         de conductor. El mismo catálogo para todos los roles: el cliente
         esconde los de nivel igual o mayor al del rol de la sesión (para
         `admin` ofrece todos); la autoridad es el `403 WRK-006` de las
@@ -1432,8 +1599,8 @@ paths:
         permitir correcciones a mano; la guarda es del formulario. Deja una fila
         de auditoría `CREATED`. `isActive`, `createdAt`, `createdBy`,
         `updatedAt` y `updatedBy` los pone el servidor y el cuerpo no los mueve;
-        `hasUser` sale en `false` (el usuario lo crea el módulo de usuarios,
-        con el rol del trabajador).
+        `account` sale nula y `hasUser` en `false` (la cuenta la crea el
+        módulo de usuarios, con el rol del trabajador).
 
         Orden de evaluación: `401` → `403 COM-003` → `400 COM-001` (cuerpo
         vacío, nulo o campo inválido, incluida la ficha) → `400 WRK-005` →
@@ -1483,8 +1650,9 @@ paths:
         Devuelve el trabajador con ese `id`, esté activo o inactivo, con su tipo
         de documento, su rol (`role`: nombre de sistema, nombre visible, nivel,
         si inicia sesión y modalidad de ficha), su fecha de ingreso, su ficha
-        de conductor (`driver`, nula si no hay fila en `drivers`), si tiene
-        usuario del sistema (`hasUser`) y quién lo creó y lo modificó por
+        de conductor (`driver`, nula si no hay fila en `drivers`), su cuenta
+        del sistema (`account`, activa o inactiva, nula si no tiene; `hasUser`
+        es lo mismo que `account` no nula) y quién lo creó y lo modificó por
         última vez. En las filas anteriores a esta unidad, `createdBy` es el
         usuario `admin`, que las cargó (nulo si no había admin al migrar), y
         `updatedBy` es nulo hasta su primera edición, baja o reactivación
@@ -1554,12 +1722,14 @@ paths:
         su trabajador. Si `role` cambia, la cuenta queda con el rol nuevo en la
         MISMA transacción (los grupos del token rigen hasta el próximo inicio de
         sesión o refresco; `/auth/me` y las escrituras de trabajadores ya leen el
-        cargo nuevo), y el cambio de cargo deja una sola fila de auditoría, la
-        del cargo: la cuenta no suma otra.
-        Cambiar a un rol que no inicia sesión a alguien que tiene usuario →
-        `400 WRK-011`: una cuenta no puede quedar con un rol sin permisos; el
-        camino para dejar a alguien sin acceso es desactivarlo. Cuenta que la
-        fila de usuario EXISTA, esté activa o no.
+        cargo nuevo).
+        Si el rol nuevo no inicia sesión y la cuenta está activa, la cuenta se
+        desactiva en la MISMA transacción y deja una fila en el rastro del
+        trabajador (`user.isActive`, de `true` a `false`, con el motivo si
+        vino), además de la del cargo, y la respuesta ya la trae apagada
+        (`account.isActive` en `false`). Una cuenta ya inactiva no se toca. Reenviar el mismo rol
+        no toca la cuenta, y volver a un rol que inicia sesión no la reactiva:
+        eso se hace desde Usuarios.
 
         Ficha (RN-11): si hay fila en `drivers`, `driver` la actualiza
         (`status` ausente → se conserva el actual, a diferencia del alta); si
@@ -1588,8 +1758,10 @@ paths:
         trabajador se serializan, y dos ediciones cruzadas también. La segunda
         relee el cargo actual de quien actúa: si dos administradores se bajan el
         cargo entre sí a la vez, la segunda sale `403 WRK-006` si su cargo nuevo
-        todavía escribe, o `403 COM-003` si ya no. Si otra operación
-        retiene una de las dos más allá del tope de espera → `409 WRK-013`, que
+        todavía escribe, o `403 COM-003` si ya no. Si el rol cambia a uno
+        que no inicia sesión y el trabajador tiene cuenta, activa o no, toma
+        también su fila antes de escribir. Si otra operación retiene una de
+        esas filas más allá del tope de espera → `409 WRK-013`, que
         es transitorio y se reintenta. Sin `If-Match`: entre dos escrituras
         serializadas gana la última.
 
@@ -1599,8 +1771,8 @@ paths:
         vacío, nulo o campo inválido, incluida la ficha) → `404 WRK-001` (el
         `id` no numérico devuelve `404` sin cuerpo) → `403 WRK-006` (rol
         actual) → `400 WRK-005` → `403 WRK-006` (rol nuevo) → `403 WRK-012` →
-        `400 WRK-011` → `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400
-        WRK-009` → `409 WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
+        `400 WRK-003` → `400 WRK-004` → `400 WRK-008` → `400 WRK-009` → `409
+        WRK-002` → `409 WRK-007`. Una sesión cuyo usuario ya no
         puede escribir (cuenta apagada, rol actual en la base fuera de los cuatro de
         escritura, o trabajador dado de baja) sale como `403 COM-003` en el primer
         escalón del organigrama, después del `404`.
@@ -1641,10 +1813,12 @@ paths:
         ficha de conductor (`drivers.is_active`) y su usuario del sistema
         (`users.is_active`), si existen: quien se fue no inicia sesión ni se
         asigna a un viaje (la sesión abierta, si la hay, sigue hasta que venza
-        su access token; el refresco ya la frena). Idempotente: sobre un
-        inactivo responde `200` sin cambio, sin código de error, sin fila de
-        auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si llega uno,
-        o cualquier `Content-Type`, se ignora.
+        su access token donde no se mira la cuenta; la renovación, `/auth/me` y
+        el cambio de contraseña ya la frenan). Si la baja apaga la cuenta, la
+        respuesta ya la trae apagada (`account.isActive` en `false`).
+        Idempotente: sobre un inactivo responde `200` sin cambio, sin código de
+        error, sin fila de auditoría y sin mover `updatedAt`/`updatedBy`. Sin
+        cuerpo: si llega uno, o cualquier `Content-Type`, se ignora.
 
         Nadie desactiva su propio trabajador (el de `users.worker_id` de la
         sesión), tampoco `admin` → `403 WRK-010`. Organigrama (RN-09): el nivel
@@ -1699,8 +1873,9 @@ paths:
       description: |
         Marca `isActive = true` y enciende su ficha de conductor solo si existe
         y el rol actual la lleva; un rol `OPTIONAL` la enciende aunque una
-        edición anterior la haya apagado. **No reactiva el usuario**: eso lo
-        hace el módulo de usuarios, que exigirá trabajador activo. Tampoco crea
+        edición anterior la haya apagado. **No reactiva el usuario** (`account`
+        sale como estaba): eso lo hace el módulo de usuarios, que exige
+        trabajador activo. Tampoco crea
         una ficha que no existe. Idempotente: sobre un activo responde `200` sin
         cambio, sin auditoría y sin mover `updatedAt`/`updatedBy`. Sin cuerpo: si
         llega uno, o cualquier `Content-Type`, se ignora.
@@ -1816,6 +1991,411 @@ paths:
               schema:
                 type: array
                 items: { $ref: '#/components/schemas/DriverResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ----- Users ----------------------------------------------------------------
+
+  /users:
+    get:
+      tags: [Users]
+      operationId: listUserAccounts
+      summary: Listar las cuentas del sistema
+      description: |
+        Todas las cuentas, sin texto de búsqueda (son decenas), con su
+        trabajador, su cargo (el del trabajador) y su estado. `isActive=true`
+        trae las activas; `false`, las inactivas; sin el parámetro, todas.
+        Orden: nombre de usuario y, a igualdad, `id`. Sin paginar.
+
+        Lectura plana para los cuatro cargos que administran cuentas: cada uno
+        ve todas, también las de cargos por encima del suyo. Se decide por el
+        cargo del token. La respuesta no trae el hash ni la versión de las
+        sesiones.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      parameters:
+        - name: isActive
+          in: query
+          description: Activas (`true`), inactivas (`false`) o todas (sin el parámetro).
+          schema: { type: boolean }
+      responses:
+        '200':
+          description: Cuentas
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserAccountSummaryResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Users]
+      operationId: createUserAccount
+      summary: Crear la cuenta de un trabajador, con el nombre de usuario generado
+      description: |
+        Crea la cuenta del trabajador `workerId`. El nombre de usuario y la
+        contraseña temporal los genera el servidor. El nombre: inicial del
+        nombre y apellido paterno, normalizados y recortados a 50 caracteres
+        con el sufijo incluido; si está tomado, `1`, `2`…; el materno entra
+        solo en el respaldo para nombres cortos. La
+        temporal: 12 caracteres al azar (`SecureRandom`) de un alfabeto sin
+        caracteres ambiguos (sin `0`, `O`, `o`, `1`, `l`, `I` ni `i`). El cuerpo
+        no trae nombre, contraseña, cargo ni estado, y si los trae se ignoran.
+        La cuenta nace activa, con el cargo del trabajador, con la versión
+        inicial de las sesiones y con `createdBy` igual a la sesión. Deja una
+        fila de rastro de alta, sin la contraseña.
+
+        La temporal sale **una sola vez**, en `temporaryPassword` de esta
+        respuesta, para quien hizo el alta: se guarda solo su hash y ninguna
+        otra respuesta, log ni rastro la contiene. Si la respuesta se pierde,
+        no se recupera: el reintento responde `409 USR-003` y se restablece con
+        `resetUserAccountPassword`. Nada obliga a cambiarla al entrar: la
+        persona la cambia con `changePassword`.
+
+        Tomado es cualquier cuenta actual, activa o inactiva, sin distinguir
+        mayúsculas. Dos altas simultáneas que generan el mismo nombre: la
+        segunda responde `409 USR-002`, sin fila nueva, o `409 USR-009` si la
+        primera no confirma antes del tope; se reintenta y sale el siguiente.
+
+        El trabajador: inexistente → `400 USR-004`; fuera del rango de la
+        sesión (su cargo de nivel igual o mayor; `admin` exento) → `403
+        USR-008`; dado de baja → `409 USR-005`; cargo que no inicia sesión →
+        `400 USR-006`; con cuenta, activa o inactiva → `409 USR-003`.
+
+        Quien escribe se relee de la base: cuenta activa, trabajador activo y
+        uno de los cuatro cargos; si no, `403 COM-003`. Toma antes la fila del
+        trabajador; si otra operación retiene más allá del tope esa fila, lo que
+        el alta escribe o la cuenta de quien escribe → `409 USR-009`,
+        transitorio.
+
+        Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+        `400 COM-001` → `400 USR-004` → `403 COM-003` (actor) → `403 USR-008` →
+        `409 USR-005` → `400 USR-006` → `409 USR-003` → `409 USR-002` → `201`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UserAccountCreateRequest' }
+            example:
+              workerId: 31
+      responses:
+        '201':
+          description: Cuenta creada, con la temporal generada (se muestra una sola vez)
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountTemporaryPasswordResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdInt'
+    get:
+      tags: [Users]
+      operationId: getUserAccount
+      summary: Obtener una cuenta del sistema
+      description: |
+        La cuenta con ese `id`, activa o inactiva: lo de la lista más el nombre
+        del trabajador en partes (nombres, paterno y materno, este nulo si no
+        tiene), y quién la creó y la modificó por última vez y cuándo.
+        `createdBy` es nulo en las cuentas que no se dieron de alta por la API.
+        `updatedBy` es nulo hasta el primer cambio posterior al alta que deja
+        rastro. Hoy dejan rastro el cambio propio de contraseña, que firma la
+        propia cuenta, desactivarla, reactivarla y restablecer su contraseña,
+        que firma quien lo hace, la baja de su trabajador desde Trabajadores
+        cuando apaga la cuenta, que firma quien la da, y la edición que pasa a
+        su trabajador a un rol que no inicia sesión con la cuenta activa, que
+        firma quien edita. La respuesta no trae el hash ni la versión de las
+        sesiones.
+
+        Lectura plana para los cuatro cargos que administran cuentas, por el
+        cargo del token; el resto → `403 COM-003`, también con un `id` que no
+        existe o que no encaja en un entero.
+
+        `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+        cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+        sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+        recurso.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: OK
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{id}/deactivate:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Users]
+      operationId: deactivateUserAccount
+      summary: Desactivar una cuenta del sistema
+      description: |
+        Marca la cuenta inactiva: ya no ingresa ni renueva (`401 AUTH-002`), y
+        `/auth/me` con su token responde `401 AUTH-002`. No toca al trabajador.
+        Un token de acceso suyo ya emitido sigue valiendo hasta que vence, más
+        60 s de margen de reloj, para leer y para escribir donde no se relee a
+        quien escribe. Las escrituras de Usuarios y Trabajadores sí lo releen y
+        responden `403 COM-003`.
+        Deja una fila `DEACTIVATED` en el rastro de la cuenta (`isActive`, de
+        `true` a `false`) y la firma quien la desactiva.
+
+        Idempotente: sobre una inactiva responde `200` sin cambio, sin fila de
+        rastro y sin firma. Sin cuerpo: si llega uno, o cualquier
+        `Content-Type`, se ignora.
+
+        Nadie desactiva su propia cuenta, tampoco `admin` → `403 USR-007`, antes
+        del rango. Rango: el cargo de la cuenta tiene que ser de nivel
+        estrictamente menor al de quien escribe; `admin` exento, y un `admin`
+        desactiva a otro `admin`. Las guardas corren antes del corte idempotente.
+
+        Quien escribe se relee de la base después de tomar la fila de la cuenta.
+        Si otra operación retiene esa fila, una de sus tablas o la secuencia del
+        rastro más allá del tope → `409 USR-009`.
+
+        `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+        cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+        sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+        recurso.
+
+        Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+        `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-007` →
+        `403 USR-008` → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: La cuenta con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /users/{id}/reactivate:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Users]
+      operationId: reactivateUserAccount
+      summary: Reactivar una cuenta del sistema
+      description: |
+        Marca la cuenta activa y sube la versión de sus sesiones: un refresh
+        emitido antes de la baja ya no renueva (`401 AUTH-003`), y uno de un
+        ingreso posterior sí. Un token de acceso emitido antes de la baja
+        vuelve a servir hasta que vence, más 60 s de margen de reloj. No toca
+        la contraseña ni al trabajador.
+        Deja una fila `REACTIVATED` en el rastro de la cuenta (`isActive`, de
+        `false` a `true`) y la firma quien la reactiva.
+
+        Exige el trabajador de la cuenta activo → si no, `409 USR-005`; y su
+        cargo con inicio de sesión → si no, `400 USR-006`. Si coincide con la
+        baja de su trabajador desde Trabajadores, la cuenta puede quedar activa
+        sobre el trabajador de baja: no ingresa mientras dure la baja, pero
+        vuelve a ingresar si Trabajadores reactiva al trabajador, sin pasar por
+        Usuarios. Se corrige desactivándola.
+
+        Idempotente: sobre una activa responde `200` sin cambio, sin fila de
+        rastro, sin firma y sin subir la versión. Las guardas y las dos reglas
+        corren antes del corte: una cuenta activa con su trabajador de baja
+        responde `409 USR-005`. Sin cuerpo: si llega uno, o cualquier
+        `Content-Type`, se ignora.
+
+        Rango: el cargo de la cuenta tiene que ser de nivel estrictamente menor
+        al de quien escribe; `admin` exento. La propia cuenta inactiva no se
+        reactiva: su sesión ya no escribe (`403 COM-003`).
+
+        Quien escribe y el trabajador de la cuenta se releen de la base después
+        de tomar la fila de la cuenta. Si otra operación retiene esa fila, una
+        de sus tablas o la secuencia del rastro más allá del tope →
+        `409 USR-009`.
+
+        `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+        cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+        sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+        recurso.
+
+        Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+        `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-008` →
+        `409 USR-005` → `400 USR-006` → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: La cuenta con el estado resultante
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /users/{id}/reset-password:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    post:
+      tags: [Users]
+      operationId: resetUserAccountPassword
+      summary: Restablecer la contraseña de una cuenta del sistema
+      description: |
+        Genera una contraseña temporal nueva (12 caracteres al azar, sin
+        caracteres ambiguos), la fija como la de la cuenta y sube la versión de
+        sus sesiones: un refresh emitido antes ya no renueva (`401 AUTH-003`).
+        Un token de acceso suyo ya emitido sigue valiendo hasta que vence, más
+        60 s de margen de reloj. No toca el estado de la cuenta ni al
+        trabajador.
+        Deja una fila `PASSWORD_RESET` en el rastro de la cuenta (`password`,
+        sin valores) y la firma quien restablece.
+
+        La temporal sale **una sola vez**, en `temporaryPassword` de esta
+        respuesta: se guarda solo su hash, y ninguna otra respuesta, log ni
+        rastro la contiene. Nada obliga a cambiarla al entrar: la persona la
+        cambia con `changePassword`.
+
+        Sin corte idempotente: cada llamada genera una temporal nueva y la
+        anterior deja de servir. Responde `200` también sobre una cuenta
+        inactiva, una cuyo trabajador está de baja o una de un cargo sin inicio
+        de sesión: la temporal sirve cuando la cuenta vuelva a poder ingresar.
+        Sin cuerpo: si llega uno, o cualquier `Content-Type`, se ignora, también
+        un `temporaryPassword`, que no entra como clave.
+
+        Nadie restablece su propia cuenta, tampoco `admin` → `403 USR-007`,
+        antes del rango: la propia se cambia con `changePassword`, que pide la
+        actual. Rango: el cargo de la cuenta tiene que ser de nivel
+        estrictamente menor al de quien escribe; `admin` exento, y un `admin`
+        restablece a otro `admin`.
+
+        Quien escribe se relee de la base después de tomar la fila de la cuenta.
+        Si otra operación retiene esa fila, una de sus tablas o la secuencia del
+        rastro más allá del tope → `409 USR-009`, sin cambios. Con un cambio
+        propio de la contraseña a la vez, los dos se ordenan sobre la fila: si
+        el restablecimiento responde `200`, queda la temporal, y una sesión
+        emitida por el cambio propio deja de renovar.
+
+        `404` cubre dos casos: `id` numérico que no existe → `USR-001` con
+        cuerpo `Problem`; `id` que no encaja en un entero de 32 bits → `404`
+        sin cuerpo, porque el conversor de parámetros falla antes de llegar al
+        recurso.
+
+        Orden (el `409 USR-009` no entra en la cadena): `401` → `403 COM-003` →
+        `404 USR-001` → `403 COM-003` (quien escribe) → `403 USR-007` →
+        `403 USR-008` → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      responses:
+        '200':
+          description: La cuenta con el estado resultante y la temporal generada, que no se vuelve a mostrar
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: ninguna cache reusa la respuesta para otro usuario'
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/UserAccountTemporaryPasswordResponse' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /user-account-candidates:
+    get:
+      tags: [Users]
+      operationId: listUserAccountCandidates
+      summary: Listar los trabajadores elegibles para una cuenta
+      description: |
+        Los trabajadores **activos, sin cuenta** (ni activa ni inactiva), **con
+        cargo que inicia sesión** y **de nivel estrictamente menor** al del cargo
+        de la sesión (`admin`: de cualquier nivel). El nivel de la sesión se lee
+        de la base; es un filtro de presentación: la autoridad es el `403
+        USR-008` del alta. Quien pregunta se relee de la base, como en el alta:
+        cuenta activa, trabajador activo y uno de los cuatro cargos; si no,
+        `403 COM-003`.
+
+        Cada uno trae `proposedUsername`, el nombre que generaría el alta si se
+        hiciera ahora. **Es orientativo:** el alta lo recalcula y, si otra cuenta
+        lo tomó en el medio, sale el siguiente; dos homónimos muestran la misma
+        propuesta.
+
+        `q` es multi-palabra, sin distinguir mayúsculas, con mínimo 3
+        caracteres: cada palabra calza en el nombre o en un apellido. `workerId`
+        limita a ese trabajador (cero o un elemento); si no es un entero, `404`
+        sin cuerpo. Los dos se combinan. Sin parámetros, todos los elegibles, en
+        el orden de la búsqueda del padrón y, entre homónimos, por id. Sin
+        paginar.
+
+        Orden: `401` → `403 COM-003` → `404` (`workerId` no entero) → `400
+        COM-001` → `403 COM-003` (quien pregunta) → `200`.
+      x-required-roles: [admin, general_manager, operations_manager, finance_manager]
+      parameters:
+        - name: q
+          in: query
+          description: Búsqueda por nombre o apellidos. Mínimo 3 caracteres; con uno o dos, 400. Enviarlo vacío (`q=`) equivale a omitirlo y no filtra.
+          schema: { type: string, minLength: 3, maxLength: 200 }
+        - name: workerId
+          in: query
+          description: Solo ese trabajador, si es elegible.
+          schema: { type: integer, format: int32 }
+      responses:
+        '200':
+          description: Trabajadores elegibles
+          headers:
+            Cache-Control:
+              description: 'Siempre `no-store`: el cuerpo es sensible y no debe sobrevivir a la sesión en el navegador'
+              schema: { type: string }
+            Vary:
+              description: 'Siempre `Authorization`: el cuerpo depende del cargo de quien pregunta'
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserAccountCandidateResponse' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -3668,6 +4248,26 @@ components:
                 instance: '/api/v1/quotations'
                 code: 'COM-002'
                 traceId: '9e1f3c5d-2a4b-4c6e-9d8f-1b2a3c4d5e6f'
+            workerNotFoundForAccount:
+              summary: El trabajador del alta no existe
+              value:
+                type: 'urn:tms:error:usr-004'
+                title: 'Bad Request'
+                status: 400
+                detail: 'El trabajador no existe'
+                instance: '/api/v1/users'
+                code: 'USR-004'
+                traceId: '7d8e9f0a-1b2c-4d3e-8f4a-5b6c7d8e9f0a'
+            roleCannotLoginForAccount:
+              summary: El cargo del trabajador no inicia sesión (alta o reactivación)
+              value:
+                type: 'urn:tms:error:usr-006'
+                title: 'Bad Request'
+                status: 400
+                detail: 'El cargo del trabajador no inicia sesión'
+                instance: '/api/v1/users/12/reactivate'
+                code: 'USR-006'
+                traceId: '9f0a1b2c-3d4e-4f5a-8b6c-7d8e9f0a1b2c'
     Unauthorized:
       description: "Token de acceso expirado o inválido. Sin token Bearer responde 401 sin cuerpo, con `WWW-Authenticate: Bearer`."
       content:
@@ -3730,6 +4330,26 @@ components:
                 instance: '/api/v1/workers'
                 code: 'WRK-006'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            userAccountSelf:
+              summary: Acción sobre la propia cuenta (desactivar o restablecer)
+              value:
+                type: 'urn:tms:error:usr-007'
+                title: 'Forbidden'
+                status: 403
+                detail: 'No puedes hacer esto sobre tu propia cuenta'
+                instance: '/api/v1/users/3/deactivate'
+                code: 'USR-007'
+                traceId: '0a1b2c3d-4e5f-4a6b-9c7d-8e9f0a1b2c3e'
+            userAccountOutOfRank:
+              summary: Cuenta de un cargo fuera del alcance de quien escribe
+              value:
+                type: 'urn:tms:error:usr-008'
+                title: 'Forbidden'
+                status: 403
+                detail: 'No puedes gestionar cuentas de ese cargo'
+                instance: '/api/v1/users/5/deactivate'
+                code: 'USR-008'
+                traceId: '1b2c3d4e-5f6a-4b7c-8d8e-9f0a1b2c3d4f'
             insufficientRole:
               summary: Rol insuficiente para la operación
               value:
@@ -3766,6 +4386,16 @@ components:
                 instance: '/api/v1/workers/999'
                 code: 'WRK-001'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            userAccountNotFound:
+              summary: Cuenta inexistente
+              value:
+                type: 'urn:tms:error:usr-001'
+                title: 'Not Found'
+                status: 404
+                detail: 'Cuenta no encontrada'
+                instance: '/api/v1/users/999'
+                code: 'USR-001'
+                traceId: '4a5b6c7d-8e9f-4a0b-9c1d-2e3f4a5b6c7d'
             quotationNotFound:
               summary: Cotización inexistente
               value:
@@ -3812,6 +4442,46 @@ components:
                 instance: '/api/v1/workers/8'
                 code: 'WRK-013'
                 traceId: '7f8a9b0c-1d2e-3f4a-5b6c-7d8e9f0a1b2c'
+            usernameTaken:
+              summary: El nombre generado lo tomó otra alta a la vez (se reintenta y sale el siguiente)
+              value:
+                type: 'urn:tms:error:usr-002'
+                title: 'Conflict'
+                status: 409
+                detail: 'Ya existe una cuenta con ese nombre de usuario'
+                instance: '/api/v1/users'
+                code: 'USR-002'
+                traceId: '5b6c7d8e-9f0a-4b1c-8d2e-3f4a5b6c7d8e'
+            workerHasAccount:
+              summary: El trabajador ya tiene cuenta, activa o inactiva
+              value:
+                type: 'urn:tms:error:usr-003'
+                title: 'Conflict'
+                status: 409
+                detail: 'El trabajador ya tiene una cuenta'
+                instance: '/api/v1/users'
+                code: 'USR-003'
+                traceId: '6c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e9f'
+            userAccountLocked:
+              summary: La cuenta o su trabajador los tiene otra operación (conflicto transitorio; se reintenta)
+              value:
+                type: 'urn:tms:error:usr-009'
+                title: 'Conflict'
+                status: 409
+                detail: 'La cuenta está siendo modificada por otra operación'
+                instance: '/api/v1/users/12/deactivate'
+                code: 'USR-009'
+                traceId: '2c3d4e5f-6a7b-4c8d-9e9f-0a1b2c3d4e5a'
+            workerInactiveForAccount:
+              summary: El trabajador está dado de baja (alta o reactivación)
+              value:
+                type: 'urn:tms:error:usr-005'
+                title: 'Conflict'
+                status: 409
+                detail: 'El trabajador está dado de baja'
+                instance: '/api/v1/users/12/reactivate'
+                code: 'USR-005'
+                traceId: '8e9f0a1b-2c3d-4e4f-9a5b-6c7d8e9f0a1b'
             duplicateWorkerLicense:
               summary: Numero de licencia de otra ficha
               value:
@@ -4090,7 +4760,7 @@ components:
           type: string
           minLength: 200
           maxLength: 4096
-          description: 'JWT firmado emitido previamente por /auth/login o /auth/refresh.'
+          description: 'JWT firmado emitido previamente por /auth/login, /auth/refresh o /auth/change-password.'
 
     ChangePasswordRequest:
       type: object
@@ -4134,19 +4804,20 @@ components:
         - type: object
           required: [role, isActive]
           properties:
-            role:     { $ref: '#/components/schemas/UserRole' }
+            role:     { type: string, description: 'El nombre de sistema del cargo del trabajador; puede ser uno que no inicia sesión', example: 'sales' }
             isActive: { type: boolean }
 
     SessionUser:
       description: |
-        El usuario de la sesión (login, refresh y /auth/me): el de UserResponse más el id de su
-        trabajador, para reconocer la ficha propia. Los autores embebidos en otras respuestas
-        (UserResponse o UserRef) no lo traen.
+        El usuario de la sesión (login, refresh, change-password y /auth/me): el de UserResponse
+        más el id de su trabajador, para reconocer la ficha propia, y con un rol que inicia sesión.
+        Los autores embebidos en otras respuestas (UserResponse o UserRef) no traen ese id.
       allOf:
         - $ref: '#/components/schemas/UserResponse'
         - type: object
-          required: [workerId]
+          required: [role, workerId]
           properties:
+            role:     { $ref: '#/components/schemas/UserRole' }
             workerId: { type: integer, format: int32, description: 'ID del trabajador de la cuenta; toda cuenta tiene uno', example: 29119 }
 
     # -------- Catálogos: Client --------------------------------------------
@@ -4842,7 +5513,7 @@ components:
         organigrama, de 4 a 1, y llega en este mismo catálogo: solo se escribe
         sobre cargos de nivel estrictamente menor al propio, con `admin` exento;
         `canLogin` dice si
-        el rol puede tener usuario, y NO se deduce del nivel (hay cargos del
+        el rol inicia sesión, y NO se deduce del nivel (hay cargos del
         mismo nivel que sí inician sesión y otros que nunca).
       required: [name, description, level, canLogin, driverProfile]
       properties:
@@ -4947,13 +5618,22 @@ components:
           properties:
             reason: { type: [string, 'null'], maxLength: 500, example: 'Corrección del DNI mal digitado en el alta' }
 
+    WorkerAccountRef:
+      type: object
+      description: La cuenta del sistema de un trabajador, para enlazarla desde su ficha.
+      required: [id, username, isActive]
+      properties:
+        id:       { type: integer, format: int32, example: 12 }
+        username: { type: string, maxLength: 50, example: 'jperez' }
+        isActive: { type: boolean, example: true }
+
     WorkerDetailResponse:
       type: object
       description: |
-        Ficha completa de un trabajador. `role` es su rol (la misma fila que
-        lleva su usuario, si lo tiene). `hasUser` dice si hay una fila en
-        `public.users` para él (el usuario lo administra el módulo de
-        usuarios). En los trabajadores cargados antes de que existiera esta
+        Ficha completa de un trabajador. `role` es su cargo. `account` es su
+        cuenta del sistema, activa o inactiva, o nula si no tiene (la
+        administra el módulo de usuarios); `hasUser` es lo mismo que
+        `account` no nula. En los trabajadores cargados antes de que existiera esta
         unidad, `createdBy` es el usuario `admin`, que los cargó (nulo si no
         había admin al migrar, o en un trabajador creado por SQL antes que el
         primer usuario), y `updatedBy` es nulo hasta su primera edición, baja
@@ -4962,7 +5642,7 @@ components:
         `fullName` une nombres, paterno y materno con un espacio, sin el
         materno si es nulo, y recorta los espacios de los extremos;
         `maternalLastName` es nulo si el trabajador no tiene materno.
-      required: [id, firstName, paternalLastName, maternalLastName, fullName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser]
+      required: [id, firstName, paternalLastName, maternalLastName, fullName, documentType, documentNumber, role, hireDate, isActive, createdAt, updatedAt, hasUser, account]
       properties:
         id:             { type: integer, format: int32, example: 8 }
         firstName:      { type: string, example: 'Juan' }
@@ -4989,7 +5669,132 @@ components:
           anyOf:
             - $ref: '#/components/schemas/WorkerDriverProfileResponse'
             - type: 'null'
+        account:
+          anyOf:
+            - $ref: '#/components/schemas/WorkerAccountRef'
+            - type: 'null'
         hasUser:        { type: boolean }
+
+    # -------- Users: cuentas ---------------------------------------------------
+    UserAccountWorkerRef:
+      type: object
+      description: |
+        El trabajador de una cuenta. Toda cuenta tiene uno, y un trabajador
+        tiene a lo sumo una cuenta. `fullName` une nombres, paterno y materno
+        con un espacio, sin el materno si es nulo, y recorta los espacios de
+        los extremos.
+      required: [id, fullName, isActive]
+      properties:
+        id:       { type: integer, format: int32, example: 31 }
+        fullName: { type: string, example: 'Juan Pérez Quispe' }
+        isActive: { type: boolean, example: true }
+
+    UserAccountSummaryResponse:
+      type: object
+      description: |
+        Una fila de la lista de cuentas. `role` es el cargo del trabajador (la
+        cuenta no tiene rol propio), con la forma del catálogo de cargos.
+      required: [id, username, worker, role, isActive]
+      properties:
+        id:       { type: integer, format: int32, example: 12 }
+        username: { type: string, maxLength: 50, example: 'jperez' }
+        worker:   { $ref: '#/components/schemas/UserAccountWorkerRef' }
+        role:     { $ref: '#/components/schemas/RoleResponse' }
+        isActive: { type: boolean, example: true }
+
+    UserAccountWorkerDetailRef:
+      description: |
+        El trabajador de una cuenta, en el detalle: lo de UserAccountWorkerRef
+        más su nombre en partes. `maternalLastName` es nulo si el trabajador no
+        tiene materno.
+      allOf:
+        - $ref: '#/components/schemas/UserAccountWorkerRef'
+        - type: object
+          required: [firstName, paternalLastName, maternalLastName]
+          properties:
+            firstName:        { type: string, example: 'Juan' }
+            paternalLastName: { type: string, example: 'Pérez' }
+            maternalLastName: { type: [string, 'null'], example: 'Quispe' }
+
+    UserAccountDetailResponse:
+      type: object
+      description: |
+        Una cuenta completa: lo de la fila de la lista, el trabajador con su
+        nombre en partes y quién la creó y la modificó por última vez.
+        `createdBy` es nulo en las cuentas que no se dieron de alta por la API.
+        `updatedBy` es nulo hasta el primer cambio posterior al alta que deja
+        rastro. Instantes en UTC.
+        Sin hash ni versión de las sesiones.
+      required: [id, username, worker, role, isActive, createdAt, createdBy, updatedAt, updatedBy]
+      properties:
+        id:        { type: integer, format: int32, example: 12 }
+        username:  { type: string, maxLength: 50, example: 'jperez' }
+        worker:    { $ref: '#/components/schemas/UserAccountWorkerDetailRef' }
+        role:      { $ref: '#/components/schemas/RoleResponse' }
+        isActive:  { type: boolean, example: true }
+        createdAt: { type: string, format: date-time, example: '2026-11-03T14:20:00Z' }
+        createdBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+        updatedAt: { type: string, format: date-time, example: '2026-11-03T14:20:00Z' }
+        updatedBy:
+          anyOf:
+            - $ref: '#/components/schemas/UserRef'
+            - type: 'null'
+
+    UserAccountCandidateResponse:
+      type: object
+      description: |
+        Un trabajador elegible para una cuenta. `fullName` une nombres, paterno
+        y materno con un espacio, sin el materno si es nulo, y recorta los
+        espacios de los extremos; `maternalLastName` es nulo si no tiene
+        materno. `proposedUsername` es el nombre que
+        generaría el alta ahora: orientativo, el alta lo recalcula.
+      required: [workerId, fullName, firstName, paternalLastName, maternalLastName, role, proposedUsername]
+      properties:
+        workerId:         { type: integer, format: int32, example: 31 }
+        fullName:         { type: string, example: 'Juan Pérez Quispe' }
+        firstName:        { type: string, example: 'Juan' }
+        paternalLastName: { type: string, example: 'Pérez' }
+        maternalLastName: { type: [string, 'null'], example: 'Quispe' }
+        role:             { $ref: '#/components/schemas/RoleResponse' }
+        proposedUsername: { type: string, pattern: '^[a-z0-9]{3,50}$', example: 'jperez' }
+
+    UserAccountCreateRequest:
+      type: object
+      description: |
+        Alta de una cuenta: solo el trabajador. El nombre y la contraseña
+        temporal los genera el servidor; el cargo es el del trabajador; nace
+        activa. Cualquier otro campo se ignora, también un `temporaryPassword`.
+      required: [workerId]
+      properties:
+        workerId:
+          type: integer
+          format: int32
+          example: 31
+
+    UserAccountTemporaryPasswordResponse:
+      type: object
+      description: |
+        La cuenta y la contraseña temporal que el servidor acaba de generar. Es
+        la única vez que sale: se guarda solo su hash y no se puede volver a
+        pedir. Nada obliga a cambiarla: la persona la cambia con
+        `changePassword`.
+      required: [account, temporaryPassword]
+      properties:
+        account: { $ref: '#/components/schemas/UserAccountDetailResponse' }
+        temporaryPassword:
+          type: string
+          format: password
+          minLength: 12
+          maxLength: 12
+          pattern: '^[A-HJ-NP-Za-hjkmnp-z2-9]{12}$'
+          description: >-
+            12 caracteres al azar de un alfabeto de 55 sin los ambiguos (0, O, o, 1, l, I, i):
+            mayúsculas, minúsculas y dígitos del 2 al 9. Cumple la regla de newPassword de
+            ChangePasswordRequest.
+          example: 'Kq7mXp3tWz9h'
 
     # -------- Warehouse: catálogos del módulo ----------------------------------
     WarehouseProductCategoryResponse:

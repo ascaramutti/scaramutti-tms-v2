@@ -8,6 +8,9 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -168,8 +171,7 @@ class WorkerUniquenessPreChecksTest {
         int userId = fixtures.seedUserFor(id, "ztestuser500", "sales");
         fixtures.setUserActive(userId, false);
 
-        assertTrue(userRepository.findByWorkerIdOptional(id).isPresent(),
-            "una cuenta apagada se puede volver a encender: sigue contando");
+        assertTrue(userRepository.findByWorkerIdOptional(id).isPresent());
     }
 
     @Test
@@ -179,21 +181,21 @@ class WorkerUniquenessPreChecksTest {
         assertTrue(userRepository.findByWorkerIdOptional(id).isEmpty());
     }
 
-    /** La pregunta de la regla de cargo sin sesion: una cuenta apagada tambien cuenta. */
+    /** Tambien la apagada: la edicion la toma igual, porque Usuarios puede estar reactivandola. */
     @Test
-    void existsByWorkerId_countsAnInactiveUser() {
+    void findIdByWorkerId_findsAnInactiveUser() {
         int id = fixtures.seedWorker("ZTESTU032", "Ana", "Silva", "sales", true);
         int userId = fixtures.seedUserFor(id, "ztestuser501", "sales");
         fixtures.setUserActive(userId, false);
 
-        assertTrue(userRepository.existsByWorkerId(id), "una cuenta apagada se puede volver a encender");
+        assertEquals(Optional.of(userId), userRepository.findIdByWorkerId(id));
     }
 
     @Test
-    void existsByWorkerId_withoutUser_isFalse() {
+    void findIdByWorkerId_withoutUser_isEmpty() {
         int id = fixtures.seedWorker("ZTESTU033", "Ana", "Silva", "operator", true);
 
-        assertFalse(userRepository.existsByWorkerId(id));
+        assertTrue(userRepository.findIdByWorkerId(id).isEmpty());
     }
 
 }

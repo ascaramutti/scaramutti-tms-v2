@@ -24,7 +24,6 @@ export function WorkerDetailCard({ worker }: { worker: WorkerDetailResponse }) {
         <Field label="Cargo" value={worker.role.description} />
         <Field label="Fecha de ingreso" value={formatDateOnly(worker.hireDate)} />
         <Field label="Teléfono" value={worker.phone ?? '—'} />
-        <Field label="Tiene usuario" value={worker.hasUser ? 'Sí' : 'No'} />
         <Field label="Estado" value={<WorkerStatusBadge isActive={worker.isActive} />} />
       </dl>
     </DetailCard>
