@@ -22,7 +22,7 @@
              Genera el metamodelo estatico (las clases `Entidad_`) del que dependen los
              repositorios para nombrar campos sin literales. -->
         <hibernate-processor.version>7.2.19.Final</hibernate-processor.version>
-        <jacoco.version>0.8.15</jacoco.version>
+        <jacoco.version>0.8.16</jacoco.version>
     </properties>
 
     <dependencyManagement>
